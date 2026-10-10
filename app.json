@@ -1,0 +1,46 @@
+{
+  "expo": {
+    "name": "Journey Creator",
+    "slug": "journey-creator-mobile",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "scheme": "journeycreator",
+    "userInterfaceStyle": "light",
+    "icon": "./assets/icon.png",
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/icon.png",
+        "backgroundColor": "#153E35"
+      },
+      "package": "com.sree8100.journeycreatormobile"
+    },
+    "web": {
+      "output": "single",
+      "favicon": "./assets/icon.png"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#F5F3EC",
+          "image": "./assets/icon.png",
+          "imageWidth": 100
+        }
+      ],
+      "@rnmapbox/maps"
+    ],
+    "experiments": {
+      "typedRoutes": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "1a763548-ee3f-4da9-a20a-71f74fdbccac"
+      }
+    }
+  }
+}
