@@ -14,6 +14,7 @@ export default function RootLayout() {
         <Stack.Screen name="discover" />
         <Stack.Screen name="create" /><Stack.Screen name="search" /><Stack.Screen name="auth" /><Stack.Screen name="account" /><Stack.Screen name="draft/[id]" />
         <Stack.Screen name="journey/[id]" />
+        <Stack.Screen name="travel/[id]" />
         <Stack.Screen name="profile/[username]" />
       </Stack>
     </ActionIntentProvider></SessionProvider>

@@ -2,17 +2,17 @@ import { useState } from 'react';
 import { ActivityIndicator, Image, StyleSheet, Text, View } from 'react-native';
 import { colors } from './ui';
 
-export function JourneyPhoto({ uri, label, ratio = 1.9 }: { uri: string | null; label: string; ratio?: number }) {
+export function JourneyPhoto({ uri, label, ratio = 1.9, fill = false, thumbnail = false }: { uri: string | null; label: string; ratio?: number; fill?: boolean; thumbnail?: boolean }) {
   const [failedUri, setFailedUri] = useState<string | null>(null);
   const [loadedUri, setLoadedUri] = useState<string | null>(null);
   const available = uri && failedUri !== uri;
-  return <View style={[styles.frame, { aspectRatio: ratio }]}>
+  return <View style={[styles.frame, fill ? { flex: 1, height: '100%' } : { aspectRatio: ratio }]}>
     {available ? <>
       <Image key={uri} source={{ uri }} accessibilityLabel={label} style={styles.image} resizeMode="cover"
         onLoad={() => setLoadedUri(uri)} onError={() => setFailedUri(uri)} />
       {loadedUri !== uri && <View pointerEvents="none" style={styles.loading} accessibilityLabel="Loading photo" accessibilityRole="progressbar"><ActivityIndicator color={colors.ink} /></View>}
-    </> : <View style={styles.fallback} accessible accessibilityLabel="No journey photo available">
-      <Text style={styles.symbol}>↗</Text><Text style={styles.label}>A journey worth discovering</Text>
+    </> : <View style={[styles.fallback, thumbnail && { padding: 0, gap: 0 }]} accessible accessibilityLabel="No journey photo available">
+      <Text style={[styles.symbol, thumbnail && { fontSize: 20 }]}>↗</Text>{!thumbnail && <Text style={styles.label}>A journey worth discovering</Text>}
     </View>}
   </View>;
 }

@@ -78,12 +78,15 @@ test('public detail normalization retains planned coords and rejects coercion/pr
   assert.equal(buildMapData(data).markers.length, 1);
   assert.equal(normalizeStops([{ id: 'card', name: 'Card', position: 0, latitude: 1, longitude: 2 }])[0].latitude, null);
 });
-test('web fallback is isolated from the native SDK and Story keeps intended section order', () => {
+test('web fallback is isolated from the native SDK and Story uses a bounded carousel with an expanded map', () => {
   const web = readFileSync('src/components/journey/map/journey-map.tsx', 'utf8');
   assert.equal(web.includes('@rnmapbox/maps'), false);
   assert.equal(web.includes('./native-map'), false);
   const story = readFileSync('src/app/journey/[id].tsx', 'utf8');
-  const positions = ['<StoryHeader ', '<JourneyMap ', '<StorySnapshot ', '{hasStory(journey)', '<StopTimeline '].map(s => story.indexOf(s));
+  assert.equal(story.includes('ScrollView'), false);
+  assert.ok(story.includes('presentation="expanded"'));
+  assert.ok(story.includes("scrollable={panel !== 'map'}"));
+  const positions = ['<StoryHeader ', '<SocialActions ', 'presentation="preview"', '<StopTimeline horizontal ', '<JourneyOptions '].map(s => story.indexOf(s));
   assert.ok(positions.every(p => p >= 0));
   assert.deepEqual(positions, [...positions].sort((a, b) => a - b));
 });

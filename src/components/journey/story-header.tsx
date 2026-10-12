@@ -2,49 +2,48 @@ import { useRouter } from 'expo-router';
 import { validHandle } from '@/lib/profile/model';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import type { PublicJourney } from '@/types/journey';
-import { travelerLabel } from '@/lib/discovery/model';
 import { JourneyPhoto } from '@/components/discovery/journey-photo';
 import { colors } from '@/components/discovery/ui';
 
-export function StoryHeader({ journey }: { journey: PublicJourney }) {
+export function StoryHeader({ journey, height, onAbout }: { journey: PublicJourney; height: number; onAbout: () => void }) {
   const router = useRouter();
-  const handle = journey.creatorUsername && validHandle(journey.creatorUsername) ? journey.creatorUsername : null;
-  return <View style={styles.header}>
-    {journey.cover && <View style={styles.cover}><JourneyPhoto uri={journey.cover} label={journey.title + ' cover photo'} ratio={1.45} /></View>}
-    <Text style={styles.eyebrow}>A JOURNEY SHARED</Text>
-    <Text accessibilityRole="header" style={styles.title}>{journey.title}</Text>
-    {journey.destination !== 'Destination not specified' && <Text style={styles.destination}>{journey.destination}</Text>}
-    <Pressable accessibilityRole={handle ? "button" : undefined} accessibilityLabel={handle ? "View creator profile: " + journey.creatorName : undefined} disabled={!handle}
-      onPress={() => { if (handle) router.push({ pathname: "/profile/[username]", params: { username: handle } }); }}
-      style={({ pressed }) => [styles.creator, pressed && { opacity: 0.7 }]}>
-      <View style={styles.avatar} accessibilityElementsHidden><Text style={styles.initial}>{journey.creatorName.slice(0, 1).toUpperCase()}</Text></View>
-      <View style={styles.creatorText}>
-        <Text style={styles.by}>A story by <Text style={styles.name}>{journey.creatorName}</Text></Text>
-        {journey.creatorUsername && <Text style={styles.username}>@{journey.creatorUsername}</Text>}
-      </View>
-    </Pressable>
-    <View style={styles.facts}>
-      <Text style={styles.tag}>{travelerLabel(journey.travelerType)}</Text>
-      {journey.durationDays !== null && <Text style={styles.fact}>{journey.durationDays} {journey.durationDays === 1 ? 'day' : 'days'}</Text>}
-      <Text style={styles.fact}>{journey.stops.length} {journey.stops.length === 1 ? 'stop' : 'stops'}</Text>
+  return <View style={[styles.cover, { height }]}>
+    <JourneyPhoto uri={journey.cover} label={journey.title + ' cover photo'} fill />
+    <View pointerEvents="none" style={styles.shade} />
+    <View style={styles.controls}>
+      <Pressable accessibilityRole="button" accessibilityLabel="Go back" onPress={() => router.canGoBack() ? router.back() : router.replace('/discover')} style={styles.control}><Text style={styles.back}>‹</Text></Pressable>
+      <Pressable accessibilityRole="button" accessibilityLabel="About this journey" onPress={onAbout} style={styles.control}><Text style={styles.controlLabel}>•••</Text></Pressable>
+    </View>
+    <View pointerEvents="none" style={[styles.titles, height < 140 && { bottom: 6, paddingVertical: 4 }]}>
+      <Text accessibilityRole="header" accessibilityLabel={journey.title} numberOfLines={height < 140 ? 1 : 2} adjustsFontSizeToFit minimumFontScale={0.75} maxFontSizeMultiplier={1.4} style={[styles.title, height < 140 && { fontSize: 22, lineHeight: 26 }]}>{journey.title}</Text>
+      {journey.destination !== 'Destination not specified' && <Text numberOfLines={1} style={styles.destination}>{journey.destination}</Text>}
     </View>
   </View>;
 }
+export function StoryCreator({ journey }: { journey: PublicJourney }) {
+  const router = useRouter();
+  const handle = journey.creatorUsername && validHandle(journey.creatorUsername) ? journey.creatorUsername : null;
+  return <Pressable accessibilityRole={handle ? 'button' : undefined} accessibilityLabel={handle ? 'View creator profile: ' + journey.creatorName : 'Shared by ' + journey.creatorName} disabled={!handle}
+    onPress={() => { if (handle) router.push({ pathname: "/profile/[username]", params: { username: handle } }); }}
+    style={({ pressed }) => [styles.creator, pressed && { opacity: 0.7 }]}>
+    <View style={styles.avatar} accessibilityElementsHidden><Text style={styles.initial}>{journey.creatorName.slice(0, 1).toUpperCase()}</Text></View>
+    <Text numberOfLines={1} style={styles.name}>{journey.creatorName}</Text>
+    {handle && <Text style={styles.profileLink}>↗</Text>}
+  </Pressable>;
+}
 const styles = StyleSheet.create({
-  header: { gap: 12 },
-  cover: { borderRadius: 24, overflow: 'hidden', marginBottom: 6 },
-  eyebrow: { fontSize: 9, letterSpacing: 1.9, color: colors.green, fontWeight: '700', marginTop: 4 },
-  title: { fontSize: 32, lineHeight: 38, letterSpacing: -1, color: colors.ink, fontWeight: '700' },
-  destination: { fontSize: 15, lineHeight: 22, color: colors.green, fontWeight: '500' },
-  creator: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 2, minHeight: 44 },
-  avatar: { width: 36, height: 36, borderRadius: 18, backgroundColor: colors.pale, alignItems: 'center', justifyContent: 'center' },
-  initial: { fontSize: 14, fontWeight: '600', color: colors.ink },
-  creatorText: { flex: 1, minWidth: 0, gap: 2 },
-  by: { fontSize: 12, lineHeight: 19, color: colors.muted },
-  name: { color: colors.ink, fontWeight: '600' },
-  username: { fontSize: 11, lineHeight: 17, color: colors.muted },
-  likes: { fontSize: 13, color: colors.green },
-  facts: { flexDirection: 'row', flexWrap: 'wrap', gap: 16, alignItems: 'center', paddingTop: 6 },
-  tag: { backgroundColor: colors.pale, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 10, fontSize: 11, fontWeight: '600', color: colors.ink },
-  fact: { fontSize: 12, lineHeight: 20, color: colors.muted },
+  cover: { borderRadius: 24, overflow: 'hidden', backgroundColor: colors.pale },
+  shade: { position: 'absolute', top: 0, bottom: 0, left: 0, right: 0, backgroundColor: 'rgba(5,28,24,0.38)' },
+  controls: { position: 'absolute', top: 8, left: 10, right: 10, flexDirection: 'row', justifyContent: 'space-between' },
+  control: { minWidth: 44, minHeight: 44, borderRadius: 22, backgroundColor: 'rgba(10,35,30,0.8)', alignItems: 'center', justifyContent: 'center' },
+  back: { color: colors.white, fontSize: 32, lineHeight: 36 },
+  controlLabel: { color: colors.white, fontSize: 16, fontWeight: '700' },
+  titles: { position: 'absolute', bottom: 12, left: 16, right: 16, gap: 3, backgroundColor: 'rgba(5,28,24,0.65)', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 12 },
+  title: { fontSize: 27, lineHeight: 31, letterSpacing: -0.7, color: colors.white, fontWeight: '700' },
+  destination: { fontSize: 12, lineHeight: 18, color: '#F4F6EC' },
+  creator: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 44, flex: 1, minWidth: 0 },
+  avatar: { width: 30, height: 30, borderRadius: 15, backgroundColor: colors.pale, alignItems: 'center', justifyContent: 'center' },
+  initial: { fontSize: 13, fontWeight: '600', color: colors.ink },
+  name: { color: colors.ink, fontSize: 12, lineHeight: 18, flexShrink: 1, fontWeight: '600' },
+  profileLink: { color: colors.green, fontSize: 14 },
 });

@@ -1,13 +1,15 @@
-import { useCallback, useRef, useSyncExternalStore } from 'react';
+import { useCallback, useRef, useState, useSyncExternalStore } from 'react';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { ActivityIndicator, Pressable, Text, View } from 'react-native';
-import { Action, ui } from '../discovery/ui';
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Action, colors, ui } from '../discovery/ui';
 import { useSessionState } from '@/hooks/session-context';
 import { useActionIntent } from '@/hooks/action-intent';
 import { remixStore } from '@/lib/remix/model';
+import { StorySheet } from './story-sheet';
 import { remixJourney } from '@/lib/remix/queries';
 export function JourneyOptions({ id, onUse }: { id: string; onUse: () => void }) {
   const router = useRouter();
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
   const focus = useRef({ active: false, generation: 0, userId: null as string | null });
   const auth = useSessionState();
   const intent = useActionIntent();
@@ -32,18 +34,29 @@ export function JourneyOptions({ id, onUse }: { id: string; onUse: () => void })
       if (intent.consume(intent.pending.token)) void copy();
     }
   }, [userId, auth.loading, id, intent, copy]));
-  return <View style={{ gap: 12 }}>
-    <Text accessibilityRole="header" style={ui.sectionTitle}>Make it your next chapter</Text>
-    <Text style={ui.body}>Follow the original route, or make a private copy to revisit later.</Text>
-    <Action label="Use This Journey" onPress={onUse} />
-    <Text style={ui.body}>Use opens this journey’s map and stops. The original stays unchanged.</Text>
+  return <View style={styles.card}>
+    <View style={styles.buttons}>
+    <Pressable accessibilityRole="button" accessibilityLabel="Use This Journey" accessibilityHint="Opens the original public route and stops" onPress={onUse} style={({ pressed }) => [styles.use, pressed && { opacity: 0.7 }]}><Text style={styles.useLabel}>↗ Use</Text></Pressable>
     <Pressable accessibilityRole="button" disabled={auth.loading || state.busy || (state.blocked && !state.copyId)} accessibilityState={{ disabled: auth.loading || state.busy || (state.blocked && !state.copyId) }}
-      onPress={() => { if (state.copyId) router.push({ pathname: '/draft/[id]', params: { id: state.copyId } }); else void copy(); }} style={[ui.action, (state.busy || state.blocked) && { opacity: 0.65 }]}>
-      {state.busy ? <ActivityIndicator color="#FFFFFF" /> : <Text style={ui.actionLabel}>{state.copyId ? 'Open private copy' : 'Remix This Journey'}</Text>}
+      onPress={() => { if (state.copyId) router.push({ pathname: '/draft/[id]', params: { id: state.copyId } }); else void copy(); }} accessibilityLabel={state.copyId ? "Open private copy" : "Remix This Journey"} accessibilityHint="Requires sign-in. Creates or opens your private draft." style={({ pressed }) => [styles.remix, (auth.loading || state.busy || (state.blocked && !state.copyId) || pressed) && { opacity: 0.65 }]}>
+      {state.busy ? <ActivityIndicator color={colors.ink} /> : <Text style={styles.remixLabel}>{state.copyId ? 'My draft ↗' : '↻ Remix'}</Text>}
     </Pressable>
-    <Text style={ui.body}>Remix requires sign-in and creates a private draft. Editing comes later.</Text>
-    {state.error && <Text accessibilityRole="alert" style={ui.body}>{state.error}</Text>}
-    {state.blocked && <Action label="Check Account drafts" onPress={() => router.push('/account')} />}
-    <Text style={ui.body}>Start Journey will be available in a future update.</Text>
+    {(state.error || state.blocked) && <Pressable accessibilityRole="button" accessibilityLabel={state.error || 'Check your Account drafts before retrying Remix'} onPress={() => setFeedbackOpen(true)} style={styles.feedback}><Text accessibilityLiveRegion="polite" style={styles.remixLabel}>!</Text></Pressable>}
+    </View>
+    <StorySheet visible={feedbackOpen} title="Remix journey" onClose={() => setFeedbackOpen(false)}>
+      {state.error && <Text accessibilityRole="alert" style={ui.body}>{state.error}</Text>}
+      {state.blocked && <Action label="Check Account drafts" onPress={() => { setFeedbackOpen(false); router.push('/account'); }} />}
+    </StorySheet>
+
   </View>;
 }
+
+const styles = StyleSheet.create({
+  feedback: { minWidth: 44, minHeight: 44, justifyContent: 'center', alignItems: 'center' },
+  card: { width: '100%', maxWidth: 300, padding: 6, borderRadius: 32, backgroundColor: colors.paper, borderWidth: 1, borderColor: colors.line, shadowColor: colors.ink, shadowOpacity: 0.16, shadowRadius: 14, shadowOffset: { width: 0, height: 5 }, elevation: 7 },
+  buttons: { flexDirection: 'row', gap: 6 },
+  use: { flex: 1, minHeight: 44, paddingHorizontal: 12, paddingVertical: 10, borderRadius: 24, backgroundColor: colors.ink, alignItems: 'center', justifyContent: 'center' },
+  useLabel: { color: colors.white, fontSize: 13, lineHeight: 19, fontWeight: '600', textAlign: 'center' },
+  remix: { flex: 1, minHeight: 44, paddingHorizontal: 16, paddingVertical: 10, borderRadius: 24, borderWidth: 1, borderColor: colors.ink, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.pale },
+  remixLabel: { color: colors.ink, fontSize: 13, lineHeight: 19, fontWeight: '600', textAlign: 'center' },
+});

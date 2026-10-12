@@ -77,10 +77,11 @@ test('dateline clusters use the shortest arc and screen-derived zoom instead of 
   assert.equal(fit.bounds, undefined);
 });
 
-function harness() {
+function harness(observePose = true) {
   let time = 0, sequence = 0;
   const timers = new Map(), moves = [], stops = [];
   const clock = {
+    now: () => time,
     set(callback, delay) { const id = ++sequence; timers.set(id, { at: time + delay, callback }); return id; },
     clear(id) { timers.delete(id); },
     advance(milliseconds) {
@@ -96,13 +97,13 @@ function harness() {
   const motion = createIdleMotion((camera, duration) => moves.push({ camera, duration }), camera => stops.push(camera), clock);
   motion.configure({ focused: true, active: true, ready: true, reduceMotion: false });
   const pose = { centerCoordinate: [35, 18], zoomLevel: 1.2, heading: 24, pitch: 0 };
-  motion.observe(pose, false);
+  if (observePose) motion.observe(pose, false);
   return { motion, clock, moves, stops, pose, timers };
 }
-test('idle rotation preserves pose and waits through the supported native animation duration', () => {
+test('first rotation starts immediately from a valid ready pose and preserves native animation duration', () => {
   const h = harness();
-  h.clock.advance(idleDelay - 1); assert.equal(h.moves.length, 0);
-  h.clock.advance(1);
+  assert.equal(h.moves.length, 0);
+  h.clock.advance(0);
   assert.equal(h.moves.length, 1); assert.equal(h.moves[0].duration, rotationDuration);
   assert.ok(Math.abs(h.moves[0].camera.centerCoordinate[0] - 35 - rotationStep) < 1e-9);
   assert.deepEqual([h.moves[0].camera.centerCoordinate[1], h.moves[0].camera.zoomLevel, h.moves[0].camera.heading], [18, 1.2, 24]);
@@ -113,7 +114,7 @@ test('idle rotation preserves pose and waits through the supported native animat
   h.motion.dispose();
 });
 test('touch/gesture immediately stop idle motion and resume from the user pose only after idle delay', () => {
-  const h = harness(); h.clock.advance(idleDelay);
+  const h = harness(); h.clock.advance(0);
   h.motion.touch(true); assert.equal(h.stops.length, 1);
   const user = { ...h.pose, centerCoordinate: [80, -10], heading: 50 };
   h.motion.observe(user, true); h.clock.advance(30000); assert.equal(h.moves.length, 1);
@@ -125,24 +126,24 @@ test('touch/gesture immediately stop idle motion and resume from the user pose o
 });
 test('selected journeys, background, blur and reduce-motion block rotation and cancel timers', () => {
   for (const patch of [{ selected: true }, { active: false }, { focused: false }, { reduceMotion: true }, { ready: false }]) {
-    const h = harness(); h.clock.advance(idleDelay); h.motion.configure(patch);
+    const h = harness(); h.clock.advance(0); h.motion.configure(patch);
     assert.equal(h.stops.length, 1); assert.equal(h.timers.size, 0);
     h.clock.advance(60000); assert.equal(h.moves.length, 1); h.motion.dispose();
   }
 });
 test('programmatic camera pauses and local zoom prevent competing idle animation', () => {
-  const h = harness(); h.motion.pause(900); h.clock.advance(idleDelay + 899); assert.equal(h.moves.length, 0);
+  const h = harness(); h.motion.pause(900); h.clock.advance(899); assert.equal(h.moves.length, 0);
   h.clock.advance(1); assert.equal(h.moves.length, 1);
   h.motion.observe({ ...h.pose, zoomLevel: 10 }, false);
   h.clock.advance(60000); assert.equal(h.moves.length, 1); assert.equal(h.timers.size, 0);
   h.motion.dispose();
 });
 test('missing native idle still advances; disposal clears work and handles strict-mode reuse', () => {
-  const h = harness(); h.clock.advance(idleDelay + rotationDuration + 230);
+  const h = harness(); h.clock.advance(rotationDuration + 230);
   assert.equal(h.moves.length, 2); assert.equal(h.stops.length, 0);
   assert.equal(h.moves[1].camera.centerCoordinate[0], 35 + 2 * rotationStep);
   h.motion.dispose(); assert.equal(h.timers.size, 0); h.clock.advance(60000); assert.equal(h.moves.length, 2);
-  h.motion.configure({ focused: true, ready: true }); h.clock.advance(idleDelay); assert.equal(h.moves.length, 3);
+  h.motion.configure({ focused: true, ready: true }); h.clock.advance(0); assert.equal(h.moves.length, 3);
   h.motion.dispose();
 });
 test('native Home disables only the scale bar and retains gestures, branding and frame guards', () => {
@@ -155,7 +156,7 @@ test('native Home disables only the scale bar and retains gestures, branding and
 });
 
 test('Locate takes ownership before command and cannot be canceled by old rotation timers', () => {
-  const h = harness(); h.clock.advance(idleDelay);
+  const h = harness(); h.clock.advance(0);
   h.motion.configure({ selected: true }); h.motion.pause(900);
   const stopsBeforeLocate = h.stops.length;
   const fit = locateCamera(points([[77, 8.6], [77.05, 8.75]]), viewport, 260);
@@ -166,7 +167,7 @@ test('Locate takes ownership before command and cannot be canceled by old rotati
   h.motion.dispose();
 });
 test('rounded and stale idle snapshots do not prevent successive visible steps', () => {
-  const h = harness(); h.clock.advance(idleDelay);
+  const h = harness(); h.clock.advance(0);
   for (let index = 0; index < 4; index++) {
     h.motion.observe(h.pose, false); h.motion.idle();
     h.clock.advance(rotationDuration + 230);
@@ -180,7 +181,7 @@ test('rounded and stale idle snapshots do not prevent successive visible steps',
 test('nearby fitted markers project inside the exposed area for both panel states', () => {
   const coordinates = [[77, 8.6], [77.05, 8.75], [77.02, 8.68]];
   const y = latitude => (1 - Math.log(Math.tan(Math.PI / 4 + latitude * Math.PI / 360)) / Math.PI) / 2;
-  for (const panel of [260, viewport.height - 96]) {
+  for (const panel of [44, 260, viewport.height - 96]) {
     const fit = locateCamera(points(coordinates), viewport, panel);
     const p = fit.padding, scale = 512 * 2 ** fit.zoomLevel;
     const cx = (p.paddingLeft + viewport.width - p.paddingRight) / 2;
@@ -258,4 +259,167 @@ test('single, dateline and wide routes retain exact fitted destinations after wo
     h.transition.select('A:1'); h.transition.run('A:1', fit); h.finish();
     assert.deepEqual(h.commands.at(-1), { ...fit, animationMode: 'flyTo', animationDuration: 1350 });
   }
+});
+
+test('sheet interaction pauses idle without adding a manual gesture delay or touching selected Locate', () => {
+  const h = harness(); h.clock.advance(0);
+  h.motion.configure({ interacting: true });
+  assert.equal(h.stops.length, 1);
+  h.clock.advance(60000); assert.equal(h.moves.length, 1);
+  h.motion.configure({ interacting: false }); h.clock.advance(0);
+  assert.equal(h.moves.length, 2);
+  h.motion.configure({ selected: true }); const stops = h.stops.length;
+  h.motion.configure({ interacting: true }); h.motion.configure({ interacting: false });
+  h.clock.advance(60000); assert.equal(h.stops.length, stops); assert.equal(h.moves.length, 2);
+  h.motion.dispose();
+});
+
+test('settled sheet refit waits for the existing Locate flight before applying its latest padding', () => {
+  const h = locateHarness(), data = points([[77, 8.6], [77.05, 8.75]]);
+  const collapsed = locateCamera(data, viewport, 260), expanded = locateCamera(data, viewport, viewport.height - 96);
+  h.transition.select('A:1'); h.transition.run('A:1', collapsed); h.finish();
+  assert.equal(h.commands.length, 2);
+  h.transition.run('A:1', expanded, false); assert.equal(h.commands.length, 2);
+  h.finish(); assert.equal(h.commands.length, 3);
+  assert.deepEqual(h.commands.at(-1), { ...expanded, animationMode: 'flyTo', animationDuration: 1350 });
+  h.transition.cancel(); h.finish(); assert.equal(h.commands.length, 3);
+});
+
+test('idle speed stays within 1–1.5 degrees/sec and repeated steps wrap at the dateline', () => {
+  assert.equal(idleDelay, 10000);
+  assert.ok(rotationStep / (rotationDuration / 1000) >= 1 && rotationStep / (rotationDuration / 1000) <= 1.5);
+  assert.ok(rotationStep / ((rotationDuration + 50) / 1000) >= 1);
+  const h = harness();
+  h.motion.observe({ ...h.pose, centerCoordinate: [179, 18] }, false);
+  h.clock.advance(20 * (rotationDuration + 50));
+  assert.equal(h.moves.length, 21);
+  for (const [index, move] of h.moves.entries()) {
+    const expected = ((179 + (index + 1) * rotationStep + 180) % 360) - 180;
+    assert.equal(move.camera.centerCoordinate[0], expected);
+    assert.ok(move.camera.centerCoordinate[0] >= -180 && move.camera.centerCoordinate[0] < 180);
+  }
+  assert.equal(h.timers.size, 1); h.motion.dispose();
+});
+
+test('already queued idle completion cannot stop or advance a newer Locate after interruption', () => {
+  for (const interrupt of [h => h.motion.touch(true), h => h.motion.configure({ selected: true }),
+    h => h.motion.configure({ active: false }), h => h.motion.configure({ focused: false }),
+    h => h.motion.configure({ reduceMotion: true }), h => h.motion.pause(900), h => h.motion.dispose()]) {
+    const h = harness(); h.clock.advance(0);
+    const stale = [...h.timers.values()][0].callback;
+    interrupt(h);
+    const stopCount = h.stops.length, moveCount = h.moves.length;
+    stale();
+    assert.equal(h.stops.length, stopCount); assert.equal(h.moves.length, moveCount);
+    h.motion.dispose();
+  }
+});
+
+test('initial camera hold survives readiness/pose updates and starts without a ten-second recovery wait', () => {
+  const h = harness(false); h.motion.pause(900);
+  h.motion.configure({ ready: true });
+  h.motion.observe({ ...h.pose, centerCoordinate: [36, 18] }, false); h.motion.idle();
+  h.clock.advance(899); assert.equal(h.moves.length, 0);
+  h.clock.advance(1); assert.equal(h.moves.length, 1);
+  assert.equal(h.moves[0].camera.centerCoordinate[0], 36 + rotationStep);
+  h.motion.pause(900); h.clock.advance(899);
+  assert.equal(h.moves.length, 1);
+  h.clock.advance(1); assert.equal(h.moves.length, 2); h.motion.dispose();
+});
+
+test('startup waits for map readiness, valid camera and motion preference before issuing any command', () => {
+  const h = harness(); h.motion.configure({ ready: false });
+  h.clock.advance(60000); assert.equal(h.moves.length, 0);
+  h.motion.configure({ ready: true, reduceMotion: true });
+  h.clock.advance(60000); assert.equal(h.moves.length, 0);
+  h.motion.configure({ reduceMotion: false }); h.clock.advance(0);
+  assert.equal(h.moves.length, 1); h.motion.dispose();
+  const commands = [], timers = [];
+  const motion = createIdleMotion(value => commands.push(value), () => {}, {
+    set(callback) { timers.push(callback); return callback; }, clear() {},
+  });
+  motion.configure({ focused: true, active: true, ready: true, reduceMotion: false });
+  assert.equal(timers.length, 0); // No native pose yet.
+  motion.observe({ ...h.pose, centerCoordinate: [NaN, 18] }, false);
+  assert.equal(timers.length, 0); motion.dispose();
+});
+
+test('gestures before the first automatic step revoke immediate startup and retain recovery delay', () => {
+  const h = harness(); h.motion.touch(true); h.motion.touch(false); h.motion.idle();
+  h.clock.advance(idleDelay - 1); assert.equal(h.moves.length, 0);
+  h.clock.advance(1); assert.equal(h.moves.length, 1); h.motion.dispose();
+});
+
+test('Locate completion starts decoration only for the latest completed fit, never canceled work', () => {
+  const commands = [], settled = [], timers = new Map();
+  const transition = createLocateTransition(value => commands.push(value), {
+    set(callback) { timers.set(callback, callback); return callback; }, clear(callback) { timers.delete(callback); },
+  }, request => settled.push(request));
+  const finish = () => { const callbacks = [...timers.keys()]; timers.clear(); callbacks.forEach(cb => cb()); };
+  const fit = locateCamera(points([[77, 8], [77.01, 8.02]]), viewport, 260);
+  transition.select('A'); transition.run('A', fit); finish();
+  assert.deepEqual(settled, []);
+  const stale = [...timers.keys()][0]; transition.select('B'); stale();
+  assert.deepEqual(settled, []);
+  transition.run('B', fit); finish();
+  transition.run('B', { ...fit, zoomLevel: fit.zoomLevel - 1 }, false);
+  finish(); assert.deepEqual(settled, []); // Pending panel fit must finish too.
+  finish(); assert.deepEqual(settled, ['B']);
+  transition.cancel(); finish(); assert.deepEqual(settled, ['B']);
+});
+
+
+test('closing a journey resumes immediately after return camera hold despite panel and camera events', () => {
+  const h = harness(); h.clock.advance(0);
+  h.motion.configure({ selected: true }); h.motion.pause(2350);
+  h.motion.observe({ ...h.pose, zoomLevel: 12 }, false);
+  h.clock.advance(3000); assert.equal(h.moves.length, 1);
+  h.motion.configure({ interacting: true }); // X touch starts on the panel.
+  h.motion.configure({ selected: false }); h.motion.pause(900);
+  h.clock.advance(400);
+  h.motion.configure({ interacting: false });
+  h.motion.observe({ ...h.pose, zoomLevel: 2 }, false); h.motion.idle();
+  h.clock.advance(499); assert.equal(h.moves.length, 1);
+  h.motion.observe(h.pose, false); h.motion.idle();
+  h.clock.advance(1); assert.equal(h.moves.length, 2);
+  assert.equal(h.moves[1].camera.centerCoordinate[0], 35 + rotationStep);
+  h.motion.dispose();
+});
+
+test('panel events and programmatic idle snapshots do not restart a manual cooldown', () => {
+  const h = harness(); h.motion.touch(true); h.motion.observe(h.pose, true);
+  h.motion.touch(false); h.motion.idle();
+  h.clock.advance(4000); h.motion.configure({ interacting: true });
+  h.clock.advance(1000); h.motion.configure({ interacting: false });
+  h.motion.pause(900); h.motion.observe(h.pose, false); h.motion.idle();
+  h.clock.advance(4999); assert.equal(h.moves.length, 0);
+  h.clock.advance(1); assert.equal(h.moves.length, 1);
+  h.motion.dispose();
+});
+
+test('stale gesture flags without a map touch cannot stop startup or a return transition', () => {
+  const h = harness(); h.motion.pause(900);
+  h.motion.observe(h.pose, true); h.motion.idle();
+  h.clock.advance(899); assert.equal(h.moves.length, 0);
+  h.clock.advance(1); assert.equal(h.moves.length, 1);
+  h.motion.observe(h.pose, true); h.clock.advance(rotationDuration + 50);
+  assert.equal(h.moves.length, 2); h.motion.dispose();
+});
+
+test('new selection, manual touch and lifecycle cancellation invalidate pending return callbacks', () => {
+  for (const interrupt of [h => h.motion.configure({ selected: true }), h => h.motion.touch(true),
+    h => h.motion.configure({ active: false }), h => h.motion.configure({ focused: false }),
+    h => h.motion.configure({ ready: false }), h => h.motion.dispose()]) {
+    const h = harness(); h.motion.pause(900);
+    const stale = [...h.timers.values()][0].callback;
+    interrupt(h); stale(); h.clock.advance(1000);
+    assert.equal(h.moves.length, 0); h.motion.dispose();
+  }
+});
+
+test('native startup waits for map loading rather than treating style loading as camera readiness', () => {
+  const source = readFileSync('src/components/discovery/globe/native-globe.tsx', 'utf8');
+  assert.ok(source.includes('onDidFinishLoadingMap={() => setReady(true)}'));
+  assert.ok(!source.includes('onDidFinishLoadingStyle={() => setReady(true)}'));
+  assert.ok(source.includes('mapTouch.current && state.gestures.isGestureActive'));
 });

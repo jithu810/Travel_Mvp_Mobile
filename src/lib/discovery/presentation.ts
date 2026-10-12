@@ -1,10 +1,10 @@
 export const spaceColor = '#080F1E';
 export const globeAtmosphere = {
-  color: '#AEB9C5',
-  highColor: '#334359',
+  color: '#669CC4',
+  highColor: '#17364F',
   spaceColor,
-  horizonBlend: 0.008,
-  starIntensity: 0.015,
+  horizonBlend: 0.015,
+  starIntensity: 0.18,
 };
 // Leave an exposed band of globe even when the discovery list is expanded.
 export function discoveryPanelSize(availableHeight: number, expanded: boolean) {

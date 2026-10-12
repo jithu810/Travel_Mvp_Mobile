@@ -24,9 +24,9 @@ export function FutureJourneyActions() {
   </View>;
 }
 const styles = StyleSheet.create({
-  snapshot: { borderLeftWidth: 3, borderColor: '#A4B78C', paddingLeft: 16, gap: 8 },
+  snapshot: { borderWidth: 1, borderColor: colors.line, backgroundColor: colors.pale, padding: 18, borderRadius: 20, gap: 8 },
   snapshotTitle: { color: colors.ink, fontSize: 16, fontWeight: '600', lineHeight: 23 },
-  note: { color: colors.muted, fontSize: 11, lineHeight: 18 },
+  note: { color: colors.muted, fontSize: 12, lineHeight: 19 },
   signals: { fontSize: 13, lineHeight: 21, color: colors.ink },
   actions: { gap: 10, paddingTop: 24, borderTopWidth: 1, borderColor: colors.line },
   actionRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 4 },

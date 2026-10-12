@@ -31,7 +31,17 @@
           "imageWidth": 100
         }
       ],
-      "@rnmapbox/maps"
+      "@rnmapbox/maps",
+      ["expo-location", {
+        "locationWhenInUsePermission": "Show your current position during an active trip.",
+        "locationAlwaysPermission": false,
+        "locationAlwaysAndWhenInUsePermission": false,
+        "motionUsagePermission": false,
+        "isIosBackgroundLocationEnabled": false,
+        "isAndroidBackgroundLocationEnabled": false,
+        "isAndroidForegroundServiceEnabled": false,
+        "isAndroidMotionActivityEnabled": false
+      }]
     ],
     "experiments": {
       "typedRoutes": true

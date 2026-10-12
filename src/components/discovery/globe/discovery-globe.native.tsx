@@ -3,7 +3,7 @@ import { Component, memo, useEffect, useState, type ComponentType, type ReactNod
 import type { DiscoveryPoints } from '@/lib/discovery/map';
 import { GlobeFallback, GlobeLoading } from './fallback';
 
-type Props = { points: DiscoveryPoints; onOpen: (id: string) => void; bottomInset: number; viewport: { width: number; height: number }; selectionId: string | null; locateVersion: number };
+type Props = { points: DiscoveryPoints; route: [number, number][][]; onOpen: (id: string) => void; bottomInset: number; viewport: { width: number; height: number }; selectionId: string | null; locateVersion: number; sheetInteracting: boolean };
 const token = process.env.EXPO_PUBLIC_MAPBOX_TOKEN?.trim();
 const failure = 'The map couldn’t load. You can still search and explore the journeys below.';
 class Boundary extends Component<{ children: ReactNode; retry: () => void; bottomInset: number }, { failed: boolean }> {

@@ -1,0 +1,23 @@
+import type { ReactNode } from 'react';
+import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { colors } from '@/components/discovery/ui';
+
+export function StorySheet({ visible, title, subtitle, onClose, children, scrollable = true }: { visible: boolean; title: string; subtitle?: string; onClose: () => void; children: ReactNode; scrollable?: boolean }) {
+  return <Modal visible={visible} animationType="slide" presentationStyle="fullScreen" onRequestClose={onClose}>
+    <SafeAreaView style={styles.safe}>
+      <View style={styles.header}><View style={styles.heading}><Text accessibilityRole="header" numberOfLines={subtitle ? 2 : undefined} style={styles.title}>{title}</Text>{subtitle && <Text style={styles.subtitle}>{subtitle}</Text>}</View><Pressable accessibilityRole="button" accessibilityLabel={subtitle ? 'Close journey map' : 'Close ' + title} onPress={onClose} style={styles.close}><Text style={styles.closeLabel}>Close</Text></Pressable></View>
+      {scrollable ? <ScrollView contentContainerStyle={styles.content}>{children}</ScrollView> : <View style={styles.fill}>{children}</View>}
+    </SafeAreaView>
+  </Modal>;
+}
+const styles = StyleSheet.create({
+  safe: { flex: 1, backgroundColor: colors.paper },
+  header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 18, paddingVertical: 8, gap: 12 },
+  heading: { flex: 1, minWidth: 0, gap: 2 },
+  title: { color: colors.ink, fontSize: 20, lineHeight: 27, fontWeight: '700' },
+  subtitle: { color: colors.muted, fontSize: 12, lineHeight: 18 },
+  close: { minHeight: 44, paddingHorizontal: 14, justifyContent: 'center', borderRadius: 22, backgroundColor: colors.pale },
+  closeLabel: { color: colors.ink, fontWeight: '600', fontSize: 13 },
+  content: { padding: 20, gap: 18, paddingBottom: 32 }, fill: { flex: 1, minHeight: 0, paddingHorizontal: 16, paddingBottom: 12 },
+});

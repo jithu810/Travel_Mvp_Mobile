@@ -7,6 +7,7 @@ import { DiscoveryPanel } from '@/components/discovery/discovery-panel';
 import { colors } from '@/components/discovery/ui';
 import { useLoad } from '@/hooks/use-load';
 import { discoveryPoints } from '@/lib/discovery/map';
+import { discoveryRoute } from '@/lib/discovery/travel';
 import { spaceColor } from '@/lib/discovery/presentation';
 import { loadPublicJourney, loadPublicJourneys } from '@/lib/discovery/queries';
 
@@ -14,6 +15,7 @@ export default function DiscoverScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const state = useLoad(loadPublicJourneys);
+  const [sheetInteracting, setSheetInteracting] = useState(false);
   const [railHeight, setRailHeight] = useState(260);
   const [layout, setLayout] = useState({ height: 0, width: 360 });
   const [locateVersion, setLocateVersion] = useState(0);
@@ -28,6 +30,7 @@ export default function DiscoverScreen() {
   const loadSelected = useCallback((signal: AbortSignal) => selectedId ? loadPublicJourney(selectedId, signal) : Promise.resolve(null), [selectedId]);
   const selection = useLoad(loadSelected);
   const points = useMemo(() => discoveryPoints(selection.data), [selection.data]);
+  const route = useMemo(() => discoveryRoute(selection.data), [selection.data]);
   const open = useCallback((id: string) => router.push({ pathname: '/journey/[id]', params: { id } }), [router]);
   const journeys = state.data || [];
   const notice = state.error || (selectedId ? selection.error || (selection.loading ? 'Finding this journey on the map…'
@@ -48,11 +51,11 @@ export default function DiscoverScreen() {
         const { width, height } = event.nativeEvent.layout;
         setLayout(previous => previous.width === width && previous.height === height ? previous : { width, height });
       }}>
-        <View style={s.map}><DiscoveryGlobe points={points} onOpen={open} bottomInset={railHeight} viewport={layout} selectionId={selectedId} locateVersion={locateVersion} /></View>
+        <View style={s.map}><DiscoveryGlobe points={points} route={route} onOpen={open} bottomInset={railHeight} viewport={layout} selectionId={selectedId} locateVersion={locateVersion} sheetInteracting={sheetInteracting} /></View>
         <DiscoveryPanel journeys={journeys} selectedId={selectedId} onLocate={locate} onOpen={open}
           notice={notice} onClear={() => setSelectedId(null)} onRetrySelection={selection.error ? selection.retry : undefined}
           loading={state.loading} refreshing={state.refreshing} error={state.error} onRefresh={state.refresh}
-          onHeight={setRailHeight} availableHeight={layout.height} availableWidth={layout.width} />
+          onInteraction={setSheetInteracting} onHeight={setRailHeight} availableHeight={layout.height} availableWidth={layout.width} />
       </View>
       <View style={[s.nav, { paddingBottom: Math.max(insets.bottom, 6) }]}>
         <View accessibilityRole="text" accessibilityLabel="Explore, current screen" style={s.navItem}><Text style={s.active}>◎ Explore</Text></View>

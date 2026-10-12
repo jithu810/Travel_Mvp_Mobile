@@ -245,3 +245,223 @@ Validation: TypeScript passed; lint passed with zero warnings; 109 automated tes
 Physical Android testing was unavailable and remains necessary: reload the existing matching development client, Locate A then B, repeat B, rapidly alternate journeys during loading/exit/hold/flight, and check whole-globe visibility before the final approach with both panel states. Interrupt during loading and the hold with touch, World, background and navigation; verify no delayed approach takes over and only a new Locate restarts it. Confirm marker-to-Story and idle gating. No new native build is required by this JavaScript-only change.
 
 Changed files: src/lib/discovery/locate-transition.ts; src/components/discovery/globe/native-globe.tsx; tests/discovery-camera-motion.test.mjs; docs/mobile-map-first-home.md. No commit, push, deployment or Prompt 33 work.
+
+## Prompt 32.6 draggable sheet and living Earth (2026-10-11)
+
+### Reference comparison and supported native capabilities
+
+Compared both supplied screenshots. Polarsteps uses photographic land/ocean imagery, dark space, blue atmospheric edging and small visible stars; Journey Creator currently shows Outdoors vector land/ocean fills and a pale halo. The panel/card/header/navigation content and style in our screenshot are retained. No reference branding or proprietary imagery was copied.
+
+Installed @rnmapbox/maps is 10.3.7, declaring native SDK 11.23.1. Inspected Mapbox.native.ts, MapView.tsx and Android RNMBXMapView style/projection, feature reattachment and ornament implementation. The wrapper exposes Satellite and SatelliteStreet enums, atmosphere, globe and logo/attribution positioning, but no logo sizing/scaling prop. Official Mapbox examples demonstrate satellite styles with globe/atmosphere. Standard Satellite is supported by the native SDK, but Satellite Streets is already exposed by this wrapper, includes geographic labels and avoids introducing Standard import/slot/3D configuration. Chosen SatelliteStreet (satellite-streets-v11), retaining existing CircleLayer/SymbolLayer overlays and no terrain/buildings.
+
+References:
+- https://docs.mapbox.com/android/maps/examples/animate-map-camera/ (Satellite Streets, globe and atmosphere)
+- https://docs.mapbox.com/android/maps/examples/android-view/display-a-globe/ (Standard Satellite comparison)
+- https://docs.mapbox.com/android/maps/examples/create-a-rotating-globe/ (native camera interpolation and gesture priority)
+- https://reactnative.dev/docs/panresponder and https://reactnative.dev/docs/animations (built-in responder and animation APIs)
+
+### Sheet interaction and camera coordination
+
+Added a hook using existing React Native PanResponder and Animated.spring, without a new dependency. The handle follows vertical movement, clamps to the existing height limits, and snaps using release velocity or the nearest midpoint. The original tap toggle remains accessible. Content-edge capture claims an upward vertical gesture in the collapsed carousel, or a downward vertical gesture that starts and remains at the expanded list's top. Horizontal swipes, upward expanded scrolling, multi-touch and gestures starting deeper in the list are left to content. Android native gesture arbitration still needs device testing.
+
+All panel style declarations, card styles/photos/buttons/metadata, heading/Refresh and bottom actions are unchanged. Both existing list orientations now stay mounted with stable identities and only the active list is displayed. This retains list state/offsets during Locate and avoids the previous toggle remount. It costs a second retained virtualized list; no new journey query, automatic list scrolling or data contract was added.
+
+Animated height uses the JS driver because layout height is unsupported by the native animation driver. It does not set React state each frame. Only settled height (or an actual viewport/orientation change) reaches Home's camera padding; mode changes only on snap completion. Existing measured map bounds and bottom safe areas are retained. Sheet touch/drag/settle activity blocks idle motion, without canceling a selected Locate. A refit during the world exit updates its pending target; during the journey flight it is queued until the current approach completes, then applies the latest fit without replaying the world sequence. Existing 800/200/1350 ms world-to-journey transitions and latest-request/cancellation guards remain in use. User globe gestures/World/background/blur/unmount still cancel pending camera work.
+
+The React checklist was applied to stable listeners, cleanup, transient refs, accessible controls and bounded effects. A narrowly scoped react-hooks/refs suppression documents a false positive around PanResponder.create: it registers callbacks containing event-time ref reads; none of those callbacks executes during render. Other lint checks remain enabled.
+
+### Earth appearance, branding and idle motion
+
+Home starts with Satellite Streets. A style/load error or a 20-second load timeout switches once to Outdoors on the same MapView, keeping native camera/selection/source definitions; failure there uses the existing graceful journey/search fallback. Retry recreates the native loader. Style failure cancels pending Locate and automatic motion; a new explicit Locate can resume once a style loads. No production diagnostics were added.
+
+Atmosphere retains #080F1E space, with blue #669CC4 lower atmosphere, #17364F upper atmosphere, horizon blend 0.015 and star intensity 0.06. These settings and satellite tile/marker readability require hardware evaluation, not just compilation. Satellite imagery adds raster tile/network work compared with Outdoors; no terrain or extra 3D rendering was added.
+
+Required native logo and attribution stay enabled and unscaled. Moved them into the exposed map's top band (logo top/left 12; attribution top 12/right 56, beside the existing compass at right 12). This keeps them above the sheet throughout dragging without continuous ornament/padding updates or cropping. The existing World button remains in its established position above the settled sheet. Native logo size cannot be reduced through the installed wrapper's supported API.
+
+Idle reuses the existing controller: ten-second delay, two-degree longitude steps over four seconds with native linearTo. Reduced the inter-step guard from 230 ms total to 50 ms and eliminated the extra scheduled gap, for near-continuous slow movement. One bounded timer is pending at a time; no per-frame React camera state updates. Sheet interactions join existing selected/local-zoom/touch/gesture/focus/background/reduced-motion/map-ready gates. Cancellation invalidates timers before competing commands.
+
+### Actual validation and remaining Android checks
+
+- TypeScript passed.
+- ESLint passed with zero warnings after resolving callback-registration lint findings.
+- 117 automated tests passed, zero failures. New coverage includes actual sheet-hook callbacks with deterministic Animated/PanResponder doubles (drag, release, tap, settle-only padding, scroll-edge arbitration, listener/animation cleanup), pure geometry/snap/layout thresholds, style fallback progression, visible branding positions, sheet idle gating and deferred refits during Locate. These doubles do not verify Android's native touch dispatcher.
+- Expo Doctor: 21/21 passed.
+- Android, iOS and web exports passed (`npx expo export --platform all`).
+- git diff --check passed; four Journey Story map hashes match the recorded baseline. No backend/auth/routes/query contracts, web application, package/configuration or native dependencies changed.
+- No Android hardware/emulator test was performed; adb was unavailable on PATH. No claim of verified device visuals, animation smoothness, satellite rendering or native scroll arbitration.
+
+On the existing matching development client: drag the handle slowly/quickly both ways, release at different heights, tap toggle and rotate the phone; test horizontal carousel versus expanded-list scrolling, including downward drags from its top and drags reaching the top from deeper content. Locate without list scrolling, preserve selection and list offsets, change panel size during each transition stage, rapidly switch journeys and interrupt with a globe gesture/World/background/navigation. Clear selection, wait ten seconds and observe gentle motion, then interrupt it; verify local zoom, Reduce Motion and offscreen cleanup. Inspect satellite imagery, labels/markers/halo/stars and unoccluded branding at 360x640 and 412x915 or equivalent sizes. Exercise satellite-to-Outdoors and final fallback/retry under network/style failure and evaluate lower-end hardware performance. These JavaScript-only changes require no new native build.
+
+Changed files:
+- src/app/discover.tsx
+- src/components/discovery/discovery-panel.tsx
+- src/components/discovery/globe/discovery-globe.native.tsx
+- src/components/discovery/globe/discovery-globe.tsx
+- src/components/discovery/globe/native-globe.tsx
+- src/hooks/use-discovery-sheet.ts (new)
+- src/lib/discovery/sheet.ts (new)
+- src/lib/discovery/globe-style.ts (new)
+- src/lib/discovery/presentation.ts
+- src/lib/discovery/idle-motion.ts
+- src/lib/discovery/locate-transition.ts
+- tests/discovery-panel.test.mjs
+- tests/discovery-camera-motion.test.mjs
+- docs/mobile-map-first-home.md
+
+No commit, push, deployment or Prompt 33 work.
+
+
+## Prompt 32.7 motion, country labels, stars and sheet range (2026-10-11)
+
+Compared the supplied current satellite globe screenshot with the earlier Polarsteps reference. The photographic Earth is retained; this change does not redesign the header, cards, panel content or bottom actions. Inspected Home's measured exploration layout, panel, sheet hook/helpers, native camera integration, idle controller, Locate controller, tests and installed @rnmapbox/maps 10.3.7 JS/Android/iOS implementation.
+
+### Exact changes and diagnosis
+
+- Rotation: 2 degrees per 4000 ms becomes 5 degrees per 4000 ms using the existing native linearTo controller: 1.25 degrees/sec during animation, approximately 1.235 degrees/sec including its existing 50 ms bridge margin. Ten-second idle delay, one bounded timer, longitude wrapping, pose preservation and all interaction/lifecycle/camera-ownership gates remain. No per-frame React updates or additional camera controller.
+- Country labels: fetched the actual SatelliteStreet enum's satellite-streets-v11 style definition using the existing public token (no token included in diagnostics). Its country-label symbol exists on composite/place_label, country filter, default visible, minzoom 1/maxzoom 10, English/native-name fallback, DIN Offc Pro Medium/Arial Unicode MS Regular fonts, configured glyph URL, rank-based sizes 11/9/8 at low zoom and white text/dark halo. Home worldCamera.zoomLevel is 0.8: the original layer is excluded at that zoom, independently of collision. The hosted style definition confirms this cause; it does not prove the phone's current loaded style or glyph requests. There is no verified evidence of an unexpected Outdoors fallback, projection failure or missing fonts on hardware.
+- The installed Android RNMBXLayer.addToMap attaches an existing layer without applying initial zoom bounds (applyZoomBounds occurs on insertion). Avoid relying on an existing-layer minZoom override. Added one supported SymbolLayer, discovery-world-countries, on the same composite/place_label source for zoom [0,1), filtered to class=country; no country names/data/source requests/geocoding hard-coded. It uses the original font/name fallback, restrained rank-based 11/10/9-point sizes, white text/dark halo, and retains collision/placement constraints. At zoom 1 the supplement stops and the unmodified style's original country labels take over, avoiding duplication and retaining intermediate zoom behavior. It mounts only after map readiness and only on Satellite Streets; existing Outdoors/failure/retry behavior and journey markers remain.
+- Stars: installed RNMBXStyleFactory directly forwards starIntensity to native atmosphere; native SDK 11.23.1 supports it with globe, including satellite styles. Increased 0.06 to 0.18; navy #080F1E, atmospheric blue colors and horizonBlend 0.015 are unchanged. API support is verified; actual star rendering/visibility on the user's phone is NOT verified. No custom star assets, terrain or rendering dependencies.
+- Sheet: let H be the measured exploration height after actual header/search, bottom action bar, top/side safe areas and bottom safe-area layout. Previously C=min(260,0.62H), E=max(C,H-96), drag range [C,E], midpoint/velocity collapsed-or-expanded snap. New bottom snap P=min(44,C), drag range [P,E], with unchanged collapsed C and expanded E. Example H=484: previous range 260–388; new range 44–388, retaining 260. The complete existing 44-point handle remains exposed on normal screens; tiny measured areas clamp within H. A 160 ms release-velocity projection chooses the nearest of peek/collapsed/expanded; the existing clamped spring is retained. Tap from peek restores collapsed content; collapsed/expanded tap behavior remains. Cards/content are clipped while peeked and become fully available again by handle drag/tap, without restyling. Orientation changes cancel pending springs and recalculate the established snap using the updated measured area.
+- Collapsed content can now claim downward vertical drags to reach peek. Horizontal carousel movement and expanded-list normal/deeper scrolling keep the previous arbitration; downward expanded drags require starting and remaining at the top. Both lists stay mounted to preserve offsets. Settled height alone updates camera padding; selected journey and the existing 800/200/1350 ms Locate sequence and deferred refits are preserved. Sheet movement does not cancel Locate.
+
+Official supporting references:
+- https://docs.mapbox.com/data/tilesets/reference/mapbox-streets-v8/ — place_label available from zoom 0, country points and symbolrank.
+- https://rnmapbox.github.io/docs/components/SymbolLayer — supported source/layer/zoom/style props; installed implementation was checked separately.
+- https://docs.mapbox.com/android/maps/api/11.7.3/mapbox-maps-android/com.mapbox.maps.extension.style.atmosphere.generated/-atmosphere-dsl-receiver/star-intensity.html — native star intensity range/behavior.
+- https://docs.mapbox.com/android/maps/examples/animate-map-camera/ — satellite globe/atmosphere/camera support.
+
+### Validation and device boundary
+
+TypeScript passed; ESLint passed with zero warnings; complete automated suite passed 121/121 (36 focused camera/sheet/style tests). Added rotation-rate/dateline/repeated-step/stale-callback interruption tests, world-label scope/fallback guards, handle-only peek/tap recovery, measured safe-viewport bounds and peek camera-fit coverage. Pure helpers and deterministic RN doubles do not verify native rendering or Android's touch dispatcher.
+
+Expo Doctor passed 21/21. Android, iOS and web exports passed via npx expo export --platform all --output-dir .expo/prompt32-7-export. Export emitted only NO_COLOR/FORCE_COLOR environment warnings. git diff --check passed; all four recorded Journey Story map hashes still match. No package/native configuration, routes, authentication, query contracts, backend/database or web-project changes.
+
+No physical Android or emulator test was performed (adb unavailable on PATH). On the existing matching development client, reload and check: world labels at 0.8 and handoff through zoom 1/intermediate zooms without overlaps/duplicates; glyph availability and actual Satellite Streets load versus Outdoors fallback; visible subtle stars and restrained edge on different screen brightnesses; rotation after ten idle seconds over several steps/dateline, with immediate gesture/Locate/World/selection/reduced-motion/background/blur interruption and no stale takeover. Drag to 44-point peek, collapsed and expanded at slow/fast velocities; tap to recover, rotate device and test small screen/system navigation, horizontal carousel and vertical list/top-edge arbitration. Preserve offsets/selection and Locate fitting through every snap and transition stage; verify markers, logo, attribution, style failure/retry and performance. These remain hardware requirements, not automated successes. JavaScript-only changes require no native dependency rebuild.
+
+Files changed in this prompt (prior Prompt 32.6 work remains uncommitted):
+- src/lib/discovery/idle-motion.ts
+- src/lib/discovery/presentation.ts
+- src/lib/discovery/globe-style.ts
+- src/lib/discovery/sheet.ts
+- src/hooks/use-discovery-sheet.ts
+- src/components/discovery/globe/native-globe.tsx
+- tests/discovery-camera-motion.test.mjs
+- tests/discovery-panel.test.mjs
+- docs/mobile-map-first-home.md
+
+No commit, push, deployment or Prompt 33 work.
+
+
+## Prompt 32.8 immediate startup and persistent world-country labels (2026-10-11)
+
+### Confirmed causes, inspection and focused changes
+
+Traced Home mounting, the native loader/token setup, native style/map readiness callbacks, measured camera/padding effect, native camera observations, reduced-motion resolution and the idle controller. In 32.7, eligible observations/configuration called schedule() with a 10000 ms default. Initial framing also called pause(locateDuration), requesting 10000+900 ms when already eligible. If the first pose arrived afterward, the old pause could be discarded and observe would schedule another 10000 ms delay. Readiness/focus/valid-pose/reduced-motion gates are necessary startup prerequisites, but the deliberate ten-second scheduling policy explains the post-ready stillness. This is a code-path diagnosis, not an on-device startup performance measurement; no evidence was found to attribute it to React performance.
+
+The controller now defaults its first eligible schedule to zero delay. Initial framing still reserves its existing 900 ms camera animation; a bounded camera-transition hold remains valid across readiness/pose updates, including when no pose exists at pause time. After that hold, rotation begins without an added ten-second wait once all safety gates are satisfied. First startup still requires a valid native pose, ready map, focused/active Home, resolved reduced-motion preference and no selection/interaction/local zoom. Selection or manual gestures before the first step revoke the immediate-start privilege. Later user-interaction recovery retains the ten-second delay. Existing five-degree eastward steps/4000 ms linearTo, 50 ms bridge margin, longitude wrapping, pose preservation, single timer/generation guards and cancellation remain; no per-frame React state, extra controller or startup-readiness bypass. World/Locate remain intentional camera owners; superseded holds/timers cannot issue stale commands.
+
+Inspected actual Satellite Streets v11 style, composite source metadata, glyph response and compressed vector tiles (read-only diagnostics, existing public token not printed or saved). Confirmed:
+- composite is mapbox.mapbox-streets-v8, source zoom 0–16. place_label metadata reports minzoom 0, which alone did not establish actual tile content.
+- Actual 0/0/0 tile contains admin/natural_label/water, with NO place_label layer.
+- Actual zoom-1 tiles contain country points: inspected northern tiles each had 192 place features, including 106 class=country entries with ranks 2/3. Repeated/worldview/buffer entries are not a count of distinct visible countries. Zoom-2 data also contains country points.
+- Original country-label remains visible by default, country filter, minzoom 1/maxzoom 10, name_en/name fallback, DIN/Arial Unicode fonts, white text/dark halo. Configured Latin glyph endpoint returned successfully (72149 bytes); this checks hosted font availability, not the phone's glyph requests.
+- 32.7 supplement had min 0/max 1, point-placement/default-visible styling, class=country, sizes 9–11 and collisions enabled. Its narrow layer range excluded zoom-1+ symbol layout, even though actual country points are found in those tiles rather than zoom zero. This is why merely lowering the layer minimum was insufficient. Exact native loaded-layer/bucket state cannot be inspected on a physical phone here; the data/range mismatch is confirmed and native rendering remains a device check.
+
+Kept the same composite/place_label source and existing layer ID. Changed the supplement's parsing range to [0,10), allowing the globe's higher-zoom tile buckets to carry country symbols. Visible text range remains [0,1): textOpacity=['step',['zoom'],1,1,0] shows the supplement at initial 0.8 and hides it at 1, where the original style labels take over. It is inserted below country-label so original country labels retain collision priority. No new source, runtime API calls, data cache, geocoder, bundled country list or fabricated coordinates. Existing globe tile loading supplies the points.
+
+Explicit visibility=visible and symbolPlacement=point, country filter plus symbolrank<=3, symbolrank sort priority, 13-point text, restrained white/dark 1.5-point halo, map pitch/rotation alignment and alternative center/top/bottom/left/right anchors with small radial offset improve readability and placement. textAllowOverlap=false/textIgnorePlacement=false retain collision-aware layout. The rank/size/placement choices aim for roughly 10–12 recognizable geographically distributed names where the visible hemisphere, data and space allow; this is not a guaranteed count or a verified Android result. Labels are real source points anchored through the native globe projection. Satellite imagery, navy space/stars/atmosphere, required branding, journey markers and style fallback are unchanged. The layer remains gated on ready Satellite Streets; no inference of unexpected Outdoors fallback was made.
+
+References checked (native implementation was inspected separately):
+- https://docs.mapbox.com/style-spec/reference/layers/ — symbol layout, zoom bounds, text opacity and collision/anchor properties.
+- https://docs.mapbox.com/data/tilesets/reference/mapbox-streets-v8/ — place_label fields, country class, rank and source data.
+- https://github.com/mapbox/mapbox-gl-js/blob/main/src/source/worker_tile.ts — primary Mapbox implementation excludes tile buckets at/above layer maxzoom (native rendering still requires Android verification).
+- https://rnmapbox.github.io/docs/components/SymbolLayer — supported wrapper props.
+
+### Actual validation and delivery boundary
+
+TypeScript and ESLint passed. Full automated suite: 124 passed, zero failures (39 focused camera/sheet/style checks). Added immediate valid-pose startup, map/readiness/reduced-motion gates, pre-first-step gesture recovery, initial camera hold before a pose and through pose/readiness updates, and later recovery timing. Existing interruption, stale callbacks, latest Locate, lifecycle, dateline, panel and fit checks pass. Updated label range/opacity/filter/visibility/placement/priority assertions; these do not emulate native glyph rasterization or count visible labels.
+
+Expo Doctor passed 21/21. Android/iOS/web exports passed using npx expo export --platform all --output-dir .expo/prompt32-8-export. Only environment NO_COLOR/FORCE_COLOR warnings were emitted. git diff --check passed; all four protected Journey Story map hashes match the recorded baseline. No sheet behavior/snap/card changes, data/queries/auth/routes, dependencies/native config, backend or web-project changes. Previous uncommitted work is preserved.
+
+Physical Android verification has NOT been performed. Reload the existing matching development client and check immediate motion after actual map/initial-camera readiness (including slow tile/font loading), no snap or repeated restarts, continuous eastward motion, gesture/World/Locate/selection/background/blur/reduced-motion interruption and safe recovery. At zoom 0.8, verify real country names appear, remain geographically anchored during rotation, and roughly 10–12 fit the visible hemisphere with readable contrast. Zoom through 1 both ways to check handoff/no duplicates/no invisible-label collision suppression, and inspect intermediate labels and journey markers. Test collapsed/peek/expanded views without changing selection or list offset, rapid Locate and fallback under style/network failure. Automated exports do not establish these native results. No native rebuild is required by these JavaScript-only edits.
+
+Files changed in Prompt 32.8:
+- src/lib/discovery/idle-motion.ts
+- src/lib/discovery/globe-style.ts
+- src/components/discovery/globe/native-globe.tsx
+- tests/discovery-camera-motion.test.mjs
+- tests/discovery-panel.test.mjs
+- docs/mobile-map-first-home.md
+
+No commit, push, deployment, dependency changes, unrelated refactor or Prompt 33 work.
+
+
+## Home photo markers and decorative journey playback (2026-10-11)
+
+Country-label work is deferred at the user's request; the existing label block/style is unchanged in this enhancement. Implemented the requested Home-only stop photos, connector and simple moving plane. No Prompt 33 work.
+
+Inspected public JourneyStop.photo, existing normalization/media signing and selected-detail loading. Those already resolve authorized public stop-photo URLs. Home point properties now carry an existing resolved HTTPS stop photo, with no new queries, storage writes or media endpoints. Unresolved storage paths, missing/unsafe photos use the original green CircleLayer. Coordinate-deduplicated markers can use an available uploaded photo from a coincident stop, without adding duplicate location markers or substituting the journey cover.
+
+Added 42-point round PointAnnotation thumbnails, white border and green background, refreshing Android's bitmap on Image.onLoad with fadeDuration=0 as required by the installed SDK. On image failure the annotation disappears, exposing the original green marker. Photo annotation taps retain the existing Journey Story navigation. Photo and plain marker labels use separate fixed offsets supported by the SDK. Photo components stay mounted through plane cancellation and repeated Locate, avoiding tap-time remounts or needless image reloads.
+
+The connector is decorative saved-stop geometry, not road routing or evidence that the traveler flew. Uses the existing ordered coordinate validator/segment builder, preserves returns to earlier stops, skips zero-length consecutive moves and breaks at missing/invalid coordinates. Dateline crossings split at matching +/-180 edges; plane targets use the short longitude arc. No invented stop coordinates or country/place discovery. A restrained green dashed line with light halo renders beneath the stop markers.
+
+The existing Locate controller now exposes an optional settled callback, invoked only for the latest active request after its final fit (including a queued panel refit) finishes. The existing 800/200/1350 ms world/hold/flight and camera fitting are unchanged. That callback enables one decorative plane pass through the valid legs, 2800 ms per leg with 650 ms stop dwell. Repeated explicit Locate replays; a panel-only refit does not restart playback for the same request. The plane does not drive or follow the camera.
+
+Uses the installed SDK's AnimatedPoint/Animated.ShapeSource and React Native Animated.parallel to update one point, with React state changed only at leg boundaries. Coordinate updates require the JS animation driver/bridge; there is no per-frame React setState or custom frame timer. A generation-guarded playback helper owns at most one dwell timer and invalidates callbacks before stopping animation. Selection changes, manual globe gestures, World reset, map failure, Home blur/background and unmount stop playback; reduced motion disables it. Single-stop/unmapped journeys show markers without a connector/plane. Panel interaction/snap behavior and scroll positions are unchanged. The plane uses the native font's U+2708 glyph; a read-only hosted glyph check confirmed it exists in Arial Unicode MS Regular. Actual Android glyph appearance and animation are still unverified.
+
+Reviewed the edited components with the React checklist: stable photo keys, pure memoized geometry, lazy AnimatedPoint setup, effect cleanup, bounded callbacks, subscription cleanup, and no frame-driven React rendering. Native modules remain confined to the existing lazy native-globe import. No dependencies/native config, Supabase contracts, backend/database, web project, authentication, card styles or Story map changes.
+
+Supporting SDK references inspected:
+- https://rnmapbox.github.io/docs/components/PointAnnotation
+- https://rnmapbox.github.io/docs/examples/Annotations/ShowPointAnnotation
+- Installed classes/AnimatedPoint.js and utils/animated/Animated.ts (current RN-compatible animation and cleanup); experimental native animator was not adopted because it lacks a public cancellation/disposal API.
+
+Validation: TypeScript passed; ESLint passed with zero warnings; 131 automated tests passed, zero failures; Expo Doctor 21/21 passed; Android/iOS/web exports passed via npx expo export --platform all --output-dir .expo/photo-travel-export. git diff --check passed; four protected Journey Story map hashes match baseline. Added photo fallback/coincident-photo tests, ordered and missing-coordinate routes, dateline splitting/short-arc movement, finite one-pass completion/dwell/stale-callback cancellation, latest Locate settled callbacks and deferred refit checks. These tests do not emulate native bitmap rendering or Android touch dispatch.
+
+Physical Android verification remains required: Locate journeys with mixed photos/no photos, slow/broken/expired URLs, singleton/duplicate/missing/dateline/wide stops; check round clipping, readable labels, correct photo-to-stop association and taps opening Story. Verify the small plane glyph, orientation, smooth motion/dwell, stop ordering and no long dateline jump, replay on repeated Locate, and no camera takeover. Interrupt during Locate and during playback with gestures/World/switching journeys/background/navigation/reduced motion, and check all panel snaps/scroll offsets. Evaluate many-photo journeys and lower-end hardware for annotation/bridge cost. No hardware verification or device-smoothness claim is made. JavaScript-only changes require no new native build.
+
+Files changed in this enhancement:
+- src/app/discover.tsx
+- src/components/discovery/globe/discovery-globe.native.tsx
+- src/components/discovery/globe/discovery-globe.tsx (mobile web-fallback prop type only)
+- src/components/discovery/globe/native-globe.tsx
+- src/components/discovery/globe/journey-overlays.tsx (new)
+- src/lib/discovery/map.ts
+- src/lib/discovery/travel.ts (new)
+- src/lib/discovery/locate-transition.ts
+- tests/discovery-globe.test.mjs
+- tests/discovery-camera-motion.test.mjs
+- docs/mobile-map-first-home.md
+
+No commit, push, deployment, dependencies/config changes or Prompt 33 work.
+
+
+## Home rotation lifecycle recovery (2026-10-11)
+
+Traced native-globe.tsx, the lazy discovery-globe.native.tsx loader, Home selection/X wiring, the sheet interaction hook and Locate controller. The loader has no rotation timer. The confirmed code-level delay came from idle-motion's firstRotation flag: selecting a journey set it false, and subsequent programmatic pause completion and sheet interaction completion scheduled the full 10,000 ms recovery delay. Clearing selection could schedule that delay before the return camera hold, whose completion scheduled it again. Panel X touches participated in the same interacting flag. Camera readiness also accepted style-loaded before map-loaded, and stale native gesture flags could halt automatic motion. No evidence establishes a startup performance problem; actual device callback ordering remains unmeasured.
+
+Replaced the overloaded firstRotation flag with a manual-interaction deadline. A map touch release or genuine gesture settling establishes the existing 10-second cooldown; panel interaction, readiness updates, selection clearing and programmatic camera events do not extend it. Panel interactions still pause rotation while active and preserve camera holds. A return-to-world or World reset holds rotation for the existing 900 ms camera animation plus 50 ms native bridge margin, then resumes from the latest valid observed pose without a new cooldown (any remaining genuine manual cooldown is respected). One timer and epoch guards remain; new selection, touch, blur, background, failure and disposal invalidate old work. Gesture inertia is tracked until native idle, but a stale gesture flag without a real map touch cannot initiate a manual cooldown or cancel Locate. Native touch evidence clears on blur/background/failure.
+
+Startup now waits for map-loaded, measured viewport, valid camera pose and reduced-motion preference; style-loaded alone no longer authorizes rotation. The initial framing hold still prevents competing camera commands. Rotation direction, step/duration, max eligible zoom, cinematic Locate/replay, fitting, selection contracts, photo markers, route/plane, sheet behavior and map style are unchanged. No dependency or native configuration changes.
+
+Validation: TypeScript passed; ESLint passed with zero warnings; full suite 136/136 tests passed; Expo Doctor 21/21 checks passed; Android/iOS/web exports passed to .expo/rotation-lifecycle-export. git diff --check passed. All four protected Journey Story map hashes match their baseline. Focused regressions cover initial readiness/hold, selection and X return with panel/camera events, preserved manual cooldown, stale gesture flags, and invalidated pending return callbacks. Existing Locate and lifecycle tests remain passing.
+
+Files changed for this task: src/lib/discovery/idle-motion.ts; src/components/discovery/globe/native-globe.tsx; tests/discovery-camera-motion.test.mjs; docs/mobile-map-first-home.md. Other working-tree modifications predate this task and are preserved.
+
+Physical Android verification remains required: repeated cold Home loads with no touch; select/Locate then X and observe smooth resumption after return; repeat X during Locate; drag/pinch/rotate and verify 10 seconds after gesture/inertia; interact with sheet during return without restarting the delay; World reset, navigation away/back, background/foreground, reduced motion and map failure; confirm photos, connector, plane and sheet scrolling remain intact. Automated tests and Expo exports do not verify native touch delivery, camera snapshot timing, visual smoothness or device performance. No commit, push, deployment or Prompt 33 work.
+
+
+## Prompt 32.10 - Spherical Home journey curves (2026-10-11)
+
+Inspected Home route construction, validated ordered stop segments, photo annotations, LineLayers, AnimatedPoint, playback controller, and installed @rnmapbox/maps TypeScript/native style adapters. The installed MapboxStyles.ts explicitly documents lineZOffset as unsupported for globe projection; the official Android API confirms the same limitation: https://docs.mapbox.com/android/maps/api/latest/mapbox-maps-android/com.mapbox.maps.extension.style.layers.generated/-line-layer/line-z-offset-as-expression.html . Native adapters expose the property but cannot make unsupported globe elevation reliable. Therefore this implementation uses the authorized globe-following surface alternative, not floating/elevated arcs, screen-space curves, terrain or a new custom renderer. Short local legs may appear almost straight because their spherical curvature is naturally small.
+
+Home-only travel geometry now interpolates a great-circle arc between consecutive valid stops using unit sphere vectors and a normalized tangent. Samples are uniformly spaced in angle at approximately two degrees or less, with 8-96 intervals per leg. Exact endpoint coordinates are preserved modulo longitude wrapping. Coincident spherical endpoints (including dateline aliases/poles) do not animate; exactly antipodal pairs use a deterministic orthogonal tangent because there is no unique shortest route. Invalid coordinates break connectivity rather than connecting across a missing stop. Stored stop ordering and existing segmented route contracts remain unchanged.
+
+Longitude samples are unwrapped continuously for the plane and split into matching +/-180 line edges for rendering, preventing across-world connector chords. Existing green dashed line and white halo styles remain unchanged beneath the original markers. Arc sampling and splitting happen once per memoized selected route, shared by line and plane. Plane progress uses one React Native Animated.Value and an O(1) sampled-path lookup/linear interpolation per update, with no per-frame trigonometry or React state updates. The original 2800 ms per leg, 650 ms dwell, finite playback, initial per-leg bearing, replay key and generation-based cancellation controller remain. Cleanup invalidates the active leg, stops animation and removes the progress listener. Camera/idle/Locate, sheet, reduced motion, photo marker and navigation wiring are untouched.
+
+Changed files for this prompt: src/lib/discovery/travel.ts; src/components/discovery/globe/journey-overlays.tsx; tests/discovery-globe.test.mjs; docs/mobile-map-first-home.md. Prior uncommitted changes are preserved. No web, Story map, backend, schema, authentication, dependency or native configuration changes; no commit, push or deployment. No Android development-client rebuild is required for these JavaScript-only changes; reload the existing compatible development client.
+
+Physical Android checks still required: visual curve smoothness and marker attachment during rotation/zoom; long and polar routes, dateline crossings, very short legs and antipodal pairs; plane remaining on the rendered line throughout playback and at dateline edges; Locate replay and interruption by gestures, World, selection changes, sheet interaction, navigation/background and reduced motion; performance with many stops. Automated geometry tests/export success do not verify native rendering, plane glyph orientation or hardware smoothness.
+
+Validation: TypeScript passed; ESLint passed with zero warnings; full suite 140/140 tests passed (including 14 focused globe/route tests); Expo Doctor 21/21 checks passed; Android/iOS/web Expo exports passed to .expo/curved-routes-export. git diff --check passed; all four protected Journey Story map hashes match the baseline. New tests cover spherical curvature/plane-path agreement, sample bounds, exact endpoints, invalid-coordinate breaks, ordering/return stops, polar/long/antipodal routes and matching dateline edges. Existing playback cancellation and camera lifecycle regressions remain passing.

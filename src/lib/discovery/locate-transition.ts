@@ -11,12 +11,27 @@ export const cinematicLocateDuration = worldExitDuration + worldPauseDuration + 
 export function createLocateTransition(send: (command: Command) => void, clock: Clock = {
   set: (callback, delay) => setTimeout(callback, delay),
   clear: handle => clearTimeout(handle as ReturnType<typeof setTimeout>),
-}) {
+}, onSettled?: (request: string) => void) {
   let timer: unknown = null, generation = 0;
   let destination: Target | null = null;
+  let phase: 'world' | 'flight' | null = null;
   let latestRequest: string | null = null, activeRequest: string | null = null;
-  function clear() { generation++; if (timer !== null) clock.clear(timer); timer = null; }
+  function clear() { phase = null; generation++; if (timer !== null) clock.clear(timer); timer = null; }
   function cancel() { clear(); activeRequest = null; destination = null; }
+  function enter(request: string, version: number) {
+    if (version !== generation || request !== activeRequest || !destination) return;
+    const sent = destination;
+    phase = 'flight';
+    send({ ...sent, animationMode: 'flyTo', animationDuration: journeyEnterDuration });
+    timer = clock.set(() => {
+      if (version !== generation || request !== activeRequest) return;
+      timer = null; phase = null;
+      // A settled sheet may need a different fit. Finish the current approach
+      // first, then apply the latest fit; never restart its world sequence.
+      if (destination !== sent) enter(request, version);
+      else onSettled?.(request);
+    }, journeyEnterDuration);
+  }
   return {
     cancel,
     // Register the request before detail loading completes. A canceled request
@@ -30,18 +45,19 @@ export function createLocateTransition(send: (command: Command) => void, clock: 
       destination = target;
       // A panel refit while zooming out updates the eventual fitted target,
       // without skipping the world hold or restarting its timer.
-      if (!viaWorld && timer !== null) return true;
+      if (!viaWorld && phase !== null) return true;
       clear();
       if (!viaWorld) {
-        send({ ...target, animationMode: 'flyTo', animationDuration: journeyEnterDuration });
+        enter(request, generation);
         return true;
       }
       const version = generation;
+      phase = 'world';
       send({ ...worldCamera, padding: target.padding, animationMode: 'easeTo', animationDuration: worldExitDuration });
       timer = clock.set(() => {
         if (version !== generation || request !== activeRequest || !destination) return;
         timer = null;
-        send({ ...destination, animationMode: 'flyTo', animationDuration: journeyEnterDuration });
+        enter(request, version);
       }, worldExitDuration + worldPauseDuration);
       return true;
     },

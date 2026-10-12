@@ -1,26 +1,27 @@
 import { useState } from 'react';
-import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Animated, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import type { PublicJourney } from '@/types/journey';
-import { discoveryCardWidth, discoveryPanelSize } from '@/lib/discovery/presentation';
+import { discoveryCardWidth } from '@/lib/discovery/presentation';
+import { useDiscoverySheet } from '@/hooks/use-discovery-sheet';
 import { HomeJourneyCard } from './home-journey-card';
 import { colors } from './ui';
 
 export function DiscoveryPanel({ journeys, selectedId, onLocate, onOpen, notice, onClear, onRetrySelection,
-  loading, refreshing, error, onRefresh, onHeight, availableHeight, availableWidth }: {
+  loading, refreshing, error, onRefresh, onHeight, onInteraction, availableHeight, availableWidth }: {
   journeys: PublicJourney[]; selectedId: string | null; onLocate: (id: string) => void; onOpen: (id: string) => void;
   notice: string; onClear: () => void; onRetrySelection?: () => void; loading: boolean; refreshing: boolean;
-  error: string | null; onRefresh: () => void; onHeight: (height: number) => void; availableHeight: number; availableWidth: number;
+  error: string | null; onRefresh: () => void; onHeight: (height: number) => void; onInteraction: (active: boolean) => void; availableHeight: number; availableWidth: number;
 }) {
-  const [expanded, setExpanded] = useState(false);
+  const sheet = useDiscoverySheet(availableHeight, onHeight, onInteraction);
+  const { expanded } = sheet;
   const [visible, setVisible] = useState(24);
-  const width = discoveryCardWidth(availableWidth, expanded);
-  return <View style={[s.sheet, { height: discoveryPanelSize(availableHeight, expanded) }]}
-    onLayout={event => onHeight(event.nativeEvent.layout.height)}>
-    <Pressable accessibilityRole="button" accessibilityLabel={expanded ? 'Collapse discovery panel' : 'Expand discovery panel'}
+  return <Animated.View style={[s.sheet, { height: sheet.height }]}
+    onTouchStart={sheet.touchStart} onTouchEnd={sheet.touchEnd} onTouchCancel={sheet.touchEnd}>
+    <View {...sheet.responders.handle}><Pressable accessibilityRole="button" accessibilityLabel={expanded ? 'Collapse discovery panel' : 'Expand discovery panel'}
       accessibilityState={{ expanded }} accessibilityHint="Double tap to change panel size"
-      onPress={() => setExpanded(value => !value)} style={s.handleButton}>
+      onPress={sheet.toggle} style={s.handleButton}>
       <View style={s.handle} /><Text style={s.toggle}>{expanded ? '⌄ Collapse' : '⌃ Explore journeys'}</Text>
-    </Pressable>
+    </Pressable></View>
     <View style={s.section}>
       <Text accessibilityRole="header" style={s.heading}>Recently shared</Text>
       <View style={s.tools}>
@@ -36,11 +37,14 @@ export function DiscoveryPanel({ journeys, selectedId, onLocate, onOpen, notice,
       <Text accessibilityLiveRegion="polite" numberOfLines={expanded ? 3 : 1} style={s.hint}>{notice}</Text>
       {expanded && onRetrySelection && <Pressable accessibilityRole="button" accessibilityLabel="Retry located journey" onPress={onRetrySelection} style={s.refresh}><Text style={s.refreshText}>Retry</Text></Pressable>}
     </View>
-    <FlatList key={expanded ? 'expanded' : 'collapsed'} horizontal={!expanded}
+    <View style={s.list} {...sheet.responders.content}>
+    {[false, true].map(listExpanded => <View key={String(listExpanded)} style={[s.list, { display: expanded === listExpanded ? 'flex' : 'none' }]}>
+    <FlatList horizontal={!listExpanded}
+      onScroll={event => { if (listExpanded) sheet.offset.current = event.nativeEvent.contentOffset.y; }} scrollEventThrottle={16}
       data={journeys.slice(0, visible)} keyExtractor={item => item.id} style={s.list}
-      showsHorizontalScrollIndicator={false} showsVerticalScrollIndicator={expanded}
-      contentContainerStyle={[s.items, expanded && s.expandedItems]}
-      renderItem={({ item }) => <HomeJourneyCard journey={item} expanded={expanded} width={width}
+      showsHorizontalScrollIndicator={false} showsVerticalScrollIndicator={listExpanded}
+      contentContainerStyle={[s.items, listExpanded && s.expandedItems]}
+      renderItem={({ item }) => <HomeJourneyCard journey={item} expanded={listExpanded} width={discoveryCardWidth(availableWidth, listExpanded)}
         selected={selectedId === item.id} onOpen={onOpen} onLocate={onLocate} />}
       ListEmptyComponent={<View style={s.empty}>
         {loading ? <><ActivityIndicator color={colors.ink} /><Text style={s.hint}>Finding your next journey…</Text></>
@@ -48,9 +52,10 @@ export function DiscoveryPanel({ journeys, selectedId, onLocate, onOpen, notice,
       </View>}
       ListFooterComponent={visible < journeys.length
         ? <Pressable accessibilityRole="button" accessibilityLabel="More journeys" onPress={() => setVisible(count => count + 24)} style={s.more}><Text style={s.refreshText}>More journeys →</Text></Pressable>
-        : expanded && journeys.length > 0 ? <Text style={s.end}>You’re up to date with recent journeys.</Text> : null}
-    />
-  </View>;
+        : listExpanded && journeys.length > 0 ? <Text style={s.end}>You’re up to date with recent journeys.</Text> : null}
+    /></View>)}
+    </View>
+  </Animated.View>;
 }
 const s = StyleSheet.create({
   sheet: { position: 'absolute', left: 0, right: 0, bottom: 0, borderTopLeftRadius: 28, borderTopRightRadius: 28,

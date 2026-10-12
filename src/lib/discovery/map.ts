@@ -1,9 +1,18 @@
 import type { PublicJourney } from '../../types/journey';
-import { buildMapData } from '../journey/map-data';
+import { safePhoto } from './model';
+import { buildMapData, hasCoordinates } from '../journey/map-data';
 
 export const worldCamera = { centerCoordinate: [35, 18], zoomLevel: 0.8, heading: 0, pitch: 0 };
 export function discoveryPoints(journey: PublicJourney | null) {
   const seen = new Set<string>();
+  const photos = new Map<string, string>();
+  for (const stop of journey?.stops || []) {
+    const photo = safePhoto(stop.photo);
+    if (hasCoordinates(stop) && photo?.startsWith('https://')) {
+      const coordinate = [stop.longitude, stop.latitude].join(',');
+      if (!photos.has(coordinate)) photos.set(coordinate, photo);
+    }
+  }
   const markers = journey ? buildMapData(journey.stops).markers : [];
   return {
     type: 'FeatureCollection' as const,
@@ -14,7 +23,8 @@ export function discoveryPoints(journey: PublicJourney | null) {
       return [{
         type: 'Feature' as const, id: marker.id,
         geometry: { type: 'Point' as const, coordinates: marker.coordinate },
-        properties: { journeyId: journey!.id, name: marker.name },
+        properties: { journeyId: journey!.id, name: marker.name,
+          photo: photos.get(key) || null },
       }];
     }),
   };
