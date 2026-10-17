@@ -38,18 +38,24 @@ function load(path, modules, hooks = harness(false).hooks, timers = globalThis) 
   }).outputText;
   const module = { exports: {} };
   const require = name => {
-    if (name === 'react/jsx-runtime') return { jsx, jsxs: jsx };
+    if(name==='@/lib/journey/nearby')return load('src/lib/journey/nearby.ts',{}); if(name.endsWith('/nearby-locations'))return {NearbyLocations:'NearbyLocations'}; if (name === 'react/jsx-runtime') return { jsx, jsxs: jsx };
     if (name === 'react') return hooks;
+    if (name === 'expo-router') return { useFocusEffect: fn => hooks.useEffect(fn, [fn]), ...modules[name] };
+    if (name === 'react-native-safe-area-context') return { ...modules[name], useSafeAreaInsets: () => ({ top: 24, bottom: 24, left: 0, right: 0 }) };
+    if (name === '@/components/journey/itinerary-sheet') return { ItinerarySheet: 'ItinerarySheet' };
+    if (name === '@/components/journey/maneuver-panel') return { ManeuverPanel: 'ManeuverPanel' };
+    if (name === '@/components/journey/arrival-prompt') return { ArrivalPrompt: 'ArrivalPrompt' };
     if (Object.hasOwn(modules, name)) return modules[name];
+    if(name==='@/components/branded-loading')return {BrandedLoading:'BrandedLoading'};
     throw new Error('Unexpected component dependency: ' + name);
   };
-  new Function('require', 'module', 'exports', 'setTimeout', 'clearTimeout', source)(require, module, module.exports, timers.setTimeout, timers.clearTimeout);
+  new Function('require', 'module', 'exports', 'setTimeout', 'clearTimeout', 'setInterval', 'clearInterval', source)(require, module, module.exports, timers.setTimeout, timers.clearTimeout, timers.setInterval ?? globalThis.setInterval, timers.clearInterval ?? globalThis.clearInterval);
   return module.exports;
 }
 function find(tree, type) {
   if (!tree || typeof tree !== 'object') return null;
   if (tree.type === type) return tree;
-  for (const child of [tree.props?.children].flat(Infinity)) {
+  for (const child of [tree.props?.children, tree.props?.footer].flat(Infinity)) {
     const match = find(child, type);
     if (match) return match;
   }
@@ -57,13 +63,14 @@ function find(tree, type) {
 }
 function all(tree, type) {
   if (!tree || typeof tree !== 'object') return [];
-  return [...(tree.type === type ? [tree] : []), ...[tree.props?.children].flat(Infinity).flatMap(child => all(child, type))];
+  return [...(tree.type === type ? [tree] : []), ...[tree.props?.children, tree.props?.footer].flat(Infinity).flatMap(child => all(child, type))];
 }
 const native = {
   StyleSheet: { create: value => value }, View: 'View', Text: 'Text', Pressable: 'Pressable', FlatList: 'FlatList',
   AccessibilityInfo: { isReduceMotionEnabled: () => Promise.resolve(true), addEventListener: () => ({ remove() {} }) },
   AppState: { currentState: 'active', addEventListener: () => ({ remove() {} }) },
-  ActivityIndicator: 'ActivityIndicator', useWindowDimensions: () => ({ width: 390, height: 844, fontScale: 1 }),
+  Modal: 'Modal', ScrollView: 'ScrollView', ActivityIndicator: 'ActivityIndicator', useWindowDimensions: () => ({ width: 390, height: 844, fontScale: 1 }),
+  Alert: { alert() {} },
   Platform: { OS: 'android' }, Linking: { openSettings: async () => {} },
 };
 const ui = { colors: {}, ui: {}, Message: 'Message', ScreenHeader: 'ScreenHeader' };
@@ -80,7 +87,14 @@ const eligibility = load('src/lib/journey/travel-preview.ts', {
 });
 const sessionModel = load('src/lib/journey/trip-session.ts', { './travel-preview': eligibility });
 const locationModel = load('src/lib/journey/foreground-location.ts', {});
+const guidanceModel = load('src/lib/journey/turn-guidance.ts', {});
+const navigationModel = load('src/lib/journey/navigation.ts', { './turn-guidance': guidanceModel, './off-route': load('src/lib/journey/off-route.ts', { './turn-guidance': guidanceModel }) });
+const arrivalModel = load('src/lib/journey/arrival.ts', { './navigation': navigationModel, './turn-guidance': guidanceModel });
+const cameraModel = load('src/lib/journey/travel-camera.ts', { './navigation': navigationModel });
 const sessionMocks = store => ({
+  '@/lib/journey/navigation': navigationModel,
+  '@/hooks/use-trip-arrival': { useTripArrival: () => ({ prompt: null, message: 'Arrival needs reliable GPS', confirm() {}, dismiss() {} }) },
+  '@/hooks/use-trip-navigation': { useTripNavigation: (journey, session) => ({ destination: sessionModel.tripDestination(journey, session), status: 'idle', message: 'Waiting for GPS', route: null, retry() {} }) },
   '@/lib/journey/foreground-location': locationModel,
   '@/hooks/use-trip-location': { useTripLocation: (journey, session) => ({ status: session.status === 'active' ? 'unavailable' : session.status, position: null, canAskAgain: true,
     begin: () => store.transition(journey, 'begin', session), retry: () => {} }) },
@@ -110,7 +124,7 @@ test('measured short/tall layouts leave space for stop browsing after reserving 
   }
 });
 
-test('Story synchronizes carousel and map, preserves selection on close, and Use opens the read-only map', () => {
+test('Story preserves map browsing while Use opens Travel directly and Remix remains separate', () => {
   const h = harness();
   const journey = { id: journeyId, title: 'Public journey', stops: [{ ...stop('first'), sequence: 0 }, { ...stop('second'), sequence: 1 }], description: '' };
   const routes = []; let focus;
@@ -133,16 +147,36 @@ test('Story synchronizes carousel and map, preserves selection on close, and Use
   }, h.hooks);
   const props = { journey, refresh: () => {}, refreshing: false, error: null };
   let tree = h.render(Screen, props);
-  assert.equal(find(tree, 'ScrollView'), null);
+  assert.ok(find(tree, 'ScrollView'), 'Map, story and deck scroll above fixed actions');
+  assert.equal(find(tree, 'StoryHeader'), null);
+  assert.equal(find(tree, 'StopTimeline').props.stacked, true);
+  assert.equal(find(tree, 'JourneyMap').props.playRouteWithSelection, true);
   assert.equal(find(tree, 'StopTimeline').props.selectedId, 'first');
   find(tree, 'StopTimeline').props.onSelect('second');
   tree = h.render(Screen, props);
   assert.equal(find(tree, 'JourneyMap').props.selectedId, 'second');
+  assert.equal(find(tree, 'JourneyOptions').props.menu.visible, false);
+  all(tree, 'Pressable').find(n => n.props.accessibilityLabel === 'Journey actions').props.onPress();
+  tree = h.render(Screen, props);
+  assert.equal(find(tree, 'JourneyOptions').props.menu.visible, true);
+
+  assert.equal(find(tree, 'JourneyOptions').props.inlineFeedback, true);
+  find(tree, 'JourneyOptions').props.menu.onClose();
+  tree = h.render(Screen, props);
+  assert.equal(find(tree, 'JourneyOptions').props.menu.visible, false);
+  all(tree, 'Pressable').find(n => n.props.accessibilityLabel === 'Journey actions').props.onPress();
+  tree = h.render(Screen, props);
   find(tree, 'JourneyOptions').props.onUse();
   tree = h.render(Screen, props);
+  assert.deepEqual(routes, [{ pathname: '/travel/[id]', params: { id: journeyId } }]);
+  assert.equal(find(tree, 'StorySheet').props.visible, false, 'Use skips the intermediate map');
+  assert.equal(all(tree, 'JourneyMap').length, 0);
+  focus(); tree = h.render(Screen, props);
+  find(tree, 'JourneyMap').props.onExpand(); tree = h.render(Screen, props);
   assert.equal(find(tree, 'StorySheet').props.visible, true);
   assert.equal(find(tree, 'StorySheet').props.scrollable, false);
   assert.equal(find(tree, 'JourneyMap').props.presentation, 'expanded');
+  assert.equal(find(tree, 'JourneyMap').props.navigationMode, undefined, 'Story keeps its cinematic map style');
   assert.equal(all(tree, 'JourneyMap').length, 1, 'Preview is not mounted behind the expanded map');
   assert.equal(find(tree, 'StorySheet').props.subtitle, '2 stops · Journey map');
   assert.equal(find(tree, 'MapItinerary').props.selectedId, 'second');
@@ -169,28 +203,29 @@ test('Story synchronizes carousel and map, preserves selection on close, and Use
   tree = h.render(Screen, props);
   assert.equal(find(tree, 'StopStoryViewer'), null);
   assert.equal(all(tree, 'JourneyMap').length, 1);
-  find(tree, 'StoryHeader').props.onAbout();
+  all(tree, 'Pressable').find(n => n.props.accessibilityLabel === 'Journey actions').props.onPress();
   tree = h.render(Screen, props);
   assert.equal(all(tree, 'JourneyMap').length, 0, 'About also unmounts the preview');
   find(tree, 'StorySheet').props.onClose();
   tree = h.render(Screen, props);
-  assert.equal(find(tree, 'JourneyMap').props.presentation, 'preview');
+  assert.equal(find(tree, 'JourneyMap').props.presentation, 'expanded');
   assert.equal(find(tree, 'StopTimeline').props.selectedId, 'first');
   find(tree, 'StopTimeline').props.onSelect('unknown');
   tree = h.render(Screen, props);
   assert.equal(find(tree, 'StopTimeline').props.selectedId, 'first');
-  assert.equal(all(tree, 'Pressable').some(item => item.props.accessibilityLabel === 'Start Journey'), false);
-  find(tree, 'JourneyOptions').props.onUse(); tree = h.render(Screen, props);
+  assert.equal(all(tree, 'Pressable').some(item => item.props.accessibilityLabel === 'Start Journey'), true);
+  find(tree, 'JourneyMap').props.onExpand(); tree = h.render(Screen, props);
   const start = all(tree, 'Pressable').find(item => item.props.accessibilityLabel === 'Start Journey');
   assert.ok(start);
   start.props.onPress(); tree = h.render(Screen, props);
-  assert.deepEqual(routes, [{ pathname: '/travel/[id]', params: { id: journeyId } }]);
+  assert.deepEqual(routes, Array.from({ length: 2 }, () => ({ pathname: '/travel/[id]', params: { id: journeyId } })));
   assert.equal(find(tree, 'StorySheet').props.visible, false);
   assert.equal(all(tree, 'JourneyMap').length, 0, 'Story map unmounts before Travel map opens');
   focus(); tree = h.render(Screen, props);
   assert.equal(find(tree, 'JourneyMap').props.selectedId, 'first', 'Returning restores Story map and selection');
-  find(tree, 'JourneyOptions').props.onUse();
+  find(tree, 'JourneyMap').props.onExpand();
   tree = h.render(Screen, { ...props, journey: { ...journey, stops: [] } });
+  const routeCount = routes.length; find(tree, 'JourneyOptions').props.onUse(); assert.equal(routes.length, routeCount);
   assert.equal(all(tree, 'Pressable').some(item => item.props.accessibilityLabel === 'Start Journey'), false);
 });
 
@@ -221,7 +256,7 @@ test('Travel Mode reloads the route ID using existing queries and handles exit, 
     '@/lib/journey/story-layout': layout, '@/lib/journey/travel-preview': eligibility,
   }, h.hooks);
   let tree = h.render(Screen, {});
-  assert.ok(find(tree, 'SafeAreaView'));
+  assert.equal(find(tree, 'SafeAreaView'), null, 'Loaded Travel is full screen with safe-area-aware overlays');
   assert.equal(find(tree, TravelModeContent).props.journey, valid);
   const signal = new AbortController().signal;
   assert.equal(await loader(signal), valid);
@@ -246,10 +281,11 @@ test('Travel Mode reloads the route ID using existing queries and handles exit, 
   assert.equal(store.get(journeyId).status, 'paused');
   state = { ...state, data: null, error: 'Offline' }; tree = h.render(Screen, {});
   assert.equal(find(tree, TravelModeContent).props.journey, store.get(journeyId).journey, 'Failed reload retains local session controls');
+  assert.match(find(tree, TravelModeContent).props.refreshNotice, /Original could not refresh/);
   store.transition(valid, 'finish', store.get(journeyId)); store.transition(valid, 'new', store.get(journeyId));
   state = { ...state, error: null };
   state = { ...state, data: null, loading: true }; tree = h.render(Screen, {});
-  assert.equal(find(tree, TravelModeContent), null); assert.ok(find(tree, 'ActivityIndicator'));
+  assert.equal(find(tree, TravelModeContent), null); assert.ok(find(tree, 'BrandedLoading'));
   state = { ...state, loading: false, error: 'Connection failed' }; tree = h.render(Screen, {});
   assert.equal(find(tree, 'Message').props.retry, state.retry);
   for (const data of [null, { ...valid, stops: [] }]) {
@@ -321,10 +357,10 @@ test('Travel session preserves map data and requires confirmation to finish or d
   find(tree, 'JourneyMap').props.onSelect('first'); tree = h.render(TravelModeContent, props);
   assert.equal(find(tree, 'MapItinerary').props.selectedId, 'first');
   all(tree, 'Pressable').find(item => item.props.accessibilityLabel === 'Begin Trip').props.onPress(); tree = h.render(TravelModeContent, props);
-  assert.match(text(tree), /Trip in progress/); assert.match(text(tree), /No travel verification/); assert.match(text(tree), /Location unavailable/);
+  assert.match(text(tree), /Stop 1 of 2/); assert.match(text(tree), /No travel verification/); assert.match(text(tree), /Location unavailable/);
   const button = label => all(tree, 'Pressable').find(item => item.props.accessibilityLabel === label);
   time = 2500; button('Pause').props.onPress(); tree = h.render(TravelModeContent, props);
-  assert.match(text(tree), /Trip paused/); time = 50000;
+  assert.match(text(tree), /Paused · Stop 1 of 2/); time = 50000;
   button('Resume').props.onPress(); tree = h.render(TravelModeContent, props);
   time = 51500; button('Finish').props.onPress(); tree = h.render(TravelModeContent, props);
   assert.equal(store.get(journeyId).status, 'active');
@@ -332,18 +368,26 @@ test('Travel session preserves map data and requires confirmation to finish or d
   assert.equal(find(tree, 'TripConfirmation'), null);
   button('Finish').props.onPress(); tree = h.render(TravelModeContent, props);
   const finish = find(tree, 'TripConfirmation').props.onConfirm; finish(); finish(); tree = h.render(TravelModeContent, props);
-  assert.match(text(tree), /Trip finished/); assert.match(text(tree), /2 planned stops/); assert.match(text(tree), /Final duration 00:04/);
+  assert.match(text(tree), /Trip ended early/); assert.match(text(tree), /0\/2 completed/); assert.match(text(tree), /Final duration 00:04/);
   assert.equal(button('Resume'), undefined); assert.equal(button('Begin Trip'), undefined);
   button('Start a new trip').props.onPress(); tree = h.render(TravelModeContent, props);
   find(tree, 'TripConfirmation').props.onCancel(); tree = h.render(TravelModeContent, props);
-  assert.match(text(tree), /Trip finished/);
+  assert.match(text(tree), /Trip ended early/);
   button('Start a new trip').props.onPress(); tree = h.render(TravelModeContent, props);
   find(tree, 'TripConfirmation').props.onConfirm(); tree = h.render(TravelModeContent, props);
   assert.match(text(tree), /Ready to start/); assert.ok(button('Begin Trip'));
   height = 568; tree = h.render(TravelModeContent, props);
   assert.equal(all(tree, 'Text').find(item => item.props.children === journey.title).props.numberOfLines, 1);
-  assert.ok(find(tree, 'ScrollView').props.style.maxHeight <= 48, 'Description stays in a bounded panel');
-  const exit = [tree.props.children].flat(Infinity).flatMap(node => node?.props?.children ?? []).find(node => typeof node?.type === 'function');
+  assert.ok(find(tree, 'ItinerarySheet'), 'Details live in a collapsible sheet');
+  tree.props.onLayout({ nativeEvent: { layout: { height: 568 } } });
+  tree = h.render(TravelModeContent, props);
+  assert.equal(find(tree, 'ItinerarySheet').props.maxSheetHeight, 328, 'Sheet reserves safe areas, heading and map controls on short screens');
+  assert.ok(all(find(tree, 'ItinerarySheet').props.footer, 'Pressable').some(item => item.props.accessibilityLabel === 'Begin Trip'), 'Primary controls are in the fixed sheet footer');
+  const mapContainer = all(tree, 'View').find(item => item.props.style?.position === 'absolute' && item.props.style?.paddingHorizontal === undefined);
+  assert.deepEqual(mapContainer.props.style, { position: 'absolute', top: 0, bottom: 0, left: 0, right: 0 }, 'Map fills the screen edge to edge');
+  assert.equal(find(tree, 'JourneyMap').props.navigationMode, true);
+  assert.equal(find(tree, 'ScrollView'), null, 'Essential controls require no screen scrolling');
+  const exit = all(tree, 'View').flatMap(node => [node.props?.children].flat(Infinity)).find(node => typeof node?.type === 'function');
   exit.type(exit.props).props.onPress(); assert.equal(exited, 1);
   assert.equal(JSON.stringify(journey), before);
 });
@@ -369,12 +413,18 @@ test('Travel renders permission, weak-fix and unavailable states honestly withou
   gps.status = 'requesting'; tree = render(); assert.equal(button(tree, 'Begin Trip').props.disabled, true);
   gps = { status: 'denied', canAskAgain: false, position: null }; tree = render();
   assert.match(text(tree), /permission denied/); button(tree, 'Open location settings').props.onPress(); assert.equal(settings, 1);
+  assert.equal(button(tree, 'Begin Trip').props.disabled, true);
+  assert.ok(find(tree, 'JourneyMap'), 'Denied permission does not remove the road map');
+  assert.equal(store.get(journeyId).status, 'ready');
+  gps = { status: 'denied', canAskAgain: true, position: null }; tree = render();
+  button(tree, 'Retry location').props.onPress(); assert.equal(retries, 1);
+  assert.equal(store.get(journeyId).status, 'ready', 'Permission Retry does not begin the trip');
   store.transition(journey, 'begin', store.get(journeyId)); gps = { status: 'unavailable', canAskAgain: true, position: null }; tree = render();
-  assert.match(text(tree), /Trip in progress/); assert.match(text(tree), /Location unavailable/); button(tree, 'Retry location').props.onPress(); assert.equal(retries, 1);
+  assert.match(text(tree), /Stop 1 of 2/); assert.match(text(tree), /Location unavailable/); button(tree, 'Retry location').props.onPress(); assert.equal(retries, 2);
   find(tree, 'MapItinerary').props.onSelect('second');
   gps = { status: 'weak', canAskAgain: true, position: { latitude: 8, longitude: 76, accuracy: 250, timestamp: 100 } }; tree = render();
   assert.match(text(tree), /signal weak/); assert.match(text(tree), /250 m/);
-  assert.equal(find(tree, 'JourneyMap').props.currentPosition, gps.position);
+  assert.equal(find(tree, 'JourneyMap').props.currentPosition, null, 'A weak/stale fix must not look like a precise current-position dot');
   assert.equal(find(tree, 'JourneyMap').props.selectedId, 'second'); assert.equal(find(tree, 'MapItinerary').props.selectedId, 'second');
   gps = { status: 'finished', canAskAgain: true, position: null }; store.transition(journey, 'finish', store.get(journeyId)); tree = render();
   assert.match(text(tree), /Trip finished · Location updates stopped/); assert.equal(find(tree, 'JourneyMap').props.currentPosition, null);
@@ -388,7 +438,7 @@ test('Travel location hook gates Begin, stops synchronously on store transitions
   const app = { currentState: 'active', addEventListener: (_, listener) => { appListener = listener; return { remove() { appListener = null; } }; } };
   const { useTripLocation } = load('src/hooks/use-trip-location.ts', {
     'expo-router': { useFocusEffect: callback => h.hooks.useEffect(callback, [callback]) },
-    'react-native': { AppState: app }, '@/lib/journey/trip-session': { tripStore: store },
+    'react-native': { AppState: app, Platform: { OS: 'android' } }, '@/lib/journey/trip-session': { tripStore: store },
     '@/lib/journey/foreground-location': locationModel,
     '@/lib/journey/location-port': { locationPort: {
       async permission(request) { requests.push(request); return { granted: true, canAskAgain: true }; },
@@ -398,7 +448,8 @@ test('Travel location hook gates Begin, stops synchronously on store transitions
   }, h.hooks);
   const render = () => h.render(() => useTripLocation(journey, store.get(journeyId)), {});
   const flush = async () => { for (let i = 0; i < 15; i++) await Promise.resolve(); };
-  let value = render(); assert.deepEqual(requests, []); assert.equal(store.get(journeyId).status, 'ready');
+  let value = render(); await flush(); value = render();
+  assert.deepEqual(requests, [true]); assert.equal(store.get(journeyId).status, 'ready'); assert.equal(watches, 0); assert.equal(value.status, 'permitted');
   await value.begin(); await flush(); value = render();
   assert.equal(store.get(journeyId).status, 'active'); assert.equal(watches, 1); assert.equal(value.position, null);
   callback({ latitude: 8, longitude: 76, accuracy: 10, timestamp: Date.now() }); value = render(); assert.equal(value.status, 'tracking');
@@ -437,7 +488,7 @@ test('expanded itinerary preserves creator order, optional days and gaps across 
   list.props.ref.current = { scrollToOffset: value => offsets.push(value) };
   props.selectedId = 'stop-65'; tree = h.render(MapItinerary, props);
   const updated = find(tree, 'FlatList');
-  assert.equal(updated.props.extraData, 'stop-65');
+  assert.equal(updated.props.extraData[0], 'stop-65');
   assert.equal(find(updated.props.renderItem({ item: stops[65], index: 65 }), 'Pressable').props.accessibilityState.selected, true);
   assert.equal(find(updated.props.renderItem({ item: stops[65], index: 65 }), 'Pressable').props['aria-selected'], true);
   assert.equal(offsets.at(-1).offset, updated.props.getItemLayout(null, 65).offset);
@@ -522,14 +573,21 @@ test('horizontal cards snap to external selections; momentum and idle scrolling 
   assert.equal(find(cards.props.renderItem({ item: props.stops[2], index: 2 }), 'JourneyPhoto').props.uri, null);
 });
 
-function nativeMapHarness(stops, extraNative = {}, timers = globalThis) {
+function nativeMapHarness(stops, extraNative = {}, timers = globalThis, store = sessionModel.createTripStore()) {
   const h = harness();
+  const cameraHook = load('src/hooks/use-travel-camera.ts', {
+    'expo-router': { useFocusEffect: fn => h.hooks.useEffect(fn, [fn]) },
+    'react-native': { ...native, ...extraNative }, '@/lib/journey/travel-camera': cameraModel,
+    '@/lib/journey/trip-session': { tripStore: store },
+  }, h.hooks, timers);
   const mapbox = Object.fromEntries(['MapView', 'Camera', 'ShapeSource', 'CircleLayer', 'SymbolLayer', 'LineLayer', 'Atmosphere'].map(key => [key, key]));
-  mapbox.StyleURL = { Outdoors: 'outdoors', SatelliteStreet: 'satellite' };
+  mapbox.StyleURL = { Outdoors: 'outdoors', SatelliteStreet: 'satellite', Street: 'streets' };
   const { NativeJourneyMap: Component } = load('src/components/journey/map/native-map.tsx', {
     '@rnmapbox/maps': mapbox, 'react-native': {...native, ...extraNative}, '@/components/discovery/ui': ui,
     '@/lib/discovery/presentation': presentation, '@/lib/discovery/globe-style': stylePolicy,
     '@/lib/journey/map-camera': framing, './map-frame': { MapFallback: 'MapFallback' },
+    '@/hooks/use-travel-camera': cameraHook,
+    '@/components/discovery/globe/journey-overlays': {JourneyOverlays:'JourneyOverlays'},
   }, h.hooks, timers);
   const props = { data: mapData.buildMapData(stops), stops, selectedId: stops[0]?.id, retry: () => {}, presentation: 'expanded' };
   const render = () => h.render(Component, props);
@@ -538,10 +596,91 @@ function nativeMapHarness(stops, extraNative = {}, timers = globalThis) {
     all(tree, 'View').find(item => item.props.onLayout).props.onLayout({nativeEvent:{layout:{width,height}}});
     tree = render(); return tree;
   };
-  return { ...h, props, render, measure };
+  return { ...h, props, render, measure, store };
 }
 const mappedStop = (id, sequence, longitude, latitude) => ({...stop(id), sequence, longitude, latitude});
 const source = (tree, id) => all(tree, 'ShapeSource').find(item => item.props.id === id);
+
+test('immersive Travel frames and positions native controls above the measured sheet and highlights the real destination', () => {
+  const h = nativeMapHarness([mappedStop('first', 0, 76, 8), mappedStop('second', 1, 77, 9)]);
+  Object.assign(h.props, { navigationMode: true, navigationPadding: { top: 90, bottom: 240 }, destinationId: 'first', selectedId: 'second' });
+  let tree = h.measure(390, 844);
+  assert.equal(find(tree, 'Camera').props.defaultSettings.padding.paddingBottom, 240);
+  assert.equal(find(tree, 'Camera').props.defaultSettings.padding.paddingTop, 90);
+  assert.deepEqual(find(tree, 'MapView').props.logoPosition, { bottom: 248, left: 12 });
+  assert.deepEqual(find(tree, 'MapView').props.attributionPosition, { bottom: 248, right: 12 });
+  assert.equal(find(tree, 'MapView').props.compassPosition.bottom, 276);
+  assert.equal(find(tree, 'View').props.style[1].borderRadius, 0);
+  const points = source(tree, 'planned-stops').props.shape.features;
+  assert.equal(points[0].properties.destination, true); assert.equal(points[1].properties.destination, false);
+  assert.equal(points[1].properties.selected, true, 'Preview selection does not replace destination');
+  h.props.navigationPadding = { top: 90, bottom: 400 }; tree = h.render();
+  assert.equal(find(tree, 'MapView').props.logoPosition.bottom, 408); h.dispose();
+});
+
+test('expanded sheet reserves a fixed footer for active controls and budgets large-text measurements', () => {
+  const h = harness(); let height;
+  const { ItinerarySheet } = load('src/components/journey/itinerary-sheet.tsx', {
+    'react-native': { ...native, ScrollView: 'ScrollView', PanResponder: { create: () => ({ panHandlers: {} }) } },
+    '@/components/discovery/ui': ui,
+  }, h.hooks);
+  const footer = jsx('ActiveControls', {}), props = { title: 'Destination', subtitle: '12 km · 20 min', footer, children: jsx('Itinerary', {}), maxSheetHeight: 400, onHeightChange: value => { height = value; } };
+  let tree = h.render(ItinerarySheet, props);
+  assert.ok(![tree.props.children].flat().some(child => child?.type === 'ScrollView'), 'Story remains a fixed composition; only the popup scrolls'); assert.ok(find(tree, 'ActiveControls'));
+  tree.props.onLayout({ nativeEvent: { layout: { height: 280 } } }); assert.equal(height, 280);
+  const measured = all(tree, 'View').filter(node => node.props.onLayout && node !== tree);
+  measured[0].props.onLayout({ nativeEvent: { layout: { height: 90 } } });
+  measured[1].props.onLayout({ nativeEvent: { layout: { height: 180 } } });
+  find(tree, 'Pressable').props.onPress(); tree = h.render(ItinerarySheet, props);
+  assert.equal(find(tree, 'ScrollView').props.style.maxHeight, 130);
+  assert.equal(find(find(tree, 'ScrollView'), 'ActiveControls'), null, 'Pause/Finish never enter the itinerary scroll surface');
+  assert.ok(find(tree, 'ActiveControls'));
+  measured[1].props.onLayout({ nativeEvent: { layout: { height: 320 } } }); tree = h.render(ItinerarySheet, props);
+  assert.equal(find(tree, 'ScrollView').props.style.maxHeight, 0, 'Details yield to large essential controls');
+  assert.ok(find(tree, 'ActiveControls')); h.dispose();
+});
+
+test('Travel opts into road style without atmosphere and fails honestly instead of using satellite', () => {
+  const h = nativeMapHarness([mappedStop('first', 0, 76, 8)]);
+  h.props.navigationMode = true;
+  let tree = h.measure();
+  assert.equal(find(tree, 'MapView').props.styleURL, 'streets');
+  assert.equal(find(tree, 'MapView').props.projection, 'mercator');
+  assert.equal(find(tree, 'Atmosphere'), null);
+  assert.equal(find(tree, 'MapView').props.logoEnabled, true);
+  assert.equal(find(tree, 'MapView').props.attributionEnabled, true);
+  find(tree, 'MapView').props.onMapLoadingError(); tree = h.render();
+  assert.equal(find(tree, 'MapView'), null);
+  assert.match(find(tree, 'MapFallback').props.message, /Road map unavailable.*Mapbox style access/);
+  assert.equal(find(tree, 'MapFallback').props.retry, h.props.retry);
+  h.dispose();
+});
+
+test('itinerary sheet snaps by drag or accessible button, bounds details on short screens, and leaves horizontal gestures alone', () => {
+  const h = harness(); let handlers, height = 568;
+  const { ItinerarySheet } = load('src/components/journey/itinerary-sheet.tsx', {
+    'react-native': { ...native, ScrollView: 'ScrollView', useWindowDimensions: () => ({ height }),
+      PanResponder: { create(value) { handlers = value; return { panHandlers: {} }; } } },
+    '@/components/discovery/ui': ui,
+  }, h.hooks);
+  const props = { title: 'Itinerary', subtitle: '2 stops', children: jsx('Details', {}), maxDetailsHeight: 100 };
+  const render = () => h.render(ItinerarySheet, props);
+  let tree = render(); assert.ok(![tree.props.children].flat().some(child => child?.type === 'ScrollView'), 'Story remains a fixed composition; only the popup scrolls');
+  assert.equal(find(tree, 'Pressable').props.accessibilityState.expanded, false);
+  assert.equal(handlers.onMoveShouldSetPanResponder(null, { dy: 10, dx: 30 }), false);
+  assert.equal(handlers.onMoveShouldSetPanResponder(null, { dy: -30, dx: 2 }), true);
+  handlers.onPanResponderRelease(null, { dy: -30 }); tree = render();
+  assert.equal(find(tree, 'Pressable').props.accessibilityState.expanded, true);
+  assert.equal(find(tree, 'ScrollView').props.style.maxHeight, 100);
+  assert.equal(find(tree, 'ScrollView').props.nestedScrollEnabled, true);
+  handlers.onPanResponderRelease(null, { dy: 30 }); tree = render();
+  assert.ok(![tree.props.children].flat().some(child => child?.type === 'ScrollView'), 'Story remains a fixed composition; only the popup scrolls');
+  find(tree, 'Pressable').props.onPress(); tree = render(); assert.ok(find(tree, 'Details'));
+  height = 300; tree = render(); assert.equal(find(tree, 'ScrollView').props.style.maxHeight, 90);
+  handlers.onPanResponderRelease(null, { dy: 10 }); tree = render(); assert.ok(find(tree, 'Details'), 'Small gestures do not snap');
+  find(tree, 'Pressable').props.onPress(); tree = render(); assert.equal(find(tree, 'Details'), null);
+  h.dispose();
+});
 
 test('cinematic Story map highlights ordered stops, rejects unknown markers, and expands only preview taps', () => {
   const stops = [mappedStop('second', 2, 77, 9), mappedStop('first', 1, 76, 8)];
@@ -667,7 +806,7 @@ test('stop stories navigate in order, disable ends, use shared photos and keep l
   assert.equal(gesture.onMoveShouldSetPanResponder(null, {dx: 100, dy: 0}), false);
   assert.equal(all(tree, 'Text').some(item => item.props.children === props.journey.stops[1].description && item.props.selectable), true);
   find(tree, 'Modal').props.onRequestClose(); tree = h.render(StopStoryViewer, props);
-  assert.equal(find(tree, 'ScrollView'), null); assert.equal(closed, 0);
+  assert.ok(![tree.props.children].flat().some(child => child?.type === 'ScrollView'), 'Story remains a fixed composition; only the popup scrolls'); assert.equal(closed, 0);
   find(tree, 'Modal').props.onRequestClose(); assert.equal(closed, 1);
   props.journey.stops = [stop('first')]; props.selectedId = 'first'; tree = h.render(StopStoryViewer, props);
   assert.equal(button(tree, 'Previous stop').props.disabled, true); assert.equal(button(tree, 'Next stop').props.disabled, true);
@@ -798,4 +937,577 @@ test('unmount cancels an observed transition and newer selection supersedes the 
   h.dispose(); assert.equal(commands.length,3); assert.equal(commands.at(-1).animationDuration,0);
   assert.deepEqual(commands.at(-1).centerCoordinate,[76.5,8.5]);
   stale.onDidFinishLoadingMap(); stale.onMapLoadingError(); assert.equal(h.lateUpdates(),0);
+});
+
+
+test('Travel navigation hook clears route synchronously on Pause/Finish/background and disposes observers on blur', async () => {
+  const h = harness(), store = sessionModel.createTripStore();
+  const journey = { id: journeyId, title: 'Coast', stops: [{ ...stop('first'), sequence: 0, latitude: 9, longitude: 77 }] };
+  let locationListener, appListener, resolve, signal, removed = 0;
+  const intervals = new Map(); let nextTimer = 0;
+  const location = { get: () => ({ position: { latitude: 8, longitude: 76, accuracy: 10, timestamp: Date.now() } }), subscribe(fn) { locationListener = fn; return () => { removed++; }; } };
+  const app = { currentState: 'active', addEventListener(_, fn) { appListener = fn; return { remove() { removed++; } }; } };
+  const road = { geometry: { type: 'LineString', coordinates: [[76, 8], [77, 9]] }, distance: 1000, duration: 60 };
+  const { useTripNavigation } = load('src/hooks/use-trip-navigation.ts', {
+    'expo-router': { useFocusEffect: fn => h.hooks.useEffect(fn, [fn]) }, 'react-native': { AppState: app },
+    '@/lib/journey/trip-session': { ...sessionModel, tripStore: store }, '@/lib/journey/navigation': { ...navigationModel,
+      requestRoadRoute: (_, __, ___, abort) => { signal = abort; return new Promise(done => { resolve = done; }); },
+      observeNavigation: (controller, read, sources, state) => navigationModel.observeNavigation(controller, read, sources, state, { set(fn) { intervals.set(++nextTimer, fn); return nextTimer; }, clear(id) { intervals.delete(id); } }),
+    },
+  }, h.hooks);
+  const render = () => h.render(() => useTripNavigation(journey, store.get(journeyId), location), {});
+  const flush = async () => { for (let i = 0; i < 12; i++) await Promise.resolve(); };
+  render(); assert.equal(signal, undefined);
+  store.transition(journey, 'begin', store.get(journeyId)); await flush(); assert.equal(render().status, 'loading');
+  resolve(road); await flush(); assert.equal(render().route, road);
+  store.transition(journey, 'pause', store.get(journeyId)); assert.equal(render().route, null);
+  store.transition(journey, 'resume', store.get(journeyId)); app.currentState = 'background'; appListener(); assert.equal(render().route, null);
+  app.currentState = 'active'; appListener(); locationListener();
+  store.transition(journey, 'finish', store.get(journeyId)); assert.equal(render().route, null);
+  h.dispose(); assert.equal(intervals.size, 0); assert.equal(removed, 2);
+  assert.equal(signal.aborted, false, 'Completed request needs no further abort; no new request during cooldown');
+});
+
+test('manual completion is separate from preview, confirms only current stop, warns for missing coordinates and resets progress', () => {
+  const h = harness(), store = sessionModel.createTripStore();
+  const journey = { id: journeyId, title: 'Trip', stops: [
+    { ...stop('later'), sequence: 2, latitude: null, longitude: null },
+    { ...stop('first'), sequence: 1, latitude: 8, longitude: 76 },
+  ] };
+  const { TravelModeContent } = load('src/app/travel/[id].tsx', {
+    ...sessionMocks(store), 'expo-router': {}, 'react-native': native,
+    'react-native-safe-area-context': {}, '@/components/discovery/ui': ui,
+    '@/components/journey/map/journey-map': { JourneyMap: 'JourneyMap' }, '@/components/journey/map-itinerary': { MapItinerary: 'MapItinerary' },
+    '@/hooks/use-load': {}, '@/lib/discovery/queries': {}, '@/lib/discovery/model': {}, '@/lib/journey/map-data': mapData,
+    '@/lib/journey/story-layout': layout, '@/lib/journey/travel-preview': eligibility,
+  }, h.hooks);
+  const render = () => h.render(TravelModeContent, { journey, onExit() {} });
+  const button = (tree, label) => all(tree, 'Pressable').find(item => item.props.accessibilityLabel === label);
+  const text = tree => all(tree, 'Text').map(item => [item.props.children].flat(Infinity).join('')).join(' ');
+  let tree = render();
+  assert.equal(button(tree, 'Mark first complete').props.disabled, true);
+  button(tree, 'Begin Trip').props.onPress(); tree = render();
+  find(tree, 'MapItinerary').props.onSelect('later'); tree = render();
+  assert.equal(find(tree, 'JourneyMap').props.selectedId, 'later');
+  assert.equal(find(tree, 'JourneyMap').props.destinationId, 'first');
+  assert.equal(button(tree, 'Mark later complete'), undefined);
+  assert.equal(all(find(tree, 'ItinerarySheet').props.footer, 'Pressable').some(node => node.props.accessibilityLabel.startsWith('Mark')), false, 'Completion lives in expanded details');
+  button(tree, 'Mark first complete').props.onPress(); tree = render();
+  find(tree, 'TripConfirmation').props.onCancel(); tree = render();
+  assert.deepEqual(store.get(journeyId).completedStopIds, []);
+  button(tree, 'Mark first complete').props.onPress(); tree = render();
+  const stale = find(tree, 'TripConfirmation').props.onConfirm;
+  button(tree, 'Pause').props.onPress(); tree = render();
+  stale(); tree = render(); assert.deepEqual(store.get(journeyId).completedStopIds, []);
+  assert.equal(button(tree, 'Mark first complete').props.disabled, true);
+  button(tree, 'Resume').props.onPress(); tree = render();
+  button(tree, 'Mark first complete').props.onPress(); tree = render();
+  const complete = find(tree, 'TripConfirmation').props.onConfirm;
+  complete(); complete(); tree = render();
+  assert.deepEqual(store.get(journeyId).completedStopIds, ['first']);
+  assert.equal(find(tree, 'JourneyMap').props.destinationId, 'later');
+  assert.equal(find(tree, 'JourneyMap').props.selectedId, 'later', 'Preview is not reset by completion');
+  assert.match(text(tree), /Stop 2 of 2/); assert.match(text(tree), /Routing unavailable.*manually/);
+  assert.deepEqual(find(tree, 'MapItinerary').props.stops.map(stop => stop.id), ['first', 'later']);
+  assert.deepEqual(find(tree, 'MapItinerary').props.completedStopIds, ['first']);
+  button(tree, 'Mark later complete').props.onPress(); tree = render();
+  assert.match(find(tree, 'TripConfirmation').props.body, /completes the journey.*timer and GPS/);
+  find(tree, 'TripConfirmation').props.onConfirm(); tree = render();
+  assert.equal(store.get(journeyId).status, 'completed'); assert.match(text(tree), /All 2 stops completed/);
+  assert.equal(button(tree, 'Finish'), undefined); assert.equal(button(tree, 'Pause'), undefined);
+  assert.equal(find(tree, 'JourneyMap').props.destinationId, undefined);
+  button(tree, 'Start a new trip').props.onPress(); tree = render();
+  find(tree, 'TripConfirmation').props.onConfirm(); tree = render();
+  assert.deepEqual(store.get(journeyId).completedStopIds, []); assert.ok(button(tree, 'Begin Trip'));
+  h.dispose();
+});
+
+test('itinerary exposes completed and current styling without changing selected preview', () => {
+  const h = harness();
+  const { MapItinerary } = load('src/components/journey/map-itinerary.tsx', {
+    'react-native': native, '@/components/discovery/ui': ui, '@/lib/journey/map-data': mapData,
+  }, h.hooks);
+  const stops = [stop('first'), stop('second'), stop('third')];
+  const tree = h.render(MapItinerary, { stops, selectedId: 'third', completedStopIds: ['first'], destinationId: 'second', onSelect() {} });
+  const list = find(tree, 'FlatList');
+  const card = i => find(list.props.renderItem({ item: stops[i], index: i }), 'Pressable');
+  assert.match(card(0).props.accessibilityLabel, /Completed manually/);
+  assert.match(card(1).props.accessibilityLabel, /Current destination/);
+  assert.equal(card(1).props.accessibilityState.selected, false);
+  assert.equal(card(2).props.accessibilityState.selected, true);
+  assert.ok(all(card(0), 'Text').some(node => node.props.children === '✓'));
+  h.dispose();
+});
+
+test('completion drives the actual navigation hook, cancels old routes, waits for mapped destination and stops on final completion', async () => {
+  const h = harness(), store = sessionModel.createTripStore();
+  const journey = { id: journeyId, title: 'Trip', stops: [
+    { ...stop('third'), sequence: 3, latitude: 10, longitude: 78 },
+    { ...stop('first'), sequence: 1, latitude: 9, longitude: 77 },
+    { ...stop('missing'), sequence: 2, latitude: null, longitude: null },
+  ] };
+  let time = Date.now(); const gates = [], signals = [], destinations = [], intervals = new Map();
+  const app = { currentState: 'active', addEventListener: () => ({ remove() {} }) };
+  const location = { get: () => ({ position: { latitude: 8, longitude: 76, accuracy: 10, timestamp: time } }), subscribe: () => () => {} };
+  const { useTripNavigation } = load('src/hooks/use-trip-navigation.ts', {
+    'expo-router': { useFocusEffect: fn => h.hooks.useEffect(fn, [fn]) }, 'react-native': { AppState: app },
+    '@/lib/journey/trip-session': { ...sessionModel, tripStore: store },
+    '@/lib/journey/navigation': { ...navigationModel,
+      createNavigation: loader => navigationModel.createNavigation(loader, () => time),
+      requestRoadRoute: (_, destination, __, signal) => { destinations.push(destination.id); signals.push(signal); return new Promise(resolve => gates.push(resolve)); },
+      observeNavigation: (controller, read, sources, app) => navigationModel.observeNavigation(controller, read, sources, app,
+        { set(fn) { intervals.set(1, fn); return 1; }, clear(id) { intervals.delete(id); } }),
+    },
+  }, h.hooks);
+  const render = () => h.render(() => useTripNavigation(journey, store.get(journeyId), location), {});
+  const flush = async () => { for (let i = 0; i < 12; i++) await Promise.resolve(); };
+  const road = { geometry: { type: 'LineString', coordinates: [[76, 8], [77, 9]] }, distance: 1000, duration: 60 };
+  render(); store.transition(journey, 'begin', store.get(journeyId)); await flush();
+  assert.deepEqual(destinations, ['first']);
+  store.completeStop(journeyId, 'first', store.get(journeyId));
+  assert.equal(signals[0].aborted, true); assert.equal(render().route, null);
+  assert.equal(render().destination.id, 'missing'); assert.match(render().message, /coordinates/);
+  await flush(); assert.equal(destinations.length, 1, 'No invented route for unmapped stop');
+  store.completeStop(journeyId, 'missing', store.get(journeyId)); await flush();
+  assert.equal(render().destination.id, 'third'); assert.equal(render().route, null);
+  time += 5000; intervals.get(1)(); await flush(); assert.deepEqual(destinations, ['first', 'third']);
+  gates[0](road); await flush(); assert.equal(render().route, null, 'Late first route cannot be restored');
+  store.completeStop(journeyId, 'third', store.get(journeyId));
+  assert.equal(signals[1].aborted, true); assert.equal(render().destination, undefined);
+  gates[1](road); await flush(); assert.equal(render().route, null); assert.match(render().message, /stopped/);
+  h.dispose(); assert.equal(intervals.size, 0);
+});
+
+test('final manual completion synchronously stops the actual GPS hook and rejects late fixes', async () => {
+  const h = harness(), store = sessionModel.createTripStore();
+  const journey = { id: journeyId, title: 'Trip', stops: [{ ...stop('only'), sequence: 1 }] };
+  let update, removed = 0;
+  const { useTripLocation } = load('src/hooks/use-trip-location.ts', {
+    'expo-router': { useFocusEffect: fn => h.hooks.useEffect(fn, [fn]) }, 'react-native': native,
+    '@/lib/journey/trip-session': { tripStore: store }, '@/lib/journey/foreground-location': locationModel,
+    '@/lib/journey/location-port': { locationPort: {
+      permission: async () => ({ granted: true, canAskAgain: true }), services: async () => true,
+      watch: async fn => { update = fn; return { remove() { removed++; } }; },
+    } },
+  }, h.hooks);
+  const render = () => h.render(() => useTripLocation(journey, store.get(journeyId)), {});
+  const flush = async () => { for (let i = 0; i < 15; i++) await Promise.resolve(); };
+  render(); await flush(); await render().begin(); await flush();
+  update({ latitude: 8, longitude: 76, accuracy: 10, timestamp: Date.now() }); assert.ok(render().position);
+  store.completeStop(journeyId, 'only', store.get(journeyId)); assert.equal(removed, 1);
+  assert.equal(render().position, null); assert.equal(render().status, 'finished');
+  update({ latitude: 9, longitude: 77, accuracy: 10, timestamp: Date.now() + 1 }); assert.equal(render().position, null);
+  h.dispose();
+});
+
+test('Travel native camera follows GPS, suspends for gestures/Fit/preview and Recenter restores following above the sheet', () => {
+  const stops = [mappedStop('first', 1, 77, 9), mappedStop('second', 2, 78, 10)];
+  const alerts = [];
+  const h = nativeMapHarness(stops, { Alert: { alert: (...args) => alerts.push(args) } });
+  const journey = { id: journeyId, title: 'Trip', stops };
+  let position = { latitude: 8, longitude: 76, accuracy: 10, timestamp: Date.now() }, locationUpdate;
+  const location = { get: () => ({ position, status: 'tracking' }), subscribe(fn) { locationUpdate = fn; return () => {}; } };
+  Object.assign(h.props, { navigationMode: true, navigationPadding: { top: 100, bottom: 240 }, travelCamera: { journeyId, location } });
+  let tree = h.measure(390, 844); const commands = [];
+  find(tree, 'Camera').props.ref.current = { setCamera: command => commands.push(command) };
+  find(tree, 'MapView').props.onDidFinishLoadingMap(); tree = h.render();
+  const recenter = () => all(tree, 'Pressable').find(node => node.props.accessibilityLabel === 'My Location, recenter map');
+  recenter().props.onPress(); tree = h.render(); assert.equal(commands.length, 0, 'Recenter never begins a ready trip');
+  assert.deepEqual(alerts.at(-1), ['My Location', 'Begin Trip to use My Location']);
+  h.store.transition(journey, 'begin', h.store.get(journeyId)); tree = h.render();
+  assert.deepEqual(commands.at(-1).centerCoordinate, [76, 8]); assert.equal(commands.at(-1).zoomLevel, 15.5);
+  const count = commands.length;
+  find(tree, 'MapView').props.onCameraChanged({ properties: { center: [76.2, 8.1], zoom: 12, heading: 0, pitch: 0 }, gestures: { isGestureActive: true } });
+  position = { ...position, longitude: 76.01 }; locationUpdate(); tree = h.render();
+  assert.equal(commands.length, count); assert.equal(recenter().props.accessibilityState.selected, false);
+  recenter().props.onPress(); tree = h.render(); assert.deepEqual(commands.at(-1).centerCoordinate, [76.01, 8]);
+  position = { ...position, longitude: 76.02 }; locationUpdate(); assert.deepEqual(commands.at(-1).centerCoordinate, [76.02, 8]);
+  all(tree, 'Pressable').find(node => node.props.accessibilityLabel === 'Fit journey and reset map orientation').props.onPress();
+  const fitCount = commands.length; position = { ...position, longitude: 76.03 }; locationUpdate(); tree = h.render();
+  assert.equal(commands.length, fitCount, 'Fit opts into exploration');
+  recenter().props.onPress(); tree = h.render(); h.props.selectedId = 'second'; tree = h.render();
+  assert.deepEqual(commands.at(-1).centerCoordinate, [78, 10]);
+  position = { ...position, longitude: 76.04 }; locationUpdate(); tree = h.render();
+  assert.equal(recenter().props.accessibilityState.selected, false, 'Preview does not fight following');
+  recenter().props.onPress(); tree = h.render();
+  h.props.navigationPadding = { top: 100, bottom: 420 }; tree = h.render();
+  assert.equal(commands.at(-1).padding.paddingBottom, 420);
+  const controls = all(tree, 'View').find(node => Array.isArray(node.props.style) && node.props.style[0]?.right === 62);
+  assert.equal(controls.props.style[1].bottom, 456, 'Recenter sits above measured sheet and left of compass');
+  h.dispose();
+});
+
+test('Travel camera hook stops synchronously on Pause/Finish/background/blur, cleans timers, and ignores late callbacks', () => {
+  const h = harness(), store = sessionModel.createTripStore();
+  const journey = { id: journeyId, title: 'Trip', stops: [mappedStop('first', 1, 77, 9)] };
+  let locationUpdate, tick, focus, cleanup, canceled = 0, removed = 0, cleared = 0;
+  const appListeners = new Set(), commands = [];
+  const app = { currentState: 'active', addEventListener(_, fn) { appListeners.add(fn); return { remove() { appListeners.delete(fn); removed++; } }; } };
+  const location = { get: () => ({ position: { latitude: 8, longitude: 76, accuracy: 10, timestamp: Date.now() }, status: 'tracking' }), subscribe(fn) { locationUpdate = fn; return () => { removed++; }; } };
+  const { useTravelCamera } = load('src/hooks/use-travel-camera.ts', {
+    'expo-router': { useFocusEffect: fn => { focus = fn; h.hooks.useEffect(() => { cleanup = fn(); return () => cleanup?.(); }, [fn]); } },
+    'react-native': { AppState: app }, '@/lib/journey/trip-session': { tripStore: store }, '@/lib/journey/travel-camera': cameraModel,
+  }, h.hooks, { ...globalThis, setInterval(fn) { tick = fn; return 1; }, clearInterval() { cleared++; } });
+  const source = { journeyId, location }, move = command => commands.push(command), cancel = () => canceled++;
+  const render = () => h.render(() => useTravelCamera(source, move, cancel, { ready: true, reduceMotion: true, top: 100, bottom: 240 }), {});
+  render(); store.transition(journey, 'begin', store.get(journeyId)); assert.equal(commands.length, 1);
+  store.transition(journey, 'pause', store.get(journeyId)); assert.equal(canceled, 1);
+  render().recenter(); assert.equal(commands.length, 1);
+  store.transition(journey, 'resume', store.get(journeyId)); assert.equal(commands.length, 2);
+  app.currentState = 'background'; for (const fn of appListeners) fn(); assert.equal(canceled, 2);
+  tick(); locationUpdate(); assert.equal(commands.length, 2);
+  app.currentState = 'active'; for (const fn of appListeners) fn(); assert.equal(commands.length, 3);
+  cleanup(); const oldTick = tick, oldLocation = locationUpdate; assert.equal(canceled, 3);
+  oldTick(); oldLocation(); render().recenter(); assert.equal(commands.length, 3, 'Blur blocks even a stale button callback');
+  cleanup = focus(); assert.equal(commands.length, 4, 'Active reentry follows a suitable fix');
+  store.transition(journey, 'finish', store.get(journeyId)); assert.equal(canceled, 4);
+  tick(); locationUpdate(); assert.equal(commands.length, 4);
+  h.dispose(); assert.equal(appListeners.size, 0); assert.equal(cleared, 2); assert.equal(removed, 4);
+});
+
+test('native Travel camera resumes on foreground even when its observer runs before the map AppState listener', () => {
+  const listeners = new Set();
+  const app = { currentState: 'active', addEventListener(_, fn) { listeners.add(fn); return { remove: () => listeners.delete(fn) }; } };
+  const stops = [mappedStop('first', 1, 77, 9)], h = nativeMapHarness(stops, { AppState: app });
+  const journey = { id: journeyId, title: 'Trip', stops };
+  const location = { get: () => ({ position: { latitude: 8, longitude: 76, accuracy: 10, timestamp: Date.now() }, status: 'tracking' }), subscribe: () => () => {} };
+  Object.assign(h.props, { navigationMode: true, travelCamera: { journeyId, location } });
+  let tree = h.measure(); const commands = [];
+  find(tree, 'Camera').props.ref.current = { setCamera: command => commands.push(command) };
+  find(tree, 'MapView').props.onDidFinishLoadingMap(); tree = h.render();
+  h.store.transition(journey, 'begin', h.store.get(journeyId)); assert.equal(commands.length, 1);
+  app.currentState = 'background'; for (const fn of listeners) fn('background');
+  const count = commands.length;
+  app.currentState = 'active'; for (const fn of listeners) fn('active');
+  assert.equal(commands.length, count + 1); assert.deepEqual(commands.at(-1).centerCoordinate, [76, 8]);
+  h.dispose(); assert.equal(listeners.size, 0);
+});
+
+test('maneuver panel renders real instruction/icons and GPS estimates, preserves full accessibility text, and never claims arrival', () => {
+  const h = harness();
+  const { ManeuverPanel } = load('src/components/journey/maneuver-panel.tsx', {
+    'react-native': native, '@/components/discovery/ui': ui, '@/lib/journey/turn-guidance': guidanceModel,
+  }, h.hooks);
+  const text = tree => all(tree, 'Text').map(node => [node.props.children].flat(Infinity).join('')).join(' ');
+  const guidance = { status: 'ready', maneuver: { type: 'turn', modifier: 'left', instruction: 'Turn left onto North Road' },
+    distanceToManeuver: 123, remainingDistance: 2400 };
+  let tree = h.render(ManeuverPanel, { guidance, message: 'Driving route' });
+  assert.match(text(tree), /↰.*~120 m to maneuver.*Turn left.*~2.4 km remaining.*GPS estimate/);
+  assert.match(tree.props.accessibilityLabel, /Turn left onto North Road/);
+  const long = 'Turn right onto ' + 'A long road name '.repeat(20);
+  tree = h.render(ManeuverPanel, { guidance: { ...guidance, maneuver: { ...guidance.maneuver, instruction: long } }, message: '' });
+  assert.ok(tree.props.accessibilityLabel.includes(long));
+  assert.equal(all(tree, 'Text').find(node => node.props.children === long).props.numberOfLines, 3);
+  tree = h.render(ManeuverPanel, { guidance: { ...guidance, maneuver: { type: 'arrive', instruction: 'You have arrived' } }, message: '' });
+  assert.match(text(tree), /Destination ahead.*Complete stop manually/); assert.doesNotMatch(text(tree), /You have arrived/);
+  for (const message of ['Calculating driving route…', 'Navigation paused', 'Mapbox request limit reached', 'Route unavailable: destination stop has no valid map coordinates']) {
+    tree = h.render(ManeuverPanel, { guidance: null, message }); assert.equal(tree.props.accessibilityLabel, message);
+  }
+  tree = h.render(ManeuverPanel, { guidance: { status: 'unavailable', message: 'Turn instructions unavailable' }, message: 'Driving route' });
+  assert.match(text(tree), /Turn instructions unavailable/); assert.doesNotMatch(text(tree), /remaining/); h.dispose();
+});
+
+test('Travel maneuver stack reserves measured camera/sheet space and preserves fixed controls plus manual completion', () => {
+  const h = harness(), store = sessionModel.createTripStore();
+  const journey = { id: journeyId, title: 'Trip', stops: [mappedStop('first', 1, 76, 8)] };
+  const { TravelModeContent } = load('src/app/travel/[id].tsx', {
+    ...sessionMocks(store), 'expo-router': {}, 'react-native': native, 'react-native-safe-area-context': {},
+    '@/components/discovery/ui': ui, '@/components/journey/map/journey-map': { JourneyMap: 'JourneyMap' },
+    '@/components/journey/map-itinerary': { MapItinerary: 'MapItinerary' }, '@/hooks/use-load': {}, '@/lib/discovery/queries': {},
+    '@/lib/discovery/model': {}, '@/lib/journey/map-data': mapData, '@/lib/journey/story-layout': layout, '@/lib/journey/travel-preview': eligibility,
+  }, h.hooks);
+  const render = () => h.render(TravelModeContent, { journey, onExit() {} });
+  let tree = render(); assert.equal(find(tree, 'ManeuverPanel'), null, 'Ready is not active navigation');
+  store.transition(journey, 'begin', store.get(journeyId)); tree = render(); assert.ok(find(tree, 'ManeuverPanel'));
+  const stack = all(tree, 'View').find(node => node.props.onLayout && node !== tree);
+  stack.props.onLayout({ nativeEvent: { layout: { height: 190 } } });
+  tree.props.onLayout({ nativeEvent: { layout: { height: 568 } } }); tree = render();
+  assert.equal(find(tree, 'JourneyMap').props.navigationPadding.top, 222);
+  assert.equal(find(tree, 'ItinerarySheet').props.maxSheetHeight, 218);
+  const footer = find(tree, 'ItinerarySheet').props.footer;
+  assert.ok(all(footer, 'Pressable').some(node => node.props.accessibilityLabel === 'Pause'));
+  assert.ok(all(footer, 'Pressable').some(node => node.props.accessibilityLabel === 'Finish'));
+  assert.ok(all(tree, 'Pressable').some(node => node.props.accessibilityLabel === 'Mark first complete'));
+  store.transition(journey, 'pause', store.get(journeyId)); tree = render(); assert.ok(find(tree, 'ManeuverPanel'));
+  store.transition(journey, 'finish', store.get(journeyId)); tree = render(); assert.equal(find(tree, 'ManeuverPanel'), null);
+  h.dispose();
+});
+
+function arrivalHarness(stops) {
+  const h = harness(), store = sessionModel.createTripStore(); let time = 100000, focusedCleanup, focusedEffect;
+  const journey = { id: journeyId, title: 'Trip', stops };
+  const listeners = new Set(), appListeners = new Set(), ticks = new Set();
+  let snapshot = { status: 'tracking', position: { latitude: 0, longitude: 0, accuracy: 5, timestamp: time } };
+  const location = { get: () => snapshot, subscribe(fn) { listeners.add(fn); return () => listeners.delete(fn); } };
+  const app = { currentState: 'active', addEventListener(_, fn) { appListeners.add(fn); return { remove: () => appListeners.delete(fn) }; } };
+  const { useTripArrival } = load('src/hooks/use-trip-arrival.ts', {
+    'expo-router': { useFocusEffect: fn => { focusedEffect = fn; h.hooks.useEffect(() => { focusedCleanup = fn(); return () => focusedCleanup?.(); }, [fn]); } },
+    'react-native': { AppState: app }, '@/lib/journey/trip-session': { ...sessionModel, tripStore: store },
+    '@/lib/journey/navigation': navigationModel,
+    '@/lib/journey/arrival': { ...arrivalModel, arrivalBlock: input => arrivalModel.arrivalBlock(input, time), createArrival: () => arrivalModel.createArrival({}, () => time),
+      observeArrival: (controller, read, sources, state) => arrivalModel.observeArrival(controller, read, sources, state, {
+        set(fn) { ticks.add(fn); return fn; }, clear(fn) { ticks.delete(fn); },
+      }),
+    },
+  }, h.hooks);
+  const emit = (patch = {}) => {
+    time += 3000; snapshot = { status: 'tracking', position: { ...snapshot.position, timestamp: time }, ...patch };
+    for (const fn of listeners) fn();
+  };
+  const begin = () => store.transition(journey, 'begin', store.get(journeyId));
+  const render = () => h.render(() => useTripArrival(journey, store.get(journeyId), location), {});
+  return { ...h, renderComponent: h.render, store, journey, location, app, listeners, appListeners, ticks, useTripArrival, emit, begin, render,
+    blur() { focusedCleanup(); }, focus() { focusedCleanup = focusedEffect(); }, time: () => time,
+    background() { app.currentState = 'background'; for (const fn of appListeners) fn(); },
+    foreground() { app.currentState = 'active'; for (const fn of appListeners) fn(); },
+  };
+}
+
+test('actual arrival hook confirms only the ordered destination exactly once, invalidates old routing and finishes the final stop', async () => {
+  const stops = [mappedStop('second', 2, 0.0001, 0), mappedStop('first', 1, 0, 0)];
+  const h = arrivalHarness(stops); h.render();
+  const road = { geometry: { type: 'LineString', coordinates: [[0, 0], [0.0001, 0]] }, distance: 10, duration: 1 };
+  const requests = [];
+  const route = navigationModel.createNavigation((_, destination, signal) => new Promise(resolve => requests.push({ destination, signal, resolve })), h.time);
+  const readRoute = () => ({ status: h.store.get(journeyId).status, focused: true, foreground: true,
+    position: h.location.get().position, destination: sessionModel.tripDestination(h.journey, h.store.get(journeyId)) });
+  const sync = () => route.update(readRoute());
+  const unsubscribe = h.store.subscribe(sync), unsubscribeGps = h.location.subscribe(sync);
+  h.begin(); for (let i = 0; i < 10; i++) await Promise.resolve();
+  assert.equal(requests[0].destination.id, 'first');
+  h.emit(); h.emit(); const before = h.render(); assert.equal(before.prompt.stopId, 'first');
+  assert.deepEqual(h.store.get(journeyId).completedStopIds, [], 'GPS evidence never completes a stop');
+  assert.equal(before.confirm(before.prompt), true); assert.equal(before.confirm(before.prompt), false);
+  assert.deepEqual(h.store.get(journeyId).completedStopIds, ['first']); assert.equal(requests[0].signal.aborted, true);
+  requests[0].resolve(road); for (let i = 0; i < 10; i++) await Promise.resolve();
+  assert.equal(route.get().route, null, 'Old destination route cannot be restored');
+  assert.equal(h.render().prompt, null, 'Next stop starts fresh evidence');
+  h.emit(); h.emit(); assert.equal(h.render().prompt, null, 'Previous stop’s cached fix is not new-stop evidence');
+  h.emit(); const final = h.render(); assert.equal(final.prompt.stopId, 'second');
+  assert.equal(final.confirm(final.prompt), true); assert.equal(final.confirm(final.prompt), false);
+  assert.equal(h.store.get(journeyId).status, 'completed'); assert.equal(h.store.get(journeyId).destinationId, null);
+  assert.equal(route.get().route, null); assert.equal(h.render().prompt, null);
+  assert.equal(h.store.get(journeyId).activeSince, null);
+  unsubscribe(); unsubscribeGps(); route.stop(); h.dispose(); assert.equal(h.ticks.size, 0);
+});
+
+test('arrival hook dismisses safely and rejects stale confirmation across Pause/Resume, Finish, blur and background', () => {
+  for (const mode of ['pause', 'finish', 'blur', 'background', 'denied', 'missing-fix']) {
+    const h = arrivalHarness([mappedStop('first', 1, 0, 0)]); h.render(); h.begin(); h.emit(); h.emit();
+    const before = h.render(); assert.ok(before.prompt);
+    if (mode === 'pause' || mode === 'finish') h.store.transition(h.journey, mode, h.store.get(journeyId));
+    if (mode === 'blur') h.blur();
+    if (mode === 'background') h.background();
+    if (mode === 'denied') h.emit({ status: 'denied', position: null });
+    if (mode === 'missing-fix') h.emit({ status: 'unavailable', position: null });
+    assert.equal(h.render().prompt, null); assert.equal(before.confirm(before.prompt), false);
+    assert.deepEqual(h.store.get(journeyId).completedStopIds, []);
+    if (mode === 'pause') { h.store.transition(h.journey, 'resume', h.store.get(journeyId)); assert.equal(h.render().prompt, null); }
+    if (mode === 'background') { h.foreground(); assert.equal(h.render().prompt, null); }
+    if (mode === 'blur') { h.focus(); assert.equal(h.render().prompt, null); }
+    h.dispose(); assert.equal(h.ticks.size, 0); assert.equal(h.appListeners.size, 0);
+  }
+  const h = arrivalHarness([mappedStop('first', 1, 0, 0)]); h.render(); h.begin(); h.emit(); h.emit();
+  const before = h.render(); assert.equal(before.dismiss(before.prompt), true); assert.equal(before.confirm(before.prompt), false);
+  h.emit(); h.emit(); assert.equal(h.render().prompt, null); assert.deepEqual(h.store.get(journeyId).completedStopIds, []); h.dispose();
+});
+
+test('arrival UI replaces the maneuver card without overlapping fixed controls, ignores preview, and leaves manual completion working after dismissal', () => {
+  const h = arrivalHarness([mappedStop('second', 2, null, null), mappedStop('first', 1, 0, 0)]);
+  const { TravelModeContent } = load('src/app/travel/[id].tsx', {
+    ...sessionMocks(h.store), '@/hooks/use-trip-arrival': { useTripArrival: h.useTripArrival },
+    '@/hooks/use-trip-location': { useTripLocation: () => ({ ...h.location.get(), source: h.location, begin: h.begin, canAskAgain: true }) },
+    'expo-router': {}, 'react-native': native, 'react-native-safe-area-context': {}, '@/components/discovery/ui': ui,
+    '@/components/journey/map/journey-map': { JourneyMap: 'JourneyMap' }, '@/components/journey/map-itinerary': { MapItinerary: 'MapItinerary' },
+    '@/hooks/use-load': {}, '@/lib/discovery/queries': {}, '@/lib/discovery/model': {}, '@/lib/journey/map-data': mapData,
+    '@/lib/journey/story-layout': layout, '@/lib/journey/travel-preview': eligibility,
+  }, h.hooks);
+  const render = () => h.renderComponent(TravelModeContent, { journey: h.journey, onExit() {} });
+  const button = (tree, label) => all(tree, 'Pressable').find(node => node.props.accessibilityLabel === label);
+  let tree = render(); button(tree, 'Begin Trip').props.onPress(); tree = render();
+  find(tree, 'MapItinerary').props.onSelect('second'); tree = render();
+  h.emit(); h.emit(); tree = render();
+  assert.equal(find(tree, 'JourneyMap').props.selectedId, 'second'); assert.equal(find(tree, 'JourneyMap').props.destinationId, 'first');
+  const prompt = find(tree, 'ArrivalPrompt'); assert.equal(prompt.props.prompt.stopId, 'first');
+  assert.equal(find(tree, 'ManeuverPanel'), null); assert.equal(find(find(tree, 'ItinerarySheet'), 'ArrivalPrompt'), null);
+  assert.ok(button(find(tree, 'ItinerarySheet').props.footer, 'Pause')); assert.ok(button(find(tree, 'ItinerarySheet').props.footer, 'Finish'));
+  const stack = all(tree, 'View').find(node => node.props.onLayout && node !== tree);
+  stack.props.onLayout({ nativeEvent: { layout: { height: 220 } } }); tree = render();
+  assert.equal(find(tree, 'JourneyMap').props.navigationPadding.top, 252, 'Measured arrival card participates in camera/layout padding');
+  prompt.props.onDismiss(); tree = render(); assert.equal(find(tree, 'ArrivalPrompt'), null); assert.ok(find(tree, 'ManeuverPanel'));
+  prompt.props.onConfirm(); assert.deepEqual(h.store.get(journeyId).completedStopIds, [], 'Dismissed callback cannot complete');
+  button(tree, 'Mark first complete').props.onPress(); tree = render(); find(tree, 'TripConfirmation').props.onConfirm(); tree = render();
+  assert.deepEqual(h.store.get(journeyId).completedStopIds, ['first']);
+  assert.ok(all(tree, 'Text').some(node => String(node.props.children).includes('no valid coordinates')));
+  h.emit({ status: 'unavailable', position: null }); tree = render();
+  button(tree, 'Mark second complete').props.onPress(); tree = render(); find(tree, 'TripConfirmation').props.onConfirm();
+  assert.equal(h.store.get(journeyId).status, 'completed', 'Manual path remains usable without coordinates/GPS'); h.dispose();
+});
+
+test('reroute status and guarded retry stay in the fixed footer without hiding arrival or trip controls', () => {
+  const h = harness(), store = sessionModel.createTripStore();
+  const journey = { id: journeyId, title: 'Trip', stops: [mappedStop('first', 1, 0, 0)] };
+  store.transition(journey, 'begin', store.get(journeyId));
+  let retryCount = 0;
+  const state = { destination: journey.stops[0], status: 'error', message: 'Reroute failed · Previous route may be outdated',
+    route: { geometry: { type: 'LineString', coordinates: [[0, 0], [0.001, 0]] }, distance: 100, duration: 10 },
+    routeOutdated: true, guidance: null, reroute: { phase: 'failed', message: 'Wait before retrying · Previous route may be outdated' },
+    canRetry: false, retry: () => retryCount++ };
+  const { TravelModeContent } = load('src/app/travel/[id].tsx', {
+    ...sessionMocks(store), '@/hooks/use-trip-navigation': { useTripNavigation: () => state },
+    '@/hooks/use-trip-arrival': { useTripArrival: () => ({ prompt: { stopId: 'first', name: 'first' }, confirm() {}, dismiss() {} }) },
+    'expo-router': {}, 'react-native': native, 'react-native-safe-area-context': {}, '@/components/discovery/ui': ui,
+    '@/components/journey/map/journey-map': { JourneyMap: 'JourneyMap' }, '@/components/journey/map-itinerary': { MapItinerary: 'MapItinerary' },
+    '@/hooks/use-load': {}, '@/lib/discovery/queries': {}, '@/lib/discovery/model': {}, '@/lib/journey/map-data': mapData,
+    '@/lib/journey/story-layout': layout, '@/lib/journey/travel-preview': eligibility,
+  }, h.hooks);
+  const render = () => h.render(TravelModeContent, { journey, onExit() {} });
+  let tree = render(), sheet = find(tree, 'ItinerarySheet');
+  assert.match(sheet.props.subtitle, /^Previous route/); assert.ok(find(tree, 'ArrivalPrompt')); assert.equal(find(tree, 'ManeuverPanel'), null);
+  const button = (tree, label) => all(tree, 'Pressable').find(node => node.props.accessibilityLabel === label);
+  assert.equal(button(sheet.props.footer, 'Retry driving route').props.disabled, true);
+  assert.ok(button(sheet.props.footer, 'Pause')); assert.ok(button(sheet.props.footer, 'Finish'));
+  assert.ok(all(sheet.props.footer, 'Text').some(node => node.props.accessibilityLiveRegion === 'polite' && String(node.props.children).includes('outdated')));
+  state.canRetry = true; tree = render(); button(find(tree, 'ItinerarySheet').props.footer, 'Retry driving route').props.onPress(); assert.equal(retryCount, 1);
+  state.status = 'ready'; state.reroute = { phase: 'confirming', message: 'Checking route deviation' }; tree = render();
+  assert.equal(button(tree, 'Retry driving route'), undefined); assert.ok(all(find(tree, 'ItinerarySheet').props.footer, 'Text').some(node => node.props.children === 'Checking route deviation'));
+  store.transition(journey, 'pause', store.get(journeyId)); tree = render(); assert.equal(button(tree, 'Retry driving route'), undefined); assert.ok(button(tree, 'Resume'));
+  h.dispose();
+});
+
+test('manual completion and early Finish reject stale confirmations after blur or a background/foreground cycle', () => {
+  for (const action of ['complete', 'finish']) for (const lifecycle of ['blur', 'background']) {
+    const h = harness(), store = sessionModel.createTripStore(); let focus, cleanup;
+    const listeners = new Set();
+    const app = { currentState: 'active', addEventListener(_, fn) { listeners.add(fn); return { remove: () => listeners.delete(fn) }; } };
+    const journey = { id: journeyId, title: 'Trip', stops: [mappedStop('first', 1, 0, 0)] };
+    store.transition(journey, 'begin', store.get(journeyId));
+    const { TravelModeContent } = load('src/app/travel/[id].tsx', {
+      ...sessionMocks(store),
+      'expo-router': { useFocusEffect: fn => { focus = fn; h.hooks.useEffect(() => { cleanup = fn(); return () => cleanup?.(); }, [fn]); } },
+      'react-native': { ...native, AppState: app }, 'react-native-safe-area-context': {}, '@/components/discovery/ui': ui,
+      '@/components/journey/map/journey-map': { JourneyMap: 'JourneyMap' }, '@/components/journey/map-itinerary': { MapItinerary: 'MapItinerary' },
+      '@/hooks/use-load': {}, '@/lib/discovery/queries': {}, '@/lib/discovery/model': {}, '@/lib/journey/map-data': mapData,
+      '@/lib/journey/story-layout': layout, '@/lib/journey/travel-preview': eligibility,
+    }, h.hooks);
+    const render = () => h.render(TravelModeContent, { journey, onExit() {} });
+    const button = tree => all(tree, 'Pressable').find(node => node.props.accessibilityLabel === (action === 'complete' ? 'Mark first complete' : 'Finish'));
+    let tree = render(); button(tree).props.onPress(); tree = render(); const stale = find(tree, 'TripConfirmation').props.onConfirm;
+    if (lifecycle === 'blur') cleanup?.();
+    else { app.currentState = 'background'; for (const fn of listeners) fn('background'); }
+    stale(); assert.equal(store.get(journeyId).status, 'active'); assert.deepEqual(store.get(journeyId).completedStopIds, []);
+    if (lifecycle === 'blur') cleanup = focus();
+    else { app.currentState = 'active'; for (const fn of listeners) fn('active'); }
+    tree = render(); assert.equal(find(tree, 'TripConfirmation'), null);
+    button(tree).props.onPress(); tree = render(); stale(); tree = render();
+    assert.ok(find(tree, 'TripConfirmation'), 'Old callback must not close a newer confirmation');
+    find(tree, 'TripConfirmation').props.onConfirm();
+    assert.equal(store.get(journeyId).status, action === 'complete' ? 'completed' : 'finished');
+    const oldListeners = [...listeners]; h.dispose(); for (const fn of oldListeners) fn('background'); stale();
+    assert.equal(listeners.size, 0); assert.equal(h.lateUpdates(), 0);
+  }
+});
+
+test('Travel never renders a precise current-position marker for unavailable, stale, future or inaccurate GPS', () => {
+  const h = harness(), store = sessionModel.createTripStore();
+  const journey = { id: journeyId, title: 'Trip', stops: [mappedStop('first', 1, 0, 0)] };
+  store.transition(journey, 'begin', store.get(journeyId));
+  const valid = { latitude: 0, longitude: 0, accuracy: 5, timestamp: Date.now() };
+  let position = valid;
+  const { TravelModeContent } = load('src/app/travel/[id].tsx', {
+    ...sessionMocks(store), '@/hooks/use-trip-location': { useTripLocation: () => ({ status: 'tracking', position }) },
+    'expo-router': {}, 'react-native': native, 'react-native-safe-area-context': {}, '@/components/discovery/ui': ui,
+    '@/components/journey/map/journey-map': { JourneyMap: 'JourneyMap' }, '@/components/journey/map-itinerary': { MapItinerary: 'MapItinerary' },
+    '@/hooks/use-load': {}, '@/lib/discovery/queries': {}, '@/lib/discovery/model': {}, '@/lib/journey/map-data': mapData,
+    '@/lib/journey/story-layout': layout, '@/lib/journey/travel-preview': eligibility,
+  }, h.hooks);
+  const render = () => h.render(TravelModeContent, { journey, onExit() {} });
+  assert.equal(find(render(), 'JourneyMap').props.currentPosition, valid);
+  for (const fix of [null, { ...valid, timestamp: Date.now() - 16000 }, { ...valid, timestamp: Date.now() + 60000 },
+    { ...valid, accuracy: 51 }, { ...valid, accuracy: null }, { ...valid, latitude: NaN }]) {
+    position = fix; assert.equal(find(render(), 'JourneyMap').props.currentPosition, null);
+  }
+  position = { ...valid, timestamp: Date.now() }; assert.equal(find(render(), 'JourneyMap').props.currentPosition, position);
+  h.dispose();
+});
+
+test('arrival card clearly names the stop and makes confirmation and dismissal explicit with accessible touch targets', () => {
+  const { ArrivalPrompt } = load('src/components/journey/arrival-prompt.tsx', { 'react-native': native, '@/components/discovery/ui': ui });
+  let confirms = 0, dismisses = 0;
+  const name = 'A long destination name '.repeat(8);
+  const tree = ArrivalPrompt({ prompt: { name }, onConfirm: () => confirms++, onDismiss: () => dismisses++ });
+  const buttons = all(tree, 'Pressable'); assert.equal(buttons.length, 2);
+  assert.equal(buttons[0].props.accessibilityLabel, 'Confirm arrival at ' + name); assert.equal(buttons[0].props.style.minHeight, 48);
+  assert.equal(buttons[1].props.accessibilityLabel, 'Dismiss arrival and keep navigating'); assert.equal(buttons[1].props.style.minHeight, 48);
+  buttons[0].props.onPress(); buttons[1].props.onPress(); assert.equal(confirms, 1); assert.equal(dismisses, 1);
+  assert.ok(all(tree, 'Text').some(node => [node.props.children].flat().join('').includes(name)));
+});
+
+test('popup JourneyOptions preserves Use, sign-in Remix, private copy reuse and inline failure recovery', async () => {
+  for (const mode of ['anonymous', 'signed-in', 'existing', 'blocked']) {
+    const h = harness();
+    const routes = [], intents = [], copies = [];
+    let uses = 0;
+    const state = { busy: false, copyId: mode === 'existing' ? 'private-copy' : null, blocked: mode === 'blocked', error: mode === 'blocked' ? 'Check your drafts' : null };
+    const component = load('src/components/journey/journey-options.tsx', {
+      'expo-router': { useRouter: () => ({ push: route => routes.push(route) }) }, 'react-native': native,
+      '../discovery/ui': { ...ui, Action: 'Action' },
+      '@/hooks/session-context': { useSessionState: () => ({ loading: false, session: mode === 'anonymous' ? null : { user: { id: 'owner' } } }) },
+      '@/hooks/action-intent': { useActionIntent: () => ({ pending: null, begin: (id, action) => { intents.push([id, action]); return true; } }) },
+      '@/lib/remix/model': { remixStore: { get: () => state, subscribe: () => () => {}, run: async (_key, task) => task() } },
+      '@/lib/remix/queries': { remixJourney: async (id, user) => { copies.push([id, user]); return 'new-copy'; } },
+      './story-sheet': { StorySheet: 'StorySheet' },
+      'react-native-safe-area-context': { SafeAreaView: 'SafeAreaView' },
+    }, h.hooks);
+    const tree = h.render(component.JourneyOptions, { id: journeyId, onUse: () => uses++, inlineFeedback: true, menu: { visible: true, onClose() {}, onAbout() {} } });
+    all(tree, 'Pressable').find(n => n.props.accessibilityLabel === 'Use This Journey').props.onPress();
+    assert.equal(uses, 1);
+    const remix = all(tree, 'Pressable').find(n => n.props.accessibilityLabel === (mode === 'existing' ? 'Open private copy' : 'Remix This Journey'));
+    if (mode === 'blocked') {
+      assert.equal(remix.props.disabled, true);
+      assert.ok(all(tree, 'Text').some(n => n.props.accessibilityRole === 'alert'));
+      find(tree, 'Action').props.onPress();
+      assert.equal(routes.at(-1), '/account');
+    } else {
+      remix.props.onPress(); await new Promise(resolve => setImmediate(resolve));
+      if (mode === 'anonymous') { assert.deepEqual(intents, [[journeyId, 'remix']]); assert.equal(routes.at(-1), '/auth'); }
+      else assert.deepEqual(routes.at(-1), { pathname: '/draft/[id]', params: { id: mode === 'existing' ? 'private-copy' : 'new-copy' } });
+      assert.equal(copies.length, mode === 'signed-in' ? 1 : 0);
+    }
+    assert.equal(find(tree, 'StorySheet').props.visible, false, 'No stacked feedback modal in the popup');
+  }
+});
+test('editor photo overlays use actual ordered markers; idle playback yields to touches, selection, background and reduced motion',async()=>{
+  const listeners=new Set();let preference;
+  const app={currentState:'active',addEventListener:(_name,fn)=>{listeners.add(fn);return {remove:()=>listeners.delete(fn)};}};
+  const h=nativeMapHarness([mappedStop('second',2,77,9),mappedStop('first',1,76,8)],{
+    AppState:app,AccessibilityInfo:{isReduceMotionEnabled:async()=>false,addEventListener:(_name,fn)=>{preference=fn;return {remove(){}};}}
+  });
+  Object.assign(h.props,{selectedId:null,memoryPhotos:{first:'https://signed.test/first',second:null},animateMemoryRoute:true});
+  let tree=h.measure();find(tree,'MapView').props.onDidFinishLoadingMap();await new Promise(resolve=>setImmediate(resolve));tree=h.render();
+  const flights=[];find(tree,'Camera').props.ref.current={setCamera:value=>flights.push(value)};
+  find(tree,'MapView').props.onMapIdle();tree=h.render();let overlay=find(tree,'JourneyOverlays');
+  assert.deepEqual(overlay.props.points.features.map(p=>[p.id,p.properties.photo]),[['first','https://signed.test/first'],['second',null]]);
+  assert.equal(overlay.props.playing,true);assert.equal(overlay.props.durationScale,3);assert.equal(overlay.props.drawRoute,false);
+  find(tree,'MapView').props.onTouchStart();tree=h.render();assert.equal(find(tree,'JourneyOverlays').props.playing,false);
+  find(tree,'MapView').props.onMapIdle();tree=h.render();assert.equal(find(tree,'JourneyOverlays').props.playing,false,'Native idle during a held gesture cannot restart playback');
+  find(tree,'MapView').props.onTouchEnd();find(tree,'MapView').props.onMapIdle();tree=h.render();assert.equal(find(tree,'JourneyOverlays').props.playing,true);
+  h.props.selectedId='second';tree=h.render();assert.equal(find(tree,'JourneyOverlays').props.playing,false);assert.deepEqual(flights.at(-1).centerCoordinate,[77,9]);assert.equal(flights.at(-1).animationDuration,450);
+  h.props.selectedId=null;h.props.animateMemoryRoute=false;tree=h.render();assert.equal(find(tree,'JourneyOverlays').props.playing,false,'Open editor sheet suppresses playback');
+  h.props.animateMemoryRoute=true;app.currentState='background';listeners.forEach(fn=>fn('background'));tree=h.render();assert.equal(find(tree,'JourneyOverlays').props.playing,false);
+  app.currentState='active';listeners.forEach(fn=>fn('active'));preference(true);tree=h.render();find(tree,'MapView').props.onMapIdle();tree=h.render();assert.equal(find(tree,'JourneyOverlays').props.playing,false);
+  h.props.selectedId='first';h.render();assert.equal(flights.at(-1).animationDuration,0);
+  h.dispose();assert.equal(listeners.size,0);
+});
+
+test('published memory deck pages one card in creator order with accessible bounded controls and map-driven selection', () => {
+  const h=harness(), selections=[];
+  const {StopTimeline}=load('src/components/journey/stop-timeline.tsx',{'react-native':native,'@/components/discovery/journey-photo':{JourneyPhoto:'JourneyPhoto'},'@/components/discovery/ui':ui,'@/lib/journey/story-layout':layout},h.hooks);
+  const props={horizontal:true,stacked:true,stops:[stop('first'),stop('second'),stop('third')],selectedId:'first',onSelect:id=>selections.push(id),onDetails(){}};
+  const Deck=StopTimeline(props).type;let tree=h.render(Deck,props);tree.props.onLayout({nativeEvent:{layout:{width:320}}});tree=h.render(Deck,props);
+  assert.equal(all(tree,'FlatList').length,1,'No separate thumbnail strip');let cards=find(tree,'FlatList');assert.equal(cards.props.pagingEnabled,true);assert.equal(cards.props.directionalLockEnabled,true);assert.equal(cards.props.snapToInterval,320);assert.deepEqual(cards.props.data,props.stops);
+  const button=label=>all(tree,'Pressable').find(n=>n.props.accessibilityLabel===label);
+  assert.equal(button('Previous memory').props.disabled,true);button('Next memory').props.onPress();assert.deepEqual(selections,['second']);
+  const offsets=[];cards.props.ref.current={scrollToOffset:v=>offsets.push(v)};props.selectedId='third';tree=h.render(Deck,props);assert.equal(offsets.at(-1).offset,640);assert.equal(button('Next memory').props.disabled,true);
+  cards=find(tree,'FlatList');cards.props.onScrollBeginDrag();cards.props.onMomentumScrollEnd({nativeEvent:{contentOffset:{x:320}}});assert.equal(selections.at(-1),'second');h.dispose();assert.equal(h.lateUpdates(),0);
 });

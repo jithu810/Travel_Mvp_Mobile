@@ -112,7 +112,7 @@ test('satellite failure falls back once to Outdoors, then graceful failure; bran
 
 // Exercise the actual hook with deterministic RN animation/responder doubles.
 // This verifies callback wiring and cleanup; it does not emulate Android touch dispatch.
-function sheetHarness() {
+function sheetHarness(available = 484, sizes) {
   const effects = [], animations = [], heights = [], interactions = [];
   class Value {
     constructor(value) { this.value = value; this.listeners = new Map(); this.active = null; }
@@ -141,7 +141,7 @@ function sheetHarness() {
     if (name.endsWith('/sheet')) return { draggedSheetHeight, sheetHeight, sheetSnapMode, shouldDragSheet };
     throw new Error(name);
   }, exports);
-  const sheet = exports.useDiscoverySheet(484, height => heights.push(height), active => interactions.push(active));
+  const sheet = exports.useDiscoverySheet(available, height => heights.push(height), active => interactions.push(active), sizes);
   const cleanup = effects.map(effect => effect()).filter(Boolean);
   return { sheet, heights, interactions, animations, cleanup: () => cleanup.forEach(callback => callback()) };
 }
@@ -196,4 +196,31 @@ test('world country layer parses zoom-one data and hands off through paint opaci
   assert.ok(native.includes("visibility: 'visible', symbolPlacement: 'point'"));
   assert.ok(native.includes("textVariableAnchor: ['center', 'top', 'bottom', 'left', 'right']"));
   assert.ok(native.includes("['coalesce', ['get', 'name_en'], ['get', 'name']]"));
+});
+
+
+test('Create custom snaps reuse Home springs, drag clamps and scroll handoff with no duplicate peek snap', () => {
+  for (const available of [180, 300, 484, 720]) {
+    const sizes = { peek: 56, collapsed: 56, expanded: Math.min(320, available * 0.55, available - 96) };
+    const h = sheetHarness(available, sizes), handle = h.sheet.responders.handle;
+    assert.deepEqual(h.heights, [56]);
+    handle.onPanResponderGrant();handle.onPanResponderMove(null, {dy:-10000});
+    assert.equal(h.sheet.height.value, sizes.expanded);
+    handle.onPanResponderRelease(null, {vy:-0.8});h.animations.at(-1).finish();
+    assert.equal(h.heights.at(-1), sizes.expanded);
+    assert.equal(h.animations.at(-1).config.stiffness, 240);
+    assert.equal(h.animations.at(-1).config.damping, 30);
+    const content = h.sheet.responders.content;
+    h.sheet.setScrollOffset(40);content.onStartShouldSetPanResponderCapture();
+    assert.equal(content.onMoveShouldSetPanResponderCapture(null,{dx:0,dy:80,numberActiveTouches:1}),false);
+    h.sheet.setScrollOffset(0);content.onStartShouldSetPanResponderCapture();
+    assert.equal(content.onMoveShouldSetPanResponderCapture(null,{dx:0,dy:-80,numberActiveTouches:1}),false);
+    assert.equal(content.onMoveShouldSetPanResponderCapture(null,{dx:0,dy:80,numberActiveTouches:1}),true);
+    handle.onPanResponderGrant();handle.onPanResponderMove(null,{dy:10000});
+    handle.onPanResponderRelease(null,{vy:0.8});h.animations.at(-1).finish();
+    assert.equal(h.heights.at(-1),56);assert.equal(sheetSnapMode(56,0,available,sizes),'collapsed');
+    h.sheet.toggle();h.animations.at(-1).finish();assert.equal(h.heights.at(-1),sizes.expanded,'One tap expands after downward drag');
+    h.sheet.toggle();h.animations.at(-1).finish();assert.equal(h.heights.at(-1),56);
+    h.cleanup();
+  }
 });

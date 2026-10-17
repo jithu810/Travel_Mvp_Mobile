@@ -12,7 +12,7 @@ class MapBoundary extends Component<{ children: ReactNode; retry: () => void; co
   static getDerivedStateFromError() { return { failed: true }; }
   render() { return this.state.failed ? <MapFallback message="The map couldn’t load. You can still browse the journey’s stops." retry={this.props.retry} compact={this.props.compact} onExpand={this.props.onExpand} /> : this.props.children; }
 }
-function NativeLoader({ data, stops, retry, selectedId, onSelect, presentation = 'story', onExpand, currentPosition }: { data: JourneyMapData; stops: JourneyStop[]; retry: () => void } & SelectionProps) {
+function NativeLoader({ data, stops, retry, selectedId, onSelect, presentation = 'story', onExpand, currentPosition, navigationRoute, navigationMode, navigationPadding, destinationId, travelCamera, memoryPhotos, animateMemoryRoute, playRouteWithSelection }: { data: JourneyMapData; stops: JourneyStop[]; retry: () => void } & SelectionProps) {
   const [Map, setMap] = useState<ComponentType<{ data: JourneyMapData; stops: JourneyStop[]; retry: () => void } & SelectionProps> | null>(null);
   const [failed, setFailed] = useState(false);
   useEffect(() => {
@@ -40,9 +40,9 @@ function NativeLoader({ data, stops, retry, selectedId, onSelect, presentation =
   }, []);
   if (failed) return <MapFallback message="The map couldn’t load. Your story is still available below." retry={retry} compact={presentation === 'preview'} onExpand={onExpand} />;
   if (!Map) return <View style={{ flex: presentation === 'story' ? undefined : 1, height: presentation === 'story' ? 310 : undefined, justifyContent: 'center' }} accessibilityLabel="Loading journey map"><ActivityIndicator /></View>;
-  return <Map data={data} stops={stops} retry={retry} selectedId={selectedId} onSelect={onSelect} presentation={presentation} onExpand={onExpand} currentPosition={currentPosition} />;
+  return <Map data={data} stops={stops} retry={retry} selectedId={selectedId} onSelect={onSelect} presentation={presentation} onExpand={onExpand} currentPosition={currentPosition} navigationRoute={navigationRoute} navigationMode={navigationMode} navigationPadding={navigationPadding} destinationId={destinationId} travelCamera={travelCamera} memoryPhotos={memoryPhotos} animateMemoryRoute={animateMemoryRoute} playRouteWithSelection={playRouteWithSelection} />;
 }
-export const JourneyMap = memo(function JourneyMap({ stops, selectedId, onSelect, presentation = 'story', onExpand, currentPosition }: { stops: JourneyStop[] } & SelectionProps) {
+export const JourneyMap = memo(function JourneyMap({ stops, selectedId, onSelect, presentation = 'story', onExpand, currentPosition, navigationRoute, navigationMode, navigationPadding, destinationId, travelCamera, memoryPhotos, animateMemoryRoute, playRouteWithSelection }: { stops: JourneyStop[] } & SelectionProps) {
   const data = useMemo(() => buildMapData(stops), [stops]);
   const [attempt, setAttempt] = useState(0);
   const retry = () => setAttempt(value => value + 1);
@@ -51,6 +51,6 @@ export const JourneyMap = memo(function JourneyMap({ stops, selectedId, onSelect
   else if (Constants.executionEnvironment === ExecutionEnvironment.StoreClient)
     content = <MapFallback message="The interactive map needs a native development build. The story remains available in Expo Go." compact={presentation === 'preview'} onExpand={onExpand} />;
   else if (!token?.startsWith('pk.')) content = <MapFallback message="The map isn’t configured yet. You can still browse the journey’s stops." compact={presentation === 'preview'} onExpand={onExpand} />;
-  else content = <MapBoundary key={attempt} retry={retry} compact={presentation === 'preview'} onExpand={onExpand}><NativeLoader data={data} stops={stops} retry={retry} selectedId={selectedId} onSelect={onSelect} presentation={presentation} onExpand={onExpand} currentPosition={currentPosition} /></MapBoundary>;
+  else content = <MapBoundary key={attempt} retry={retry} compact={presentation === 'preview'} onExpand={onExpand}><NativeLoader data={data} stops={stops} retry={retry} selectedId={selectedId} onSelect={onSelect} presentation={presentation} onExpand={onExpand} currentPosition={currentPosition} navigationRoute={navigationRoute} navigationMode={navigationMode} navigationPadding={navigationPadding} destinationId={destinationId} travelCamera={travelCamera} memoryPhotos={memoryPhotos} animateMemoryRoute={animateMemoryRoute} playRouteWithSelection={playRouteWithSelection} /></MapBoundary>;
   return <MapFrame data={data} presentation={presentation}>{content}</MapFrame>;
 });

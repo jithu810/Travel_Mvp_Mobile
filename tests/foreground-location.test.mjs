@@ -127,6 +127,43 @@ test('late subscriptions, pending permissions and rejected stale commits cannot 
   const h = fixture(); await h.controller.begin(() => false); assert.equal(h.counts().watches, 0); assert.equal(h.controller.get().status, 'ready');
 });
 
+test('future-dated fixes never enter the GPS source or poison its timestamp watermark', async () => {
+  const f = fixture(); await f.begin();
+  for (const timestamp of [100001, 104999, 105000]) f.fix({ timestamp });
+  assert.equal(f.controller.get().position, null);
+  f.fix(); assert.equal(f.controller.get().position.timestamp, 100000, 'A valid current fix still recovers');
+  f.controller.stop();
+});
+
+test('watch startup rejection invalidates callbacks and explicit Retry creates only one fresh watcher', async () => {
+  const f = fixture(); let abandonedUpdate, abandonedError;
+  const original = f.port.watch;
+  f.port.watch = async (update, error) => { abandonedUpdate = update; abandonedError = error; throw new Error('native startup failure'); };
+  await f.begin(); const unavailable = f.controller.get();
+  assert.equal(unavailable.status, 'unavailable'); assert.equal(f.pending.size, 0);
+  abandonedUpdate({ latitude: 8, longitude: 76, accuracy: 5, timestamp: 100000 }); abandonedError();
+  assert.equal(f.controller.get(), unavailable, 'Failed startup callbacks cannot restore GPS');
+  f.port.watch = original; await f.controller.retry(); f.fix();
+  assert.equal(f.controller.get().status, 'tracking'); assert.equal(f.counts().watches, 1);
+  abandonedUpdate({ latitude: 9, longitude: 77, accuracy: 5, timestamp: 100001 }); abandonedError();
+  assert.equal(f.controller.get().position.latitude, 8); assert.equal(f.counts().removed, 0);
+  f.controller.sync('finished', true, true); assert.equal(f.counts().removed, 1);
+});
+
+test('foreground reentry rechecks revoked permission and disabled services, then recovers without duplicate watchers', async () => {
+  const f = fixture(); await f.begin(); f.fix();
+  f.controller.sync('active', false, true); f.setGranted(false, false);
+  f.controller.sync('active', true, true); await flush();
+  assert.equal(f.controller.get().status, 'denied'); assert.equal(f.controller.get().position, null);
+  assert.equal(f.controller.get().canAskAgain, false); assert.equal(f.requests.at(-1), false);
+  f.setGranted(true); f.setServices(false); await f.controller.retry();
+  assert.equal(f.controller.get().status, 'unavailable'); assert.equal(f.counts().watches, 1);
+  f.setServices(true); await f.controller.retry(); f.advance(1); f.fix();
+  assert.equal(f.controller.get().status, 'tracking'); assert.equal(f.counts().watches, 2);
+  f.error(); assert.equal(f.controller.get().position, null); await f.controller.retry(); f.advance(1); f.fix();
+  assert.equal(f.counts().watches - f.counts().removed, 1); f.controller.stop();
+});
+
 test('native adapter checks permission before requesting and uses only foreground watches', async () => {
   let result = { granted: false, canAskAgain: true }, prompts = 0, callback, errorCallback, options;
   const { locationPort } = load('src/lib/journey/location-port.native.ts', { 'expo-location': {
@@ -139,6 +176,13 @@ test('native adapter checks permission before requesting and uses only foregroun
   await locationPort.permission(true); assert.equal(prompts, 1);
   result = { granted: false, canAskAgain: false }; await locationPort.permission(true); assert.equal(prompts, 1);
   result = { granted: true, canAskAgain: true }; await locationPort.permission(true); assert.equal(prompts, 1);
+  result = { granted: false, canAskAgain: true, status: 'denied' };
+  await locationPort.permission(true, true); await locationPort.permission(true, true);
+  assert.equal(prompts, 1, 'Opening Travel never repeats a previously denied native prompt');
+  result = { granted: false, canAskAgain: true, status: 'undetermined' };
+  await locationPort.permission(true, true); assert.equal(prompts, 2, 'First opening requests undetermined permission');
+  result = { granted: false, canAskAgain: true, status: 'denied' };
+  await locationPort.permission(true); assert.equal(prompts, 3, 'Explicit Retry may request permission again');
   let fix, errors = 0; await locationPort.watch(value => { fix = value; }, () => errors++);
   callback({ coords: { latitude: 8, longitude: 76, accuracy: 25 }, timestamp: 123 }); errorCallback('private native details');
   assert.deepEqual(fix, { latitude: 8, longitude: 76, accuracy: 25, timestamp: 123 }); assert.equal(errors, 1); assert.equal(options.accuracy, 4);
@@ -147,4 +191,52 @@ test('native adapter checks permission before requesting and uses only foregroun
 test('web adapter never requests browser geolocation', async () => {
   const { locationPort } = load('src/lib/journey/location-port.ts');
   await assert.rejects(locationPort.permission(true), /native development build/);
+});
+
+test('opening prepares permission once without GPS or a session; Begin remains explicit', async () => {
+  const f = fixture(), gate = deferred();
+  f.port.permission = async request => { f.requests.push(request); return gate.promise; };
+  const first = f.controller.prepare(); await f.controller.prepare(); await f.begin();
+  assert.deepEqual(f.requests, [true]); assert.equal(f.counts().commits, 0); assert.equal(f.counts().watches, 0);
+  gate.resolve({ granted: true, canAskAgain: true }); await first;
+  assert.equal(f.controller.get().status, 'permitted'); assert.equal(f.controller.get().position, null); assert.equal(f.pending.size, 0);
+  await f.begin(); assert.deepEqual(f.requests, [true, false]);
+  assert.equal(f.counts().commits, 1); assert.equal(f.counts().watches, 1); f.controller.stop();
+});
+
+test('denied preparation never starts tracking, reentry checks silently and ready Retry never starts the timer', async () => {
+  const f = fixture(); f.setGranted(false); await f.controller.prepare();
+  assert.equal(f.controller.get().status, 'denied'); assert.equal(f.counts().commits, 0);
+  f.controller.sync('ready', false, false); f.controller.sync('ready', true, true);
+  await f.controller.prepare(); await f.begin();
+  assert.deepEqual(f.requests, [true, false, false]); assert.equal(f.counts().watches, 0);
+  f.setGranted(true); await f.controller.retry();
+  assert.equal(f.requests.at(-1), true); assert.equal(f.controller.get().status, 'permitted');
+  assert.equal(f.counts().commits, 0); assert.equal(f.counts().watches, 0);
+  await f.begin(); assert.equal(f.counts().commits, 1); assert.equal(f.counts().watches, 1); f.controller.stop();
+  const g = fixture(); g.setServices(false); await g.controller.prepare();
+  assert.equal(g.controller.get().status, 'unavailable'); assert.equal(g.counts().commits, 0); assert.equal(g.counts().watches, 0); assert.equal(g.pending.size, 0);
+});
+
+test('permission preparation cleans up on blur, background, finish and timeout and rejects late grants', async () => {
+  for (const [status, active, focused] of [['ready', true, false], ['ready', false, true], ['finished', true, true]]) {
+    const f = fixture(), gate = deferred(); f.port.permission = () => gate.promise;
+    const preparing = f.controller.prepare(); f.controller.sync(status, active, focused);
+    gate.resolve({ granted: true, canAskAgain: true }); await preparing;
+    assert.notEqual(f.controller.get().status, 'permitted'); assert.equal(f.pending.size, 0);
+    assert.equal(f.counts().commits, 0); assert.equal(f.counts().watches, 0);
+  }
+  const f = fixture(), gate = deferred(); f.port.permission = () => gate.promise;
+  const preparing = f.controller.prepare(); [...f.pending.values()][0]();
+  gate.resolve({ granted: true, canAskAgain: true }); await preparing;
+  assert.equal(f.controller.get().status, 'unavailable'); assert.equal(f.pending.size, 0); assert.equal(f.counts().watches, 0);
+});
+
+test('permission dialog inactivity during preparation waits for foreground and never begins a session', async () => {
+  const f = fixture(), gate = deferred(); f.port.permission = () => gate.promise;
+  const preparing = f.controller.prepare(); f.controller.sync('ready', false, true, 'inactive');
+  gate.resolve({ granted: true, canAskAgain: true }); await flush();
+  assert.equal(f.counts().commits, 0); assert.equal(f.counts().watches, 0);
+  f.controller.sync('ready', true, true); await preparing;
+  assert.equal(f.controller.get().status, 'permitted'); assert.equal(f.counts().watches, 0); assert.equal(f.pending.size, 0);
 });

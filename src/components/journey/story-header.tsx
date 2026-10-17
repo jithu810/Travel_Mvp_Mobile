@@ -12,7 +12,7 @@ export function StoryHeader({ journey, height, onAbout }: { journey: PublicJourn
     <View pointerEvents="none" style={styles.shade} />
     <View style={styles.controls}>
       <Pressable accessibilityRole="button" accessibilityLabel="Go back" onPress={() => router.canGoBack() ? router.back() : router.replace('/discover')} style={styles.control}><Text style={styles.back}>‹</Text></Pressable>
-      <Pressable accessibilityRole="button" accessibilityLabel="About this journey" onPress={onAbout} style={styles.control}><Text style={styles.controlLabel}>•••</Text></Pressable>
+      <Pressable accessibilityRole="button" accessibilityLabel="Journey actions" onPress={onAbout} style={styles.control}><Text style={styles.controlLabel}>•••</Text></Pressable>
     </View>
     <View pointerEvents="none" style={[styles.titles, height < 140 && { bottom: 6, paddingVertical: 4 }]}>
       <Text accessibilityRole="header" accessibilityLabel={journey.title} numberOfLines={height < 140 ? 1 : 2} adjustsFontSizeToFit minimumFontScale={0.75} maxFontSizeMultiplier={1.4} style={[styles.title, height < 140 && { fontSize: 22, lineHeight: 26 }]}>{journey.title}</Text>

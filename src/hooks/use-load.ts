@@ -15,7 +15,12 @@ export function useLoad<T>(loader: (signal: AbortSignal) => Promise<T>) {
   useEffect(() => {
     const controller = new AbortController();
     let cancelled = false;
-    const timeout = setTimeout(() => controller.abort(), 15000);
+    const timeout = setTimeout(() => {
+      controller.abort();
+      if (cancelled) return;
+      cancelled = true; // Ignore late results even from transports that ignore AbortSignal.
+      setResult(previous => ({ request, loader, data: request.preserve && previous?.loader === loader ? previous.data : null, error: 'The request timed out. Please try again.' }));
+    }, 15000);
     // Only asynchronous request completion sets result state. A new loader or
     // request derives its loading state without a second render from the effect.
     loader(controller.signal).then(data => {
@@ -35,11 +40,11 @@ export function useLoad<T>(loader: (signal: AbortSignal) => Promise<T>) {
   const settled = result?.request === request && result.loader === loader;
   const preserved = request.preserve && result?.loader === loader;
   const refresh = useCallback(() => setRequest(previous => ({ version: previous.version + 1, preserve: true })), []);
-  const retry = useCallback(() => setRequest(previous => ({ version: previous.version + 1, preserve: false })), []);
+  const retry = useCallback(() => setRequest(previous => ({ version: previous.version + 1, preserve: true })), []);
   return {
     data: settled || preserved ? result?.data ?? null : null,
-    loading: !settled && !request.preserve,
-    refreshing: !settled && request.preserve,
+    loading: !settled && !(preserved && result?.data != null),
+    refreshing: !settled && preserved && result?.data != null,
     error: settled ? result.error : null,
     refresh, retry,
   };

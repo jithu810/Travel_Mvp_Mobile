@@ -215,3 +215,12 @@ test('creator and profile journey navigation reuse existing routes; future actio
   assert.ok(profileScreen.includes('<JourneyCard journey={item}'));
   assert.ok(readFileSync('src/lib/journey/snapshot.ts','utf8').includes("['Start Journey']"));
 });
+
+test('Account published collection reuses anonymous contract, owner/status filtering and invalid-id guard',async()=>{
+  const {loadPublishedProfileJourneys}=require(join(output,'lib/profile/queries.js'));
+  publicCalls.length=0;profileRows=[card,{...card,creator_id:other},{...card,status:'draft'}];
+  const result=await loadPublishedProfileJourneys(uid,new AbortController().signal);
+  assert.equal(result.length,1);assert.deepEqual(publicCalls[0],['get_account_journeys',{owner_id:uid,collection:'published'}]);
+  publicCalls.length=0;assert.deepEqual(await loadPublishedProfileJourneys('../private',new AbortController().signal),[]);assert.equal(publicCalls.length,0);
+  profileRows=[card];
+});

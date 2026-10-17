@@ -1,17 +1,17 @@
 export type Position = Readonly<{ latitude: number; longitude: number; accuracy: number | null; timestamp: number }>;
-export type LocationStatus = 'ready' | 'requesting' | 'tracking' | 'weak' | 'unavailable' | 'denied' | 'paused' | 'finished' | 'stopped';
+export type LocationStatus = 'ready' | 'permitted' | 'requesting' | 'tracking' | 'weak' | 'unavailable' | 'denied' | 'paused' | 'finished' | 'stopped';
 export type LocationSnapshot = Readonly<{ status: LocationStatus; position: Position | null; canAskAgain: boolean }>;
 export type LocationPort = {
-  permission: (request: boolean) => Promise<{ granted: boolean; canAskAgain: boolean }>;
+  permission: (request: boolean, onlyIfUndetermined?: boolean) => Promise<{ granted: boolean; canAskAgain: boolean }>;
   services: () => Promise<boolean>;
   watch: (update: (position: Position) => void, error: () => void) => Promise<{ remove: () => void }>;
 };
-type SessionStatus = 'ready' | 'active' | 'paused' | 'finished';
+type SessionStatus = 'ready' | 'active' | 'paused' | 'finished' | 'completed';
 type Timers = { set: (callback: () => void, delay: number) => ReturnType<typeof setTimeout>; clear: (id: ReturnType<typeof setTimeout>) => void };
 export function validPosition(position: Position, now: number) {
   return Number.isFinite(position.latitude) && Math.abs(position.latitude) <= 90
     && Number.isFinite(position.longitude) && Math.abs(position.longitude) <= 180
-    && Number.isFinite(position.timestamp) && position.timestamp <= now + 5000 && now - position.timestamp <= 30000;
+    && Number.isFinite(position.timestamp) && position.timestamp <= now && now - position.timestamp <= 30000;
 }
 
 // One current fix in memory. No history, storage, logging, or backend access.
@@ -25,6 +25,7 @@ export function createForegroundLocation(port: LocationPort, now = Date.now, tim
   let timeout: ReturnType<typeof setTimeout> | undefined;
   let permissionDialogInactive = false;
   let foregroundReady: (() => void) | undefined;
+  let prepared = false;
   const publish = (next: LocationSnapshot) => { snapshot = next; listeners.forEach(listener => listener()); };
   const clearTimer = () => { if (timeout !== undefined) timers.clear(timeout); timeout = undefined; };
   const stop = () => {
@@ -33,9 +34,9 @@ export function createForegroundLocation(port: LocationPort, now = Date.now, tim
     subscription?.remove(); subscription = undefined; clearTimer();
   };
   const usable = () => focused && foreground;
-  const idle = (): LocationStatus => status === 'ready' ? 'ready' : status === 'paused' ? 'paused' : status === 'finished' ? 'finished' : 'stopped';
-  const connect = async (request: boolean, begin?: () => boolean) => {
-    if (!usable() || busy || (begin ? status !== 'ready' : status !== 'active')) return;
+  const idle = (): LocationStatus => status === 'ready' ? 'ready' : status === 'paused' ? 'paused' : status === 'finished' || status === 'completed' ? 'finished' : 'stopped';
+  const connect = async (request: boolean, begin?: () => boolean, prepare = false, onlyIfUndetermined = false) => {
+    if (!usable() || busy || (begin || prepare ? status !== 'ready' : status !== 'active')) return;
     stop(); busy = true;
     const token = generation;
     const current = () => token === generation && usable();
@@ -44,7 +45,7 @@ export function createForegroundLocation(port: LocationPort, now = Date.now, tim
       if (token === generation && focused) { stop(); publish({ status: 'unavailable', position: null, canAskAgain: snapshot.canAskAgain }); }
     }, 30000);
     try {
-      const permission = await port.permission(request);
+      const permission = await port.permission(request, onlyIfUndetermined);
       // iOS permission dialogs can temporarily make the app inactive. Preserve
       // the explicit Begin intent, but wait for foreground before starting anything.
       if (token === generation && permissionDialogInactive) await new Promise<void>(resolve => { foregroundReady = resolve; });
@@ -52,6 +53,15 @@ export function createForegroundLocation(port: LocationPort, now = Date.now, tim
       if (!permission.granted) {
         clearTimer();
         publish({ status: 'denied', position: null, canAskAgain: permission.canAskAgain });
+        return;
+      }
+      if (prepare) {
+        // Permission preparation never commits a session or creates a GPS watcher.
+        const services = await port.services();
+        if (current()) {
+          clearTimer();
+          publish({ status: services ? 'permitted' : 'unavailable', position: null, canAskAgain: permission.canAskAgain });
+        }
         return;
       }
       if (begin) {
@@ -82,7 +92,7 @@ export function createForegroundLocation(port: LocationPort, now = Date.now, tim
       }, unavailable);
       if (!current()) next.remove(); else subscription = next;
     } catch {
-      if (current()) { clearTimer(); publish({ status: 'unavailable', position: null, canAskAgain: true }); }
+      if (current()) { stop(); publish({ status: 'unavailable', position: null, canAskAgain: snapshot.canAskAgain }); }
     } finally {
       if (token === generation) busy = false;
     }
@@ -90,8 +100,14 @@ export function createForegroundLocation(port: LocationPort, now = Date.now, tim
   return {
     get: () => snapshot,
     subscribe(listener: () => void) { listeners.add(listener); return () => { listeners.delete(listener); }; },
-    begin: (commit: () => boolean) => connect(true, commit),
-    retry: () => connect(true),
+    prepare() {
+      if (!usable() || busy || status !== 'ready') return;
+      const request = !prepared;
+      prepared = true;
+      return connect(request, undefined, true, true);
+    },
+    begin: (commit: () => boolean) => connect(!prepared, commit),
+    retry: () => connect(true, undefined, status === 'ready'),
     sync(nextStatus: SessionStatus, appActive: boolean, screenFocused: boolean, appState = appActive ? 'active' : 'background') {
       if (status === 'ready' && nextStatus === 'ready' && focused && screenFocused && busy && snapshot.status === 'requesting') {
         if (appState === 'inactive') { foreground = false; permissionDialogInactive = true; return; }
@@ -110,7 +126,7 @@ export function createForegroundLocation(port: LocationPort, now = Date.now, tim
 }
 
 export function locationLabel(value: LocationSnapshot) {
-  return ({ ready: 'Ready to request location', requesting: 'Requesting permission / location…', tracking: 'Location updating in foreground',
+  return ({ ready: 'Ready to request location', permitted: 'Location allowed · Tap Begin Trip when ready', requesting: 'Requesting permission / location…', tracking: 'Location updating in foreground',
     weak: 'Location signal weak', unavailable: 'Location unavailable · Check device location services', denied: 'Location permission denied',
     paused: 'Trip paused · Location updates stopped', finished: 'Trip finished · Location updates stopped', stopped: 'Location updates stopped' })[value.status]
     + (value.status === 'weak' && value.position?.accuracy !== null && value.position?.accuracy !== undefined ? ' · Accuracy ±' + Math.round(value.position.accuracy) + ' m' : '');

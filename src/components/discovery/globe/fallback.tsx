@@ -1,18 +1,19 @@
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { BrandedLoading } from '@/components/branded-loading';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { spaceColor } from '@/lib/discovery/presentation';
 import { colors } from '../ui';
-export function GlobeFallback({ message, retry, bottomInset = 0 }: { message: string; retry?: () => void; bottomInset?: number }) {
+export function GlobeFallback({ message, retry, bottomInset = 0, compact = false }: { message: string; retry?: () => void; bottomInset?: number; compact?: boolean }) {
   return <View style={styles.fallback}>
-    <ScrollView showsVerticalScrollIndicator={false} style={[styles.viewport, { bottom: bottomInset }]} contentContainerStyle={styles.content}>
-      <Text style={styles.kicker}>A WORLD OF POSSIBILITIES</Text>
-      <Text style={styles.title}>Your next chapter starts here.</Text>
-      <Text style={styles.body}>{message}</Text>
+    <ScrollView showsVerticalScrollIndicator={false} style={[styles.viewport, { bottom: bottomInset }]} contentContainerStyle={[styles.content, compact && { padding: 8, gap: 4 }]}>
+      {!compact && <Text style={styles.kicker}>A WORLD OF POSSIBILITIES</Text>}
+      {!compact && <Text style={styles.title}>Your next chapter starts here.</Text>}
+      <Text style={styles.body}>{compact ? 'World preview unavailable' : message}</Text>
       {retry && <Pressable accessibilityRole="button" onPress={retry} style={styles.retry}><Text style={styles.label}>Retry map</Text></Pressable>}
     </ScrollView>
   </View>;
 }
 export function GlobeLoading({ bottomInset = 0 }: { bottomInset?: number }) {
-  return <View style={styles.fallback}><View style={[styles.viewport, styles.content, { bottom: bottomInset }]} accessibilityRole="progressbar" accessibilityLabel="Loading world map"><ActivityIndicator color="#B9D8F0" /><Text style={styles.body}>Opening the world…</Text></View></View>;
+  return <View style={styles.fallback}><View style={[styles.viewport, styles.content, { bottom: bottomInset, padding: 0, alignItems: 'stretch' }]}><BrandedLoading compact message="Opening the world…" /></View></View>;
 }
 export const styles = StyleSheet.create({
   fallback: { flex: 1, backgroundColor: spaceColor },

@@ -1,8 +1,8 @@
 import { isJourneyId } from '../discovery/model';
 import type { TravelerType, JourneyStop } from '../../types/journey';
 export type Place = { name: string; label: string; latitude: number; longitude: number; mapboxId: string | null };
-export type StopInput = { id: string; name: string; description: string; latitude: number | null; longitude: number | null; mapboxId: string | null; day: string; rating: string };
-export type CreateForm = { id: string; title: string; description: string; destination: Place | null; traveler: TravelerType | ''; days: string; updatedAt: string | null; stops: StopInput[] };
+export type StopInput = { id: string; name: string; description: string; latitude: number | null; longitude: number | null; mapboxId: string | null; day: string; rating: string; photoPath?: string | null; descriptionWasNull?: boolean };
+export type CreateForm = { id: string; title: string; description: string; destination: Place | null; traveler: TravelerType | ''; days: string; updatedAt: string | null; stops: StopInput[]; destinationSlug?: string; coverPath?: string | null; descriptionWasNull?: boolean };
 export type SavePayload = ReturnType<typeof savePayload>;
 export type Saved = { id: string; status: 'draft' | 'published'; updated_at: string };
 export function newForm(id: string): CreateForm { return { id, title: '', description: '', destination: null, traveler: '', days: '1', updatedAt: null, stops: [] }; }
@@ -36,11 +36,11 @@ export function validateForm(form: CreateForm, status: 'draft' | 'published'): s
 }
 export function savePayload(form: CreateForm, status: 'draft' | 'published') {
   const destination = form.destination!;
-  return { id: form.id, title: form.title.trim(), description: form.description, destination_slug: slug(destination.name),
+  return { id: form.id, title: form.title.trim(), description: form.descriptionWasNull && !form.description ? null : form.description, destination_slug: form.destinationSlug ?? slug(destination.name),
     destination_name: destination.name, destination_latitude: destination.latitude, destination_longitude: destination.longitude,
-    traveler_type: form.traveler, duration_days: Number(form.days), cover_image_path: null, status, updated_at: form.updatedAt,
-    stops: form.stops.map((stop, index) => ({ id: stop.id, sequence: index + 1, name: stop.name.trim(), description: stop.description,
-      latitude: stop.latitude, longitude: stop.longitude, mapbox_place_id: stop.mapboxId, photo_path: null, rating: optionalNumber(stop.rating), day_number: optionalNumber(stop.day) })) };
+    traveler_type: form.traveler, duration_days: Number(form.days), cover_image_path: form.coverPath ?? null, status, updated_at: form.updatedAt,
+    stops: form.stops.map((stop, index) => ({ id: stop.id, sequence: index + 1, name: stop.name.trim(), description: stop.descriptionWasNull && !stop.description ? null : stop.description,
+      latitude: stop.latitude, longitude: stop.longitude, mapbox_place_id: stop.mapboxId, photo_path: stop.photoPath ?? null, rating: optionalNumber(stop.rating), day_number: optionalNumber(stop.day) })) };
 }
 export function addStop(stops: StopInput[], place: Place, id: string): StopInput[] {
   if (stops.length >= 50 || !coordinates(place.latitude, place.longitude) || stops.some(stop => (place.mapboxId && stop.mapboxId === place.mapboxId) || (stop.latitude === place.latitude && stop.longitude === place.longitude))) return stops;

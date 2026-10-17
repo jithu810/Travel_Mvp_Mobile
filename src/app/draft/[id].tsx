@@ -1,3 +1,4 @@
+import { BrandedLoading } from '@/components/branded-loading';
 import { useCallback } from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ActivityIndicator, ScrollView, Text, View } from 'react-native';
@@ -33,10 +34,10 @@ export default function PrivateDraftScreen() {
   return <SafeAreaView style={ui.safe}><View style={ui.page}><ScreenHeader title="Private draft" back />
     <ScrollView contentContainerStyle={[ui.list, { gap: 24 }]}>
       {auth.loading ? <ActivityIndicator /> : !auth.session ? <Message title="Sign in to open your draft" body="Private copies are available only to their owner." action="Sign in" retry={() => router.push('/auth')} />
-        : state.loading ? <ActivityIndicator /> : !state.data ? <Message title="Draft unavailable" body={state.error || 'This draft may belong to another account or no longer be available.'} retry={state.retry} />
+        : state.loading ? <BrandedLoading message="Opening your private journey…" /> : !state.data ? <Message title="Draft unavailable" body={state.error || 'This draft may belong to another account or no longer be available.'} retry={state.retry} />
           : <><Text style={ui.eyebrow}>PRIVATE · UNPUBLISHED</Text><Text style={ui.heading}>{state.data.title}</Text>
             <JourneyPhoto uri={state.data.cover} label={state.data.title} />
-            <Text style={ui.body}>Your private journey copy. Editing will be available in a later update.</Text>
+            <Action label="Continue editing" onPress={() => router.push({ pathname: '/create', params: { draft: id } })} />
             {state.data.description ? <Text style={ui.body}>{state.data.description}</Text> : null}
             {state.data.sourceId && <SourceAttribution id={state.data.sourceId} />}
             <JourneyMap stops={state.data.stops} /><StopTimeline stops={state.data.stops} />

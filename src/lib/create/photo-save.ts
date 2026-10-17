@@ -1,0 +1,85 @@
+import { SaveFailure, validateForm, type CreateForm, type Saved, type createSaveController } from './model';
+import { isJourneyId } from '../discovery/model';
+import type { LocalPhoto } from './photo-model';
+type SavePort = ReturnType<typeof createSaveController>['save'];
+export type PhotoSavePorts = {
+  save: SavePort;
+  checkDraft: (form: CreateForm, signal: AbortSignal) => Promise<{ ownerId: string; stopIds: string[] }>;
+  upload: (objectName: string, photo: LocalPhoto, signal: AbortSignal) => Promise<void>;
+  uuid: () => string;
+};
+type Upload = { objectName: string; path: string; state: 'allocated' | 'uploaded' | 'unknown' };
+export type PhotoSaveResult = { kind: 'saved'; saved: Saved; form: CreateForm } | { kind: 'error'; message: string; uncertain?: boolean } | { kind: 'blocked' };
+export function photoObjectName(owner: string, journey: string, key: string, uuid: string, mime: string) {
+  if (![owner,journey,uuid].every(isJourneyId) || key !== 'cover' && !isJourneyId(key)) throw new SaveFailure('Invalid photo ownership or memory ID.');
+  const ext = ({ 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' } as Record<string,string>)[mime];
+  if (!ext) throw new SaveFailure('Unsupported photo format.');
+  return owner + '/' + journey + '/' + (key === 'cover' ? 'cover' : 'stops/' + key) + '/' + uuid + '.' + ext;
+}
+export function createPhotoSaveController(ports: PhotoSavePorts) {
+  let busy = false, blocked = false;
+  // Editor-lifetime ledger. No remote deletion, overwrites or automatic write retries.
+  const uploads = new Map<string, Upload>();
+  return {
+    getUploads: () => [...uploads.values()].map(entry => ({ ...entry })),
+    async save(form: CreateForm, status: 'draft' | 'published', candidates: Record<string, LocalPhoto>, signal: AbortSignal,
+      progress: (message: string) => void = () => {}, checkpoint: (form: CreateForm) => void = () => {}): Promise<PhotoSaveResult> {
+      if (busy || blocked) return { kind: 'blocked' };
+      const validation = validateForm(form,status);
+      if (validation) return { kind: 'error', message: validation };
+      if ([form.coverPath,...form.stops.map(stop => stop.photoPath)].some(path => path && /^(file|content|data|blob):/i.test(path))) return { kind: 'error', message: 'Local photo addresses cannot be saved as Storage paths.' };
+      const entries = Object.entries(candidates);
+      if (entries.some(([key]) => key !== 'cover' && !form.stops.some(stop => stop.id === key))) return { kind: 'error', message: 'Finish editing the selected memory before saving its photo.' };
+      busy = true;
+      let current = form;
+      const cancelled = () => { if (signal.aborted) throw new SaveFailure('Save cancelled. Check your saved draft before continuing.'); };
+      const persist = async (snapshot: CreateForm, desired: 'draft' | 'published') => {
+        cancelled(); progress('Saving journey...');
+        const result = await ports.save(snapshot,desired,signal);
+        if (result.kind !== 'saved') {
+          if (result.kind === 'error') throw new SaveFailure(result.message,Boolean(result.uncertain));
+          throw new SaveFailure('Save is blocked. Reload the saved draft before continuing.',true);
+        }
+        return { saved: result.saved, form: { ...snapshot, updatedAt: result.saved.updated_at } };
+      };
+      try {
+        cancelled();
+        if (!entries.length) { const result = await persist(current,status); return { kind: 'saved', ...result }; }
+        // An initial metadata save makes a private journey available to INSERT RLS.
+        if (!current.updatedAt) { const result = await persist(current,'draft'); current = result.form; cancelled(); checkpoint(current); }
+        progress('Checking private draft...');
+        let draft = await ports.checkDraft(current,signal); cancelled();
+        if (entries.some(([key]) => key !== 'cover' && !draft.stopIds.includes(key))) {
+          const result = await persist(current,'draft'); current = result.form; cancelled(); checkpoint(current);
+          draft = await ports.checkDraft(current,signal); cancelled();
+          if (entries.some(([key]) => key !== 'cover' && !draft.stopIds.includes(key))) throw new SaveFailure('The selected memory could not be verified in your saved draft. Reload before continuing.',true);
+        }
+        const paths: Record<string,string> = {};
+        for (const [index,[key,photo]] of entries.entries()) {
+          cancelled();
+          const ledgerKey = JSON.stringify([draft.ownerId,current.id,key,photo.uri]);
+          let entry = uploads.get(ledgerKey);
+          if (!entry) {
+            const objectName = photoObjectName(draft.ownerId,current.id,key,ports.uuid(),photo.mime);
+            entry = { objectName, path: 'journey-media/' + objectName, state: 'allocated' }; uploads.set(ledgerKey,entry);
+          }
+          if (entry.state === 'unknown') throw new SaveFailure('An upload result is unconfirmed. Reload/check your draft before another save; no upload will be retried automatically.',true);
+          if (entry.state !== 'uploaded') {
+            progress('Uploading photo ' + (index+1) + ' of ' + entries.length + '...');
+            try { await ports.upload(entry.objectName,photo,signal); entry.state = 'uploaded'; }
+            catch (error) { if (!(error instanceof SaveFailure) || error.uncertain) entry.state = 'unknown'; throw error; }
+          }
+          paths[key] = entry.path;
+        }
+        cancelled();
+        const snapshot = { ...current, coverPath: paths.cover ?? current.coverPath,
+          stops: current.stops.map(stop => paths[stop.id] ? { ...stop, photoPath: paths[stop.id] } : stop) };
+        const result = await persist(snapshot,status);
+        return { kind: 'saved', ...result };
+      } catch (error) {
+        blocked = !(error instanceof SaveFailure) || error.uncertain;
+        return { kind: 'error', message: error instanceof Error ? error.message : 'Save result unconfirmed. Check your draft before continuing.', uncertain: blocked };
+      } finally { busy = false; }
+    },
+  };
+}

@@ -4,17 +4,18 @@ import type { PublicJourney } from '@/types/journey';
 import { journeyFacts } from '@/lib/discovery/model';
 import { colors } from './ui';
 
-export const HomeJourneyCard = memo(function HomeJourneyCard({ journey, expanded, width, selected, onOpen, onLocate }: {
+export const HomeJourneyCard = memo(function HomeJourneyCard({ journey, expanded, width, selected, onOpen, onLocate, onHeight }: {
   journey: PublicJourney; expanded: boolean; width: number; selected: boolean;
-  onOpen: (id: string) => void; onLocate: (id: string) => void;
+  onOpen: (id: string) => void; onLocate: (id: string) => void; onHeight?: (height: number) => void;
 }) {
   const [failedUri, setFailedUri] = useState<string | null>(null);
-  return <View style={[s.card, { width }, selected && s.selected]}>
+  return <View style={[s.card, { width }, selected && s.selected]} onLayout={event => onHeight?.(event.nativeEvent.layout.height)}>
     <Pressable accessibilityRole="button" accessibilityLabel={'Open journey: ' + journey.title + ', ' + journey.destination}
       accessibilityHint="Opens Journey Story" onPress={() => onOpen(journey.id)} style={[s.story, expanded && s.expandedStory]}>
       <View style={[s.cover, expanded && s.expandedCover, expanded && { height: Math.round(width / 2.6) }]}>
         {journey.cover && failedUri !== journey.cover
-          ? <Image source={{ uri: journey.cover }} accessibilityLabel={journey.title + ' cover photo'} style={s.image} resizeMode="cover" onError={() => setFailedUri(journey.cover)} />
+          ? <><Image source={{ uri: journey.cover }} accessible={false} accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={s.backdrop} resizeMode="cover" blurRadius={18} />
+            <Image key={journey.cover} source={{ uri: journey.cover }} accessibilityLabel={journey.title + ' cover photo'} style={s.image} resizeMode="contain" onError={() => setFailedUri(journey.cover)} /></>
           : <View style={s.placeholder} accessible accessibilityLabel="No journey cover photo available"><Text style={s.placeholderIcon}>↗</Text></View>}
       </View>
       <View style={[s.content, expanded && s.expandedContent]}>
@@ -33,23 +34,24 @@ export const HomeJourneyCard = memo(function HomeJourneyCard({ journey, expanded
   </View>;
 });
 const s = StyleSheet.create({
-  card: { borderRadius: 18, backgroundColor: colors.white, borderWidth: 1, borderColor: colors.line, overflow: 'hidden' },
-  selected: { borderColor: colors.green, backgroundColor: '#EFF3E7' },
+  card: { borderRadius: 18, backgroundColor: colors.white, borderWidth: 1, borderColor: '#E1E8F4', overflow: 'hidden' },
+  selected: { borderColor: '#3873CE', backgroundColor: '#F0F6FF' },
   story: { flexDirection: 'row', padding: 10, paddingBottom: 4, gap: 10 },
   expandedStory: { flexDirection: 'column', padding: 0, gap: 0 },
-  cover: { width: 64, height: 76, borderRadius: 12, overflow: 'hidden', backgroundColor: colors.pale },
+  cover: { width: 96, height: 84, borderRadius: 12, overflow: 'hidden', backgroundColor: colors.pale },
   expandedCover: { width: '100%', height: undefined, aspectRatio: 2.6, borderRadius: 0 },
   image: { position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' },
+  backdrop: { position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', opacity: 0.45 },
   placeholder: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.pale },
-  placeholderIcon: { fontSize: 24, color: colors.green },
+  placeholderIcon: { fontSize: 24, color: '#2C63AF' },
   content: { flex: 1, minWidth: 0, gap: 3, paddingHorizontal: 4, paddingVertical: 4 },
   expandedContent: { paddingHorizontal: 14, paddingTop: 10 },
-  destination: { color: colors.green, fontSize: 10, fontWeight: '600' },
-  title: { color: colors.ink, fontSize: 14, lineHeight: 18, fontWeight: '600' },
+  destination: { color: '#2C63AF', fontSize: 10, fontWeight: '600' },
+  title: { color: '#14243F', fontSize: 15, lineHeight: 19, fontWeight: '700' },
   creator: { color: colors.muted, fontSize: 10, lineHeight: 14 },
   facts: { color: colors.muted, fontSize: 10, lineHeight: 14 },
   actions: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 10 },
   locate: { minHeight: 44, justifyContent: 'center', paddingHorizontal: 4 },
-  locateText: { fontSize: 11, fontWeight: '600', color: colors.green },
-  openText: { fontSize: 11, fontWeight: '600', color: colors.ink },
+  locateText: { fontSize: 11, fontWeight: '600', color: '#2C63AF' },
+  openText: { fontSize: 11, fontWeight: '600', color: '#14243F' },
 });

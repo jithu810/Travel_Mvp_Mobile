@@ -6,16 +6,20 @@
     "orientation": "portrait",
     "scheme": "journeycreator",
     "userInterfaceStyle": "light",
-    "icon": "./assets/icon.png",
+    "icon": "./assets/launcher-icon.png",
     "ios": {
       "supportsTablet": true
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/icon.png",
-        "backgroundColor": "#153E35"
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#06275B"
       },
-      "package": "com.sree8100.journeycreatormobile"
+      "package": "com.sree8100.journeycreatormobile",
+      "blockedPermissions": [
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE"
+      ]
     },
     "web": {
       "output": "single",
@@ -27,21 +31,32 @@
         "expo-splash-screen",
         {
           "backgroundColor": "#F5F3EC",
-          "image": "./assets/icon.png",
+          "image": "./assets/journey-creator-logo.png",
           "imageWidth": 100
         }
       ],
       "@rnmapbox/maps",
-      ["expo-location", {
-        "locationWhenInUsePermission": "Show your current position during an active trip.",
-        "locationAlwaysPermission": false,
-        "locationAlwaysAndWhenInUsePermission": false,
-        "motionUsagePermission": false,
-        "isIosBackgroundLocationEnabled": false,
-        "isAndroidBackgroundLocationEnabled": false,
-        "isAndroidForegroundServiceEnabled": false,
-        "isAndroidMotionActivityEnabled": false
-      }]
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Show your current position during an active trip.",
+          "locationAlwaysPermission": false,
+          "locationAlwaysAndWhenInUsePermission": false,
+          "motionUsagePermission": false,
+          "isIosBackgroundLocationEnabled": false,
+          "isAndroidBackgroundLocationEnabled": false,
+          "isAndroidForegroundServiceEnabled": false,
+          "isAndroidMotionActivityEnabled": false
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Choose an optional photo for your journey or memory.",
+          "cameraPermission": "Take an optional photo for your journey or memory.",
+          "microphonePermission": false
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true

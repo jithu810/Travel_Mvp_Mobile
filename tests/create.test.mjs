@@ -7,7 +7,7 @@ import { createRequire } from 'node:module';
 import ts from 'typescript';
 const output = mkdtempSync(join(tmpdir(), 'journey-create-'));
 after(() => rmSync(output, { recursive: true, force: true }));
-const program = ts.createProgram(['src/lib/create/id.ts', 'src/lib/create/model.ts', 'src/lib/create/places.ts', 'src/lib/create/queries.ts', 'src/lib/journey/map-data.ts'], {
+const program = ts.createProgram(['src/lib/create/memory.ts', 'src/lib/create/id.ts', 'src/lib/create/model.ts', 'src/lib/create/places.ts', 'src/lib/create/queries.ts', 'src/lib/journey/map-data.ts'], {
   target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS, types: ['node'], esModuleInterop: true,
   outDir: output, rootDir: resolve('src'), strict: true, skipLibCheck: true,
 });
@@ -135,9 +135,9 @@ test('repository never claims mismatched or incomplete save success and classifi
 test('entry, auth return, private/public routes and existing map reuse remain explicit', () => {
   const screen = readFileSync('src/app/create.tsx', 'utf8');
   assert.ok(screen.includes("context: 'create'")); assert.ok(screen.includes('prompted.current = true'));
-  assert.ok(screen.includes("result.saved.status === 'draft' ? '/draft/[id]' : '/journey/[id]'"));
+  assert.ok(screen.includes("params: { draft: result.saved.id }")); assert.ok(screen.includes('initial={draft.data}'));
   assert.ok(screen.includes('<JourneyMap stops={stops}')); assert.ok(screen.includes('key={auth.session.user.id}'));
-  assert.ok(screen.includes('if (publishedId) return')); assert.ok(readFileSync('src/app/discover.tsx', 'utf8').includes('accessibilityLabel="Create Journey"'));
+  assert.ok(screen.includes('if (publishedId) return')); assert.ok(readFileSync('src/app/discover.tsx', 'utf8').includes('<FloatingNavigation ')); assert.ok(readFileSync('src/components/floating-navigation.tsx', 'utf8').includes("route: '/create'"));
 });
 
 test('secure UUIDs are new valid v4 IDs; cancelled saves never reach the RPC', async () => {
@@ -148,4 +148,104 @@ test('secure UUIDs are new valid v4 IDs; cancelled saves never reach the RPC', a
   await assert.rejects(() => saveNewJourney(model.savePayload(valid(), 'draft'), uid, cancelled.signal), error => !error.uncertain);
   assert.equal(calls.length, 0);
   assert.ok(readFileSync('src/lib/create/id.native.ts', 'utf8').includes('requireOptionalNativeModule'));
+});
+
+const editorModel = require(join(output, 'lib/create/editor-model.js'));
+const version = '2026-10-14T10:00:00.123456Z';
+const draftRow = { id, user_id: uid, title: 'Existing journey', description: null, status: 'draft', is_demo: false,
+  updated_at: version, destination_slug: 'original-town-slug', destination_name: 'Selected town', destination_latitude: 0, destination_longitude: 0,
+  traveler_type: 'family', duration_days: 3, cover_image_path: 'journey-media/other-owner/source/cover/old.png' };
+const stopRows = [
+  { id: secondId, journey_id: id, sequence: 2, name: 'Unlocated note', description: null, latitude: null, longitude: null, mapbox_place_id: null, photo_path: null, rating: 0, day_number: null },
+  { id: stopId, journey_id: id, sequence: 1, name: 'Beach', description: 'Keep this', latitude: 0, longitude: 0, mapbox_place_id: 'mapbox.original', photo_path: 'journey-media/source/route/stops/photo.webp', rating: 4.5, day_number: 2 },
+];
+test('quick creation suggests editable titles without choosing travellers or requiring stops', () => {
+  let form = editorModel.selectDestination(model.newForm(id), place, false);
+  assert.equal(form.title, 'Selected town journey'); assert.equal(form.traveler, ''); assert.equal(form.days, '1');
+  assert.ok(model.validateForm(form, 'draft'));
+  form = { ...form, traveler: 'solo' };
+  assert.equal(model.validateForm(form, 'draft'), null); assert.match(model.validateForm(form, 'published'), /at least one stop/);
+  assert.equal(editorModel.selectDestination({ ...form, title: 'My words' }, { ...place, name: 'Elsewhere' }, true).title, 'My words');
+  assert.equal(editorModel.selectDestination(form, { ...place, name: 'Elsewhere' }, false).title, 'Elsewhere journey');
+  assert.equal(editorModel.selectDestination({ ...form, title: '' }, place, true).title, '', 'Explicitly cleared titles are not regenerated');
+});
+test('hydration and subsequent save retain IDs, sequence, raw paths, nullable descriptions, destination and precise version', () => {
+  const before = JSON.stringify(stopRows);
+  const form = editorModel.hydrateDraft(draftRow, stopRows, id, uid);
+  const payload = model.savePayload(form, 'draft');
+  assert.equal(payload.id, id); assert.equal(payload.updated_at, version); assert.equal(payload.destination_slug, 'original-town-slug');
+  assert.equal(payload.destination_latitude, 0); assert.equal(payload.destination_longitude, 0);
+  assert.equal(payload.cover_image_path, draftRow.cover_image_path); assert.equal(payload.description, null);
+  assert.deepEqual(payload.stops, [...stopRows].sort((a,b) => a.sequence-b.sequence).map(({ journey_id, ...stop }) => stop));
+  assert.equal(JSON.stringify(stopRows), before);
+  const changed = { ...form, title: 'Edited', stops: model.moveStop(form.stops, 1, -1) };
+  assert.deepEqual(model.savePayload(changed, 'draft').stops.map(s => [s.id,s.sequence,s.photo_path]), [[secondId,1,null],[stopId,2,stopRows[1].photo_path]]);
+  assert.match(model.validateForm(form, 'published'), /valid coordinates/);
+});
+test('hydration fails closed for ownership, publication, missing versions, malformed or omitted stops', () => {
+  for (const patch of [{ user_id: id }, { status: 'published' }, { updated_at: null }, { cover_image_path: {} }]) assert.throws(() => editorModel.hydrateDraft({ ...draftRow, ...patch }, stopRows, id, uid));
+  for (const rows of [null, [{ ...stopRows[1], sequence: 3 }], [{ ...stopRows[1], photo_path: {} }], [{ ...stopRows[1], journey_id: uid }], [stopRows[1], stopRows[1]]]) assert.throws(() => editorModel.hydrateDraft(draftRow, rows, id, uid));
+});
+
+let reads = [], readQueue = [];
+client.from = table => {
+  const filters = [], entry = { table, filters };
+  const query = { select(columns) { entry.columns = columns; return query; }, eq(key,value) { filters.push([key,value]); return query; },
+    order(key) { entry.order = key; return query; }, abortSignal(signal) { assert.equal(signal.aborted,false); entry.signal = signal; return query; },
+    maybeSingle: async () => { reads.push(entry); return readQueue.shift(); },
+    then(resolve,reject) { reads.push(entry); return Promise.resolve(readQueue.shift()).then(resolve,reject); } };
+  return query;
+};
+const { loadEditableDraft } = require(join(output, 'lib/create/queries.js'));
+function draftReads(lastVersion = version) { reads = []; readQueue = [{ data: draftRow, error: null }, { data: stopRows, error: null }, { data: { updated_at: lastVersion }, error: null }]; viewer = uid; }
+test('real draft repository reads owner-only rows, checks consistent version, then saves existing ID/version through RPC', async () => {
+  draftReads(); const form = await loadEditableDraft(id, uid, new AbortController().signal);
+  assert.deepEqual(reads.map(r => r.table), ['journeys','journey_stops','journeys']);
+  assert.ok(reads[0].filters.some(([key,value]) => key==='user_id' && value===uid));
+  assert.ok(reads[0].filters.some(([key,value]) => key==='status' && value==='draft'));
+  assert.equal(reads[1].order,'sequence'); assert.ok(reads[1].columns.includes('mapbox_place_id'));
+  failure = null; response = { ...saved, updated_at: '2026-10-14T11:00:00Z' }; calls.length = 0;
+  const result = await saveNewJourney(model.savePayload({ ...form, title: 'Changed title' }, 'draft'), uid);
+  assert.equal(result.id, id); assert.equal(calls[0][1].payload.updated_at, version); assert.equal(calls[0][1].payload.cover_image_path, draftRow.cover_image_path);
+  response = saved;
+});
+test('draft repository rejects mixed-version reads, denied users, missing stops and aborted work', async () => {
+  draftReads('2026-10-14T12:00:00Z'); await assert.rejects(loadEditableDraft(id,uid,new AbortController().signal), /changed while loading/);
+  draftReads(); viewer = null; await assert.rejects(loadEditableDraft(id,uid,new AbortController().signal)); assert.equal(reads.length,0);
+  draftReads(); readQueue[1] = { data:null,error:{} }; await assert.rejects(loadEditableDraft(id,uid,new AbortController().signal), /every stop/);
+  draftReads(); const abort = new AbortController(); abort.abort(); await assert.rejects(loadEditableDraft(id,uid,abort.signal)); assert.equal(reads.length,0);
+});
+test('save conflict blocks retry until an explicit fresh editor load, preserving the unsaved form', async () => {
+  draftReads(); const form = editorModel.hydrateDraft(draftRow,stopRows,id,uid), before = JSON.stringify(form);
+  failure = { code:'40001' }; const controller = model.createSaveController(payload => saveNewJourney(payload,uid));
+  const result = await controller.save(form,'draft'); assert.equal(result.uncertain,true); assert.match(result.message,/changed/);
+  assert.equal((await controller.save(form,'draft')).kind,'blocked'); assert.equal(JSON.stringify(form),before); failure = null;
+});
+const memories = require(join(output,'lib/create/memory.js'));
+test('memory snapshots preserve full hydrated metadata and raw media, accept null private locations and reject duplicates/invalid details',()=>{
+  const form=editorModel.hydrateDraft(draftRow,stopRows,id,uid),before=JSON.stringify(form);
+  const baseline=form.stops[0],edit={baseline,value:{...baseline,description:'A fresh note',day:'3',rating:'0'},isNew:false};
+  const snapshot=memories.memorySnapshot(form,edit);assert.equal(JSON.stringify(form),before);assert.equal(snapshot.stops[1],form.stops[1]);
+  const payload=model.savePayload(snapshot,'draft');assert.equal(payload.cover_image_path,draftRow.cover_image_path);assert.equal(payload.updated_at,version);assert.equal(payload.destination_slug,draftRow.destination_slug);
+  assert.equal(payload.stops[0].photo_path,baseline.photoPath);assert.equal(payload.stops[0].mapbox_place_id,baseline.mapboxId);assert.equal(payload.stops[0].rating,0);
+  assert.equal(payload.stops[1].description,null);assert.equal(memories.memoryChanged(edit),true);assert.equal(memories.memoryChanged({...edit,value:baseline}),false);
+  const fresh=memories.emptyMemory('55555555-5555-4555-8555-555555555555');const named={baseline:fresh,value:{...fresh,name:'A moment'},isNew:true};
+  assert.equal(memories.memorySnapshot(form,named).stops.at(-1).latitude,null);
+  assert.throws(()=>memories.memorySnapshot(form,{...named,value:{...named.value,latitude:0,longitude:0,mapboxId:'other'}}),/already in your journey/);
+  for(const patch of [{name:''},{description:'x'.repeat(1001)},{day:'4'},{rating:'6'},{id:id}])assert.throws(()=>memories.memorySnapshot(form,{...edit,value:{...edit.value,...patch}}));
+  assert.throws(()=>memories.memorySnapshot(form,{...edit,isNew:true}),/changed/);assert.throws(()=>memories.memorySnapshot({...form,stops:[]},edit),/changed/);
+});
+test('publication readiness shares validation, names the unlocated memory, and does not require optional media/notes/day/rating',()=>{
+  assert.match(memories.publicationIssue({...valid(),stops:[]}),/at least one stop/);
+  const unlocated={...valid(),stops:[{...valid().stops[0],name:'Sunset',latitude:null,longitude:null}]};
+  assert.match(memories.publicationIssue(unlocated),/memory 1 \(Sunset\)/);
+  assert.match(memories.publicationIssue({...valid(),stops:[{...valid().stops[0],name:''}]}),/name/);
+  assert.equal(memories.publicationIssue(valid()),null);
+});
+test('private photo reads sign only existing storage objects, respect owner checks and keep raw paths unchanged',async()=>{
+  const {loadEditorPhotos}=require(join(output,'lib/create/queries.js'));const raw=['journey-media/owner/trip/stops/a.webp','https://legacy.test/a.jpg','journey-media/../bad.png'];const before=JSON.stringify(raw);let signing=[];
+  client.storage={from:bucket=>{assert.equal(bucket,'journey-media');return {createSignedUrls:async(paths,ttl)=>{signing=paths;assert.equal(ttl,3600);return {data:[{signedUrl:'https://signed.test/a'}],error:null};}};}};
+  viewer=uid;assert.deepEqual(await loadEditorPhotos(raw,uid,new AbortController().signal),{[raw[0]]:'https://signed.test/a'});assert.deepEqual(signing,['owner/trip/stops/a.webp']);assert.equal(JSON.stringify(raw),before);
+  viewer=null;signing=[];await assert.rejects(loadEditorPhotos(raw,uid,new AbortController().signal));assert.equal(signing.length,0);viewer=uid;
+  const abort=new AbortController();abort.abort();await assert.rejects(loadEditorPhotos(raw,uid,abort.signal));
 });

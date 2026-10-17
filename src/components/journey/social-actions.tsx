@@ -1,3 +1,5 @@
+import { JourneyShareSheet } from './journey-share-sheet';
+import { createShareArtwork, type ShareArtwork } from '@/lib/social/share-artwork';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useActionIntent } from '@/hooks/action-intent';
 import { useCallback, useRef, useState } from 'react';
@@ -8,7 +10,7 @@ import { colors } from '@/components/discovery/ui';
 import { useJourneySocial } from '@/hooks/use-journey-social';
 import { sharePublicJourney } from '@/lib/social/sharing';
 
-export function SocialActions({ journey, compact = false }: { journey: PublicJourney; compact?: boolean }) {
+export function SocialActions({ journey, compact = false, selectedMemoryId }: { journey: PublicJourney; compact?: boolean; selectedMemoryId?: string | null }) {
   const social = useJourneySocial(journey.id, journey.likes);
   const router = useRouter();
   const intent = useActionIntent();
@@ -22,12 +24,14 @@ export function SocialActions({ journey, compact = false }: { journey: PublicJou
       if (pending && pending.action !== 'remix') void social.act(pending.action, true);
     }
   }, [social, intent, journey.id]));
+  const [artwork, setArtwork] = useState<ShareArtwork | null>(null);
+  useFocusEffect(useCallback(() => () => setArtwork(null), []));
   const [shareMessage, setShareMessage] = useState<string | null>(null);
   const [sharing, setSharing] = useState(false);
   const shareLock = useRef(false);
   const shareButton = useRef<View>(null);
   const disabled = social.auth.loading || Boolean(social.auth.error) || Boolean(social.busy) || (!social.state && Boolean(social.auth.session));
-  async function share() {
+  async function shareLink() {
     if (shareLock.current) return;
     shareLock.current = true; setSharing(true); setShareMessage(null);
     const result = await sharePublicJourney(journey.id, journey.title, process.env.EXPO_PUBLIC_SITE_URL, Platform.OS,
@@ -52,7 +56,7 @@ export function SocialActions({ journey, compact = false }: { journey: PublicJou
       <Pressable accessibilityRole="button" accessibilityLabel={social.state?.liked ? 'Unlike journey' : 'Like journey'}
         accessibilityState={{ disabled, selected: social.state?.liked ?? false }} disabled={disabled}
         onPress={() => { act('like'); }} style={({ pressed }) => [styles.button, compact && styles.compactButton, social.state?.liked && styles.active, disabled && styles.disabled, pressed && styles.pressed]}>
-        {social.busy === 'like' ? <ActivityIndicator color={colors.ink} /> : <Text style={[styles.label, compact && styles.compactLabel]}>{compact ? (social.state?.liked ? '♥ Like' : '♡ Like') : social.state?.liked ? '♥ Unlike' : '♡ Like'}{!compact && likes !== null && likes !== undefined ? ' · ' + likes : ''}</Text>}
+        {social.busy === 'like' ? <ActivityIndicator color={colors.ink} /> : <Text style={[styles.label, compact && styles.compactLabel]}>{compact ? (social.state?.liked ? '♥ Like' : '♡ Like') : social.state?.liked ? '♥ Unlike' : '♡ Like'}{likes !== null && likes !== undefined ? ' · ' + likes : ''}</Text>}
       </Pressable>
       <Pressable accessibilityRole="button" accessibilityLabel={social.state?.saved ? 'Remove journey from Saved' : 'Save journey'}
         accessibilityState={{ disabled, selected: social.state?.saved ?? false }} disabled={disabled}
@@ -60,12 +64,13 @@ export function SocialActions({ journey, compact = false }: { journey: PublicJou
         {social.busy === 'save' ? <ActivityIndicator color={colors.ink} /> : <Text style={[styles.label, compact && styles.compactLabel]}>{social.state?.saved ? (compact ? 'Saved' : 'Saved ✓') : 'Save'}</Text>}
       </Pressable>
       <Pressable ref={shareButton} accessibilityRole="button" accessibilityLabel="Share public journey"
-        accessibilityState={{ disabled: sharing }} disabled={sharing} onPress={() => { void share(); }}
+        accessibilityState={{ disabled: sharing }} disabled={sharing} onPress={() => { const next = createShareArtwork(journey, selectedMemoryId, process.env.EXPO_PUBLIC_SITE_URL); if (next && selectedMemoryId !== undefined) setArtwork(next); else void shareLink(); }}
         style={({ pressed }) => [styles.button, compact && styles.compactButton, pressed && styles.pressed]}>
         {sharing ? <ActivityIndicator color={colors.ink} /> : <Text style={[styles.label, compact && styles.compactLabel]}>{compact ? 'Share' : 'Share ↗'}</Text>}
       </Pressable>
       {compact && (social.error || social.auth.error || social.message || shareMessage) && <Pressable accessibilityRole="button" accessibilityLiveRegion="polite" accessibilityLabel={'View journey action feedback: ' + (social.error || social.auth.error || social.message || shareMessage || '')} onPress={() => setFeedbackOpen(true)} style={styles.status}><Text style={styles.label}>!</Text></Pressable>}
     </View>
+    {artwork && <JourneyShareSheet key={artwork.memoryId || artwork.journeyId} artwork={artwork} message={shareMessage} onClose={() => setArtwork(null)} onShareLink={shareLink} />}
     {compact ? <StorySheet visible={feedbackOpen} title="Journey actions" onClose={() => setFeedbackOpen(false)}>{feedback}</StorySheet> : feedback}
   </View>;
 }

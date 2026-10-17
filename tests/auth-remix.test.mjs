@@ -183,9 +183,10 @@ test('owner drafts use authenticated detail/list/media contracts and reject othe
   assert.ok(calls.some(call => call[0] === 'get_account_journeys' && call[1].collection === 'drafts'));
   viewer = other; await assert.rejects(() => queries.loadPrivateDraft(copyId, uid, new AbortController().signal)); viewer = uid;
 });
-test('Use targets the existing map; authenticated returns consume intents once and copies use the private route', () => {
+test('Use targets existing Travel Mode; authenticated returns consume intents once and copies use the private route', () => {
   const story = readFileSync('src/app/journey/[id].tsx', 'utf8');
-  assert.ok(story.includes('onUse={openMap}') && story.includes("const openMap = useCallback(() => setPanel('map')"));
+  assert.ok(story.includes('onUse={openTravel}') && story.includes("pathname: '/travel/[id]'"));
+  assert.ok(story.includes("const openMap = useCallback(() => setPanel('map')") && story.includes('onExpand={openMap}'), 'Map browsing remains a separate entry point');
   const options = readFileSync('src/components/journey/journey-options.tsx', 'utf8');
   assert.ok(options.includes('accessibilityLabel="Use This Journey"') && options.includes('onPress={onUse}'));
   assert.ok(options.includes("pathname: '/draft/[id]'"));

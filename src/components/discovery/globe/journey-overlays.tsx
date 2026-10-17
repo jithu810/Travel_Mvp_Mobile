@@ -6,14 +6,15 @@ import { createTravelPlayback, travelLegs, travelLine, travelPosition, type Trav
 import type { Coordinate } from '@/lib/journey/map-data';
 import { colors } from '../ui';
 
-const PhotoPin = memo(function PhotoPin({ point, onOpen }: { point: DiscoveryPoints['features'][number]; onOpen: (id: string) => void }) {
+const PhotoPin = memo(function PhotoPin({ point, onOpen, selected = false }: { selected?: boolean; point: DiscoveryPoints['features'][number]; onOpen: (id: string) => void }) {
   const annotation = useRef<PointAnnotation>(null);
   const [failed, setFailed] = useState(false);
   const uri = point.properties.photo;
+  useEffect(() => { annotation.current?.refresh(); }, [selected]);
   if (!uri || failed) return null; // The original green circle remains beneath every photo.
   return <Mapbox.PointAnnotation ref={annotation} id={'photo-' + point.id} coordinate={point.geometry.coordinates}
     onSelected={() => onOpen(point.properties.journeyId)}>
-    <View collapsable={false} style={s.photoRing}>
+    <View collapsable={false} style={[s.photoRing, selected && { borderColor: '#63D4EF' }]}>
       <Image accessibilityLabel={'Photo at ' + point.properties.name} source={{ uri }} style={s.photo}
         resizeMode="cover" fadeDuration={0} onLoad={() => annotation.current?.refresh()} onError={() => setFailed(true)} />
     </View>
@@ -44,21 +45,21 @@ function TravelingPlane({ legs }: { legs: TravelLeg[] }) {
       textRotate: bearing - 45, textRotationAlignment: 'map', textAllowOverlap: true, textIgnorePlacement: true }} />
   </Mapbox.Animated.ShapeSource>;
 }
-export function JourneyOverlays({ points, route, onOpen, playing, playbackKey }: {
-  points: DiscoveryPoints; route: Coordinate[][]; onOpen: (id: string) => void; playing: boolean; playbackKey: string;
+export function JourneyOverlays({ points, route, onOpen, playing, playbackKey, drawRoute = true, durationScale = 1, selectedId, onPointOpen }: {
+  points: DiscoveryPoints; route: Coordinate[][]; onOpen: (id: string) => void; playing: boolean; playbackKey: string; drawRoute?: boolean; durationScale?: number; selectedId?: string | null; onPointOpen?: (id: string) => void;
 }) {
-  const legs = useMemo(() => travelLegs(route), [route]);
+  const legs = useMemo(() => travelLegs(route).map(leg => ({ ...leg, duration: leg.duration * durationScale })), [route, durationScale]);
   const line = useMemo(() => travelLine(route, legs), [route, legs]);
   const hasLegs = line.geometry.coordinates.length > 0;
   return <>
-    {hasLegs && <Mapbox.ShapeSource id="discovery-travel-line" shape={line}>
+    {hasLegs && drawRoute && <Mapbox.ShapeSource id="discovery-travel-line" shape={line}>
       <Mapbox.LineLayer id="discovery-travel-line-halo" belowLayerID="discovery-pins"
         style={{ lineColor: '#FFFFFF', lineWidth: 5, lineOpacity: 0.65, lineCap: 'round', lineJoin: 'round' }} />
       <Mapbox.LineLayer id="discovery-travel-line-color" belowLayerID="discovery-pins"
         style={{ lineColor: '#4A9D7C', lineWidth: 2.5, lineOpacity: 0.9, lineDasharray: [2, 2], lineCap: 'round' }} />
     </Mapbox.ShapeSource>}
     {points.features.filter(point => point.properties.photo).map(point => <PhotoPin key={point.id + point.properties.photo}
-      point={point} onOpen={onOpen} />)}
+      point={point} onOpen={onPointOpen ? () => onPointOpen(String(point.id)) : onOpen} selected={selectedId === point.id} />)}
     {hasLegs && playing && <TravelingPlane key={playbackKey} legs={legs} />}
   </>;
 }

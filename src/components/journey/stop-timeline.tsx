@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
-import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import { AccessibilityInfo, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import type { NativeScrollEvent, NativeSyntheticEvent } from 'react-native';
 import type { JourneyStop } from '@/types/journey';
 import { JourneyPhoto } from '@/components/discovery/journey-photo';
 import { colors, ui } from '@/components/discovery/ui';
 import { stopIndexAtOffset } from '@/lib/journey/story-layout';
 
-type CarouselProps = { stops: JourneyStop[]; horizontal: true; selectedId: string | null; onSelect: (id: string) => void; onDetails: (id: string) => void; compact?: boolean };
+type CarouselProps = { stops: JourneyStop[]; horizontal: true; selectedId: string | null; onSelect: (id: string) => void; onDetails: (id: string) => void; stacked?: boolean; compact?: boolean };
 export function StopTimeline(props: CarouselProps | { stops: JourneyStop[]; horizontal?: false }) {
   return props.horizontal ? <HorizontalStopTimeline {...props} /> : <VerticalStopTimeline stops={props.stops} />;
 }
@@ -36,14 +36,21 @@ const vertical = StyleSheet.create({
   photo: { borderRadius: 18, overflow: 'hidden' }, description: { color: colors.muted, fontSize: 14, lineHeight: 23 }, rating: { fontSize: 12, color: colors.ink, lineHeight: 20, fontWeight: '600' },
 });
 
-function HorizontalStopTimeline({ stops, selectedId, onSelect, onDetails, compact = false }: {
-  stops: JourneyStop[]; selectedId: string | null; onSelect: (id: string) => void; onDetails: (id: string) => void; compact?: boolean;
+function HorizontalStopTimeline({ stops, selectedId, onSelect, onDetails, stacked = false, compact = false }: {
+  stops: JourneyStop[]; selectedId: string | null; onSelect: (id: string) => void; onDetails: (id: string) => void; stacked?: boolean; compact?: boolean;
 }) {
+  const [reduceMotion, setReduceMotion] = useState(true);
+  useEffect(() => {
+    let active = true, changed = false;
+    AccessibilityInfo.isReduceMotionEnabled().then(value => { if (active && !changed) setReduceMotion(value); }).catch(() => {});
+    const listener = AccessibilityInfo.addEventListener('reduceMotionChanged', value => { changed = true; if (active) setReduceMotion(value); });
+    return () => { active = false; listener.remove(); };
+  }, []);
   const cards = useRef<FlatList<JourneyStop>>(null);
   const thumbnails = useRef<FlatList<JourneyStop>>(null);
   const [width, setWidth] = useState(0);
   const index = Math.max(0, stops.findIndex(stop => stop.id === selectedId));
-  const stride = Math.max(1, Math.round(width * 0.88));
+  const stride = Math.max(1, Math.round(width * (stacked ? 1 : 0.88)));
   const lastOffset = useRef(-1);
   const lastSelected = useRef(selectedId);
   const dragging = useRef(false);
@@ -55,11 +62,11 @@ function HorizontalStopTimeline({ stops, selectedId, onSelect, onDetails, compac
     if (!width || dragging.current) return;
     const offset = index * stride;
     if (lastOffset.current !== offset) {
-      cards.current?.scrollToOffset({ offset, animated: lastOffset.current >= 0 });
+      cards.current?.scrollToOffset({ offset, animated: lastOffset.current >= 0 && !reduceMotion });
       lastOffset.current = offset;
     }
     thumbnails.current?.scrollToOffset({ offset: Math.max(0, index * 66 - width / 2 + 33), animated: true });
-  }, [index, stride, width, selectedId]);
+  }, [index, stride, width, selectedId, reduceMotion]);
   useEffect(() => () => { if (settleTimer.current) clearTimeout(settleTimer.current); }, []);
   function settle(offset: number) {
     if (settleTimer.current) clearTimeout(settleTimer.current);
@@ -76,8 +83,8 @@ function HorizontalStopTimeline({ stops, selectedId, onSelect, onDetails, compac
     settleTimer.current = setTimeout(() => settle(offset), 150);
   }
   if (!stops.length) return <View style={styles.empty}><Text style={styles.name}>Places still to come</Text><Text style={styles.note}>The creator hasn’t added stops yet.</Text></View>;
-  return <View style={styles.section} onLayout={event => setWidth(event.nativeEvent.layout.width)}>
-    <FlatList testID="journey-stop-thumbnails" ref={thumbnails} horizontal data={stops} extraData={selectedId} keyExtractor={stop => stop.id} showsHorizontalScrollIndicator={false}
+  return <View style={stacked ? styles.deck : styles.section} onLayout={event => setWidth(event.nativeEvent.layout.width)}>
+    {!stacked && <FlatList testID="journey-stop-thumbnails" ref={thumbnails} horizontal data={stops} extraData={selectedId} keyExtractor={stop => stop.id} showsHorizontalScrollIndicator={false}
       style={styles.timeline} contentContainerStyle={styles.thumbnailContent} getItemLayout={(_, i) => ({ length: 66, offset: i * 66, index: i })}
       renderItem={({ item, index: i }) => <View style={styles.thumbnailSlot}>
         {i < stops.length - 1 && <View style={styles.connector} />}
@@ -85,11 +92,12 @@ function HorizontalStopTimeline({ stops, selectedId, onSelect, onDetails, compac
           <View style={styles.thumbnailImage}><JourneyPhoto uri={item.photo} label={item.name + ' photo'} ratio={1} thumbnail /></View>
           <View style={styles.number}><Text style={styles.numberLabel}>{i + 1}</Text></View>
         </Pressable>
-      </View>} />
+      </View>} />}
     <View style={styles.progress} accessibilityLiveRegion="polite"><Text style={styles.progressLabel}>Stop {index + 1} of {stops.length}{stops[index]?.dayNumber !== null ? ' · Day ' + stops[index]?.dayNumber : ''}</Text><Text style={styles.swipe}>Swipe to explore →</Text></View>
+    {stacked && stops.length > 1 && <View pointerEvents="none" accessible={false} style={styles.stackEdge} />}
     {width > 0 && <FlatList testID="journey-stop-carousel" ref={cards} horizontal data={stops} keyExtractor={stop => stop.id} extraData={selectedId}
-      style={styles.carousel} contentContainerStyle={{ paddingRight: Math.max(0, width - stride), height: '100%' }} showsHorizontalScrollIndicator={false}
-      snapToInterval={stride} decelerationRate="fast" disableIntervalMomentum
+      style={stacked ? styles.deckCarousel : styles.carousel} contentContainerStyle={{ paddingRight: Math.max(0, width - stride), height: '100%' }} showsHorizontalScrollIndicator={false}
+      directionalLockEnabled nestedScrollEnabled pagingEnabled={stacked} snapToInterval={stride} decelerationRate="fast" disableIntervalMomentum
       getItemLayout={(_, i) => ({ length: stride, offset: i * stride, index: i })}
       scrollEventThrottle={16} onScroll={event => {
         const offset = event.nativeEvent.contentOffset.x;
@@ -100,20 +108,30 @@ function HorizontalStopTimeline({ stops, selectedId, onSelect, onDetails, compac
       onScrollBeginDrag={() => { dragging.current = true; if (settleTimer.current) clearTimeout(settleTimer.current); }}
       onScrollEndDrag={dragEnd} onMomentumScrollBegin={() => { if (settleTimer.current) clearTimeout(settleTimer.current); }}
       onMomentumScrollEnd={event => settle(event.nativeEvent.contentOffset.x)}
-      renderItem={({ item, index: i }) => <View style={{ width: stride, paddingRight: 10, height: '100%' }}>
+      renderItem={({ item, index: i }) => <View style={{ width: stride, paddingRight: stacked ? 0 : 10, height: '100%' }}>
         <Pressable accessibilityRole="button" accessibilityLabel={'Read stop ' + (i + 1) + ': ' + item.name} accessibilityState={{ selected: item.id === selectedId }} accessibilityHint="Opens the full stop story and photo" onPress={() => onDetails(item.id)} style={styles.card}>
-          <JourneyPhoto uri={item.photo} label={item.name + ' photo'} fill />
-          <View style={styles.cardShade} pointerEvents="none" />
-          <View style={[styles.cardText, compact && { padding: 8 }]} pointerEvents="none">
-            <Text maxFontSizeMultiplier={1.3} numberOfLines={compact ? 1 : 2} style={[styles.cardName, compact && { fontSize: 18, lineHeight: 23 }]}>{item.name}{compact ? ' ↗' : ''}</Text>
-            {!!item.description.trim() && <Text numberOfLines={compact ? 1 : 2} style={styles.excerpt}>{item.description}</Text>}
+          <View style={stacked ? styles.deckPhoto : { flex: 1 }}><JourneyPhoto uri={item.photo} label={item.name + ' photo'} fill fit={stacked ? 'contain' : 'cover'} /></View>
+          {!stacked && <View style={styles.cardShade} pointerEvents="none" />}
+          <View style={[styles.cardText, stacked && styles.deckText, compact && { padding: 8 }]} pointerEvents="none">
+            <Text maxFontSizeMultiplier={1.3} numberOfLines={compact || stacked ? 1 : 2} style={[styles.cardName, compact && { fontSize: 18, lineHeight: 23 }]}>{item.name}{compact ? ' ↗' : ''}</Text>
+            {!!item.description.trim() && <Text numberOfLines={compact || stacked ? 1 : 2} style={styles.excerpt}>{item.description}</Text>}
             {!compact && <Text style={styles.readMore}>{item.rating !== null ? '★ ' + item.rating + '/5 · Creator’s rating · ' : ''}Read story ↗</Text>}
           </View>
         </Pressable>
       </View>} />}
+    {stacked && <View style={styles.progress}>
+      <Pressable accessibilityRole="button" accessibilityLabel="Previous memory" disabled={index === 0} accessibilityState={{ disabled: index === 0 }} onPress={() => { if (index > 0) onSelect(stops[index - 1].id); }} style={[styles.deckControl, index === 0 && { opacity: 0.4 }]}><Text style={styles.progressLabel}>← Previous</Text></Pressable>
+      <Pressable accessibilityRole="button" accessibilityLabel="Next memory" disabled={index >= stops.length - 1} accessibilityState={{ disabled: index >= stops.length - 1 }} onPress={() => { if (index < stops.length - 1) onSelect(stops[index + 1].id); }} style={[styles.deckControl, index >= stops.length - 1 && { opacity: 0.4 }]}><Text style={styles.progressLabel}>Next →</Text></Pressable>
+    </View>}
   </View>;
 }
 const styles = StyleSheet.create({
+  deck: { gap: 8, position: 'relative' },
+  deckPhoto: { height: 140, backgroundColor: '#101B2E' },
+  deckText: { position: 'relative', backgroundColor: '#18243B', paddingVertical: 6 },
+  deckCarousel: { height: 230, flexGrow: 0, borderRadius: 22 },
+  stackEdge: { position: 'absolute', top: 19, left: 10, right: 10, height: 230, borderRadius: 22, backgroundColor: '#D6DFF2', transform: [{ rotate: '2deg' }] },
+  deckControl: { minHeight: 44, minWidth: 100, paddingHorizontal: 14, borderRadius: 18, backgroundColor: '#E7EDF9', alignItems: 'center', justifyContent: 'center' },
   section: { flex: 1, minHeight: 0, gap: 6 },
   timeline: { flexGrow: 0, flexShrink: 0, height: 62 },
   thumbnailContent: { alignItems: 'center' }, thumbnailSlot: { width: 66, height: 60, justifyContent: 'center' },
