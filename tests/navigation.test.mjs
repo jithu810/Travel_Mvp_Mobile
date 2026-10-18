@@ -82,13 +82,16 @@ test('timeout invalidates even a transport that ignores abort; no late success c
   assert.equal(f.calls[0].signal.aborted, true); assert.equal(f.controller.get().status, 'error'); assert.match(f.controller.get().message, /timed out/);
   resolve(road); await flush(); assert.equal(f.controller.get().route, null); assert.equal(f.pending.size, 0);
 });
-test('ineligible states never request and clear completed routes, including GPS expiry without a new reading', async () => {
+test('ineligible states never request; lifecycle clears routes while GPS loss retains hidden reference progress', async () => {
   for (const patch of [{ status: 'ready' }, { status: 'paused' }, { status: 'finished' }, { foreground: false }, { focused: false }, { position: null }, { position: fix({ accuracy: 51 }) }, { destination: undefined }, { destination: stop({ longitude: null }) }]) {
     const f = fixture(); f.controller.update(f.sample(patch)); await flush(); assert.equal(f.calls.length, 0);
     f.controller.update(f.sample()); await flush(); assert.equal(f.controller.get().route, road);
-    f.controller.update(f.sample(patch)); assert.equal(f.controller.get().route, null); assert.equal(f.pending.size, 0);
+    f.controller.update(f.sample(patch));
+    if ('position' in patch) { assert.equal(f.controller.get().route, road); assert.equal(f.controller.get().gpsHeld, true); }
+    else assert.equal(f.controller.get().route, null);
+    assert.equal(f.pending.size, 0); f.controller.stop();
   }
-  const f = fixture(); f.controller.update(input()); await flush(); f.advance(15001); f.controller.update(input()); assert.equal(f.controller.get().route, null);
+  const f = fixture(); f.controller.update(input()); await flush(); f.advance(15001); f.controller.update(input()); assert.equal(f.controller.get().route, road); assert.equal(f.controller.get().gpsHeld, true); f.controller.stop();
 });
 test('Pause/Finish/blur/background invalidate in-flight responses and remove timers', async () => {
   for (const patch of [{ status: 'paused' }, { status: 'finished' }, { focused: false }, { foreground: false }]) {

@@ -1,0 +1,35 @@
+import { Platform, StyleSheet } from 'react-native';
+
+// Shared by sign-in and registration. Spacing follows the measured safe-area viewport; controls keep usable touch targets.
+export const signupStyles = StyleSheet.create({
+  background: { backgroundColor: '#10243E' },
+  transparent: { backgroundColor: 'transparent' },
+  scenery: { position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' },
+  shade: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, backgroundColor: 'rgba(16,36,62,0.34)', experimental_backgroundImage: 'linear-gradient(180deg, rgba(16,36,62,0.12) 0%, rgba(16,36,62,0.65) 24%, rgba(16,36,62,0.9) 58%, #10243E 90%)' },
+  header: { minHeight: 52, paddingVertical: 4, gap: 12 },
+  back: { width: 44, height: 44, borderRadius: 22, borderWidth: 1, borderColor: 'rgba(255,255,255,0.45)', backgroundColor: 'rgba(255,255,255,0.08)', alignItems: 'center', justifyContent: 'center' },
+  backText: { color: '#FFFFFF', fontSize: 36, lineHeight: 40 },
+  headerTitle: { flex: 1, color: '#FFFFFF', fontSize: 17, lineHeight: 22, fontWeight: '500' },
+  form: { gap: 10, paddingTop: 8, paddingBottom: 8, flexGrow: 1 },
+  compactForm: { gap: 6, paddingTop: 6, paddingBottom: 6 },
+  // This consumes surplus height only. It never forces content below the viewport.
+  scenicSpace: { flexGrow: 1, flexShrink: 1, flexBasis: 0, maxHeight: 160 },
+  intro: { gap: 6 },
+  eyebrow: { color: '#FFD18B', letterSpacing: 2, fontSize: 10, lineHeight: 14 },
+  heading: { color: '#FFFFFF', fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif', fontWeight: '700', fontSize: 36, lineHeight: 42, letterSpacing: -1 },
+  compactHeading: { fontSize: 32, lineHeight: 38 },
+  body: { color: '#F6F4F2', fontSize: 14, lineHeight: 18 },
+  field: { gap: 3 },
+  label: { color: '#FFFFFF', fontSize: 13, lineHeight: 16, includeFontPadding: false, fontWeight: '500' },
+  input: { minHeight: 44, paddingVertical: 10, paddingHorizontal: 14, fontSize: 16, lineHeight: 20, includeFontPadding: false, borderRadius: 13, borderColor: 'rgba(255,255,255,0.85)', backgroundColor: 'rgba(255,255,255,0.20)', color: '#FFFFFF', boxShadow: '0 0 10px rgba(255,255,255,0.12), inset 0 1px 3px rgba(255,255,255,0.25)' },
+  feedback: { color: '#FFFFFF' },
+  emailButton: { minHeight: 48, borderRadius: 14, borderWidth: 1, borderColor: '#FFA37B', backgroundColor: '#FF663F', experimental_backgroundImage: 'linear-gradient(110deg, #FF6052 0%, #FF702D 100%)', boxShadow: '0 4px 14px rgba(255,96,65,0.3)' },
+  emailLabel: { fontSize: 16, lineHeight: 22, fontWeight: '600', textShadowColor: '#8A301C', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 },
+  googleOption: { alignItems: 'center' },
+  googleButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, maxWidth: '100%', minHeight: 48, paddingVertical: 6, paddingHorizontal: 16, borderRadius: 12, borderWidth: 1, borderColor: '#DADCE0', backgroundColor: '#FFFFFF' },
+  googleLogo: { width: 22, height: 22 },
+  googleCopy: { flexShrink: 1, alignItems: 'center' },
+  googleLabel: { color: '#1F1F1F', fontSize: 15, lineHeight: 20, fontWeight: '500' },
+  googleHint: { color: '#60646B', fontSize: 11, lineHeight: 14, textAlign: 'center' },
+  switch: { minHeight: 44, paddingVertical: 8 },
+});

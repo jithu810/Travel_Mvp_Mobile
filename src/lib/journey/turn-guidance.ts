@@ -7,7 +7,7 @@ export type RouteStep = {
   distance: number; duration: number; geometry: Coordinate[];
 };
 export type Guidance = {
-  status: 'ready' | 'waiting' | 'unavailable'; message: string;
+  status: 'ready' | 'waiting' | 'unavailable'; message: string; holdReason?: 'gps' | 'progress'; recoveryRequested?: boolean;
   maneuver: RouteStep | null; maneuverIndex: number | null;
   distanceToManeuver: number | null; remainingDistance: number | null;
 };
@@ -96,12 +96,13 @@ export function createGuidance(validFix: (position: Position | null, now: number
   let route: RoadRoute | null = null, measured: Measured[] = [], index = 0, progress = 0;
   let previous: Position | null = null, candidate: { since: number; along: number; startAlong: number; timestamp: number } | null = null;
   let acceptedAt: number | null = null, lastResult: Guidance | null = null;
-  const reset = () => { route = null; measured = []; index = 0; progress = 0; previous = null; candidate = null; acceptedAt = null; lastResult = null; };
+  let held: { since: number; timestamp: number; count: number } | null = null;
+  const reset = () => { held = null; route = null; measured = []; index = 0; progress = 0; previous = null; candidate = null; acceptedAt = null; lastResult = null; };
   const calculate = (next: RoadRoute, position: Position | null): Guidance => {
     if (next !== route) { reset(); route = next; measured = next.steps ? measure(next.steps) : []; }
     if (!measured.length) return unavailable('Turn instructions unavailable for this route. Stop completion remains manual.', 'unavailable');
     if (!validFix(position, now()) || !position || position.accuracy === null || position.accuracy > GUIDANCE_ACCURACY_METERS) {
-      candidate = null; previous = null; return unavailable('Waiting for precise GPS: accuracy ≤25 m and age ≤15 seconds required');
+      held = null; candidate = null; previous = null; return { ...unavailable('Waiting for precise GPS: accuracy ≤25 m and age ≤15 seconds required'), holdReason: 'gps' };
     }
     const coordinate: Coordinate = [position.longitude, position.latitude], current = measured[index];
     const match = project(coordinate, current, progress - current.offset);
@@ -120,7 +121,16 @@ export function createGuidance(validFix: (position: Position | null, now: number
       && nextMatch.along >= TURN_PASS_METERS && nextMatch.distance <= MATCH_DISTANCE_METERS && nextMatch.distance + 3 < match.distance;
     const proposed = crossing ? following.offset + nextMatch.along : current.offset + match.along;
     const bad = gap || jump || proposed > progress + forwardBudget || proposed < progress - 8 || (!crossing && match.distance > MATCH_DISTANCE_METERS);
-    if (bad) { candidate = null; previous = position; return unavailable('Cannot confirm route progress. Guidance is held; stop completion remains manual.'); }
+    if (bad) {
+      // Count only distinct, continuous, plausible precise fixes. Never change the maneuver index here.
+      if (gap || jump) held = null;
+      else if (!held) held = { since: position.timestamp, timestamp: position.timestamp, count: 1 };
+      else if (position.timestamp - held.timestamp >= 2000) held = { ...held, timestamp: position.timestamp, count: held.count + 1 };
+      candidate = null; previous = position;
+      return { ...unavailable('Cannot confirm route progress. Guidance is held; stop completion remains manual.'), holdReason: 'progress',
+        recoveryRequested: !!held && held.count >= 3 && position.timestamp - held.since >= 8000 };
+    }
+    held = null;
     if (crossing) {
       if (!candidate || nextMatch.along < candidate.along - 3) candidate = { since: position.timestamp, along: nextMatch.along, startAlong: nextMatch.along, timestamp: position.timestamp };
       else if (position.timestamp > candidate.timestamp && position.timestamp - candidate.since >= TURN_CONFIRMATION_MS && nextMatch.along >= candidate.startAlong + 3) {

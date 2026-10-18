@@ -6,7 +6,7 @@ import { colors, ui } from '@/components/discovery/ui';
 import type { JourneyMapData } from '@/lib/journey/map-data';
 
 export type MapPresentation = 'story' | 'preview' | 'expanded';
-export type MapDisplayProps = { memoryPhotos?: Readonly<Record<string, string | null>>; animateMemoryRoute?: boolean; playRouteWithSelection?: boolean; travelCamera?: TravelCameraSource; navigationMode?: boolean; navigationPadding?: { top: number; bottom: number }; destinationId?: string | null; presentation?: MapPresentation; onExpand?: () => void; navigationRoute?: RoadGeometry | null; currentPosition?: { latitude: number; longitude: number } | null };
+export type MapDisplayProps = { memoryPhotos?: Readonly<Record<string, string | null>>; animateMemoryRoute?: boolean; playRouteWithSelection?: boolean; travelCamera?: TravelCameraSource; navigationMode?: boolean; navigationPadding?: { top: number; bottom: number }; destinationId?: string | null; presentation?: MapPresentation; onExpand?: () => void; navigationRoute?: RoadGeometry | null; currentPosition?: { latitude: number; longitude: number; direction?: number | null } | null };
 
 export function MapFrame({ data, children, presentation = 'story' }: { data: JourneyMapData; children: ReactNode } & MapDisplayProps) {
   if (presentation !== 'story') return <View style={[styles.display, presentation === 'expanded' && { flex: 1 }]}>{children}</View>;

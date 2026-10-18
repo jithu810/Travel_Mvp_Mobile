@@ -121,7 +121,7 @@ test('new route identity resets maneuver progress and uses the replacement steps
 });
 const flush = async () => { for (let i = 0; i < 12; i++) await Promise.resolve(); };
 test('existing navigation controller requests steps once, updates guidance on GPS, and clears it on every lifecycle stop', async () => {
-  for (const patch of [{ status: 'paused' }, { status: 'finished' }, { status: 'completed' }, { foreground: false }, { focused: false }, { position: null }]) {
+  for (const patch of [{ status: 'paused' }, { status: 'finished' }, { status: 'completed' }, { foreground: false }, { focused: false }]) {
     let time = 100000, calls = 0;
     const route = road(), controller = createNavigation(async () => { calls++; return route; }, () => time);
     const base = { status: 'active', foreground: true, focused: true, position: { latitude: 0, longitude: 0, accuracy: 5, timestamp: time }, destination: { id: 'first', latitude: d[1], longitude: d[0] } };

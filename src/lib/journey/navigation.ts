@@ -14,7 +14,7 @@ export type Destination = Pick<JourneyStop, 'id' | 'name' | 'latitude' | 'longit
 type Point = { latitude: number; longitude: number };
 export type NavigationInput = { status: TripStatus; foreground: boolean; focused: boolean; position: Position | null; destination: Destination | undefined; session?: object };
 export type RerouteState = { phase: 'confirming' | 'cooldown' | 'loading' | 'failed'; message: string; retryAt?: number };
-export type NavigationState = { key: string; status: 'idle' | 'loading' | 'ready' | 'error'; message: string; route: RoadRoute | null; guidance?: Guidance | null; routeOutdated?: boolean; reroute?: RerouteState | null; retryAvailable?: boolean };
+export type NavigationState = { key: string; status: 'idle' | 'loading' | 'ready' | 'error'; message: string; route: RoadRoute | null; guidance?: Guidance | null; routeOutdated?: boolean; reroute?: RerouteState | null; retryAvailable?: boolean; gpsHeld?: boolean };
 export function coordinates(point: { latitude: unknown; longitude: unknown } | null | undefined): point is Point {
   return !!point && typeof point.latitude === 'number' && Number.isFinite(point.latitude) && Math.abs(point.latitude) <= 90
     && typeof point.longitude === 'number' && Number.isFinite(point.longitude) && Math.abs(point.longitude) <= 180;
@@ -84,7 +84,7 @@ export function createNavigation(load: Loader, now = Date.now, timers: Timers = 
   let input: NavigationInput | undefined, generation = 0, pending: AbortController | undefined, timeout: ReturnType<typeof setTimeout> | undefined;
   let attemptedAt = -Infinity, reroutedAt = -Infinity, referenceExpiresAt = 0;
   let currentSession: object | undefined, pendingReference: RoadRoute | null = null;
-  let previousFix: Position | null = null;
+  let previousFix: Position | null = null, progressReplacement = false;
   const publish = (next: NavigationState) => {
     next = { ...next, retryAvailable: next.status === 'error' && now() - attemptedAt >= ROUTE_RETRY_MS && now() >= (next.reroute?.retryAt ?? 0) };
     if (!next.route) { next = { ...next, guidance: null }; progress.reset(); }
@@ -93,11 +93,11 @@ export function createNavigation(load: Loader, now = Date.now, timers: Timers = 
       && a?.status === b?.status && a?.message === b?.message && a?.maneuver === b?.maneuver
       && a?.maneuverIndex === b?.maneuverIndex && a?.distanceToManeuver === b?.distanceToManeuver && a?.remainingDistance === b?.remainingDistance
       && !!state.routeOutdated === !!next.routeOutdated && state.reroute?.phase === next.reroute?.phase
-      && state.reroute?.message === next.reroute?.message && state.reroute?.retryAt === next.reroute?.retryAt && state.retryAvailable === next.retryAvailable) return;
+      && state.reroute?.message === next.reroute?.message && state.reroute?.retryAt === next.reroute?.retryAt && state.retryAvailable === next.retryAvailable && state.gpsHeld === next.gpsHeld) return;
     state = next; listeners.forEach(listener => listener());
   };
   const cancel = () => { generation++; pending?.abort(); pending = undefined; pendingReference = null; if (timeout !== undefined) timers.clear(timeout); timeout = undefined; };
-  const clear = () => { cancel(); deviation.reset(); previousFix = null; referenceExpiresAt = 0; };
+  const clear = () => { progressReplacement = false; cancel(); deviation.reset(); previousFix = null; referenceExpiresAt = 0; };
   const stop = () => { clear(); input = undefined; currentSession = undefined; publish({ key: '', status: 'idle', message: 'Navigation stopped while away', route: null }); };
   const backOnRoute = (route: RoadRoute, position: Position) => distanceFromRoad(position, route) + position.accuracy! <= policy.deviationMeters;
   const recover = (route: RoadRoute, next: NavigationInput) => {
@@ -107,7 +107,20 @@ export function createNavigation(load: Loader, now = Date.now, timers: Timers = 
   const update = (next: NavigationInput, retry = false) => {
     input = next;
     const key = destinationKey(next.destination), block = navigationBlock(next, now());
-    if (block) { clear(); currentSession = next.session; publish({ key, status: 'idle', message: block, route: null }); return; }
+    if (block) {
+      if (next.status === 'active' && next.focused && next.foreground && key && key === state.key && currentSession === next.session) {
+        // Retain accepted progress through poor GPS, but hide geometry/instructions until eligible again.
+        const interrupted = !!pending;
+        cancel(); deviation.reset(); previousFix = null;
+        const guidance = state.route ? progress.update(state.route, null) : null;
+        publish({ ...state, gpsHeld: true, guidance: state.routeOutdated ? null : guidance, route: state.routeOutdated ? null : state.route,
+          status: interrupted ? (state.routeOutdated ? 'error' : state.route ? 'ready' : 'idle') : state.status,
+          message: interrupted && state.routeOutdated ? 'Reroute interrupted by GPS loss. Retry route when GPS recovers.' : state.message });
+        return;
+      }
+      clear(); currentSession = next.session; publish({ key, status: 'idle', message: block, route: null }); return;
+    }
+    if (state.gpsHeld) publish({ ...state, gpsHeld: false });
     if (state.key !== key || currentSession !== next.session) { clear(); currentSession = next.session; publish({ key, status: 'idle', message: '', route: null }); }
     // Recovery must also be a new, plausible fix: one GPS teleport must not cancel a reroute.
     const position = next.position!, gap = previousFix ? position.timestamp - previousFix.timestamp : 0;
@@ -119,19 +132,21 @@ export function createNavigation(load: Loader, now = Date.now, timers: Timers = 
         reroute: state.reroute ? { ...state.reroute, message: state.reroute.message.replace('Previous route may be outdated', 'Previous route hidden') } : null });
     }
     if (pending) {
-      if (recoveryReliable && pendingReference && now() < referenceExpiresAt && backOnRoute(pendingReference, position)) recover(pendingReference, next);
+      if (!progressReplacement && recoveryReliable && pendingReference && now() < referenceExpiresAt && backOnRoute(pendingReference, position)) recover(pendingReference, next);
       return;
     }
     let replacement = !!state.routeOutdated;
     if (state.status === 'ready' && state.route) {
       const evidence = deviation.update(state.route, next.position);
-      if (evidence.status !== 'confirmed') {
-        publish({ ...state, guidance: progress.update(state.route, next.position), reroute: evidence.status === 'confirming' ? { phase: 'confirming', message: evidence.message } : null }); return;
+      const guidance = progress.update(state.route, next.position);
+      if (evidence.status !== 'confirmed' && !guidance.recoveryRequested) {
+        publish({ ...state, guidance, reroute: evidence.status === 'confirming' ? { phase: 'confirming', message: evidence.message } : null }); return;
       }
+      progressReplacement = evidence.status !== 'confirmed' && guidance.recoveryRequested === true;
       replacement = true;
     }
     if (state.status === 'error' && !retry) {
-      if (recoveryReliable && state.routeOutdated && state.route && backOnRoute(state.route, position)) { recover(state.route, next); return; }
+      if (!progressReplacement && recoveryReliable && state.routeOutdated && state.route && backOnRoute(state.route, position)) { recover(state.route, next); return; }
       if (state.reroute) {
         const seconds = Math.max(0, Math.ceil((reroutedAt + policy.cooldownMs - now()) / 1000));
         publish({ ...state, reroute: { phase: 'failed', retryAt: reroutedAt + policy.cooldownMs,
@@ -174,7 +189,7 @@ export function createNavigation(load: Loader, now = Date.now, timers: Timers = 
         || !nonnegative(route.distance) || (route.duration != null && !nonnegative(route.duration))) throw new RoutingError('Mapbox returned an invalid route response');
       if (distanceFromRoad(input.position!, route) - input.position!.accuracy! > policy.deviationMeters)
         throw new RoutingError((replacement ? 'Replacement route' : 'Driving route') + ' does not match current GPS. Retry when position is stable');
-      progress.reset(); deviation.reset(); referenceExpiresAt = 0;
+      progressReplacement = false; progress.reset(); deviation.reset(); referenceExpiresAt = 0;
       publish({ key, status: 'ready', message: replacement ? 'Driving route updated' : 'Driving route · last calculation', route, guidance: progress.update(route, input.position), reroute: null });
     }).catch(error => {
       if (version === generation) fail(error instanceof RoutingError ? error.message : 'Network error calculating driving route');

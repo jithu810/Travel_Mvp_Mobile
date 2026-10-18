@@ -556,6 +556,8 @@ test('static horizontal history keeps a centered heading, every draft, and no sh
     assert.equal(header.props.onMoveShouldSetPanResponderCapture,undefined);assert.equal(header.props.style.minHeight,44);
     const list=all(tree,'ScrollView')[0];assert.equal(list.props.horizontal,true);assert.equal(list.props.directionalLockEnabled,true);
     assert.equal(list.props.onScroll,undefined,'Swiping drafts cannot update form/sheet height');
+    assert.equal(all(tree,'DeleteDraftAction').length,0);assert.equal(all(tree,'Modal').length,0);
+    assert.ok(list.props.children.every(n=>n.type==='Pressable'),'History has only original cards, without extra action rows');
     assert.equal(list.props.style.flexShrink,0);assert.equal(list.props.style.height,undefined,'Text can grow without fixed-height cropping');
     const cards=all(list,'Pressable');assert.equal(cards.length,8,'No collapsed-state truncation');
     const cardStyle=cards[0].props.style({pressed:false});assert.ok(cardStyle[1].width<=width-32);assert.ok(cardStyle[1].width<=320);

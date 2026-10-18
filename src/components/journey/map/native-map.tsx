@@ -178,11 +178,6 @@ export const NativeJourneyMap = memo(function NativeJourneyMap({ data, stops, re
         }} onMapLoadingError={mapError}>
         {!navigationMode && <Mapbox.Atmosphere style={globeAtmosphere} />}
         <Mapbox.Camera ref={camera} defaultSettings={frame.camera} minZoomLevel={0} maxZoomLevel={16} />
-        {currentPosition && Number.isFinite(currentPosition.latitude) && Math.abs(currentPosition.latitude) <= 90
-          && Number.isFinite(currentPosition.longitude) && Math.abs(currentPosition.longitude) <= 180 && <Mapbox.ShapeSource id="travel-current-position" shape={{ type: 'Feature', properties: {}, geometry: { type: 'Point', coordinates: [currentPosition.longitude, currentPosition.latitude] } }}>
-          <Mapbox.CircleLayer id="travel-position-halo" style={{ circleRadius: 13, circleColor: '#2677D9', circleOpacity: 0.25 }} />
-          <Mapbox.CircleLayer id="travel-position-dot" style={{ circleRadius: 7, circleColor: '#2677D9', circleStrokeWidth: 3, circleStrokeColor: '#FFFFFF' }} />
-        </Mapbox.ShapeSource>}
         {frame.route.geometry.coordinates.length > 0 && <Mapbox.ShapeSource id="planned-line" shape={frame.route}>
           <Mapbox.LineLayer id="planned-line-halo" style={{ lineColor: '#FFFFFF', lineWidth: 6, lineOpacity: 0.75, lineJoin: 'round', lineCap: 'round' }} />
           <Mapbox.LineLayer id="planned-line-layer" style={{ lineColor: '#4A9D7C', lineWidth: 3, lineOpacity: 0.95, lineDasharray: [2, 2], lineJoin: 'round', lineCap: 'round' }} />
@@ -204,6 +199,14 @@ export const NativeJourneyMap = memo(function NativeJourneyMap({ data, stops, re
           }} />
           <Mapbox.SymbolLayer id="stop-numbers" style={{ textField: ['get', 'number'], textSize: 12, textColor: '#FFFFFF', textAllowOverlap: true, textIgnorePlacement: true }} />
         </Mapbox.ShapeSource>
+        {currentPosition && Number.isFinite(currentPosition.latitude) && Math.abs(currentPosition.latitude) <= 90
+          && Number.isFinite(currentPosition.longitude) && Math.abs(currentPosition.longitude) <= 180 && <Mapbox.ShapeSource id="travel-current-position" shape={{ type: 'Feature', properties: {}, geometry: { type: 'Point', coordinates: [currentPosition.longitude, currentPosition.latitude] } }}>
+          <Mapbox.CircleLayer id="travel-position-halo" style={{ circleRadius: 9, circleColor: '#2677D9', circleOpacity: 0.18 }} />
+          {typeof currentPosition.direction === 'number' ? <Mapbox.SymbolLayer id="travel-position-arrow" style={{
+            textField: '▲', textSize: 22, textColor: '#2677D9', textHaloColor: '#FFFFFF', textHaloWidth: 2,
+            textRotate: currentPosition.direction, textRotationAlignment: 'map', textPitchAlignment: 'map', textAllowOverlap: true, textIgnorePlacement: true,
+          }} /> : <Mapbox.CircleLayer id="travel-position-dot" style={{ circleRadius: 5, circleColor: '#2677D9', circleStrokeWidth: 2, circleStrokeColor: '#FFFFFF' }} />}
+        </Mapbox.ShapeSource>}
         {ready && memoryPreview && <JourneyOverlays points={memoryPoints} route={data.line.geometry.coordinates} onOpen={selectMemory}
           drawRoute={false} durationScale={3} selectedId={selectedId} playbackKey={JSON.stringify(data.line.geometry.coordinates)}
           playing={nearby.length === 0 && animateMemoryRoute && focused && appActive && !reduceMotion && memoryIdle && (!selectedId || playRouteWithSelection)} />}

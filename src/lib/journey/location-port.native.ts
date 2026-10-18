@@ -14,7 +14,7 @@ export const locationPort: LocationPort = {
   async watch(update, error) {
     const location = await import('expo-location');
     return location.watchPositionAsync({ accuracy: location.Accuracy.High, timeInterval: 3000, distanceInterval: 0 }, fix => {
-      update({ latitude: fix.coords.latitude, longitude: fix.coords.longitude, accuracy: fix.coords.accuracy, timestamp: fix.timestamp });
+      update({ latitude: fix.coords.latitude, longitude: fix.coords.longitude, accuracy: fix.coords.accuracy, timestamp: fix.timestamp, heading: fix.coords.heading, speed: fix.coords.speed });
     }, () => error());
   },
 };

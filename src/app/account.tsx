@@ -4,7 +4,7 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { ActivityIndicator, FlatList, Modal, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Action, colors, Message, ui } from '@/components/discovery/ui';
-import { ProfileDraftCard, ProfileHeader, ProfileIdentity, ProfileJourneyCard, ProfileTabs, profileStyles as s } from '@/components/profile/profile-ui';
+import { ProfileCollections, ProfileDraftCard, ProfileHeader, ProfileIdentity, ProfileJourneyCard, profileStyles as s } from '@/components/profile/profile-ui';
 import { useSessionState } from '@/hooks/session-context';
 import { useActionIntent } from '@/hooks/action-intent';
 import { useLoad } from '@/hooks/use-load';
@@ -33,6 +33,7 @@ export default function AccountScreen() {
   const [tab, setTab] = useState<'published' | 'drafts'>('drafts');
   const [settings, setSettings] = useState(false), [busy, setBusy] = useState(false);
   const signOutLock = useRef(false);
+  const [deleteMessage, setDeleteMessage] = useState('');
   const [error, setError] = useState<string | null>(null);
   const refreshDrafts = drafts.refresh, refreshPublished = published.refresh;
   useFocusEffect(useCallback(() => { refreshDrafts(); refreshPublished(); }, [refreshDrafts, refreshPublished]));
@@ -58,10 +59,12 @@ export default function AccountScreen() {
     {auth.loading ? <ActivityIndicator accessibilityLabel="Loading account" /> : !auth.session ? <View style={s.content}><Message title="Your next chapter" body="Sign in to Like, Save, and create private journey copies." retry={() => router.push('/auth')} action="Sign in or register" />{auth.error && <Text accessibilityRole="alert" style={ui.body}>{auth.error}</Text>}</View>
       : <FlatList data={rows} keyExtractor={row => row.kind + ':' + (row.kind === 'draft' ? row.draft.id : row.journey.id)} contentContainerStyle={s.content} showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={tab === 'drafts' ? drafts.refreshing : published.refreshing} onRefresh={refresh} tintColor={colors.ink} />}
-        renderItem={({ item }) => item.kind === 'draft' ? <ProfileDraftCard draft={item.draft} /> : <ProfileJourneyCard journey={item.journey} />}
+        renderItem={({ item }) => item.kind === 'draft' ? <ProfileDraftCard draft={item.draft} onDeleted={() => { setDeleteMessage('Draft deleted.'); refreshDrafts(); }} /> : <ProfileJourneyCard journey={item.journey} />}
         ListHeaderComponent={<View>
-          <ProfileIdentity name={name} username={profile?.username || null} bio={bio} avatar={avatar} owner count={published.data ? published.data.journeys.length : null} />
-          <View style={s.section}><Text accessibilityRole="header" style={s.heading}>{name}’s Journeys</Text><ProfileTabs selected={tab} onSelect={setTab} drafts /></View>
+          {deleteMessage ? <Text accessibilityLiveRegion="polite" style={s.notice}>{deleteMessage}</Text> : null}
+          <ProfileIdentity name={name} username={profile?.username || null} bio={bio} avatar={avatar} owner count={null} onCreate={() => router.push('/create')} />
+          <ProfileCollections publishedCount={published.data ? published.data.journeys.length : null} draftCount={drafts.data ? drafts.data.length : null} selected={tab} onSelect={setTab} />
+          <View style={s.section}><View style={s.sectionTop}><Text accessibilityRole="header" style={s.heading}>My journeys</Text><Text style={s.sectionNote}>{tab === 'drafts' ? 'Pick up where you left off' : 'Your shared stories'}</Text></View></View>
           {(error || auth.error) && <Text accessibilityRole="alert" style={ui.body}>{error || auth.error}</Text>}
           {collectionError && rows.length > 0 && <Message title="Couldn’t refresh journeys" body={collectionError} retry={retry} />}
         </View>}

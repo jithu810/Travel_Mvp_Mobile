@@ -357,7 +357,7 @@ test('Travel session preserves map data and requires confirmation to finish or d
   find(tree, 'JourneyMap').props.onSelect('first'); tree = h.render(TravelModeContent, props);
   assert.equal(find(tree, 'MapItinerary').props.selectedId, 'first');
   all(tree, 'Pressable').find(item => item.props.accessibilityLabel === 'Begin Trip').props.onPress(); tree = h.render(TravelModeContent, props);
-  assert.match(text(tree), /Stop 1 of 2/); assert.match(text(tree), /No travel verification/); assert.match(text(tree), /Location unavailable/);
+  assert.match(text(tree), /Stop 1 of 2/); assert.match(text(tree), /No travel verification/); assert.match(text(tree), /GPS temporarily unavailable/);
   const button = label => all(tree, 'Pressable').find(item => item.props.accessibilityLabel === label);
   time = 2500; button('Pause').props.onPress(); tree = h.render(TravelModeContent, props);
   assert.match(text(tree), /Paused · Stop 1 of 2/); time = 50000;
@@ -420,7 +420,7 @@ test('Travel renders permission, weak-fix and unavailable states honestly withou
   button(tree, 'Retry location').props.onPress(); assert.equal(retries, 1);
   assert.equal(store.get(journeyId).status, 'ready', 'Permission Retry does not begin the trip');
   store.transition(journey, 'begin', store.get(journeyId)); gps = { status: 'unavailable', canAskAgain: true, position: null }; tree = render();
-  assert.match(text(tree), /Stop 1 of 2/); assert.match(text(tree), /Location unavailable/); button(tree, 'Retry location').props.onPress(); assert.equal(retries, 2);
+  assert.match(text(tree), /Stop 1 of 2/); assert.match(text(tree), /GPS temporarily unavailable/); button(tree, 'Retry location').props.onPress(); assert.equal(retries, 2);
   find(tree, 'MapItinerary').props.onSelect('second');
   gps = { status: 'weak', canAskAgain: true, position: { latitude: 8, longitude: 76, accuracy: 250, timestamp: 100 } }; tree = render();
   assert.match(text(tree), /signal weak/); assert.match(text(tree), /250 m/);
@@ -1115,7 +1115,7 @@ test('Travel native camera follows GPS, suspends for gestures/Fit/preview and Re
   recenter().props.onPress(); tree = h.render(); assert.equal(commands.length, 0, 'Recenter never begins a ready trip');
   assert.deepEqual(alerts.at(-1), ['My Location', 'Begin Trip to use My Location']);
   h.store.transition(journey, 'begin', h.store.get(journeyId)); tree = h.render();
-  assert.deepEqual(commands.at(-1).centerCoordinate, [76, 8]); assert.equal(commands.at(-1).zoomLevel, 15.5);
+  assert.deepEqual(commands.at(-1).centerCoordinate, [76, 8]); assert.equal(commands.at(-1).zoomLevel, 16);
   const count = commands.length;
   find(tree, 'MapView').props.onCameraChanged({ properties: { center: [76.2, 8.1], zoom: 12, heading: 0, pitch: 0 }, gestures: { isGestureActive: true } });
   position = { ...position, longitude: 76.01 }; locationUpdate(); tree = h.render();
@@ -1510,4 +1510,21 @@ test('published memory deck pages one card in creator order with accessible boun
   assert.equal(button('Previous memory').props.disabled,true);button('Next memory').props.onPress();assert.deepEqual(selections,['second']);
   const offsets=[];cards.props.ref.current={scrollToOffset:v=>offsets.push(v)};props.selectedId='third';tree=h.render(Deck,props);assert.equal(offsets.at(-1).offset,640);assert.equal(button('Next memory').props.disabled,true);
   cards=find(tree,'FlatList');cards.props.onScrollBeginDrag();cards.props.onMomentumScrollEnd({nativeEvent:{contentOffset:{x:320}}});assert.equal(selections.at(-1),'second');h.dispose();assert.equal(h.lateUpdates(),0);
+});
+
+test('Travel marker switches between compact dot and map-aligned direction above preserved routes', () => {
+ const h=nativeMapHarness([mappedStop('a',0,76,8),mappedStop('b',1,76.01,8.01)]);
+ try {
+   Object.assign(h.props,{navigationMode:true,currentPosition:{latitude:8,longitude:76,direction:359},navigationRoute:{type:'LineString',coordinates:[[76,8],[76.01,8.01]]}});
+   let tree=h.measure();
+   const arrow=all(tree,'SymbolLayer').find(n=>n.props.id==='travel-position-arrow');
+   assert.equal(arrow.props.style.textRotate,359); assert.equal(arrow.props.style.textRotationAlignment,'map');
+   assert.equal(all(tree,'CircleLayer').some(n=>n.props.id==='travel-position-dot'),false);
+   const sources=all(tree,'ShapeSource').map(n=>n.props.id);
+   assert.ok(sources.indexOf('travel-current-position')>sources.indexOf('travel-road-route')); assert.ok(sources.includes('planned-line'));
+   h.props.currentPosition={latitude:8,longitude:76,direction:null}; tree=h.render();
+   assert.equal(all(tree,'SymbolLayer').some(n=>n.props.id==='travel-position-arrow'),false);
+   const dot=all(tree,'CircleLayer').find(n=>n.props.id==='travel-position-dot');
+   assert.equal(dot.props.style.circleRadius,5); assert.equal(dot.props.style.circleStrokeWidth,2);
+ } finally {h.dispose();}
 });

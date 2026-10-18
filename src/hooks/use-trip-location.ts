@@ -15,7 +15,7 @@ export function useTripLocation(journey: PublicJourney, session: TripSession) {
     const sync = () => {
       const status = tripStore.get(journey.id).status;
       const active = AppState.currentState === 'active';
-      controller.sync(status, active, true, AppState.currentState);
+      controller.sync(status, active, true, AppState.currentState, tripStore.get(journey.id).journey);
       const readyInForeground = status === 'ready' && active;
       if (Platform.OS !== 'web' && readyInForeground && !wasReadyInForeground) void controller.prepare();
       wasReadyInForeground = readyInForeground;

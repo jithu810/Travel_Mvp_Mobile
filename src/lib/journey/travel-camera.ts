@@ -2,7 +2,7 @@ import type { Position } from './foreground-location';
 import { navigationFix } from './navigation';
 import type { TripStatus } from './trip-session';
 
-export const NAVIGATION_ZOOM = 15.5;
+export const NAVIGATION_ZOOM = 16;
 export type TravelCameraCommand = {
   centerCoordinate: [number, number]; zoomLevel: number; heading: number; pitch: number;
   padding: { paddingTop: number; paddingBottom: number; paddingLeft: number; paddingRight: number };

@@ -28,7 +28,7 @@ export default function CreatorProfileScreen() {
         ListHeaderComponent={<View>
           {state.error && <Message title="Couldn’t refresh this profile" body={state.error} retry={state.refresh} />}
           <ProfileIdentity name={value.profile.displayName || value.profile.username} username={value.profile.username} bio={value.profile.bio} avatar={value.profile.avatar} count={value.journeys.length} owner={owner} />
-          <View style={s.section}><Text accessibilityRole="header" style={s.heading}>{value.profile.displayName || value.profile.username}’s Journeys</Text>
+          <View style={s.section}><Text accessibilityRole="header" style={s.heading}>Published journeys</Text>
             <ProfileTabs selected="published" drafts={owner} onSelect={tab => { if (tab === 'drafts' && owner) router.push('/account'); }} />
           </View>
         </View>}

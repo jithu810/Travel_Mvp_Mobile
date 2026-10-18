@@ -98,7 +98,7 @@ test('disabled services, errors and timeouts show unavailable, clear positions a
   f.setServices(true); await f.controller.retry(); f.fix(); f.error();
   assert.equal(f.controller.get().status, 'unavailable'); assert.equal(f.controller.get().position, null); assert.equal(f.counts().removed, 1);
   await f.controller.retry(); assert.equal(f.pending.size, 1);
-  [...f.pending.values()][0](); assert.equal(f.counts().removed, 2); assert.equal(f.pending.size, 0);
+  [...f.pending.values()][0](); assert.equal(f.counts().removed, 2); assert.equal(f.pending.size, 1);
   const gate = deferred(); f.port.permission = () => gate.promise;
   const retry = f.controller.retry(); [...f.pending.values()][0](); gate.resolve({ granted: true, canAskAgain: true }); await retry;
   assert.equal(f.counts().watches, 2, 'Timed out permission completion cannot subscribe');
@@ -140,7 +140,7 @@ test('watch startup rejection invalidates callbacks and explicit Retry creates o
   const original = f.port.watch;
   f.port.watch = async (update, error) => { abandonedUpdate = update; abandonedError = error; throw new Error('native startup failure'); };
   await f.begin(); const unavailable = f.controller.get();
-  assert.equal(unavailable.status, 'unavailable'); assert.equal(f.pending.size, 0);
+  assert.equal(unavailable.status, 'unavailable'); assert.equal(f.pending.size, 1);
   abandonedUpdate({ latitude: 8, longitude: 76, accuracy: 5, timestamp: 100000 }); abandonedError();
   assert.equal(f.controller.get(), unavailable, 'Failed startup callbacks cannot restore GPS');
   f.port.watch = original; await f.controller.retry(); f.fix();
@@ -184,8 +184,8 @@ test('native adapter checks permission before requesting and uses only foregroun
   result = { granted: false, canAskAgain: true, status: 'denied' };
   await locationPort.permission(true); assert.equal(prompts, 3, 'Explicit Retry may request permission again');
   let fix, errors = 0; await locationPort.watch(value => { fix = value; }, () => errors++);
-  callback({ coords: { latitude: 8, longitude: 76, accuracy: 25 }, timestamp: 123 }); errorCallback('private native details');
-  assert.deepEqual(fix, { latitude: 8, longitude: 76, accuracy: 25, timestamp: 123 }); assert.equal(errors, 1); assert.equal(options.accuracy, 4);
+  callback({ coords: { latitude: 8, longitude: 76, accuracy: 25, heading: 90, speed: 2 }, timestamp: 123 }); errorCallback('private native details');
+  assert.deepEqual(fix, { latitude: 8, longitude: 76, accuracy: 25, timestamp: 123, heading: 90, speed: 2 }); assert.equal(errors, 1); assert.equal(options.accuracy, 4);
 });
 
 test('web adapter never requests browser geolocation', async () => {

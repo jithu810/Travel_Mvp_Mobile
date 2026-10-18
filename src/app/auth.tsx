@@ -1,12 +1,14 @@
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
-import { useCallback, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { colors, ScreenHeader, ui } from '@/components/discovery/ui';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ActivityIndicator, Image, Keyboard, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, useWindowDimensions, View } from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { colors, ui } from '@/components/discovery/ui';
 import { useSessionState } from '@/hooks/session-context';
 import { useActionIntent } from '@/hooks/action-intent';
 import { createAuthController, type AuthMode } from '@/lib/auth/model';
 import { authenticate } from '@/lib/auth/queries';
+import { StatusBar } from 'expo-status-bar';
+import { signupStyles as authStyles } from '@/components/auth/signup-styles';
 
 export default function AuthScreen() {
   const router = useRouter();
@@ -20,6 +22,27 @@ export default function AuthScreen() {
   const submitLock = useRef(false);
   const controller = useMemo(() => createAuthController(authenticate), []);
   const [mode, setMode] = useState<AuthMode>('signin');
+  const registration = mode === 'register';
+  const { height } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
+  const scroll = useRef<ScrollView>(null);
+  const focusedInput = useRef<number | null>(null);
+  const [headerHeight, setHeaderHeight] = useState(52);
+  const [viewportHeight, setViewportHeight] = useState(0);
+  const [contentHeight, setContentHeight] = useState(0);
+  const availableHeight = viewportHeight || Math.max(0, height - insets.top - insets.bottom - headerHeight);
+  const compact = availableHeight < 620;
+  const needsScroll = contentHeight > availableHeight + 1;
+  const revealInput = useCallback(() => {
+    if (focusedInput.current !== null && Keyboard.isVisible()) {
+      // Leave space for the email action below the last input as well as the caret.
+      scroll.current?.scrollResponderScrollNativeHandleToKeyboard(focusedInput.current, 72, true);
+    }
+  }, []);
+  useEffect(() => {
+    revealInput();
+    if (!needsScroll) scroll.current?.scrollTo({ y: 0, animated: false });
+  }, [viewportHeight, contentHeight, needsScroll, revealInput]);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
@@ -49,31 +72,65 @@ export default function AuthScreen() {
     else if (result.kind === 'confirmation') { setMode('signin'); setMessage('Check your email to confirm your account, then return here and sign in. You are not signed in yet.'); }
     else if (result.kind === 'error') setError(result.message);
   }
-  return <SafeAreaView style={ui.safe}><View style={ui.page}>
-    <ScreenHeader title={mode === 'signin' ? 'Sign in' : 'Create account'} back />
-    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <ScrollView contentContainerStyle={[ui.list, styles.form]} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
-        <Text style={ui.eyebrow}>YOUR NEXT CHAPTER</Text>
-        <Text accessibilityRole="header" style={ui.heading}>{mode === 'signin' ? 'Welcome back.' : 'Make it yours.'}</Text>
-        <Text style={ui.body}>{returnJourney ? 'Sign in to continue with your selected journey.' : creating ? 'Sign in to create your journey.' : 'Keep journeys for later and make a private remix.'}</Text>
-        {auth.loading ? <ActivityIndicator color={colors.ink} /> : auth.session
-          ? <Pressable accessibilityRole="button" onPress={backAfterAuth} style={ui.action}><Text style={ui.actionLabel}>Continue</Text></Pressable>
+  return <View style={[ui.safe, authStyles.background]}>
+    <>
+      <StatusBar style="light" />
+      <Image source={require('../../assets/auth/sunset-road.png')} accessible={false} importantForAccessibility="no" resizeMode="cover" style={authStyles.scenery} />
+      <View pointerEvents="none" style={authStyles.shade} />
+    </>
+    <SafeAreaView style={[ui.safe, authStyles.transparent]}><View style={ui.page}>
+    <View onLayout={event => setHeaderHeight(event.nativeEvent.layout.height)} style={[ui.header, authStyles.header]}>
+      <Pressable accessibilityRole="button" accessibilityLabel="Go back" onPress={() => router.canGoBack() ? router.back() : router.replace('/discover')} style={authStyles.back}>
+        <Text style={authStyles.backText}>‹</Text>
+      </Pressable>
+      <Text style={authStyles.headerTitle}>{registration ? 'Create account' : 'Sign in'}</Text>
+    </View>
+    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'} keyboardVerticalOffset={insets.top}>
+      <ScrollView ref={scroll}
+        onLayout={event => setViewportHeight(event.nativeEvent.layout.height)}
+        onContentSizeChange={(_width, measuredHeight) => setContentHeight(measuredHeight)}
+        scrollEnabled={needsScroll} bounces={false} overScrollMode="never"
+        contentContainerStyle={[ui.list, styles.form, authStyles.form, compact && authStyles.compactForm]}
+        keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
+        {!compact && <View style={authStyles.scenicSpace} />}
+        <View style={authStyles.intro}>
+          {!compact && <Text style={[ui.eyebrow, authStyles.eyebrow]}>YOUR NEXT CHAPTER</Text>}
+          <Text accessibilityRole="header" style={[ui.heading, authStyles.heading, compact && authStyles.compactHeading]}>{registration ? 'Make it yours.' : 'Welcome back.'}</Text>
+          <Text style={authStyles.body}>{registration ? 'Save journeys. Make them yours.' : returnJourney ? 'Sign in to continue with your selected journey.' : creating ? 'Sign in to create your journey.' : 'Keep journeys for later and make a private remix.'}</Text>
+        </View>
+        {auth.loading ? <ActivityIndicator color={colors.white} /> : auth.session
+          ? <Pressable accessibilityRole="button" onPress={backAfterAuth} style={[ui.action, authStyles.emailButton]}><Text style={[ui.actionLabel, authStyles.emailLabel]}>Continue</Text></Pressable>
           : <>
-            {mode === 'register' && <View style={styles.field}><Text style={styles.label}>Display name</Text><TextInput accessibilityLabel="Display name" value={name} onChangeText={setName} editable={!busy} maxLength={80} autoComplete="name" style={styles.input} /></View>}
-            <View style={styles.field}><Text style={styles.label}>Email</Text><TextInput accessibilityLabel="Email address" value={email} onChangeText={setEmail} editable={!busy} autoCapitalize="none" autoCorrect={false} keyboardType="email-address" autoComplete="email" maxLength={254} style={styles.input} /></View>
-            <View style={styles.field}><Text style={styles.label}>Password</Text><TextInput accessibilityLabel="Password" value={password} onChangeText={setPassword} editable={!busy} secureTextEntry autoCapitalize="none" autoCorrect={false} autoComplete={mode === 'register' ? 'new-password' : 'current-password'} returnKeyType="go" onSubmitEditing={() => { void submit(); }} style={styles.input} /></View>
-            {error && <Text accessibilityRole="alert" style={styles.feedback}>{error}</Text>}
-            {message && <Text accessibilityLiveRegion="polite" style={styles.feedback}>{message}</Text>}
-            <Pressable accessibilityRole="button" disabled={busy} accessibilityState={{ disabled: busy }} onPress={() => { void submit(); }} style={[ui.action, busy && styles.disabled]}>
-              {busy ? <ActivityIndicator color={colors.white} /> : <Text style={ui.actionLabel}>{mode === 'signin' ? 'Sign in with email' : 'Register with email'}</Text>}
+            {mode === 'register' && <View style={[styles.field, authStyles.field]}><Text style={[styles.label, authStyles.label]}>Display name</Text><TextInput accessibilityLabel="Display name" value={name} onChangeText={setName} editable={!busy} maxLength={80} autoComplete="name" selectionColor="#FFD18B" onFocus={event => { focusedInput.current = event.nativeEvent.target; revealInput(); }}
+              onBlur={() => { focusedInput.current = null; }}
+              style={[styles.input, authStyles.input]} /></View>}
+            <View style={[styles.field, authStyles.field]}><Text style={[styles.label, authStyles.label]}>Email</Text><TextInput accessibilityLabel="Email address" value={email} onChangeText={setEmail} editable={!busy} autoCapitalize="none" autoCorrect={false} keyboardType="email-address" autoComplete="email" maxLength={254} selectionColor="#FFD18B" onFocus={event => { focusedInput.current = event.nativeEvent.target; revealInput(); }}
+              onBlur={() => { focusedInput.current = null; }}
+              style={[styles.input, authStyles.input]} /></View>
+            <View style={[styles.field, authStyles.field]}><Text style={[styles.label, authStyles.label]}>Password</Text><TextInput accessibilityLabel="Password" value={password} onChangeText={setPassword} editable={!busy} secureTextEntry autoCapitalize="none" autoCorrect={false} autoComplete={mode === 'register' ? 'new-password' : 'current-password'} returnKeyType="go" onSubmitEditing={() => { void submit(); }} selectionColor="#FFD18B" onFocus={event => { focusedInput.current = event.nativeEvent.target; revealInput(); }}
+              onBlur={() => { focusedInput.current = null; }}
+              style={[styles.input, authStyles.input]} /></View>
+            {error && <Text accessibilityRole="alert" style={[styles.feedback, authStyles.feedback]}>{error}</Text>}
+            {message && <Text accessibilityLiveRegion="polite" style={[styles.feedback, authStyles.feedback]}>{message}</Text>}
+            <Pressable accessibilityRole="button" disabled={busy} accessibilityState={{ disabled: busy }} onPress={() => { void submit(); }} style={[ui.action, authStyles.emailButton, busy && styles.disabled]}>
+              {busy ? <ActivityIndicator color={colors.white} /> : <Text style={[ui.actionLabel, authStyles.emailLabel]}>{mode === 'signin' ? 'Sign in with email' : 'Register with email'}</Text>}
             </Pressable>
-            <Pressable accessibilityRole="button" disabled={busy} onPress={() => { setMode(mode === 'signin' ? 'register' : 'signin'); setPassword(''); setError(null); setMessage(null); }} style={styles.switch}>
-              <Text style={styles.label}>{mode === 'signin' ? 'New here? Create an account' : 'Already registered? Sign in'}</Text>
+            {registration && <View style={authStyles.googleOption}>
+              <Pressable accessibilityRole="button" accessibilityLabel="Continue with Google" accessibilityHint="Google sign-up is not available yet." accessibilityState={{ disabled: true }} disabled style={authStyles.googleButton}>
+                <Image source={require('../../assets/auth/google-g.png')} accessible={false} style={authStyles.googleLogo} resizeMode="contain" />
+                <View style={authStyles.googleCopy}>
+                  <Text style={authStyles.googleLabel}>Continue with Google</Text>
+                  <Text style={authStyles.googleHint}>Not available yet</Text>
+                </View>
+              </Pressable>
+            </View>}
+            <Pressable accessibilityRole="button" disabled={busy} onPress={() => { setMode(mode === 'signin' ? 'register' : 'signin'); setPassword(''); setError(null); setMessage(null); }} style={[styles.switch, authStyles.switch]}>
+              <Text style={[styles.label, authStyles.label]}>{mode === 'signin' ? 'New here? Create an account' : 'Already registered? Sign in'}</Text>
             </Pressable>
           </>}
       </ScrollView>
     </KeyboardAvoidingView>
-  </View></SafeAreaView>;
+  </View></SafeAreaView></View>;
 }
 const styles = StyleSheet.create({
   form: { gap: 18, paddingTop: 16 }, field: { gap: 8 },
