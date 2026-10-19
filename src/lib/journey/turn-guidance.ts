@@ -10,6 +10,7 @@ export type Guidance = {
   status: 'ready' | 'waiting' | 'unavailable'; message: string; holdReason?: 'gps' | 'progress'; recoveryRequested?: boolean;
   maneuver: RouteStep | null; maneuverIndex: number | null;
   distanceToManeuver: number | null; remainingDistance: number | null;
+  remainingGeometry?: RoadRoute['geometry'];
 };
 export const GUIDANCE_ACCURACY_METERS = 25;
 export const MATCH_DISTANCE_METERS = 20;
@@ -145,7 +146,24 @@ export function createGuidance(validFix: (position: Position | null, now: number
       maneuverIndex: Math.min(index + 1, measured.length - 1), distanceToManeuver: Math.max(0, target.offset - progress),
       remainingDistance: Math.max(0, (total - progress) / total * next.distance) };
   };
-  return { update(next: RoadRoute, position: Position | null) { lastResult = calculate(next, position); return lastResult; }, reset };
+  return { update(next: RoadRoute, position: Position | null) {
+    const result = calculate(next, position);
+    if (result === lastResult) return result;
+    lastResult = result;
+    if (measured.length) {
+      const current = measured[index], along = Math.max(0, progress - current.offset);
+      const geometry = current.step.geometry;
+      let segment = 1;
+      while (segment < geometry.length - 1 && current.lengths[segment] < along) segment++;
+      const a = geometry[segment - 1], b = geometry[segment];
+      const length = current.lengths[segment] - current.lengths[segment - 1];
+      const fraction = length > 0 ? Math.max(0, Math.min(1, (along - current.lengths[segment - 1]) / length)) : 0;
+      const start: Coordinate = [longitudeDelta(a[0] + longitudeDelta(b[0] - a[0]) * fraction), a[1] + (b[1] - a[1]) * fraction];
+      const coordinates: Coordinate[] = [start, ...geometry.slice(segment), ...measured.slice(index + 1).flatMap(item => item.step.geometry.slice(1))];
+      lastResult = { ...lastResult, remainingGeometry: { type: 'LineString', coordinates } };
+    }
+    return lastResult;
+  }, reset };
 }
 
 export function maneuverIcon(step: RouteStep) {

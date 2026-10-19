@@ -14,7 +14,7 @@ export type Destination = Pick<JourneyStop, 'id' | 'name' | 'latitude' | 'longit
 type Point = { latitude: number; longitude: number };
 export type NavigationInput = { status: TripStatus; foreground: boolean; focused: boolean; position: Position | null; destination: Destination | undefined; session?: object };
 export type RerouteState = { phase: 'confirming' | 'cooldown' | 'loading' | 'failed'; message: string; retryAt?: number };
-export type NavigationState = { key: string; status: 'idle' | 'loading' | 'ready' | 'error'; message: string; route: RoadRoute | null; guidance?: Guidance | null; routeOutdated?: boolean; reroute?: RerouteState | null; retryAvailable?: boolean; gpsHeld?: boolean };
+export type NavigationState = { session?: object; key: string; status: 'idle' | 'loading' | 'ready' | 'error'; message: string; route: RoadRoute | null; guidance?: Guidance | null; routeOutdated?: boolean; reroute?: RerouteState | null; retryAvailable?: boolean; gpsHeld?: boolean };
 export function coordinates(point: { latitude: unknown; longitude: unknown } | null | undefined): point is Point {
   return !!point && typeof point.latitude === 'number' && Number.isFinite(point.latitude) && Math.abs(point.latitude) <= 90
     && typeof point.longitude === 'number' && Number.isFinite(point.longitude) && Math.abs(point.longitude) <= 180;
@@ -32,7 +32,7 @@ export function navigationBlock(input: NavigationInput, now = Date.now()) {
   if (!input.focused || !input.foreground) return 'Navigation stopped while away';
   if (input.status !== 'active') return input.status === 'paused' ? 'Navigation paused' : input.status === 'finished' || input.status === 'completed' ? 'Navigation stopped' : 'Begin Trip to calculate a driving route';
   if (!destinationKey(input.destination)) return 'Route unavailable: destination stop has no valid map coordinates';
-  if (!navigationFix(input.position, now)) return 'Waiting for GPS: accuracy ≤50 m and age ≤15 seconds required';
+  if (!navigationFix(input.position, now)) return 'GPS signal weak or delayed · Guidance resumes automatically when GPS recovers';
   return '';
 }
 export class RoutingError extends Error {}
@@ -86,10 +86,10 @@ export function createNavigation(load: Loader, now = Date.now, timers: Timers = 
   let currentSession: object | undefined, pendingReference: RoadRoute | null = null;
   let previousFix: Position | null = null, progressReplacement = false;
   const publish = (next: NavigationState) => {
-    next = { ...next, retryAvailable: next.status === 'error' && now() - attemptedAt >= ROUTE_RETRY_MS && now() >= (next.reroute?.retryAt ?? 0) };
+    next = { ...next, session: currentSession, retryAvailable: next.status === 'error' && now() - attemptedAt >= ROUTE_RETRY_MS && now() >= (next.reroute?.retryAt ?? 0) };
     if (!next.route) { next = { ...next, guidance: null }; progress.reset(); }
     const a = state.guidance, b = next.guidance;
-    if (state.key === next.key && state.status === next.status && state.message === next.message && state.route === next.route
+    if (state.session === next.session && state.key === next.key && state.status === next.status && state.message === next.message && state.route === next.route
       && a?.status === b?.status && a?.message === b?.message && a?.maneuver === b?.maneuver
       && a?.maneuverIndex === b?.maneuverIndex && a?.distanceToManeuver === b?.distanceToManeuver && a?.remainingDistance === b?.remainingDistance
       && !!state.routeOutdated === !!next.routeOutdated && state.reroute?.phase === next.reroute?.phase

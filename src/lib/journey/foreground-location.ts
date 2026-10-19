@@ -164,21 +164,25 @@ export function locationLabel(value: LocationSnapshot) {
     + (value.status === 'weak' && value.position?.accuracy !== null && value.position?.accuracy !== undefined ? ' · Accuracy ±' + Math.round(value.position.accuracy) + ' m' : '');
 }
 
-// Course is supplied by the provider, never inferred from route geometry or a compass.
+// GPS course only: stationary readings retain the last confirmed travel direction.
+// With no reliable movement course yet, render a neutral dot rather than inventing north.
 export function createTravelDirection() {
   let previous: Position | null = null, heading: number | null = null;
   const reset = () => { previous = null; heading = null; };
   return { reset, update(position: Position, now: number): number | null {
+    if (!validPosition(position, now) || now - position.timestamp > 15000 || position.accuracy === null || !Number.isFinite(position.accuracy) || position.accuracy > 25 || position.accuracy < 0) { reset(); return null; }
+    if (previous && position.timestamp <= previous.timestamp) return heading;
+    if (previous && position.timestamp - previous.timestamp > 15000) reset();
     const course = position.heading, speed = position.speed;
-    if (!validPosition(position, now) || now - position.timestamp > 15000 || position.accuracy === null || !Number.isFinite(position.accuracy) || position.accuracy > 25 || position.accuracy < 0
-      || typeof course !== 'number' || !Number.isFinite(course) || course < 0 || course >= 360
-      || typeof speed !== 'number' || !Number.isFinite(speed) || speed < 1.5 || speed > 55) { reset(); return null; }
-    if (previous && position.timestamp <= previous.timestamp) return position.timestamp === previous.timestamp ? heading : null;
-    const gap = previous ? position.timestamp - previous.timestamp : 0;
-    const delta = previous ? ((course - previous.heading! + 540) % 360) - 180 : 0;
-    if (!previous || gap > 5000 || Math.abs(delta) > 60) { previous = position; heading = null; return null; }
-    if (gap < 2000) return heading;
-    heading = heading === null ? course : (heading + (((course - heading + 540) % 360) - 180) * 0.5 + 360) % 360;
+    if (typeof course !== 'number' || !Number.isFinite(course) || course < 0 || course >= 360
+      || typeof speed !== 'number' || !Number.isFinite(speed) || speed < 1.5 || speed > 55) return heading;
+    if (!previous) { previous = position; return heading; }
+    const gap = position.timestamp - previous.timestamp;
+    if (gap < 1000) return heading;
+    const lat = (position.latitude - previous.latitude) * 111195;
+    const lon = (position.longitude - previous.longitude) * 111195 * Math.cos(position.latitude * Math.PI / 180);
+    if (Math.hypot(lat, lon) > 55 * gap / 1000 + 20) { reset(); previous = position; return null; }
+    heading = heading === null ? course : (heading + (((course - heading + 540) % 360) - 180) * 0.65 + 360) % 360;
     previous = position;
     return heading;
   } };

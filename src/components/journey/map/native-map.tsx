@@ -15,6 +15,11 @@ import type { JourneyStop } from '@/types/journey';
 import type { JourneyMapData } from '@/lib/journey/map-data';
 import { MapFallback, type MapDisplayProps } from './map-frame';
 
+// Bundled PNG keeps the navigation arrow independent of map fonts and networking.
+const travelArrowImage = { uri: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABwAAAAcCAYAAAByDd+UAAAAeElEQVR4nO3TUQqAIBCEYU/TFTtrpzGIAhvcds3ZLcQfetP56qGUZn8on40JZmgs8EKWdTsedzQURMwdDQUlzA0NBTXsE5CKhoJWjIZqvwIVrI1KUVAc0+oCy5FaeA7hZlT6Ctb5x8vmtxRg86UW6PUOA4rYnN3aARXgn2yondtvAAAAAElFTkSuQmCC' };
+
+const travelArrowImages = { 'travel-direction-arrow': travelArrowImage };
+
 let configuredToken: string | null = null;
 export async function configureMap(token: string) {
   if (configuredToken === token) return;
@@ -176,6 +181,7 @@ export const NativeJourneyMap = memo(function NativeJourneyMap({ data, stops, re
         onDidFinishLoadingMap={() => {
           if (mounted.current) setMapState(previous => previous.style === style && !previous.ready ? { ...previous, ready: true } : previous);
         }} onMapLoadingError={mapError}>
+        {navigationMode && <Mapbox.Images images={travelArrowImages} />}
         {!navigationMode && <Mapbox.Atmosphere style={globeAtmosphere} />}
         <Mapbox.Camera ref={camera} defaultSettings={frame.camera} minZoomLevel={0} maxZoomLevel={16} />
         {frame.route.geometry.coordinates.length > 0 && <Mapbox.ShapeSource id="planned-line" shape={frame.route}>
@@ -193,7 +199,7 @@ export const NativeJourneyMap = memo(function NativeJourneyMap({ data, stops, re
             if (typeof id === 'string' && data.markers.some(marker => marker.id === id)) { selectMemory(id); if (presentation === 'preview') onExpand?.(); }
           }}>
           <Mapbox.CircleLayer id="stop-circles" style={{
-            circleRadius: ['case', ['get', 'selected'], presentation === 'preview' ? 12 : 18, presentation === 'preview' ? 10 : 14],
+            circleRadius: navigationMode ? 10 : ['case', ['get', 'selected'], presentation === 'preview' ? 12 : 18, presentation === 'preview' ? 10 : 14],
             circleColor: ['case', ['get', 'destination'], '#2677D9', ['get', 'selected'], colors.ink, colors.green],
             circleStrokeWidth: ['case', ['get', 'selected'], 4, 2], circleStrokeColor: '#FFFFFF',
           }} />
@@ -203,8 +209,8 @@ export const NativeJourneyMap = memo(function NativeJourneyMap({ data, stops, re
           && Number.isFinite(currentPosition.longitude) && Math.abs(currentPosition.longitude) <= 180 && <Mapbox.ShapeSource id="travel-current-position" shape={{ type: 'Feature', properties: {}, geometry: { type: 'Point', coordinates: [currentPosition.longitude, currentPosition.latitude] } }}>
           <Mapbox.CircleLayer id="travel-position-halo" style={{ circleRadius: 9, circleColor: '#2677D9', circleOpacity: 0.18 }} />
           {typeof currentPosition.direction === 'number' ? <Mapbox.SymbolLayer id="travel-position-arrow" style={{
-            textField: '▲', textSize: 22, textColor: '#2677D9', textHaloColor: '#FFFFFF', textHaloWidth: 2,
-            textRotate: currentPosition.direction, textRotationAlignment: 'map', textPitchAlignment: 'map', textAllowOverlap: true, textIgnorePlacement: true,
+            iconImage: 'travel-direction-arrow', iconSize: 1,
+            iconRotate: currentPosition.direction, iconRotationAlignment: 'map', iconPitchAlignment: 'map', iconAllowOverlap: true, iconIgnorePlacement: true,
           }} /> : <Mapbox.CircleLayer id="travel-position-dot" style={{ circleRadius: 5, circleColor: '#2677D9', circleStrokeWidth: 2, circleStrokeColor: '#FFFFFF' }} />}
         </Mapbox.ShapeSource>}
         {ready && memoryPreview && <JourneyOverlays points={memoryPoints} route={data.line.geometry.coordinates} onOpen={selectMemory}

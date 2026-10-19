@@ -113,7 +113,7 @@ export function TravelModeContent({ journey, onExit, refreshNotice }: { journey:
     <View style={styles.mapArea}>
       <JourneyMap stops={journey.stops} selectedId={selectedId} onSelect={select} presentation="expanded" navigationMode
         travelCamera={travelCamera} navigationPadding={navigationPadding} destinationId={navigation.destination?.id}
-        currentPosition={navigationFix(location.position) ? location.position : null} navigationRoute={navigation.route?.geometry} />
+        currentPosition={navigationFix(location.position) ? location.position : null} navigationRoute={navigation.remainingGeometry} />
     </View>
     <View pointerEvents="box-none" style={[styles.overlays, { paddingTop: insets.top + 8, paddingBottom: Math.max(insets.bottom, 8) }]}>
       <View style={styles.topStack} onLayout={event => setTopOverlayHeight(event.nativeEvent.layout.height)}>

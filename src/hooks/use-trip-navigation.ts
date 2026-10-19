@@ -23,8 +23,11 @@ export function useTripNavigation(journey: PublicJourney, session: TripSession, 
   }, [controller, read, location]));
   // Guard current render as well as async callbacks; preview selection never changes destination.
   const block = navigationBlock({ status: session.status, focused: true, foreground: AppState.currentState === 'active', position: location.get().position, destination });
-  const visible = !block && destinationKey(destination) === state.key;
-  return { ...state, route: visible ? state.route : null, guidance: visible ? state.guidance : null, reroute: visible ? state.reroute : null,
+  const sameActiveTrip = state.session === session && session.status === 'active' && AppState.currentState === 'active' && destinationKey(destination) === state.key;
+  const visible = !block && sameActiveTrip;
+  // Retain only this active controller's accepted route during GPS interruption.
+  const retained = sameActiveTrip && state.gpsHeld && !!state.route && !state.routeOutdated;
+  return { ...state, route: visible || retained ? state.route : null, remainingGeometry: visible || retained ? state.guidance?.remainingGeometry ?? state.route?.geometry : null, guidance: visible ? state.guidance : null, reroute: visible ? state.reroute : null,
     canRetry: visible && state.retryAvailable === true, message: block || state.message, destination,
     retry: () => controller.update(read(), true) };
 }
