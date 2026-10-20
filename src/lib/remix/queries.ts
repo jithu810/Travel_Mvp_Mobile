@@ -63,3 +63,34 @@ export async function remixJourney(sourceId: string, userId: string): Promise<st
     throw new RemixFailure(submitted ? 'Copy result unconfirmed. Check Account private drafts before trying again.' : 'Couldn’t check your account or the original journey. Please retry.', submitted, copyId);
   } finally { clearTimeout(timer); }
 }
+
+// One server transaction copies only selected source stops and retains attribution.
+// A stable draft ID makes transport retries refer to the same draft.
+export async function remixSelectedJourney(sourceId: string, stopIds: string[], draftId: string, userId: string): Promise<string> {
+  if (!isJourneyId(sourceId) || !isJourneyId(draftId) || draftId === sourceId || !stopIds.length || stopIds.length > 50
+    || stopIds.some(id => !isJourneyId(id)) || new Set(stopIds).size !== stopIds.length) throw new RemixFailure('Invalid stop selection. Review your stops.');
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 15000);
+  let submitted = false;
+  try {
+    await owner(userId, controller.signal);
+    if (controller.signal.aborted) throw new RemixFailure('Connection timed out before copying. Please retry.');
+    submitted = true;
+    const { data, error } = await api().rpc('copy_journey_selected', { source_id: sourceId, selected_stop_ids: stopIds, draft_id: draftId }).abortSignal(controller.signal);
+    if (error) {
+      if (error.code === 'PGRST202' || error.code === '42883') throw new RemixFailure('Customize stops is not available on the server yet. Your selections are preserved; no draft was created.');
+      const definite = /^[0-9A-Z]{5}$/.test(error.code ?? '') && !error.code.startsWith('PGRST');
+      throw new RemixFailure(definite ? 'Couldn’t create this selection. The source may have changed; review your stops and retry.'
+        : 'Draft result unconfirmed. Check Account drafts before continuing.', !definite);
+    }
+    if (data !== draftId) throw new RemixFailure('Draft result unconfirmed. Check Account drafts before continuing.', true);
+    const { data: detail, error: readError } = await api().rpc('get_journey_detail', { target_id: draftId }).abortSignal(controller.signal);
+    const draft = normalizeDraft(detail, draftId, userId);
+    if (readError || !draft || draft.sourceId !== sourceId || draft.stops.length !== stopIds.length)
+      throw new RemixFailure('Your draft was created but could not be verified. Check Account drafts.', true, draftId);
+    return draftId;
+  } catch (error) {
+    if (error instanceof RemixFailure) throw error;
+    throw new RemixFailure(submitted ? 'Draft result unconfirmed. Check Account drafts before continuing.' : 'Couldn’t check your account. Please retry.', submitted);
+  } finally { clearTimeout(timer); }
+}
