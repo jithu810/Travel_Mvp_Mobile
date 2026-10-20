@@ -1,5 +1,13 @@
 # Journey Creator Mobile — roadmap
 
+## Stationary navigation direction — 2026-10-20
+
+- FIELD FEEDBACK: Owner tested Begin Trip while stationary at home and still saw a dot. This does not establish an arrow failure during actual movement. Prior code required reliable movement course and had no stationary compass source.
+- IMPLEMENTED: Use calibrated true-north device compass at startup/while stationary; confirmed movement course takes priority when travelling. Smooth compass wraparound and show phone-direction versus travel-direction labels. Collapsed panel explains unavailable orientation or poor/stale GPS. Compass callbacks preserve measured coordinates, GPS timestamps, watchdog and route progress. Sensor errors do not disconnect GPS. Heading subscriptions and timers stop on Pause/Finish/background/blur and reject obsolete callbacks.
+- LIMITS: No invented north/route bearing. Compass requires medium/high calibration and precise current GPS. Android emits only after phone direction changes; compass expires after 30 seconds without a new reading and explains how to refresh. Indoors, poor GPS may prevent an arrow. Stationary compass means phone facing, not proof of travel. No dependency/native build/key/EAS changes; existing development client can load updated JavaScript.
+- VALIDATION: Final simulated suite 547/547 passed; writer TypeScript passed; independent reviewer passed 10/10 compass tests. Two P2 review findings (poor-GPS advice and obsolete expiry timer cleanup) reproduced in tests and resolved; reviewer confirmed no remaining actionable findings. Full and scoped zero-warning lint and Android Hermes export passed. Final three-application/two-test snapshot SHA256: dba148a72633e8df41d3de7c5bc7ce4a48868c8cf0dc7d21696c0cdc63cb1763 (sorted path + NUL + file SHA256 + LF). Offline Expo compatibility reports dependencies up to date with its offline reliability caveat.
+- DEVICE PENDING: Reload latest JS on Android, allow precise location, test Begin stationary outdoors, rotate phone through north, verify calibrated arrow and labels, then walk/drive safely to confirm course priority. Check compass loss/30-second expiry, poor GPS, Pause/Resume/Finish and background/resume. Existing screenshot is observed baseline only; no physical verification of this fix performed.
+
 ## Android navigation field fixes — 2026-10-19
 
 - ROOT CAUSES: Travel rendered the original route overview instead of accepted progress; the GPS guard hid retained geometry during brief accuracy loss; course filtering discarded sharp turns and stationary readings; a font glyph and large destination circles reduced navigation clarity.

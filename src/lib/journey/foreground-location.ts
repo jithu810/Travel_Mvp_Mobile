@@ -1,7 +1,10 @@
-export type Position = Readonly<{ latitude: number; longitude: number; accuracy: number | null; timestamp: number; heading?: number | null; speed?: number | null; direction?: number | null }>;
+export type Position = Readonly<{ latitude: number; longitude: number; accuracy: number | null; timestamp: number; heading?: number | null; speed?: number | null; direction?: number | null; directionSource?: 'course' | 'compass' | null }>;
 export type LocationStatus = 'ready' | 'permitted' | 'requesting' | 'tracking' | 'weak' | 'unavailable' | 'denied' | 'paused' | 'finished' | 'stopped';
 export type LocationSnapshot = Readonly<{ status: LocationStatus; position: Position | null; canAskAgain: boolean; reason?: 'acquiring' | 'services-disabled' | 'temporary' }>;
+export type Heading = Readonly<{ heading: number; accuracy: number; timestamp: number }>;
+export const COMPASS_MAX_AGE_MS = 30_000;
 export type LocationPort = {
+  watchHeading?: (update: (heading: Heading) => void, error: () => void) => Promise<{ remove: () => void }>;
   permission: (request: boolean, onlyIfUndetermined?: boolean) => Promise<{ granted: boolean; canAskAgain: boolean }>;
   services: () => Promise<boolean>;
   watch: (update: (position: Position) => void, error: () => void) => Promise<{ remove: () => void }>;
@@ -22,6 +25,9 @@ export function createForegroundLocation(port: LocationPort, now = Date.now, tim
   const listeners = new Set<() => void>();
   let status: SessionStatus = 'ready', foreground = false, focused = false, generation = 0, busy = false;
   let subscription: { remove: () => void } | undefined;
+  let headingSubscription: { remove: () => void } | undefined, compass: Heading | null = null;
+  let compassTimer: ReturnType<typeof setTimeout> | undefined;
+  let course: number | null = null, compassDirection: number | null = null;
   let timeout: ReturnType<typeof setTimeout> | undefined;
   let permissionDialogInactive = false;
   let foregroundReady: (() => void) | undefined;
@@ -33,11 +39,24 @@ export function createForegroundLocation(port: LocationPort, now = Date.now, tim
   const clearTimer = () => { if (timeout !== undefined) timers.clear(timeout); timeout = undefined; };
   const stop = () => {
     generation++; busy = false; permissionDialogInactive = false;
-    direction.reset();
+    direction.reset(); course = null; compass = null; compassDirection = null;
+    headingSubscription?.remove(); headingSubscription = undefined;
+    if (compassTimer !== undefined) timers.clear(compassTimer); compassTimer = undefined;
     if (retryTimer !== undefined) timers.clear(retryTimer);
     retryTimer = undefined;
     foregroundReady?.(); foregroundReady = undefined;
     subscription?.remove(); subscription = undefined; clearTimer();
+  };
+  const orient = (position: Position): Position => {
+    const eligible = validPosition(position, now()) && now() - position.timestamp <= 15000
+      && position.accuracy !== null && Number.isFinite(position.accuracy) && position.accuracy >= 0 && position.accuracy <= 25;
+    const moving = typeof position.speed === 'number' && position.speed >= 1.5 && position.speed <= 55;
+    const currentCompass = compass && now() >= compass.timestamp && now() - compass.timestamp < COMPASS_MAX_AGE_MS ? compassDirection : null;
+    const source = !eligible ? null : moving && course !== null ? 'course' : currentCompass !== null ? 'compass' : course !== null ? 'course' : null;
+    return { ...position, direction: source === 'compass' ? currentCompass : source === 'course' ? course : null, directionSource: source };
+  };
+  const publishOrientation = () => {
+    if (snapshot.position) publish({ ...snapshot, position: orient(snapshot.position) });
   };
   const usable = () => focused && foreground;
   const idle = (): LocationStatus => status === 'ready' ? 'ready' : status === 'paused' ? 'paused' : status === 'finished' || status === 'completed' ? 'finished' : 'stopped';
@@ -97,6 +116,31 @@ export function createForegroundLocation(port: LocationPort, now = Date.now, tim
         return;
       }
       if (!current()) return;
+      if (port.watchHeading) {
+        // Compass errors must not disconnect valid position tracking. Late startup is removed on cancellation.
+        void Promise.resolve().then(() => current() ? port.watchHeading!(reading => {
+          if (!current() || status !== 'active') return;
+          if (!Number.isFinite(reading.heading) || reading.heading < 0 || reading.heading >= 360
+            || !Number.isInteger(reading.accuracy) || reading.accuracy < 2 || reading.accuracy > 3
+            || !Number.isFinite(reading.timestamp) || reading.timestamp > now() || now() - reading.timestamp >= COMPASS_MAX_AGE_MS) {
+            compass = null; compassDirection = null; publishOrientation(); return;
+          }
+          if (compass && reading.timestamp < compass.timestamp) return;
+          compassDirection = compassDirection === null ? reading.heading
+            : (compassDirection + (((reading.heading - compassDirection + 540) % 360) - 180) * 0.4 + 360) % 360;
+          compass = reading;
+          if (compassTimer !== undefined) timers.clear(compassTimer);
+          const expiry = timers.set(() => {
+            if (!current() || compassTimer !== expiry) return;
+            compassTimer = undefined;
+            compass = null; compassDirection = null; publishOrientation();
+          }, Math.max(1, COMPASS_MAX_AGE_MS - (now() - reading.timestamp)));
+          compassTimer = expiry;
+          publishOrientation();
+        }, () => { if (current()) { compass = null; compassDirection = null; publishOrientation(); } }) : null)
+          .then(next => { if (!next) return; if (current()) headingSubscription = next; else next.remove(); })
+          .catch(() => { /* Position updates remain useful when this device has no compass. */ });
+      }
       let lastTimestamp = -Infinity;
       const unavailable = () => {
         if (!current()) return;
@@ -112,7 +156,8 @@ export function createForegroundLocation(port: LocationPort, now = Date.now, tim
         const accuracy = position.accuracy !== null && Number.isFinite(position.accuracy) && position.accuracy >= 0 ? position.accuracy : null;
         failures = 0;
         const normalized = { ...position, accuracy };
-        publish({ status: accuracy === null || accuracy > 100 ? 'weak' : 'tracking', position: { ...normalized, direction: direction.update(normalized, now()) }, canAskAgain: true });
+        course = direction.update(normalized, now());
+        publish({ status: accuracy === null || accuracy > 100 ? 'weak' : 'tracking', position: orient(normalized), canAskAgain: true });
         if (!current() || status !== 'active') return;
         clearTimer(); timeout = timers.set(unavailable, Math.max(1, 30000 - (now() - position.timestamp)));
       }, unavailable) : { remove() {} }).finally(() => { pendingWatch = false; });
@@ -153,12 +198,18 @@ export function createForegroundLocation(port: LocationPort, now = Date.now, tim
   };
 }
 
-export function locationLabel(value: LocationSnapshot) {
+export function locationLabel(value: LocationSnapshot, now = Date.now()) {
+  if (value.status === 'tracking' && (!value.position || !validPosition(value.position, now)
+    || now - value.position.timestamp > 15000 || value.position.accuracy === null
+    || !Number.isFinite(value.position.accuracy) || value.position.accuracy < 0 || value.position.accuracy > 25))
+    return 'Waiting for precise GPS · Direction will appear when location improves';
   if (value.status === 'requesting' && value.reason === 'acquiring') return 'Checking location permission / acquiring GPS…';
   if (value.status === 'unavailable') return value.reason === 'services-disabled'
     ? 'Device location is off · Enable location; recovery retries automatically during an active trip'
     : 'GPS temporarily unavailable · Retrying automatically during an active trip';
-  return ({ ready: 'Ready to request location', permitted: 'Location allowed · Tap Begin Trip when ready', requesting: 'Requesting permission / location…', tracking: 'Location updating in foreground',
+  return ({ ready: 'Ready to request location', permitted: 'Location allowed · Tap Begin Trip when ready', requesting: 'Requesting permission / location…', tracking: value.position?.directionSource === 'compass' ? 'Location updating · Arrow shows phone direction (compass)'
+      : value.position?.directionSource === 'course' ? 'Location updating · Arrow shows travel direction'
+      : 'Location updating · Direction unavailable; turn phone to refresh compass or move when safe',
     weak: 'Location signal weak', unavailable: 'Location unavailable · Check device location services', denied: 'Location permission denied',
     paused: 'Trip paused · Location updates stopped', finished: 'Trip finished · Location updates stopped', stopped: 'Location updates stopped' })[value.status]
     + (value.status === 'weak' && value.position?.accuracy !== null && value.position?.accuracy !== undefined ? ' · Accuracy ±' + Math.round(value.position.accuracy) + ' m' : '');

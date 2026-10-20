@@ -78,7 +78,7 @@ export function TravelModeContent({ journey, onExit, refreshNotice }: { journey:
   const arrival = useTripArrival(journey, session, location.source);
   const requesting = location.status === 'requesting';
   const compactRouteStatus = navigation.message.startsWith('Waiting for GPS:') ? 'Waiting for an accurate GPS fix' : navigation.message;
-  const showLocationStatus = Platform.OS === 'web' || ['ready', 'requesting', 'weak', 'unavailable', 'denied', 'stopped'].includes(location.status);
+  const showLocationStatus = (session.status === 'active' && location.status === 'tracking' && location.position?.directionSource !== 'course') || Platform.OS === 'web' || ['ready', 'requesting', 'weak', 'unavailable', 'denied', 'stopped'].includes(location.status);
   const [confirmation, setConfirmation] = useState<{ action: 'finish' | 'new' | 'complete'; session: TripSession; stopId?: string; epoch: number } | null>(null);
   const interaction = useRef({ focused: false, epoch: 0 });
   useFocusEffect(useCallback(() => {

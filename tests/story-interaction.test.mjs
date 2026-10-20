@@ -426,6 +426,14 @@ test('Travel renders permission, weak-fix and unavailable states honestly withou
   assert.match(text(tree), /signal weak/); assert.match(text(tree), /250 m/);
   assert.equal(find(tree, 'JourneyMap').props.currentPosition, null, 'A weak/stale fix must not look like a precise current-position dot');
   assert.equal(find(tree, 'JourneyMap').props.selectedId, 'second'); assert.equal(find(tree, 'MapItinerary').props.selectedId, 'second');
+  for (const [directionSource, direction, message] of [['compass', 90, /Arrow shows phone direction/], [null, null, /Direction unavailable/]]) {
+    gps = { status: 'tracking', canAskAgain: true, position: { latitude: 8, longitude: 76, accuracy: 5, timestamp: Date.now(), directionSource, direction } };
+    tree = render();
+    // Status must appear in the collapsed footer, not solely inside expanded itinerary details.
+    const footer = find(tree, 'ItinerarySheet').props.footer;
+    assert.match(text(footer), message);
+    assert.equal(find(tree, 'JourneyMap').props.currentPosition.direction, direction);
+  }
   gps = { status: 'finished', canAskAgain: true, position: null }; store.transition(journey, 'finish', store.get(journeyId)); tree = render();
   assert.match(text(tree), /Trip finished · Location updates stopped/); assert.equal(find(tree, 'JourneyMap').props.currentPosition, null);
   h.dispose();
