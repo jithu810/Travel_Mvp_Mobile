@@ -1,5 +1,25 @@
 # Journey Creator Mobile — roadmap
 
+## Successful Customize Stops Android retry — 2026-10-21
+
+- [x] Confirmed selection, created the three-stop private Church To home draft with original stop 2 skipped, pressed Save Draft and observed Saved privately without error.
+- [x] Left editor for Account: new private draft appeared, count 5 to 6. Reopened it with the three selected names/order retained and the skipped stop absent. Photos omitted as expected. Earlier backend blockers below are superseded for this exercised path.
+- [x] Fresh 543/543 tests, TypeScript, zero-warning lint and whitespace checks passed on the tested local snapshot. Independent UI/test review already passed. User authorized publication to existing PR #3 branch; no merge or deploy.
+- [ ] Broader backend SQL/RLS/concurrency, screen-reader, enlarged-font and iOS acceptance remain separate. No GitHub check/status runs reported; branch protection unavailable to integration (403). No SQL/Web migration changes included.
+
+## Hosted Customize Stops acceptance — 2026-10-21
+
+- [x] Confirmed correct checkout/branch, preserved five existing modifications and verified Metro project root/USB forwarding. User reports standalone backend deployment; native review accepted 3 of 4 stops with original stop 2 skipped.
+- [x] One authorized creation attempt captured and diagnosed: SQLSTATE 42501, permission denied for schema auth, before insertion in private.standalone_copy_journey_selected. Its owner customize_stops_rpc lacks auth schema USAGE despite auth.uid() EXECUTE. No Mobile code defect established; no retry, grants or schema changes performed.
+- [ ] Backend owner separately reviews/corrects effective permissions. Then repeat creation and navigate-away/reopen persistence acceptance; this run did not create a draft or reach the editor. Photos expected omitted. See PROJECT_STATUS.md for exact evidence; prior missing-RPC blocker is superseded.
+
+## Customize stops UX follow-up — 2026-10-20
+
+- [x] Compact card, fixed Keep/Skip/Undo controls, explicit swipe directions and optional-swipe guidance; grouped selected/skipped review, original positions and restored-state explanation.
+- [x] Connected Android 16 device checks: tap Skip/Undo/Keep, left/right swipes, vertical-scroll arbitration, mixed selection counts and restoring original stop 2. No draft confirmation or production writes. See PROJECT_STATUS.md for device configuration and evidence limits.
+- [x] Final automated verification: 543/543 tests including 12 focused cases, TypeScript, zero-warning lint and whitespace checks. Offline Expo compatibility reports up to date with its caveat; no patches installed. Independent Code Reviewer found no actionable issues and independently passed 12 focused cases. Android Back retained choices; native route rendered, with development Refreshing banner limiting settled-screen evidence. Changes remain local/uncommitted on codex/customize-stops.
+- [ ] Backend copy_journey_selected remains a separate approval and isolated-validation dependency. Missing-RPC message is honest; no draft creation is claimed. No SQL applied. TalkBack/VoiceOver, enlarged fonts, iOS and backend end-to-end QA remain pending.
+
 ## Customize stops — 2026-10-20
 
 - IMPLEMENTED: Published journey actions retain Use all stops and whole-journey Remix and add Customize stops. One-card Keep/Skip swipes and visible buttons, Undo, photo/metadata fallbacks, original-position labels, review/back retention, restore/revisit controls, and a selected-stop map preview. No card animations; buttons provide accessible gesture alternatives.

@@ -19,17 +19,18 @@ const journey = Object.freeze({ id: sourceId, title: 'Original', stops });
 const tick = () => new Promise(setImmediate);
 function deferred() { let resolve, reject; const promise = new Promise((a,b) => { resolve=a; reject=b; }); return { promise, resolve, reject }; }
 function all(tree, type) { if (!tree || typeof tree !== 'object') return []; return [...(tree.type === type ? [tree] : []), ...[tree.props?.children].flat(Infinity).flatMap(child => all(child,type))]; }
+function textContent(tree) { if (tree === null || tree === undefined || typeof tree === 'boolean') return ''; if (Array.isArray(tree)) return tree.map(textContent).join(''); return typeof tree === 'object' ? textContent(tree.props?.children) : String(tree); }
 function harness() {
   const slots=[]; let cursor=0, effects=[], auth={ loading:false, session:null }, route={loading:false,error:null,data:null,retry(){}}, writes=[], routes=[];
   const memo=(fn,deps) => { const i=cursor++; if (!slots[i] || deps.some((v,j)=>slots[i].deps[j]!==v)) slots[i]={value:fn(),deps}; return slots[i].value; };
-  const hooks={ useState(value) { const i=cursor++; if (!(i in slots)) slots[i]=typeof value==='function'?value():value; return [slots[i],value=>{slots[i]=typeof value==='function'?value(slots[i]):value;}]; }, useRef(value) { const i=cursor++; return slots[i]??={current:value}; }, useMemo:memo, useCallback:(fn,deps)=>memo(()=>fn,deps), useSyncExternalStore:(_,get)=>get() };
+  const hooks={ useState(value) { const i=cursor++; if (!(i in slots)) slots[i]=typeof value==='function'?value():value; return [slots[i],value=>{slots[i]=typeof value==='function'?value(slots[i]):value;}]; }, useRef(value) { const i=cursor++; return slots[i]??={current:value}; }, useEffect:fn=>{effects.push(fn);}, useMemo:memo, useCallback:(fn,deps)=>memo(()=>fn,deps), useSyncExternalStore:(_,get)=>get() };
   const store=remix.createRemixStore(); let pending=null;
   const router={push:value=>routes.push(['push',value]),replace:value=>routes.push(['replace',value]),back:()=>routes.push(['back'])};
   const jsx=(type,props)=>({type,props});
   const component=load('src/components/journey/customize-stops.tsx', {
     react:hooks,'react/jsx-runtime':{jsx,jsxs:jsx,Fragment:'Fragment'},'expo-router':{useRouter:()=>router,useFocusEffect:fn=>{ effects.push(fn); }},
-    'react-native':{...Object.fromEntries(['ActivityIndicator','Pressable','ScrollView','Text','View'].map(v=>[v,v])),BackHandler:{addEventListener:()=>({remove(){}})},PanResponder:{create:value=>({panHandlers:value})}},
-    '../discovery/ui':{Action:'Action',ui:{}},'../discovery/journey-photo':{JourneyPhoto:'JourneyPhoto'},'./map/journey-map':{JourneyMap:'JourneyMap'},
+    'react-native':{...Object.fromEntries(['ActivityIndicator','Pressable','ScrollView','Text','View'].map(v=>[v,v])),StyleSheet:{create:value=>value},BackHandler:{addEventListener:()=>({remove(){}})},PanResponder:{create:value=>({panHandlers:value})}},
+    '../discovery/ui':{Action:'Action',ui:{},colors:{paper:'#F5F3EC',ink:'#153E35',muted:'#65736A',green:'#708454',line:'#DEE2D7',white:'#FFFFFF',pale:'#E5EBD9'}},'../discovery/journey-photo':{JourneyPhoto:'JourneyPhoto'},'./map/journey-map':{JourneyMap:'JourneyMap'},
     '@/hooks/session-context':{useSessionState:()=>auth},'@/hooks/use-load':{useLoad:()=>route},'@/lib/create/id':{randomUUID:()=>draftId},'@/lib/remix/customize':model,
     '@/lib/remix/model':{remixStore:store},'@/lib/remix/queries':{remixSelectedJourney:async(...args)=>{writes.push(args);if(pending)await pending;return draftId;}},'@/lib/journey/navigation':navigation,
   }).CustomizeStops;
@@ -71,6 +72,48 @@ test('actual component Undo, review/back and restore retain decisions and order 
   assert.ok(all(h.tree(),'Text').some(v=>String(v.props.children).includes('Current selection:')));
   h.click('Keep');h.click('Keep');h.click('Keep');h.click('Review selected stops');assert.deepEqual(all(h.tree(),'JourneyMap')[0].props.stops,stops);
   h.click('Exit customization');assert.equal(h.writes.length,0);assert.deepEqual(h.routes.at(-1),['back']);
+});
+
+test('selection offers persistent named buttons and explicit swipe directions without requiring a gesture',()=>{
+  const h=harness();h.render();
+  for (const [index,label] of ['Skip','Keep','Skip'].entries()) {
+    const tree=h.tree(), scroll=all(tree,'ScrollView')[0];
+    assert.match(textContent(tree),/Swipe left to skip/);assert.match(textContent(tree),/Swipe right to keep/);
+    assert.match(textContent(tree),/swiping is optional/);
+    for (const actionLabel of ['Skip','Keep']) {
+      const button=all(tree,'Action').find(item=>item.props.label===actionLabel);
+      assert.ok(button,`${actionLabel} is available before deciding`);
+      assert.equal(button.props.accessibilityLabel,`${actionLabel} ${stops[index].name}`);
+      assert.ok(!all(scroll,'Action').includes(button),'Decision buttons stay outside scrolling card content');
+    }
+    h.click(label);
+  }
+  h.click('Review selected stops');
+  assert.deepEqual(all(h.tree(),'JourneyMap')[0].props.stops,[stops[1]]);
+  assert.equal(h.writes.length,0);
+});
+
+test('review groups selected and skipped stops and makes restore, original position and undo observable',()=>{
+  const h=harness();h.render();h.click('Keep');h.click('Skip');h.click('Keep');h.click('Review selected stops');
+  const section=prefix=>all(h.tree(),'View').find(view=>[view.props.children].flat(Infinity).some(child=>child?.type==='Text'&&textContent(child).startsWith(prefix)));
+  const row=label=>all(h.tree(),'View').find(view=>[view.props.children].flat(Infinity).some(child=>child?.type==='Action'&&child.props.label===label));
+  assert.match(textContent(section('Selected stops · ')),/Selected stops · 2/);
+  assert.match(textContent(section('Skipped stops · ')),/Skipped stops · 1/);
+  assert.match(textContent(row('Restore Middle')),/MiddleOriginal stop 2Skipped/);
+  assert.match(textContent(row('Skip First')),/FirstOriginal stop 1Selected/);
+  assert.match(textContent(h.tree()),/Restore adds a stop back in its original position/);
+  h.click('Restore Middle');
+  assert.match(textContent(section('Selected stops · ')),/Selected stops · 3/);
+  assert.match(textContent(section('Skipped stops · ')),/Skipped stops · 0/);
+  assert.match(textContent(row('Skip Middle')),/MiddleOriginal stop 2Restored · selected/);
+  assert.deepEqual(all(h.tree(),'JourneyMap')[0].props.stops,stops);
+  h.click('Undo');
+  assert.ok(all(h.tree(),'Text').some(item=>textContent(item)==='Current selection: Skip'));
+  assert.ok(all(h.tree(),'Text').some(item=>textContent(item)==='Middle'));
+  h.click('Skip');h.click('Keep');h.click('Review selected stops');
+  assert.deepEqual(all(h.tree(),'JourneyMap')[0].props.stops,[stops[0],stops[2]]);
+  assert.match(textContent(row('Restore Middle')),/MiddleOriginal stop 2Skipped/);
+  assert.equal(h.writes.length,0);
 });
 test('authentication return retains selections; repeated confirmation creates one editable draft',async()=>{
   const h=harness();h.render();h.click('Keep');h.click('Skip');h.click('Keep');h.click('Review selected stops');h.click('Confirm and create draft');await tick();
