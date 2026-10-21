@@ -10,6 +10,10 @@ export const locationPort: LocationPort = {
     if (request && !result.granted && result.canAskAgain && (!onlyIfUndetermined || result.status === 'undetermined')) result = await location.requestForegroundPermissionsAsync();
     return { granted: result.granted, canAskAgain: result.canAskAgain };
   },
+  async watchHeading(update, error) {
+    const location = await import('expo-location');
+    return location.watchHeadingAsync(reading => update({ heading: reading.trueHeading, accuracy: reading.accuracy, timestamp: Date.now() }), () => error());
+  },
   async services() { return (await import('expo-location')).hasServicesEnabledAsync(); },
   async watch(update, error) {
     const location = await import('expo-location');

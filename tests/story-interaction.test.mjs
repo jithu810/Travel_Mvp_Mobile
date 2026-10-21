@@ -426,6 +426,14 @@ test('Travel renders permission, weak-fix and unavailable states honestly withou
   assert.match(text(tree), /signal weak/); assert.match(text(tree), /250 m/);
   assert.equal(find(tree, 'JourneyMap').props.currentPosition, null, 'A weak/stale fix must not look like a precise current-position dot');
   assert.equal(find(tree, 'JourneyMap').props.selectedId, 'second'); assert.equal(find(tree, 'MapItinerary').props.selectedId, 'second');
+  for (const [directionSource, direction, message] of [['compass', 90, /Arrow shows phone direction/], [null, null, /Direction unavailable/]]) {
+    gps = { status: 'tracking', canAskAgain: true, position: { latitude: 8, longitude: 76, accuracy: 5, timestamp: Date.now(), directionSource, direction } };
+    tree = render();
+    // Status must appear in the collapsed footer, not solely inside expanded itinerary details.
+    const footer = find(tree, 'ItinerarySheet').props.footer;
+    assert.match(text(footer), message);
+    assert.equal(find(tree, 'JourneyMap').props.currentPosition.direction, direction);
+  }
   gps = { status: 'finished', canAskAgain: true, position: null }; store.transition(journey, 'finish', store.get(journeyId)); tree = render();
   assert.match(text(tree), /Trip finished · Location updates stopped/); assert.equal(find(tree, 'JourneyMap').props.currentPosition, null);
   h.dispose();
@@ -580,7 +588,7 @@ function nativeMapHarness(stops, extraNative = {}, timers = globalThis, store = 
     'react-native': { ...native, ...extraNative }, '@/lib/journey/travel-camera': cameraModel,
     '@/lib/journey/trip-session': { tripStore: store },
   }, h.hooks, timers);
-  const mapbox = Object.fromEntries(['MapView', 'Camera', 'ShapeSource', 'CircleLayer', 'SymbolLayer', 'LineLayer', 'Atmosphere'].map(key => [key, key]));
+  const mapbox = Object.fromEntries(['MapView', 'Camera', 'ShapeSource', 'CircleLayer', 'SymbolLayer', 'LineLayer', 'Atmosphere', 'Images'].map(key => [key, key]));
   mapbox.StyleURL = { Outdoors: 'outdoors', SatelliteStreet: 'satellite', Street: 'streets' };
   const { NativeJourneyMap: Component } = load('src/components/journey/map/native-map.tsx', {
     '@rnmapbox/maps': mapbox, 'react-native': {...native, ...extraNative}, '@/components/discovery/ui': ui,
@@ -966,6 +974,54 @@ test('Travel navigation hook clears route synchronously on Pause/Finish/backgrou
   store.transition(journey, 'finish', store.get(journeyId)); assert.equal(render().route, null);
   h.dispose(); assert.equal(intervals.size, 0); assert.equal(removed, 2);
   assert.equal(signal.aborted, false, 'Completed request needs no further abort; no new request during cooldown');
+});
+
+test('Travel hook retains route through GPS loss and recovers while hiding it on lifecycle and destination replacement', async () => {
+  const h = harness(), store = sessionModel.createTripStore();
+  const journey = { id: journeyId, title: 'Synthetic route', stops: [
+    { ...stop('first'), sequence: 0, latitude: 0, longitude: 0.001 },
+    { ...stop('second'), sequence: 1, latitude: 0, longitude: 0.002 },
+  ] };
+  let time = 100000, locationListener, appListener, calls = 0;
+  let position = { latitude: 0, longitude: 0, accuracy: 5, timestamp: time };
+  const location = { get: () => ({ position }), subscribe(fn) { locationListener = fn; return () => {}; } };
+  const app = { currentState: 'active', addEventListener(_, fn) { appListener = fn; return { remove() {} }; } };
+  const geometry = { type: 'LineString', coordinates: [[0, 0], [0.001, 0]] };
+  const road = { geometry, distance: 111, duration: 30, steps: null };
+  const intervals = new Map();
+  const { useTripNavigation } = load('src/hooks/use-trip-navigation.ts', {
+    'expo-router': { useFocusEffect: fn => h.hooks.useEffect(fn, [fn]) }, 'react-native': { AppState: app },
+    '@/lib/journey/trip-session': { ...sessionModel, tripStore: store }, '@/lib/journey/navigation': { ...navigationModel,
+      createNavigation: loader => navigationModel.createNavigation(loader, () => time),
+      navigationBlock: input => navigationModel.navigationBlock(input, time),
+      requestRoadRoute: async () => { calls++; return road; },
+      observeNavigation: (controller, read, sources, state) => navigationModel.observeNavigation(controller, read, sources, state,
+        { set(fn) { intervals.set(1, fn); return 1; }, clear(id) { intervals.delete(id); } }),
+    },
+  }, h.hooks);
+  const render = () => h.render(() => useTripNavigation(journey, store.get(journeyId), location), {});
+  const flush = async () => { for (let i = 0; i < 12; i++) await Promise.resolve(); };
+  render(); store.transition(journey, 'begin', store.get(journeyId)); await flush();
+  assert.equal(render().route, road);
+  for (const accuracy of [60, null]) {
+    position = { ...position, timestamp: ++time, accuracy }; locationListener();
+    assert.equal(render().route, road); assert.equal(render().guidance, null);
+    assert.equal(render().remainingGeometry, geometry);
+    position = { ...position, timestamp: ++time, accuracy: 5 }; locationListener();
+    assert.equal(render().route, road); assert.equal(calls, 1);
+  }
+  position = null; time += 16000; locationListener();
+  assert.equal(render().route, road); assert.equal(render().guidance, null);
+  position = { latitude: 0, longitude: 0, accuracy: 5, timestamp: ++time }; locationListener();
+  assert.equal(render().route, road); assert.equal(calls, 1);
+  app.currentState = 'background'; appListener(); assert.equal(render().route, null);
+  app.currentState = 'active'; appListener(); await flush(); assert.equal(render().route, road);
+  store.transition(journey, 'pause', store.get(journeyId)); assert.equal(render().route, null);
+  time += 5000; position = { ...position, timestamp: time };
+  store.transition(journey, 'resume', store.get(journeyId)); await flush(); assert.equal(render().route, road);
+  store.completeStop(journeyId, 'first', store.get(journeyId)); assert.equal(render().route, null);
+  store.transition(journey, 'finish', store.get(journeyId)); assert.equal(render().route, null);
+  h.dispose(); assert.equal(intervals.size, 0);
 });
 
 test('manual completion is separate from preview, confirms only current stop, warns for missing coordinates and resets progress', () => {
@@ -1518,7 +1574,7 @@ test('Travel marker switches between compact dot and map-aligned direction above
    Object.assign(h.props,{navigationMode:true,currentPosition:{latitude:8,longitude:76,direction:359},navigationRoute:{type:'LineString',coordinates:[[76,8],[76.01,8.01]]}});
    let tree=h.measure();
    const arrow=all(tree,'SymbolLayer').find(n=>n.props.id==='travel-position-arrow');
-   assert.equal(arrow.props.style.textRotate,359); assert.equal(arrow.props.style.textRotationAlignment,'map');
+   assert.equal(arrow.props.style.iconRotate,359); assert.equal(arrow.props.style.iconRotationAlignment,'map');
    assert.equal(all(tree,'CircleLayer').some(n=>n.props.id==='travel-position-dot'),false);
    const sources=all(tree,'ShapeSource').map(n=>n.props.id);
    assert.ok(sources.indexOf('travel-current-position')>sources.indexOf('travel-road-route')); assert.ok(sources.includes('planned-line'));

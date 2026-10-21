@@ -88,6 +88,47 @@ test('duplicate callbacks/ticks and stationary junction drift cannot advance a m
   assert.equal(f.at(0.001, 0.00015).maneuverIndex, 1, 'New timestamps without forward movement do not confirm');
   assert.equal(f.at(0.001, 0.0003).maneuverIndex, 2);
 });
+
+test('remaining geometry clips accepted progress through a turn without mutating the calculated route', () => {
+  const f = fixture(), original = structuredClone(f.route);
+  f.at(0, 0); const east = f.at(0.0004, 0).remainingGeometry;
+  assert.equal(east.type, 'LineString');
+  assert.ok(Math.abs(east.coordinates[0][0] - 0.0004) < 1e-10);
+  assert.ok(Math.abs(east.coordinates[0][1]) < 1e-10);
+  assert.deepEqual(east.coordinates.at(-1), d);
+  f.at(0.0008, 0); f.at(0.001, 0.00015);
+  const north = f.at(0.001, 0.0003).remainingGeometry;
+  assert.ok(Math.abs(north.coordinates[0][0] - 0.001) < 1e-10);
+  assert.ok(Math.abs(north.coordinates[0][1] - 0.0003) < 1e-10);
+  assert.equal(north.coordinates.some(p => p[0] < 0.001 - 1e-10), false);
+  assert.deepEqual(north.coordinates.at(-1), d);
+  assert.deepEqual(f.route, original);
+});
+
+test('poor GPS, genuine off-route movement and later-leg jumps freeze accepted trim without false snapping', () => {
+  for (const [x, y, patch] of [[0.0005, 0, { accuracy: 60 }], [0.0004, 0.001, {}], [0.0015, 0.001, {}], [0.0001, 0, {}]]) {
+    const f = fixture(); f.at(0, 0); const accepted = f.at(0.0004, 0).remainingGeometry;
+    const held = f.at(x, y, 1000, patch);
+    assert.equal(held.status, 'waiting'); assert.equal(held.maneuver, null);
+    assert.deepEqual(held.remainingGeometry, accepted);
+  }
+  const f = fixture(); f.at(0, 0); const accepted = f.at(0.0004, 0).remainingGeometry;
+  assert.deepEqual(f.controller.update(f.route, null).remainingGeometry, accepted);
+  const recovered = f.at(0.0005, 0);
+  assert.equal(recovered.status, 'ready');
+  assert.ok(recovered.remainingGeometry.coordinates[0][0] > accepted.coordinates[0][0]);
+});
+
+test('route replacement resets trim and routes without valid steps never invent progress geometry', () => {
+  const f = fixture(); f.at(0, 0); f.at(0.0004, 0);
+  f.advance(1000);
+  const replacement = road();
+  const state = f.controller.update(replacement, f.position(0, 0));
+  assert.deepEqual(state.remainingGeometry.coordinates[0], a);
+  const noSteps = { ...replacement, steps: null };
+  assert.equal(f.controller.update(noSteps, f.position(0.0004, 0)).remainingGeometry, undefined);
+  assert.deepEqual(noSteps.geometry.coordinates, [a, b, c, d]);
+});
 test('slow forward movement can accumulate confirmation distance across several fresh fixes', () => {
   const f = fixture(); f.at(0, 0); f.at(0.0004, 0); f.at(0.0008, 0);
   assert.equal(f.at(0.001, 0.00015).maneuverIndex, 1);

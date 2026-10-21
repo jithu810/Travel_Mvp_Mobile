@@ -78,7 +78,7 @@ export function TravelModeContent({ journey, onExit, refreshNotice }: { journey:
   const arrival = useTripArrival(journey, session, location.source);
   const requesting = location.status === 'requesting';
   const compactRouteStatus = navigation.message.startsWith('Waiting for GPS:') ? 'Waiting for an accurate GPS fix' : navigation.message;
-  const showLocationStatus = Platform.OS === 'web' || ['ready', 'requesting', 'weak', 'unavailable', 'denied', 'stopped'].includes(location.status);
+  const showLocationStatus = (session.status === 'active' && location.status === 'tracking' && location.position?.directionSource !== 'course') || Platform.OS === 'web' || ['ready', 'requesting', 'weak', 'unavailable', 'denied', 'stopped'].includes(location.status);
   const [confirmation, setConfirmation] = useState<{ action: 'finish' | 'new' | 'complete'; session: TripSession; stopId?: string; epoch: number } | null>(null);
   const interaction = useRef({ focused: false, epoch: 0 });
   useFocusEffect(useCallback(() => {
@@ -113,7 +113,7 @@ export function TravelModeContent({ journey, onExit, refreshNotice }: { journey:
     <View style={styles.mapArea}>
       <JourneyMap stops={journey.stops} selectedId={selectedId} onSelect={select} presentation="expanded" navigationMode
         travelCamera={travelCamera} navigationPadding={navigationPadding} destinationId={navigation.destination?.id}
-        currentPosition={navigationFix(location.position) ? location.position : null} navigationRoute={navigation.route?.geometry} />
+        currentPosition={navigationFix(location.position) ? location.position : null} navigationRoute={navigation.remainingGeometry} />
     </View>
     <View pointerEvents="box-none" style={[styles.overlays, { paddingTop: insets.top + 8, paddingBottom: Math.max(insets.bottom, 8) }]}>
       <View style={styles.topStack} onLayout={event => setTopOverlayHeight(event.nativeEvent.layout.height)}>

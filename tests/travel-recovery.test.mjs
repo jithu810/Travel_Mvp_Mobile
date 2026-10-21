@@ -122,21 +122,24 @@ test('co-located next stop requires fresh readings and old prompt cannot confirm
  c.update(input()); assert.equal(c.get().prompt,null); assert.equal(c.canConfirm(old,input()),false);
  for(let i=0;i<2;i++){time+=3000;c.update(input());assert.equal(c.get().prompt,null);} time+=3000;c.update(input()); assert.equal(c.get().prompt.stopId,'b');
 });
-test('direction requires sustained provider movement, handles wraparound and falls back on poor/missing data', () => {
- let time=100000; const c=gps.createTravelDirection(); const at=(heading=359,speed=2,accuracy=5,dt=3000)=>{time+=dt;return c.update({latitude:0,longitude:0,accuracy,timestamp:time,heading,speed},time);};
- assert.equal(at(),null); assert.equal(at(),359); assert.equal(at(1),0); assert.equal(at(3),1.5);
- for(const [h,s,a] of [[null,2,5],[-1,2,5],[NaN,2,5],[360,2,5],[10,null,5],[10,0,5],[10,1,5],[10,2,30],[10,2,null]]) {
-   assert.equal(at(h,s,a),null); assert.equal(at(10),null); assert.equal(at(10),10);
- }
- assert.equal(at(120),null); assert.equal(at(120),120); assert.equal(at(120,2,5,6000),null);
+test('direction confirms moving course, crosses north, follows turns and retains stationary orientation', () => {
+ let time=100000; const c=gps.createTravelDirection();
+ const at=(heading=359,speed=2,accuracy=5,dt=1000)=>{time+=dt;return c.update({latitude:0,longitude:0,accuracy,timestamp:time,heading,speed},time);};
+ assert.equal(at(),null); assert.equal(at(),359);
+ const north=at(1); assert.ok(north < 2 || north > 358);
+ const turn=at(90); assert.ok(turn > 40 && turn < 90, 'A real right turn updates rather than hiding the arrow');
+ assert.equal(at(270,0),turn); assert.equal(at(null,null),turn);
+ assert.equal(at(90,2,30),null); assert.equal(at(90),null); assert.equal(at(90),90);
+ assert.equal(at(90,2,5,16000),null); assert.equal(at(90),90);
  assert.equal(c.update({latitude:0,longitude:0,accuracy:5,timestamp:time-15001,heading:120,speed:2},time),null);
  c.reset(); assert.equal(at(120),null);
 });
+
 test('location layers sit above both preserved routes; arrow uses map-relative rotation and compact fallback', () => {
  const source=readFileSync('src/components/journey/map/native-map.tsx','utf8');
  assert.ok(source.indexOf('id="travel-current-position"')>source.indexOf('id="travel-road-line"'));
- assert.ok(source.includes('id="planned-line-layer"')); assert.match(source,/textRotationAlignment: 'map'/);
- assert.match(source,/textRotate: currentPosition.direction/); assert.match(source,/circleRadius: 5/); assert.match(source,/circleRadius: 9/);
+ assert.ok(source.includes('id="planned-line-layer"')); assert.match(source,/iconRotationAlignment: 'map'/);
+ assert.match(source,/iconRotate: currentPosition.direction/); assert.match(source,/circleRadius: 5/); assert.match(source,/circleRadius: 9/);
  assert.match(readFileSync('src/lib/journey/travel-camera.ts','utf8'),/NAVIGATION_ZOOM = 16/);
 });
 
