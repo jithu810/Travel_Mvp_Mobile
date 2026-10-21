@@ -1,5 +1,35 @@
 # Journey Creator Mobile — roadmap
 
+## Successful Customize Stops Android retry — 2026-10-21
+
+- [x] Confirmed selection, created the three-stop private Church To home draft with original stop 2 skipped, pressed Save Draft and observed Saved privately without error.
+- [x] Left editor for Account: new private draft appeared, count 5 to 6. Reopened it with the three selected names/order retained and the skipped stop absent. Photos omitted as expected. Earlier backend blockers below are superseded for this exercised path.
+- [x] Fresh 543/543 tests, TypeScript, zero-warning lint and whitespace checks passed on the tested local snapshot. Independent UI/test review already passed. User authorized publication to existing PR #3 branch; no merge or deploy.
+- [ ] Broader backend SQL/RLS/concurrency, screen-reader, enlarged-font and iOS acceptance remain separate. No GitHub check/status runs reported; branch protection unavailable to integration (403). No SQL/Web migration changes included.
+
+## Hosted Customize Stops acceptance — 2026-10-21
+
+- [x] Confirmed correct checkout/branch, preserved five existing modifications and verified Metro project root/USB forwarding. User reports standalone backend deployment; native review accepted 3 of 4 stops with original stop 2 skipped.
+- [x] One authorized creation attempt captured and diagnosed: SQLSTATE 42501, permission denied for schema auth, before insertion in private.standalone_copy_journey_selected. Its owner customize_stops_rpc lacks auth schema USAGE despite auth.uid() EXECUTE. No Mobile code defect established; no retry, grants or schema changes performed.
+- [ ] Backend owner separately reviews/corrects effective permissions. Then repeat creation and navigate-away/reopen persistence acceptance; this run did not create a draft or reach the editor. Photos expected omitted. See PROJECT_STATUS.md for exact evidence; prior missing-RPC blocker is superseded.
+
+## Customize stops UX follow-up — 2026-10-20
+
+- [x] Compact card, fixed Keep/Skip/Undo controls, explicit swipe directions and optional-swipe guidance; grouped selected/skipped review, original positions and restored-state explanation.
+- [x] Connected Android 16 device checks: tap Skip/Undo/Keep, left/right swipes, vertical-scroll arbitration, mixed selection counts and restoring original stop 2. No draft confirmation or production writes. See PROJECT_STATUS.md for device configuration and evidence limits.
+- [x] Final automated verification: 543/543 tests including 12 focused cases, TypeScript, zero-warning lint and whitespace checks. Offline Expo compatibility reports up to date with its caveat; no patches installed. Independent Code Reviewer found no actionable issues and independently passed 12 focused cases. Android Back retained choices; native route rendered, with development Refreshing banner limiting settled-screen evidence. Changes remain local/uncommitted on codex/customize-stops.
+- [ ] Backend copy_journey_selected remains a separate approval and isolated-validation dependency. Missing-RPC message is honest; no draft creation is claimed. No SQL applied. TalkBack/VoiceOver, enlarged fonts, iOS and backend end-to-end QA remain pending.
+
+## Customize stops — 2026-10-20
+
+- IMPLEMENTED: Published journey actions retain Use all stops and whole-journey Remix and add Customize stops. One-card Keep/Skip swipes and visible buttons, Undo, photo/metadata fallbacks, original-position labels, review/back retention, restore/revisit controls, and a selected-stop map preview. No card animations; buttons provide accessible gesture alternatives.
+- ROUTING: Existing driving-route adapter calculates adjacent selected pairs only, with resulting selected start/end; one stop uses a marker-only preview. Invalid selections block confirmation; routing timeout/error/retry/cancellation retain choices and reject stale results. Skipping a waypoint does not promise physical road avoidance. No source route geometry, stop reordering or active-navigation changes.
+- DRAFTS: Existing sign-in boundary at confirmation retains in-memory choices; atomic selected-copy contract preserves original order/media/attribution and opens the existing Create editor. Stable client draft IDs and request/result locks prevent duplicate confirmation and block ambiguous retries with Account recovery. Exit/review do not write. Process termination does not persist selections.
+- BACKEND DEPENDENCY: Current copy_journey always copies all stops and save_journey cannot establish attribution. Required new copy_journey_selected contract is prepared under docs/backend for review only, not registered/applied in either hosted resources or the web repository. Missing RPC is explained without losing choices. Hosted confirmation requires separately reviewed backend rollout; SQL runtime/integration verification is pending.
+- VALIDATED: 541 direct Node tests across 39 files, including 10 new cases; TypeScript, zero-warning lint, Android Hermes export and whitespace checks passed. Real loading-hook test verifies obsolete request abortion/late-result rejection. Offline Expo compatibility reports dependencies up to date with its offline reliability caveat. Independent code review results recorded in the handoff/PR.
+- DEVICE PENDING: Android/iOS physical swipe versus scrolling, VoiceOver/TalkBack focus/labels, large fonts/safe areas, reduced-motion behavior and native Mapbox loading/camera/route checks. Development-client execution, hosted contract parity and nonproduction end-to-end copy checks remain pending; mocks/export do not establish these. No production test writes, dependency changes, deployment, merge or hosted migration.
+- ISOLATION: Feature branch codex/customize-stops from verified origin/main 90f121eb; navigation PR #2 remains separate and is not needed. Original Mobile and web working trees inspected clean and preserved. See docs/customize-stops-handoff.md for laptop steps.
+
 ## Account/Profile travel design and compact Create drafts — 2026-10-18
 
 - IMPLEMENTED: Shared Account/public Profile presentation now uses the existing paper/green palette, app logo, JourneyPhoto avatars/covers, native icon treatments, rounded raised surfaces and gradient buttons. A static atlas/globe motif uses decorative native Views only, with no additional renderer, map/location request or animation. Compact toolbar retains back/settings; the nonfunctional notification placeholder is removed.
