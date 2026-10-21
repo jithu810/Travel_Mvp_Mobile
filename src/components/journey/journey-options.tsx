@@ -37,13 +37,14 @@ export function JourneyOptions({ id, onUse, inlineFeedback = false, menu }: { id
   }, [userId, auth.loading, id, intent, copy]));
   const actions = <View style={styles.card}>
     <View style={styles.buttons}>
-    <Pressable accessibilityRole="button" accessibilityLabel="Use This Journey" accessibilityHint="Opens Travel Mode. Begin Trip starts the timer and location tracking." onPress={onUse} style={({ pressed }) => [styles.use, pressed && { opacity: 0.7 }]}><Text style={styles.useLabel}>↗ Use</Text></Pressable>
+    <Pressable accessibilityRole="button" accessibilityLabel="Use This Journey" accessibilityHint="Use all stops. Opens Travel Mode. Begin Trip starts the timer and location tracking." onPress={onUse} style={({ pressed }) => [styles.use, pressed && { opacity: 0.7 }]}><Text style={styles.useLabel}>↗ Use all stops</Text></Pressable>
     <Pressable accessibilityRole="button" disabled={auth.loading || state.busy || (state.blocked && !state.copyId)} accessibilityState={{ disabled: auth.loading || state.busy || (state.blocked && !state.copyId) }}
       onPress={() => { if (state.copyId) router.push({ pathname: '/draft/[id]', params: { id: state.copyId } }); else void copy(); }} accessibilityLabel={state.copyId ? "Open private copy" : "Remix This Journey"} accessibilityHint="Requires sign-in. Creates or opens your private draft." style={({ pressed }) => [styles.remix, (auth.loading || state.busy || (state.blocked && !state.copyId) || pressed) && { opacity: 0.65 }]}>
       {state.busy ? <ActivityIndicator color={colors.ink} /> : <Text style={styles.remixLabel}>{state.copyId ? 'My draft ↗' : '↻ Remix'}</Text>}
     </Pressable>
     {!inlineFeedback && (state.error || state.blocked) && <Pressable accessibilityRole="button" accessibilityLabel={state.error || 'Check your Account drafts before retrying Remix'} onPress={() => setFeedbackOpen(true)} style={styles.feedback}><Text accessibilityLiveRegion="polite" style={styles.remixLabel}>!</Text></Pressable>}
     </View>
+    <Pressable accessibilityRole="button" accessibilityLabel="Customize stops" accessibilityHint="Choose stops before creating your own editable draft." onPress={() => { menu?.onClose(); router.push({ pathname: '/customize/[id]', params: { id } }); }} style={styles.menuAction}><Text style={styles.remixLabel}>Customize stops →</Text></Pressable>
     {inlineFeedback && <View style={{ gap: 10 }}>
       {state.error && <Text accessibilityRole="alert" style={ui.body}>{state.error}</Text>}
       {state.blocked && <Action label="Check Account drafts" onPress={() => router.push('/account')} />}
