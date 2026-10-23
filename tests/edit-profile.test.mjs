@@ -2,8 +2,12 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import ts from 'typescript';
+// Execute the actual dependency-free shared theme in the component harness.
+const mobileTheme = {};
+new Function('exports', ts.transpileModule(readFileSync('src/theme/mobile-theme.ts', 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText)(mobileTheme);
+
 const jsx=(type,props)=>({type,props});
-function load(path,modules){const exports={};const code=ts.transpileModule(readFileSync(path,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX}}).outputText;new Function('require','exports',code)(name=>name==='@/components/branded-loading'?{BrandedLoading:'BrandedLoading'}:name==='react/jsx-runtime'?{jsx,jsxs:jsx,Fragment:'Fragment'}:name in modules?modules[name]:(()=>{throw Error(name);})(),exports);return exports;}
+function load(path,modules){const exports={};const code=ts.transpileModule(readFileSync(path,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX}}).outputText;new Function('require','exports',code)(name=>name==='@/theme/mobile-theme'?mobileTheme:name==='@/components/branded-loading'?{BrandedLoading:'BrandedLoading'}:name==='react/jsx-runtime'?{jsx,jsxs:jsx,Fragment:'Fragment'}:name in modules?modules[name]:(()=>{throw Error(name);})(),exports);return exports;}
 const uid='22222222-2222-4222-8222-222222222222',other='33333333-3333-4333-8333-333333333333',uuid='11111111-1111-4111-8111-111111111111';
 const discovery={isJourneyId:s=>/^[0-9a-f-]{36}$/.test(s),object:v=>v&&typeof v==='object'?v:null,safePhoto:s=>typeof s==='string'&&/^https:\/\//.test(s)?s:null};
 const model=load('src/lib/profile/edit-model.ts',{'../discovery/model':discovery,'./model':{validHandle:s=>/^[a-zA-Z0-9_]{3,30}$/.test(s)&&s.toLowerCase()!=='edit'}});

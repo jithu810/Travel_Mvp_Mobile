@@ -2,7 +2,7 @@ import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Image, Keyboard, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { colors, ui } from '@/components/discovery/ui';
+import { colors, ui } from '@/components/auth/legacy-ui';
 import { useSessionState } from '@/hooks/session-context';
 import { useActionIntent } from '@/hooks/action-intent';
 import { createAuthController, type AuthMode } from '@/lib/auth/model';

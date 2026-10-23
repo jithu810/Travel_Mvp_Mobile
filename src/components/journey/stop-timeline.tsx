@@ -1,3 +1,4 @@
+import { theme } from '@/theme/mobile-theme';
 import { useEffect, useRef, useState } from 'react';
 import { AccessibilityInfo, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import type { NativeScrollEvent, NativeSyntheticEvent } from 'react-native';
@@ -30,7 +31,7 @@ const vertical = StyleSheet.create({
   title: { fontSize: 25, lineHeight: 32, marginBottom: 22, color: colors.ink, fontWeight: '700' },
   row: { flexDirection: 'row', gap: 10, paddingBottom: 18 }, rail: { width: 30, alignItems: 'center' },
   number: { width: 30, height: 30, borderRadius: 15, backgroundColor: colors.ink, alignItems: 'center', justifyContent: 'center' },
-  numberText: { fontSize: 12, color: colors.paper, fontWeight: '600' }, line: { width: 1, flex: 1, backgroundColor: '#CDD7C2', marginVertical: 7 },
+  numberText: { fontSize: 12, color: colors.paper, fontWeight: '600' }, line: { width: 1, flex: 1, backgroundColor: theme.border, marginVertical: 7 },
   stop: { flex: 1, minWidth: 0, padding: 14, gap: 12, backgroundColor: colors.white, borderRadius: 20, borderWidth: 1, borderColor: colors.line },
   day: { fontSize: 11, fontWeight: '700', letterSpacing: 1.3, color: colors.green }, name: { fontSize: 19, lineHeight: 26, color: colors.ink, fontWeight: '600' },
   photo: { borderRadius: 18, overflow: 'hidden' }, description: { color: colors.muted, fontSize: 14, lineHeight: 23 }, rating: { fontSize: 12, color: colors.ink, lineHeight: 20, fontWeight: '600' },
@@ -113,9 +114,9 @@ function HorizontalStopTimeline({ stops, selectedId, onSelect, onDetails, stacke
           <View style={stacked ? styles.deckPhoto : { flex: 1 }}><JourneyPhoto uri={item.photo} label={item.name + ' photo'} fill fit={stacked ? 'contain' : 'cover'} /></View>
           {!stacked && <View style={styles.cardShade} pointerEvents="none" />}
           <View style={[styles.cardText, stacked && styles.deckText, compact && { padding: 8 }]} pointerEvents="none">
-            <Text maxFontSizeMultiplier={1.3} numberOfLines={compact || stacked ? 1 : 2} style={[styles.cardName, compact && { fontSize: 18, lineHeight: 23 }]}>{item.name}{compact ? ' ↗' : ''}</Text>
-            {!!item.description.trim() && <Text numberOfLines={compact || stacked ? 1 : 2} style={styles.excerpt}>{item.description}</Text>}
-            {!compact && <Text style={styles.readMore}>{item.rating !== null ? '★ ' + item.rating + '/5 · Creator’s rating · ' : ''}Read story ↗</Text>}
+            <Text maxFontSizeMultiplier={1.3} numberOfLines={compact || stacked ? 1 : 2} style={[styles.cardName, stacked && { color: theme.text }, compact && { fontSize: 18, lineHeight: 23 }]}>{item.name}{compact ? ' ↗' : ''}</Text>
+            {!!item.description.trim() && <Text numberOfLines={compact || stacked ? 1 : 2} style={[styles.excerpt, stacked && { color: theme.muted }]}>{item.description}</Text>}
+            {!compact && <Text style={[styles.readMore, stacked && { color: theme.accent }]}>{item.rating !== null ? '★ ' + item.rating + '/5 · Creator’s rating · ' : ''}Read story ↗</Text>}
           </View>
         </Pressable>
       </View>} />}
@@ -128,14 +129,14 @@ function HorizontalStopTimeline({ stops, selectedId, onSelect, onDetails, stacke
 const styles = StyleSheet.create({
   deck: { gap: 8, position: 'relative' },
   deckPhoto: { height: 140, backgroundColor: '#101B2E' },
-  deckText: { position: 'relative', backgroundColor: '#18243B', paddingVertical: 6 },
+  deckText: { position: 'relative', backgroundColor: theme.surface, paddingVertical: 6 },
   deckCarousel: { height: 230, flexGrow: 0, borderRadius: 22 },
   stackEdge: { position: 'absolute', top: 19, left: 10, right: 10, height: 230, borderRadius: 22, backgroundColor: '#D6DFF2', transform: [{ rotate: '2deg' }] },
   deckControl: { minHeight: 44, minWidth: 100, paddingHorizontal: 14, borderRadius: 18, backgroundColor: '#E7EDF9', alignItems: 'center', justifyContent: 'center' },
   section: { flex: 1, minHeight: 0, gap: 6 },
   timeline: { flexGrow: 0, flexShrink: 0, height: 62 },
   thumbnailContent: { alignItems: 'center' }, thumbnailSlot: { width: 66, height: 60, justifyContent: 'center' },
-  connector: { position: 'absolute', left: 48, right: -10, top: 28, height: 2, backgroundColor: '#BDCBAA' },
+  connector: { position: 'absolute', left: 48, right: -10, top: 28, height: 2, backgroundColor: theme.border },
   thumbnail: { width: 54, height: 54, borderRadius: 27, borderWidth: 2, padding: 3, borderColor: colors.paper, backgroundColor: colors.paper },
   thumbnailImage: { flex: 1, borderRadius: 24, overflow: 'hidden' },
   selectedThumbnail: { borderColor: colors.ink, backgroundColor: colors.green },

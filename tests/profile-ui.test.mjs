@@ -2,6 +2,10 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import ts from 'typescript';
+// Execute the actual dependency-free shared theme in the component harness.
+const mobileTheme = {};
+new Function('exports', ts.transpileModule(readFileSync('src/theme/mobile-theme.ts', 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText)(mobileTheme);
+
 const jsx=(type,props)=>({type,props});
 const native=Object.fromEntries(['View','Text','Image','Pressable','FlatList','ScrollView','Modal','ActivityIndicator','RefreshControl'].map(n=>[n,n]));
 native.StyleSheet={create:s=>s};let width=360;native.useWindowDimensions=()=>({width,height:800});
@@ -13,7 +17,7 @@ function hooks(){let slots=[],cursor=0,effects=[];return {
   render(fn){cursor=0;effects=[];const tree=fn();effects.forEach(f=>f());return tree;},
 };}
 function load(path,modules={},react=hooks().react){const exports={};const code=ts.transpileModule(readFileSync(path,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX}}).outputText;
-  new Function('require','exports',code)(name=>name==='./profile-styles'?load('src/components/profile/profile-styles.ts',{'@/components/discovery/ui':ui}):name==='react'?react:name==='@/components/delete-draft-action'?{DeleteDraftAction:'DeleteDraftAction'}:name==='@/components/branded-loading'?{BrandedLoading:'BrandedLoading'}:name==='react/jsx-runtime'?{jsx,jsxs:jsx,Fragment:'Fragment'}:name==='react-native'?native:name.endsWith('.png')?1:name in modules?modules[name]:(()=>{throw Error(name);})(),exports);return exports;}
+  new Function('require','exports',code)(name=>name==='@/theme/mobile-theme'?mobileTheme:name==='./profile-styles'?load('src/components/profile/profile-styles.ts',{'@/components/discovery/ui':ui}):name==='react'?react:name==='@/components/delete-draft-action'?{DeleteDraftAction:'DeleteDraftAction'}:name==='@/components/branded-loading'?{BrandedLoading:'BrandedLoading'}:name==='react/jsx-runtime'?{jsx,jsxs:jsx,Fragment:'Fragment'}:name==='react-native'?native:name.endsWith('.png')?1:name in modules?modules[name]:(()=>{throw Error(name);})(),exports);return exports;}
 function all(tree,type){if(!tree||typeof tree!=='object')return [];return [...(tree.type===type?[tree]:[]),...[tree.props?.children].flat(Infinity).flatMap(t=>all(t,type))];}
 const uid='22222222-2222-4222-8222-222222222222';const journey={id:'real',title:'Hill journey',destination:'Ponmudi',cover:'https://test/cover.jpg',durationDays:1,stops:[{},{}]};
 function shared(routes=[]){return load('src/components/profile/profile-ui.tsx',{'expo-router':{useFocusEffect:()=>{},useRouter:()=>({canGoBack:()=>true,back:()=>routes.push('back'),push:r=>routes.push(r)})},'react-native-safe-area-context':{SafeAreaView:'SafeAreaView'},'@/components/discovery/ui':ui,'@/components/discovery/journey-photo':{JourneyPhoto:'JourneyPhoto'},'@/lib/discovery/model':{journeyFacts:j=>j.durationDays+' day · '+j.stops.length+' stops'}});}

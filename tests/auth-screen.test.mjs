@@ -2,12 +2,16 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import ts from 'typescript';
+// Execute the actual dependency-free shared theme in the component harness.
+const mobileTheme = {};
+new Function('exports', ts.transpileModule(readFileSync('src/theme/mobile-theme.ts', 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText)(mobileTheme);
+
 
 const jsx = (type, props) => ({ type, props });
 const compile = path => ts.transpileModule(readFileSync(path, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true } }).outputText;
 function load(path, modules) {
   const module = { exports: {} };
-  new Function('require', 'module', 'exports', compile(path))(name => {
+  new Function('require', 'module', 'exports', compile(path))(name => { if (name === '@/theme/mobile-theme') return mobileTheme; if (name === '@/components/auth/legacy-ui') return load('src/components/auth/legacy-ui.ts', { 'react-native': native });
     if (name.endsWith('.png')) return name;
     assert.ok(name in modules, `Unexpected dependency ${name}`);
     return modules[name];

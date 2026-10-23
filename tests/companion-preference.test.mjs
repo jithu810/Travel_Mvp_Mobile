@@ -2,10 +2,14 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import ts from 'typescript';
+// Execute the actual dependency-free shared theme in the component harness.
+const mobileTheme = {};
+new Function('exports', ts.transpileModule(readFileSync('src/theme/mobile-theme.ts', 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText)(mobileTheme);
+
 function load(file,deps={},timers={setTimeout,clearTimeout}) {
   const exports={};
   const output=ts.transpileModule(readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX}}).outputText;
-  new Function('require','exports','setTimeout','clearTimeout',output)(name=>{assert.ok(name in deps,name);return deps[name];},exports,timers.setTimeout,timers.clearTimeout);
+  new Function('require','exports','setTimeout','clearTimeout',output)(name=>{ if (name === '@/theme/mobile-theme') return mobileTheme; assert.ok(name in deps,name);return deps[name];},exports,timers.setTimeout,timers.clearTimeout);
   return exports;
 }
 const model=load('src/lib/companion/model.ts');

@@ -1,8 +1,9 @@
+import { theme, primaryControl } from '@/theme/mobile-theme';
 import type { ReactNode } from 'react';
 import { useRouter } from 'expo-router';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 
-export const colors = { paper: '#F5F3EC', ink: '#153E35', muted: '#65736A', green: '#708454', line: '#DEE2D7', white: '#FFFFFF', pale: '#E5EBD9' };
+export const colors = { paper: theme.background, ink: theme.text, muted: theme.muted, green: theme.accent, line: theme.border, white: theme.white, pale: theme.lavender };
 
 export function ScreenHeader({ title, back = false, right, compact = false }: { title: string; back?: boolean; right?: ReactNode; compact?: boolean }) {
   const router = useRouter();
@@ -15,7 +16,7 @@ export function ScreenHeader({ title, back = false, right, compact = false }: { 
   </View>;
 }
 export function Action({ label, onPress, disabled = false, accessibilityLabel, secondary = false, compact = false, vibrant = false, memorySheet = false }: { label: string; onPress: () => void; disabled?: boolean; accessibilityLabel?: string; secondary?: boolean; compact?: boolean; vibrant?: boolean; memorySheet?: boolean }) {
-  return <Pressable accessibilityRole="button" accessibilityLabel={accessibilityLabel ?? label} disabled={disabled} accessibilityState={{ disabled }} onPress={onPress} style={({ pressed }) => [ui.action, vibrant && ui.vibrantAction, memorySheet && ui.memoryAction, secondary && { backgroundColor: colors.pale }, (pressed || disabled) && { opacity: 0.75 }, compact && { minHeight: 44, paddingHorizontal: 14 }]}>
+  return <Pressable accessibilityRole="button" accessibilityLabel={accessibilityLabel ?? label} disabled={disabled} accessibilityState={{ disabled }} onPress={onPress} style={({ pressed }) => [ui.action, vibrant && ui.vibrantAction, memorySheet && ui.memoryAction, secondary && { backgroundColor: colors.pale, experimental_backgroundImage: 'none', borderColor: colors.line, boxShadow: 'none' }, (pressed || disabled) && { opacity: 0.75 }, compact && { minHeight: 44, paddingHorizontal: 14 }]}>
     <Text style={[ui.actionLabel, vibrant && ui.vibrantLabel, memorySheet && ui.memoryLabel, secondary && { color: colors.ink }]}>{label}</Text>
   </Pressable>;
 }
@@ -32,7 +33,7 @@ export function LoadingCards() {
   </View>;
 }
 export const ui = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.paper },
+  safe: { flex: 1, backgroundColor: colors.paper, experimental_backgroundImage: theme.backgroundGradient },
   page: { width: '100%', maxWidth: 560, flex: 1, alignSelf: 'center' },
   list: { paddingHorizontal: 22, paddingBottom: 30, flexGrow: 1 },
   header: { minHeight: 76, paddingHorizontal: 22, paddingVertical: 14, flexDirection: 'row', alignItems: 'center', gap: 12 },
@@ -47,10 +48,10 @@ export const ui = StyleSheet.create({
   heading: { fontSize: 32, lineHeight: 38, fontWeight: '700', letterSpacing: -1, color: colors.ink },
   sectionTitle: { fontSize: 21, lineHeight: 28, fontWeight: '700', color: colors.ink },
   body: { color: colors.muted, fontSize: 14, lineHeight: 22 },
-  action: { minHeight: 48, borderRadius: 14, backgroundColor: colors.ink, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 20 },
-  memoryAction: { minHeight: 50, borderRadius: 24, backgroundColor: '#6555CF', experimental_backgroundImage: 'linear-gradient(110deg, #AA54DB 0%, #7655DF 38%, #246BE0 100%)', borderWidth: 1, borderColor: '#DCD6FF', boxShadow: '0 4px 9px rgba(81, 76, 181, 0.22), inset 0 1px 2px rgba(255, 255, 255, 0.65)' },
+  action: { ...primaryControl, minHeight: 48, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 20 },
+  memoryAction: { ...primaryControl, minHeight: 50, borderRadius: 24 },
   memoryLabel: { fontSize: 18, fontWeight: '600' },
-  vibrantAction: { borderRadius: 20, backgroundColor: '#EA3C56', experimental_backgroundImage: 'linear-gradient(110deg, #FFB544 0%, #FF6438 32%, #FA2377 100%)', borderWidth: 1, borderColor: '#FFC0AD', boxShadow: '0 4px 10px rgba(238, 70, 98, 0.22), inset 0 1px 2px rgba(255, 255, 255, 0.65)' },
+  vibrantAction: { ...primaryControl, borderRadius: 24 },
   vibrantLabel: { fontSize: 16, fontWeight: '600', textShadowColor: 'rgba(79, 22, 23, 0.3)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 },
   actionLabel: { fontSize: 14, color: colors.white, fontWeight: '600' },
   message: { paddingVertical: 36, gap: 14 },

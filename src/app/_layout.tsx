@@ -1,3 +1,4 @@
+import { theme } from '@/theme/mobile-theme';
 import { MainNavigationFrame } from '@/components/floating-navigation';
 import { StartupLoading } from '@/components/startup-loading';
 import { View } from 'react-native';
@@ -12,10 +13,10 @@ export default function RootLayout() {
   return (
     <SessionProvider><ActionIntentProvider>
       <StatusBar style="dark" />
-      <View style={{ flex: 1 }}><MainNavigationFrame><Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: '#F5F3EC' } }}>
+      <View style={{ flex: 1 }}><MainNavigationFrame><Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: theme.background } }}>
         <Stack.Screen name="index" />
         <Stack.Screen name="discover" />
-        <Stack.Screen name="create" /><Stack.Screen name="search" /><Stack.Screen name="auth" /><Stack.Screen name="account" /><Stack.Screen name="draft/[id]" />
+        <Stack.Screen name="create" /><Stack.Screen name="search" /><Stack.Screen name="auth" options={{ contentStyle: { backgroundColor: '#F5F3EC' } }} /><Stack.Screen name="account" /><Stack.Screen name="draft/[id]" />
         <Stack.Screen name="journey/[id]" />
         <Stack.Screen name="travel/[id]" />
         <Stack.Screen name="profile/edit" /><Stack.Screen name="profile/[username]" />

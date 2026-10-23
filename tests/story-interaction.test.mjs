@@ -2,6 +2,10 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import ts from 'typescript';
+// Execute the actual dependency-free shared theme in the component harness.
+const mobileTheme = {};
+new Function('exports', ts.transpileModule(readFileSync('src/theme/mobile-theme.ts', 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText)(mobileTheme);
+
 
 const jsx = (type, props) => ({ type, props });
 function harness(runEffects = true) {
@@ -38,6 +42,7 @@ function load(path, modules, hooks = harness(false).hooks, timers = globalThis) 
   }).outputText;
   const module = { exports: {} };
   const require = name => {
+    if (name === '@/theme/mobile-theme') return mobileTheme;
     if(name==='@/lib/journey/nearby')return load('src/lib/journey/nearby.ts',{}); if(name.endsWith('/nearby-locations'))return {NearbyLocations:'NearbyLocations'}; if (name === 'react/jsx-runtime') return { jsx, jsxs: jsx };
     if (name === 'react') return hooks;
     if (name === 'expo-router') return { useFocusEffect: fn => hooks.useEffect(fn, [fn]), ...modules[name] };

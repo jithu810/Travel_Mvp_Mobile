@@ -1,3 +1,4 @@
+import { theme, primaryControl } from '@/theme/mobile-theme';
 import { BrandedLoading } from '@/components/branded-loading';
 import { PlacePicker } from '@/components/create/place-picker';
 import type { Place } from '@/lib/create/model';
@@ -49,7 +50,7 @@ export default function DiscoverScreen() {
   const locate = useCallback((id: string) => { setPlace(null); dismissSearch(); setSelectedId(id); setLocateVersion(version => version + 1); }, [dismissSearch]);
   useFocusEffect(useCallback(() => {
     if (Platform.OS === 'web') return;
-    const entry = StatusBar.pushStackEntry({ barStyle: 'light-content' });
+    const entry = StatusBar.pushStackEntry({ barStyle: 'dark-content' });
     return () => StatusBar.popStackEntry(entry);
   }, []));
   // Coordinates are only in public detail. Resolve one explicit selection, never N+1 card requests.
@@ -93,23 +94,23 @@ export default function DiscoverScreen() {
   </SafeAreaView>;
 }
 const s = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: spaceColor },
+  safe: { flex: 1, backgroundColor: theme.background },
   page: { flex: 1, width: '100%', maxWidth: 900, alignSelf: 'center' },
-  header: { minHeight: 52, paddingHorizontal: 18, paddingVertical: 6, flexDirection: 'row', alignItems: 'center', gap: 8, zIndex: 10 },
+  header: { backgroundColor: theme.background, minHeight: 52, paddingHorizontal: 18, paddingVertical: 6, flexDirection: 'row', alignItems: 'center', gap: 8, zIndex: 10 },
   // Keep the touch area large; only the inner painted surface is compact.
   search: { flex: 1, minWidth: 0, minHeight: 44, justifyContent: 'center' },
   iconButton: { width: 44, minHeight: 44, flexShrink: 0, alignItems: 'center', justifyContent: 'center' },
   bell: { width: 22, height: 22, alignItems: 'center', justifyContent: 'center' },
-  bellBody: { width: 14, height: 15, borderWidth: 1.8, borderColor: '#C3CED9', borderTopLeftRadius: 9, borderTopRightRadius: 9 },
-  bellRim: { width: 20, height: 2, backgroundColor: '#C3CED9' },
-  bellClapper: { width: 4, height: 2, marginTop: 2, borderRadius: 3, backgroundColor: '#C3CED9' },
+  bellBody: { width: 14, height: 15, borderWidth: 1.8, borderColor: theme.muted, borderTopLeftRadius: 9, borderTopRightRadius: 9 },
+  bellRim: { width: 20, height: 2, backgroundColor: theme.muted },
+  bellClapper: { width: 4, height: 2, marginTop: 2, borderRadius: 3, backgroundColor: theme.muted },
   banner: { position: 'absolute', left: 16, right: 16, zIndex: 3, minHeight: 54, borderRadius: 20, paddingHorizontal: 12, paddingVertical: 4,
-    flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 6, backgroundColor: '#132642', borderWidth: 1, borderColor: '#395273' },
+    flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 6, backgroundColor: theme.surface, borderWidth: 1, borderColor: theme.border },
   bannerCopy: { flexGrow: 1, flexShrink: 1, flexBasis: 130, gap: 2 },
-  bannerTitle: { color: '#F5F8FF', fontSize: 12, fontWeight: '600' },
-  bannerSubtitle: { color: '#B5C6DE', fontSize: 10 },
-  bannerAction: { minHeight: 44, borderRadius: 24, paddingHorizontal: 12, justifyContent: 'center', backgroundColor: '#D3E5FF' },
-  bannerActionText: { color: '#174CA2', fontSize: 11, fontWeight: '700' },
+  bannerTitle: { color: theme.text, fontSize: 12, fontWeight: '600' },
+  bannerSubtitle: { color: theme.muted, fontSize: 10 },
+  bannerAction: { ...primaryControl, minHeight: 44, borderRadius: 24, paddingHorizontal: 12, justifyContent: 'center' },
+  bannerActionText: { color: theme.white, fontSize: 11, fontWeight: '700' },
   exploration: { flex: 1 },
   map: { position: 'absolute', top: 0, bottom: 0, left: 0, right: 0, backgroundColor: spaceColor },
 });

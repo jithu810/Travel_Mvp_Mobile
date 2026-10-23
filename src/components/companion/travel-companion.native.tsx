@@ -1,3 +1,4 @@
+import { theme } from '@/theme/mobile-theme';
 import { requireOptionalNativeModule } from 'expo';
 import { Component, useCallback, useEffect, useRef, useState, type ComponentType, type ReactNode } from 'react';
 import { Animated, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -103,12 +104,12 @@ const styles = StyleSheet.create({
   anchor: { position: 'absolute', top: COMPANION.top, right: COMPANION.right, width: COMPANION.width },
   mascot: { width: COMPANION.width, height: 140 },
   canvas: { flex: 1, backgroundColor: 'transparent' },
-  control: { minHeight: 44, width: COMPANION.width, alignItems: 'center', justifyContent: 'center', borderRadius: 22, backgroundColor: '#F5F3EC' },
+  control: { minHeight: 44, width: COMPANION.width, alignItems: 'center', justifyContent: 'center', borderRadius: 22, backgroundColor: theme.surface },
   restore: { width: 44, alignSelf: 'flex-end' },
-  icon: { fontSize: 24, color: '#153E35' },
-  text: { fontSize: 13, lineHeight: 19, color: '#153E35' },
+  icon: { fontSize: 24, color: theme.text },
+  text: { fontSize: 13, lineHeight: 19, color: theme.text },
   bubble: { position: 'absolute', top: COMPANION.top, right: COMPANION.right + COMPANION.width + 8, width: 144,
-    maxHeight: 180, borderRadius: 16, padding: 8, backgroundColor: '#F5F3EC' },
+    maxHeight: 180, borderRadius: 16, padding: 8, backgroundColor: theme.surface },
   message: { flexShrink: 1 },
   close: { minHeight: 44, alignItems: 'center', justifyContent: 'center' },
 });

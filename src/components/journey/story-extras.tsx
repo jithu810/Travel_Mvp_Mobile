@@ -1,3 +1,4 @@
+import { theme } from '@/theme/mobile-theme';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import type { PublicJourney } from '@/types/journey';
 import { futureActions, storySnapshot } from '@/lib/journey/snapshot';
@@ -30,6 +31,6 @@ const styles = StyleSheet.create({
   signals: { fontSize: 13, lineHeight: 21, color: colors.ink },
   actions: { gap: 10, paddingTop: 24, borderTopWidth: 1, borderColor: colors.line },
   actionRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 4 },
-  action: { minHeight: 44, justifyContent: 'center', paddingHorizontal: 13, paddingVertical: 10, borderRadius: 12, borderWidth: 1, borderColor: colors.line, backgroundColor: '#EEEEE7' },
+  action: { minHeight: 44, justifyContent: 'center', paddingHorizontal: 13, paddingVertical: 10, borderRadius: 12, borderWidth: 1, borderColor: colors.line, backgroundColor: theme.inset },
   actionLabel: { fontSize: 12, color: colors.muted },
 });

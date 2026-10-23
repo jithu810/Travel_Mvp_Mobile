@@ -1,3 +1,4 @@
+import { theme } from '@/theme/mobile-theme';
 import type { ReactNode } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -12,7 +13,7 @@ export function StorySheet({ visible, title, subtitle, onClose, children, scroll
   </Modal>;
 }
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.paper },
+  safe: { flex: 1, backgroundColor: colors.paper, experimental_backgroundImage: theme.backgroundGradient },
   header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 18, paddingVertical: 8, gap: 12 },
   heading: { flex: 1, minWidth: 0, gap: 2 },
   title: { color: colors.ink, fontSize: 20, lineHeight: 27, fontWeight: '700' },

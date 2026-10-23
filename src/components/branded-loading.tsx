@@ -1,3 +1,4 @@
+import { theme } from '@/theme/mobile-theme';
 import { useEffect, useState } from 'react';
 import { AccessibilityInfo, ActivityIndicator, Animated, AppState, Image, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -36,15 +37,15 @@ export function BrandedLoading({ message = 'Preparing your journeyâ€¦', comp
   </SafeAreaView>;
 }
 const s = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: '#071325', justifyContent: 'center', alignItems: 'center' },
+  screen: { flex: 1, backgroundColor: theme.background, justifyContent: 'center', alignItems: 'center' },
   overlay: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, zIndex: 100, elevation: 30 },
   compact: { minHeight: 72, padding: 8 },
   content: { alignItems: 'center', justifyContent: 'center', gap: 16, padding: 12, maxWidth: 340 },
   compactContent: { flexDirection: 'row', gap: 8, padding: 4, maxWidth: '100%' },
-  halo: { width: 148, height: 148, borderRadius: 74, alignItems: 'center', justifyContent: 'center', backgroundColor: '#102844', borderWidth: 1, borderColor: '#214864' },
+  halo: { width: 148, height: 148, borderRadius: 74, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.lavender, borderWidth: 1, borderColor: theme.border },
   smallHalo: { width: 56, height: 56, borderRadius: 28 },
   logo: { width: 116, height: 116 }, smallLogo: { width: 44, height: 44 },
-  label: { color: '#D7E6F6', fontSize: 14, lineHeight: 21, textAlign: 'center' },
+  label: { color: theme.text, fontSize: 14, lineHeight: 21, textAlign: 'center' },
   smallLabel: { flexShrink: 1, fontSize: 11, lineHeight: 16 },
-  stillIndicator: { width: 24, height: 3, borderRadius: 2, backgroundColor: '#69D8FA' },
+  stillIndicator: { width: 24, height: 3, borderRadius: 2, backgroundColor: theme.accent },
 });

@@ -1,3 +1,4 @@
+import { theme } from '@/theme/mobile-theme';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Keyboard, Modal, ScrollView, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { colors, ui } from '../discovery/ui';
@@ -42,7 +43,7 @@ export function PlacePicker({ label, memorySheet = false, premium = false, homeS
   if (homeSearch) return <View style={styles.homeWrap}>
     <Pressable accessibilityRole="button" accessibilityLabel="Focus place search" onPress={() => input.current?.focus()} style={styles.homeTarget}><View style={styles.homeSurface}><Text accessible={false} style={styles.homeGlyph}>⌕</Text>
       <TextInput ref={input} accessibilityLabel={label} editable={!disabled} value={query} onChangeText={change}
-        onFocus={() => setFocusEpoch(dismissVersion)} maxLength={200} placeholder="Search destinations & places..." placeholderTextColor="#C3CED9"
+        onFocus={() => setFocusEpoch(dismissVersion)} maxLength={200} placeholder="Search destinations & places..." placeholderTextColor={theme.muted}
         autoCorrect={false} style={styles.homeInput} returnKeyType="search" submitBehavior="submit" onSubmitEditing={() => { void search(); }} />
     </View></Pressable>
     {focusEpoch === dismissVersion && <View style={styles.homeResults}>
@@ -95,12 +96,12 @@ const styles = StyleSheet.create({ ...formStyles,
   memorySearchLabel: { color: '#FFFFFF' },
   raisedInput: { borderRadius: 24, backgroundColor: colors.white, boxShadow: '0 3px 5px rgba(57, 49, 29, 0.15)' },
   premiumInput: { borderColor: '#EDEBE5', borderRadius: 24 },
-  premiumSearch: { backgroundColor: '#DDF2D4', borderRadius: 18, borderColor: '#FFFFFF', boxShadow: '0 3px 5px rgba(57, 49, 29, 0.13), inset 0 1px 2px rgba(255, 255, 255, 0.8)' },
+  premiumSearch: { backgroundColor: theme.lavender, borderRadius: 18, borderColor: '#FFFFFF', boxShadow: '0 3px 5px rgba(57, 49, 29, 0.13), inset 0 1px 2px rgba(255, 255, 255, 0.8)' },
   homeTarget: { minHeight: 44, justifyContent: 'center' },
   homeWrap: { minHeight: 44, justifyContent: 'center' },
-  homeSurface: { minHeight: 42, flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 8, borderRadius: 24, backgroundColor: 'rgba(36, 52, 76, 0.82)', borderWidth: 1, borderColor: 'rgba(52, 66, 84, 0.75)' },
-  homeGlyph: { fontSize: 18, lineHeight: 20, includeFontPadding: false, color: '#DDE6EF' },
-  homeInput: { flex: 1, minWidth: 0, paddingVertical: 6, fontSize: 12, lineHeight: 18, color: '#DDE6EF' },
+  homeSurface: { minHeight: 42, flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 8, borderRadius: 24, backgroundColor: theme.surface, boxShadow: theme.shadow, borderWidth: 1, borderColor: theme.white },
+  homeGlyph: { fontSize: 18, lineHeight: 20, includeFontPadding: false, color: theme.text },
+  homeInput: { flex: 1, minWidth: 0, paddingVertical: 6, fontSize: 12, lineHeight: 18, color: theme.text },
   homeResults: { position: 'absolute', top: '100%', left: 0, right: 0, padding: 6, borderRadius: 16, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.paper, zIndex: 20, elevation: 12 },
   inputWrap: { flexGrow: 1, flexShrink: 1, flexBasis: 120, minWidth: 0 },
   embeddedInput: { width: '100%', flexGrow: 0, flexShrink: 0, flexBasis: 'auto', paddingLeft: 36 },

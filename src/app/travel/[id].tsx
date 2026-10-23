@@ -1,3 +1,4 @@
+import { primaryControl } from '@/theme/mobile-theme';
 import { BrandedLoading } from '@/components/branded-loading';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useMemo, useRef, useState } from 'react';
@@ -200,12 +201,12 @@ const styles = StyleSheet.create({
   rerouteStatus: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   routeRetry: { minHeight: 44, paddingHorizontal: 10, justifyContent: 'center', borderRadius: 12, backgroundColor: colors.pale },
   completion: { gap: 6, paddingVertical: 8 },
-  completeButton: { minHeight: 48, padding: 10, borderRadius: 14, backgroundColor: colors.ink, alignItems: 'center', justifyContent: 'center' },
+  completeButton: { ...primaryControl, minHeight: 48, padding: 10, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
   progress: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8 },
   stopName: { color: colors.ink, fontSize: 16, lineHeight: 22, fontWeight: '600' },
   routeNote: { color: colors.muted, fontSize: 11, lineHeight: 17 },
   actions: { flexDirection: 'row', gap: 8, marginTop: 4 },
-  begin: { flex: 1, minHeight: 44, paddingVertical: 8, paddingHorizontal: 12, borderRadius: 14, backgroundColor: colors.ink, alignItems: 'center', justifyContent: 'center' },
+  begin: { ...primaryControl, flex: 1, minHeight: 44, paddingVertical: 8, paddingHorizontal: 12, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
   finish: { flex: 1, minHeight: 44, borderRadius: 14, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.paper, alignItems: 'center', justifyContent: 'center', paddingVertical: 8, paddingHorizontal: 12 },
   beginLabel: { color: colors.white, fontSize: 13, lineHeight: 18, fontWeight: '600', textAlign: 'center' },
   locationAction: { minHeight: 44, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 8 },
