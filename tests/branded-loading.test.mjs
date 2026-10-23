@@ -2,6 +2,10 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import ts from 'typescript';
+// Execute the actual dependency-free shared theme in the component harness.
+const mobileTheme = {};
+new Function('exports', ts.transpileModule(readFileSync('src/theme/mobile-theme.ts', 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText)(mobileTheme);
+
 function harness() {
   const slots=[]; let cursor=0,effects=[],serial=0;
   const timers=new Map();
@@ -21,7 +25,7 @@ function harness() {
 function load(file,h,modules={}) {
   const exports={};const jsx=(type,props)=>({type,props});
   const code=ts.transpileModule(readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX,target:ts.ScriptTarget.ES2022}}).outputText;
-  new Function('require','exports','setTimeout','clearTimeout',code)(name=>{
+  new Function('require','exports','setTimeout','clearTimeout',code)(name=>{ if (name === '@/theme/mobile-theme') return mobileTheme;
     if(name==='react')return h.react;if(name==='react/jsx-runtime')return {jsx,jsxs:jsx};if(name.endsWith('.png'))return name;
     if(name in modules)return modules[name];throw Error(name);
   },exports,h.setTimeout,h.clearTimeout);return exports;

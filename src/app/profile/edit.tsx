@@ -1,3 +1,4 @@
+import { theme } from '@/theme/mobile-theme';
 import { BrandedLoading } from '@/components/branded-loading';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useFocusEffect, useNavigation, useRouter } from 'expo-router';
@@ -15,7 +16,7 @@ import { loadOwnProfile, updateOwnProfile, uploadProfileAvatar } from '@/lib/pro
 function EditHeader({ onBack }: { onBack: () => void }) {
   useFocusEffect(useCallback(() => {
     if (Platform.OS === 'web') return;
-    const entry = StatusBar.pushStackEntry({ barStyle: 'light-content' });
+    const entry = StatusBar.pushStackEntry({ barStyle: 'dark-content' });
     return () => StatusBar.popStackEntry(entry);
   }, []));
   return <SafeAreaView edges={['top']} style={s.navy}><View style={s.header}>
@@ -125,10 +126,10 @@ export default function EditProfileScreen() {
   </View></View></SafeAreaView>;
 }
 const s = StyleSheet.create({
-  grow: { flex: 1, minHeight: 0 }, navy: { backgroundColor: '#0D1D2C' }, header: { minHeight: 60, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12 },
-  back: { width: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' }, backText: { color: '#A8EABB', fontSize: 32, lineHeight: 36 }, heading: { flex: 1, color: '#FFFEFA', fontSize: 20, fontWeight: '700', textAlign: 'center' },
+  grow: { flex: 1, minHeight: 0 }, navy: { backgroundColor: theme.background }, header: { minHeight: 60, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12 },
+  back: { width: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' }, backText: { color: theme.accent, fontSize: 32, lineHeight: 36 }, heading: { flex: 1, color: theme.text, fontSize: 20, fontWeight: '700', textAlign: 'center' },
   content: { padding: 18, gap: 14 }, avatarArea: { alignItems: 'center', gap: 4 }, avatar: { width: 104, height: 104, borderRadius: 52, overflow: 'hidden', backgroundColor: colors.pale, alignItems: 'center', justifyContent: 'center', borderWidth: 3, borderColor: colors.white },
-  initial: { color: colors.ink, fontSize: 36, fontWeight: '600' }, photoButton: { minHeight: 44, paddingHorizontal: 18, justifyContent: 'center', backgroundColor: '#E5EFE4', borderRadius: 22, marginTop: 8 }, photoLabel: { color: colors.ink, fontWeight: '600', fontSize: 14 }, remove: { minHeight: 44, justifyContent: 'center' },
-  form: { gap: 8 }, label: { color: colors.ink, fontSize: 14, fontWeight: '600', marginTop: 4 }, input: { minHeight: 48, borderRadius: 16, borderWidth: 1, borderColor: colors.line, backgroundColor: '#FFFEFA', paddingHorizontal: 14, paddingVertical: 10, color: colors.ink, fontSize: 15 }, bio: { minHeight: 88 },
+  initial: { color: colors.ink, fontSize: 36, fontWeight: '600' }, photoButton: { minHeight: 44, paddingHorizontal: 18, justifyContent: 'center', backgroundColor: theme.lavender, borderRadius: 22, marginTop: 8 }, photoLabel: { color: colors.ink, fontWeight: '600', fontSize: 14 }, remove: { minHeight: 44, justifyContent: 'center' },
+  form: { gap: 8 }, label: { color: colors.ink, fontSize: 14, fontWeight: '600', marginTop: 4 }, input: { minHeight: 48, borderRadius: 16, borderWidth: 1, borderColor: colors.line, backgroundColor: theme.surface, paddingHorizontal: 14, paddingVertical: 10, color: colors.ink, fontSize: 15 }, bio: { minHeight: 88 },
   hint: { color: colors.muted, fontSize: 12, lineHeight: 18, textAlign: 'center' }, counter: { color: colors.muted, fontSize: 12, textAlign: 'right' }, error: { color: '#8B3933', fontSize: 14, lineHeight: 21 }, success: { color: colors.ink, fontSize: 14, lineHeight: 21, fontWeight: '600' }, footer: { paddingHorizontal: 18, paddingVertical: 10, gap: 8, backgroundColor: colors.paper },
 });

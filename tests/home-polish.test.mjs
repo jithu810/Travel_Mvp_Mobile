@@ -2,6 +2,10 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { readFileSync } from 'node:fs';
 import ts from 'typescript';
+// Execute the actual dependency-free shared theme in the component harness.
+const mobileTheme = {};
+new Function('exports', ts.transpileModule(readFileSync('src/theme/mobile-theme.ts', 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText)(mobileTheme);
+
 
 function load(file, dependencies, state = null) {
   const exports = {};
@@ -10,7 +14,7 @@ function load(file, dependencies, state = null) {
   const rn = { StyleSheet: { create: value => value }, Platform: { OS: 'web' }, StatusBar: {} };
   for (const name of ['View', 'Text', 'Pressable', 'Image']) rn[name] = name;
   const source = ts.transpileModule(readFileSync(file, 'utf8'), { compilerOptions: { jsx: ts.JsxEmit.ReactJSX, module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
-  new Function('require', 'exports', source)(name => {
+  new Function('require', 'exports', source)(name => { if (name === '@/theme/mobile-theme') return mobileTheme;
     if (name === 'react') return react;
     if (name === 'react/jsx-runtime') return { jsx, jsxs: jsx, Fragment: 'Fragment' };
     if (name === 'react-native') return { ...rn, ...dependencies[name] };

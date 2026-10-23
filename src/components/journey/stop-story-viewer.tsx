@@ -1,7 +1,8 @@
+import { theme } from '@/theme/mobile-theme';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Modal, PanResponder, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { JourneyPhoto } from '@/components/discovery/journey-photo';
 import { colors } from '@/components/discovery/ui';
 import type { PublicJourney } from '@/types/journey';
@@ -10,6 +11,7 @@ export function StopStoryViewer({ journey, selectedId, onSelect, onClose, onMap 
   journey: PublicJourney; selectedId: string | null; onSelect: (id: string) => void; onClose: () => void; onMap: () => void;
 }) {
   const { height } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
   const [notesId, setNotesId] = useState<string | null>(null);
   const index = journey.stops.findIndex(stop => stop.id === selectedId);
   const stop = journey.stops[index];
@@ -42,8 +44,9 @@ export function StopStoryViewer({ journey, selectedId, onSelect, onClose, onMap 
   }), [shouldSwipe, finishSwipe]);
   return <Modal visible animationType="fade" presentationStyle="fullScreen" onRequestClose={() => expanded ? setNotesId(null) : onClose()}>
     <View style={styles.screen} testID="stop-story-viewer">
-      <StatusBar style="light" />
+      <StatusBar style="dark" />
       {stop && <View style={styles.photo}><JourneyPhoto uri={stop.photo} label={stop.name + ' photo'} fill /></View>}
+      <View pointerEvents="none" style={[styles.statusBarBacking, { height: insets.top }]} />
       <SafeAreaView style={styles.safe}>
         <View style={styles.header}>
           <View accessible accessibilityRole="progressbar" accessibilityLabel="Journey stop progress" accessibilityValue={{ min: 1, max: Math.max(1, journey.stops.length), now: Math.max(1, index + 1), text: stop ? 'Stop ' + (index + 1) + ' of ' + journey.stops.length : 'No stops available' }} style={styles.progress}>
@@ -82,17 +85,18 @@ export function StopStoryViewer({ journey, selectedId, onSelect, onClose, onMap 
   </Modal>;
 }
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: colors.ink }, photo: { position: 'absolute', top: 0, bottom: 0, left: 0, right: 0 },
-  safe: { flex: 1 }, header: { padding: 12, gap: 8, backgroundColor: 'rgba(5,28,24,0.75)' },
-  progress: { flexDirection: 'row', gap: 3, height: 3 }, segment: { flex: 1, backgroundColor: 'rgba(245,243,236,0.35)', borderRadius: 2 }, completed: { backgroundColor: '#A9BA91' }, current: { backgroundColor: colors.paper },
+  screen: { flex: 1, backgroundColor: theme.background }, photo: { position: 'absolute', top: 0, bottom: 0, left: 0, right: 0 },
+  statusBarBacking: { position: 'absolute', top: 0, left: 0, right: 0, backgroundColor: theme.surface },
+  safe: { flex: 1 }, header: { padding: 12, gap: 8, backgroundColor: theme.surface },
+  progress: { flexDirection: 'row', gap: 3, height: 3 }, segment: { flex: 1, backgroundColor: theme.border, borderRadius: 2 }, completed: { backgroundColor: theme.accent }, current: { backgroundColor: theme.navigation },
   topRow: { flexDirection: 'row', alignItems: 'center', gap: 12 }, context: { flex: 1, minWidth: 0, gap: 3 },
-  journeyName: { color: colors.paper, fontSize: 14, lineHeight: 20, fontWeight: '600' }, position: { color: '#DEE8D3', fontSize: 11, lineHeight: 17 },
-  close: { width: 44, minHeight: 44, borderRadius: 22, backgroundColor: 'rgba(245,243,236,0.14)', alignItems: 'center', justifyContent: 'center' }, closeLabel: { color: colors.paper, fontSize: 18 },
+  journeyName: { color: theme.text, fontSize: 14, lineHeight: 20, fontWeight: '600' }, position: { color: theme.muted, fontSize: 11, lineHeight: 17 },
+  close: { width: 44, minHeight: 44, borderRadius: 22, backgroundColor: theme.lavender, alignItems: 'center', justifyContent: 'center' }, closeLabel: { color: theme.text, fontSize: 18 },
   imageArea: { flex: 1, minHeight: 44 }, tapAreas: { flex: 1, flexDirection: 'row' }, tapZone: { flex: 1 },
-  caption: { paddingHorizontal: 18, paddingTop: 14, paddingBottom: 10, gap: 6, backgroundColor: 'rgba(5,28,24,0.85)' },
-  title: { color: colors.paper, fontSize: 26, lineHeight: 32, letterSpacing: -0.6, fontWeight: '700' }, destination: { color: '#D7E0CA', fontSize: 12, lineHeight: 18 },
-  readDescription: { minHeight: 44, gap: 4, paddingVertical: 4 }, excerpt: { color: colors.paper, fontSize: 14, lineHeight: 21 }, readMore: { color: '#CCDAB7', fontSize: 12, lineHeight: 18, fontWeight: '600' },
-  navigation: { flexDirection: 'row', justifyContent: 'space-between', gap: 4 }, navigationButton: { minWidth: 44, minHeight: 44, justifyContent: 'center', paddingHorizontal: 8 }, navigationLabel: { color: colors.paper, fontSize: 12, lineHeight: 19, fontWeight: '600' }, disabled: { opacity: 0.4 },
+  caption: { paddingHorizontal: 18, paddingTop: 14, paddingBottom: 10, gap: 6, backgroundColor: theme.surface },
+  title: { color: theme.text, fontSize: 26, lineHeight: 32, letterSpacing: -0.6, fontWeight: '700' }, destination: { color: theme.muted, fontSize: 12, lineHeight: 18 },
+  readDescription: { minHeight: 44, gap: 4, paddingVertical: 4 }, excerpt: { color: theme.text, fontSize: 14, lineHeight: 21 }, readMore: { color: theme.accent, fontSize: 12, lineHeight: 18, fontWeight: '600' },
+  navigation: { flexDirection: 'row', justifyContent: 'space-between', gap: 4 }, navigationButton: { minWidth: 44, minHeight: 44, justifyContent: 'center', paddingHorizontal: 8 }, navigationLabel: { color: theme.text, fontSize: 12, lineHeight: 19, fontWeight: '600' }, disabled: { opacity: 0.4 },
   notes: { position: 'absolute', left: 0, right: 0, bottom: 0, backgroundColor: colors.paper, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 18 },
   notesHeader: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 12 }, notesTitle: { flex: 1, color: colors.ink, fontSize: 19, lineHeight: 25, fontWeight: '700' },
   notesClose: { minHeight: 44, paddingHorizontal: 14, justifyContent: 'center', backgroundColor: colors.pale, borderRadius: 22 }, notesCloseLabel: { color: colors.ink, fontSize: 13, fontWeight: '600' },

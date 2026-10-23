@@ -1,3 +1,4 @@
+import { theme } from '@/theme/mobile-theme';
 import type { ReactNode } from 'react';
 import { ScrollView, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Action, colors } from '../discovery/ui';
@@ -8,7 +9,7 @@ export function QuickJourneySetup({ form, disabled, editing = false, saving = fa
   onChange: (patch: Partial<CreateForm>) => void; onStart: () => void;
 }) {
   const days = Number(form.days);
-  const accents = { solo: '#DDF2E8', couple: '#FBE8EA', friends: '#E5F0FC', family: '#FBF1DC' };
+  const accents = { solo: theme.lavender, couple: theme.lavender, friends: '#E5F0FC', family: theme.lavender };
   const symbols = { solo: '●', couple: '♥', friends: '♣', family: '⌂' };
   const fewerDisabled = disabled || !Number.isInteger(days) || days <= 1;
   const moreDisabled = disabled || !Number.isInteger(days) || days >= 365 || days < 1;
@@ -51,12 +52,12 @@ const s = StyleSheet.create({
   editLabel: { color: '#202C43', fontSize: 13, lineHeight: 19, fontWeight: '600' },
   editInput: { backgroundColor: '#F1F3F8', borderColor: '#FFFFFF', color: '#18243B', borderRadius: 18, boxShadow: 'inset 0 2px 4px rgba(35, 48, 78, 0.10)' },
   description: { minHeight: 76, textAlignVertical: 'top' },
-  setup: { gap: 6, flexShrink: 1, minHeight: 0, padding: 12, borderRadius: 28, backgroundColor: '#FCFBF8', borderWidth: 1, borderColor: '#FFFFFF', boxShadow: '0 3px 8px rgba(57, 49, 29, 0.16), inset 0 1px 2px rgba(255, 255, 255, 0.9)' },
+  setup: { gap: 6, flexShrink: 1, minHeight: 0, padding: 12, borderRadius: 28, backgroundColor: theme.surface, borderWidth: 1, borderColor: '#FFFFFF', boxShadow: '0 3px 8px rgba(57, 49, 29, 0.16), inset 0 1px 2px rgba(255, 255, 255, 0.9)' },
   controls: { flexGrow: 0, flexShrink: 1 },
   controlContent: { gap: 6 },
-  destinationCard: { gap: 6, padding: 0, borderRadius: 20, backgroundColor: '#FCFBF8' },
-  detailsCard: { gap: 10, padding: 0, borderRadius: 20, backgroundColor: '#FCFBF8' },
-  titleInput: { minHeight: 44, padding: 10, borderRadius: 16, backgroundColor: '#F1F0EC', borderColor: '#EAE8E1', boxShadow: 'inset 0 1px 3px rgba(85, 72, 49, 0.08)' },
+  destinationCard: { gap: 6, padding: 0, borderRadius: 20, backgroundColor: theme.surface },
+  detailsCard: { gap: 10, padding: 0, borderRadius: 20, backgroundColor: theme.surface },
+  titleInput: { minHeight: 44, padding: 10, borderRadius: 16, backgroundColor: theme.inset, borderColor: theme.border, boxShadow: 'inset 0 1px 3px rgba(85, 72, 49, 0.08)' },
   selectedPlace: { gap: 4, paddingTop: 4, borderTopWidth: 1, borderTopColor: colors.line },
   placeName: { color: colors.ink, fontSize: 13, lineHeight: 18, fontWeight: '600' },
   durationRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
@@ -65,8 +66,8 @@ const s = StyleSheet.create({
   chip: { minHeight: 44, paddingHorizontal: 8, flexDirection: 'row', alignItems: 'center', gap: 4, justifyContent: 'center', borderRadius: 16, backgroundColor: colors.pale, borderWidth: 1, borderColor: '#FFFFFF', boxShadow: '0 3px 5px rgba(53, 72, 56, 0.10)' },
   chipIcon: { color: colors.ink, fontSize: 13 },
   selected: { borderColor: '#326A8C', boxShadow: '0 0 0 1px #326A8C, 0 3px 5px rgba(50, 106, 140, 0.14)' }, chipText: { color: colors.ink, fontSize: 12, fontWeight: '600' }, selectedText: { color: '#163F57', fontWeight: '700' },
-  duration: { flexDirection: 'row', alignItems: 'center', gap: 4 }, days: { minWidth: 64, minHeight: 44, padding: 8, textAlign: 'center', borderColor: '#FFFFFF', backgroundColor: '#FAF9F6', boxShadow: '0 2px 4px rgba(57, 49, 29, 0.14)' },
-  step: { minWidth: 44, minHeight: 44, borderRadius: 14, backgroundColor: '#F0F1EB', borderWidth: 1, borderColor: '#FFFFFF', boxShadow: '0 2px 4px rgba(57, 49, 29, 0.14)', alignItems: 'center', justifyContent: 'center' },
+  duration: { flexDirection: 'row', alignItems: 'center', gap: 4 }, days: { minWidth: 64, minHeight: 44, padding: 8, textAlign: 'center', borderColor: '#FFFFFF', backgroundColor: theme.surface, boxShadow: '0 2px 4px rgba(57, 49, 29, 0.14)' },
+  step: { minWidth: 44, minHeight: 44, borderRadius: 14, backgroundColor: theme.lavender, borderWidth: 1, borderColor: '#FFFFFF', boxShadow: '0 2px 4px rgba(57, 49, 29, 0.14)', alignItems: 'center', justifyContent: 'center' },
   dimmed: { opacity: 0.5 },
   stepText: { color: colors.ink, fontSize: 22 },
 });

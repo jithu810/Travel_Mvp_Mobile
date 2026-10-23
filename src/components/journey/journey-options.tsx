@@ -1,3 +1,4 @@
+import { primaryControl } from '@/theme/mobile-theme';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useCallback, useRef, useState, useSyncExternalStore } from 'react';
 import { useFocusEffect, useRouter } from 'expo-router';
@@ -80,7 +81,7 @@ const styles = StyleSheet.create({
   feedback: { minWidth: 44, minHeight: 44, justifyContent: 'center', alignItems: 'center' },
   card: { width: '100%', maxWidth: 300, padding: 6, borderRadius: 32, backgroundColor: colors.paper, borderWidth: 1, borderColor: colors.line, shadowColor: colors.ink, shadowOpacity: 0.16, shadowRadius: 14, shadowOffset: { width: 0, height: 5 }, elevation: 7 },
   buttons: { flexDirection: 'row', gap: 6 },
-  use: { flex: 1, minHeight: 44, paddingHorizontal: 12, paddingVertical: 10, borderRadius: 24, backgroundColor: colors.ink, alignItems: 'center', justifyContent: 'center' },
+  use: { ...primaryControl, flex: 1, minHeight: 44, paddingHorizontal: 12, paddingVertical: 10, borderRadius: 24, alignItems: 'center', justifyContent: 'center' },
   useLabel: { color: colors.white, fontSize: 13, lineHeight: 19, fontWeight: '600', textAlign: 'center' },
   remix: { flex: 1, minHeight: 44, paddingHorizontal: 16, paddingVertical: 10, borderRadius: 24, borderWidth: 1, borderColor: colors.ink, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.pale },
   remixLabel: { color: colors.ink, fontSize: 13, lineHeight: 19, fontWeight: '600', textAlign: 'center' },

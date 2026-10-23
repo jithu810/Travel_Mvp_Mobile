@@ -2,6 +2,10 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import ts from 'typescript';
+// Execute the actual dependency-free shared theme in the component harness.
+const mobileTheme = {};
+new Function('exports', ts.transpileModule(readFileSync('src/theme/mobile-theme.ts', 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText)(mobileTheme);
+
 function harness() {
   const slots = []; let cursor = 0, effects = [];
   const memo = (fn, deps) => { const i = cursor++; if (!slots[i] || deps.some((v,j) => slots[i].deps[j] !== v)) slots[i] = { value: fn(), deps }; return slots[i].value; };
@@ -18,7 +22,7 @@ const ui = { colors: {}, ui: {}, Action:'Action', Message:'Message', ScreenHeade
 function load(file, modules, hooks=harness().hooks, timers=globalThis) {
   const exports={}; const jsx=(type,props)=>({type,props});
   const code=ts.transpileModule(readFileSync(file,'utf8'), {compilerOptions:{module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX,target:ts.ScriptTarget.ES2022}}).outputText;
-  new Function('require','exports','setTimeout','clearTimeout',code)(name=>{
+  new Function('require','exports','setTimeout','clearTimeout',code)(name=>{ if (name === '@/theme/mobile-theme') return mobileTheme;
     if(name==='@/lib/journey/nearby')return load('src/lib/journey/nearby.ts',{}); if(name.endsWith('/nearby-locations'))return {NearbyLocations:'NearbyLocations'}; if(name==='@/components/branded-loading')return {BrandedLoading:'BrandedLoading'};if(name==='@/lib/discovery/destination-camera')return destinationHelpers;if(name==='@/hooks/use-discovery-sheet')return modules[name] || {useDiscoverySheet:()=>({height:56,expanded:true,responders:{handle:{},content:{}},offset:{current:0},setScrollOffset(){},toggle(){}})};if(name==='@/components/create/create-journey-header')return {CreateJourneyHeader:'CreateJourneyHeader'};if(name==='react')return hooks;if(name==='react/jsx-runtime')return {jsx,jsxs:jsx,Fragment:'Fragment'};
     if(name==='react-native')return {...native,...modules[name]};if(name in modules)return modules[name];throw Error(name);
   },exports,timers.setTimeout,timers.clearTimeout);return exports;
@@ -454,7 +458,9 @@ test('reference journey editor uses only the actual cover and keeps all main act
   assert.equal(saveSlot.props.style.minWidth,0);assert.equal(publishStyle.minWidth,0);
   assert.equal(publishStyle.minHeight,44);assert.equal(publishStyle.alignItems,'center');
   assert.equal(all(publish,'Text')[0].props.style[0].textAlign,'center');
-  assert.equal(publish.props.style({pressed:false})[1].backgroundColor,'#F1F2EB','Unavailable publish remains visually distinct');
+  assert.equal(publish.props.style({pressed:false})[1].backgroundColor,mobileTheme.theme.inset,'Unavailable publish remains visually distinct');
+  assert.equal(publish.props.style({pressed:false})[1].experimental_backgroundImage,'none','Disabled publish clears the primary gradient');
+  assert.equal(publish.props.style({pressed:false})[1].boxShadow,'none','Disabled publish clears the primary shadow');
   assert.equal(footer.props.style.flexShrink,0);assert.equal(footer.props.style.paddingHorizontal,16);
   for(const width of [320,360,393,412]) {
     const cell=(width-2*footer.props.style.paddingHorizontal-row.props.style.gap)/2;

@@ -1,3 +1,4 @@
+import { theme } from '@/theme/mobile-theme';
 import { StyleSheet, Text, View } from 'react-native';
 import { colors } from '@/components/discovery/ui';
 import { guidanceDistance, maneuverIcon, type Guidance } from '@/lib/journey/turn-guidance';
@@ -19,7 +20,7 @@ export function ManeuverPanel({ guidance, message }: { guidance?: Guidance | nul
   </View>;
 }
 const styles = StyleSheet.create({
-  panel: { flexDirection: 'row', gap: 10, padding: 12, borderRadius: 18, backgroundColor: colors.ink, alignItems: 'center' },
+  panel: { flexDirection: 'row', gap: 10, padding: 12, borderRadius: 18, backgroundColor: theme.navigation, alignItems: 'center' },
   content: { flex: 1, minWidth: 0, gap: 2 },
   icon: { color: colors.white, fontSize: 30, width: 34, textAlign: 'center' },
   distance: { color: colors.white, fontSize: 12, lineHeight: 17, fontWeight: '700' },

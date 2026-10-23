@@ -5,11 +5,14 @@ import { test } from 'node:test';
 import ts from 'typescript';
 import { AnimationMixer, Box3, Texture, Vector3 } from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+// Execute the actual dependency-free shared theme in the component harness.
+const mobileTheme = {};
+new Function('exports', ts.transpileModule(readFileSync('src/theme/mobile-theme.ts', 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText)(mobileTheme);
 
 function load(file, deps = {}) {
   const exports = {};
   const source = ts.transpileModule(readFileSync(file, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, target: ts.ScriptTarget.ES2022 } }).outputText;
-  new Function('require', 'exports', source)(name => { assert.ok(name in deps, name); return deps[name]; }, exports);
+  new Function('require', 'exports', source)(name => { if (name === '@/theme/mobile-theme') return mobileTheme;  assert.ok(name in deps, name); return deps[name]; }, exports);
   return exports;
 }
 const model = load('src/lib/companion/model.ts');

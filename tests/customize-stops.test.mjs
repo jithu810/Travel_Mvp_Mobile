@@ -2,10 +2,14 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { readFileSync } from 'node:fs';
 import ts from 'typescript';
+// Execute the actual dependency-free shared theme in the component harness.
+const mobileTheme = {};
+new Function('exports', ts.transpileModule(readFileSync('src/theme/mobile-theme.ts', 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText)(mobileTheme);
+
 function load(file, modules) {
   const exports = {};
   const code = ts.transpileModule(readFileSync(file, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, target: ts.ScriptTarget.ES2022 } }).outputText;
-  new Function('require', 'exports', code)(name => { if (name in modules) return modules[name]; throw new Error(name); }, exports);
+  new Function('require', 'exports', code)(name => { if (name === '@/theme/mobile-theme') return mobileTheme;  if (name in modules) return modules[name]; throw new Error(name); }, exports);
   return exports;
 }
 const coordinates = stop => Number.isFinite(stop.latitude) && Math.abs(stop.latitude) <= 90 && Number.isFinite(stop.longitude) && Math.abs(stop.longitude) <= 180;

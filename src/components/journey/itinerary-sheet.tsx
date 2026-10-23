@@ -1,3 +1,4 @@
+import { theme, raisedSurface } from '@/theme/mobile-theme';
 import { useMemo, useState, type ReactNode } from 'react';
 import { PanResponder, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { colors } from '@/components/discovery/ui';
@@ -31,7 +32,7 @@ export function ItinerarySheet({ title, subtitle, children, footer, compact = fa
   </View>;
 }
 const styles = StyleSheet.create({
-  sheet: { flexShrink: 0, borderRadius: 24, backgroundColor: colors.white, borderWidth: 1, borderColor: colors.line, overflow: 'hidden', elevation: 8, shadowColor: colors.ink, shadowOpacity: 0.15, shadowRadius: 16, shadowOffset: { width: 0, height: 4 } },
+  sheet: { ...raisedSurface, flexShrink: 0, borderRadius: 24, backgroundColor: theme.surface, borderWidth: 1, borderColor: colors.line, overflow: 'hidden', elevation: 8, shadowColor: colors.ink, shadowOpacity: 0.15, shadowRadius: 16, shadowOffset: { width: 0, height: 4 } },
   handle: { minHeight: 68, paddingHorizontal: 16, paddingTop: 7, paddingBottom: 10, gap: 6 },
   grip: { alignSelf: 'center', width: 32, height: 4, borderRadius: 2, backgroundColor: colors.line },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12 }, heading: { flex: 1, minWidth: 0 },

@@ -1,3 +1,4 @@
+import { theme } from '@/theme/mobile-theme';
 import { useState } from 'react';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { colors } from '../discovery/ui';
@@ -38,17 +39,17 @@ const s = StyleSheet.create({
   memoryIcon: { color: '#5360C5', fontSize: 26, lineHeight: 30 },
   memoryText: { color: '#202C43' },
   field: { gap: 8, padding: 12, borderRadius: 22, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.white },
-  coverField: { marginTop: -12, zIndex: 1, backgroundColor: '#FFFDFA', borderColor: '#FFFFFF', boxShadow: '0 3px 8px rgba(57, 49, 29, 0.13)' },
+  coverField: { marginTop: -12, zIndex: 1, backgroundColor: theme.surface, borderColor: '#FFFFFF', boxShadow: '0 3px 8px rgba(57, 49, 29, 0.13)' },
   coverSummary: { minHeight: 56, flexDirection: 'row', alignItems: 'center', gap: 12 },
   summaryCopy: { flex: 1, minWidth: 0, gap: 4 }, chevron: { color: colors.ink, fontSize: 24 },
   mediaRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, alignItems: 'flex-start' },
   preview: { width: 72, height: 72, borderRadius: 16, backgroundColor: colors.paper },
   coverPreview: { width: 52, height: 52, borderRadius: 16, backgroundColor: colors.paper },
-  coverPlaceholder: { width: 52, height: 52, backgroundColor: '#F6E6DF', borderWidth: 1, borderColor: '#FFFFFF' },
+  coverPlaceholder: { width: 52, height: 52, backgroundColor: theme.lavender, borderWidth: 1, borderColor: '#FFFFFF' },
   placeholder: { width: 72, height: 72, borderRadius: 16, backgroundColor: colors.pale, alignItems: 'center', justifyContent: 'center' },
   label: { color: colors.ink, fontSize: 15, lineHeight: 21, fontWeight: '600' }, badge: { color: colors.ink, fontSize: 12, lineHeight: 18, fontWeight: '600' },
   actions: { flex: 1, minWidth: 144, flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
-  button: { minHeight: 72, flexGrow: 1, flexBasis: 64, minWidth: 64, paddingHorizontal: 6, paddingVertical: 6, borderRadius: 16, borderWidth: 1, borderColor: colors.line, backgroundColor: '#F7F8F1', alignItems: 'center', justifyContent: 'center', gap: 4 },
+  button: { minHeight: 72, flexGrow: 1, flexBasis: 64, minWidth: 64, paddingHorizontal: 6, paddingVertical: 6, borderRadius: 16, borderWidth: 1, borderColor: colors.line, backgroundColor: theme.surface, alignItems: 'center', justifyContent: 'center', gap: 4 },
   compactButton: { minHeight: 44, flexGrow: 1, flexBasis: 70, minWidth: 64, padding: 6, borderRadius: 12, backgroundColor: colors.pale, alignItems: 'center', justifyContent: 'center', gap: 2 },
   icon: { color: colors.ink, fontSize: 22, lineHeight: 24 }, link: { color: colors.ink, fontSize: 11, lineHeight: 15, textAlign: 'center' },
   note: { color: colors.muted, fontSize: 12, lineHeight: 18 },

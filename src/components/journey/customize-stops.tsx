@@ -1,3 +1,4 @@
+import { theme } from '@/theme/mobile-theme';
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { ActivityIndicator, BackHandler, PanResponder, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -162,7 +163,7 @@ const styles = StyleSheet.create({
   caption: { color: colors.muted, fontSize: 12, lineHeight: 18 },
   progressRow: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: 6 },
   progress: { color: colors.ink, fontSize: 13, fontWeight: '700', lineHeight: 20 },
-  card: { borderRadius: 24, backgroundColor: '#FCFBF8', borderWidth: 1, borderColor: colors.white, overflow: 'hidden', boxShadow: '0 3px 8px rgba(21,62,53,0.09)' },
+  card: { borderRadius: 24, backgroundColor: theme.surface, borderWidth: 1, borderColor: colors.white, overflow: 'hidden', boxShadow: '0 3px 8px rgba(21,62,53,0.09)' },
   cardBody: { padding: 16, gap: 8 },
   cardTitle: { color: colors.ink, fontSize: 24, lineHeight: 30, fontWeight: '700', letterSpacing: -0.5 },
   dock: { paddingHorizontal: 18, paddingTop: 10, paddingBottom: 8, gap: 8, backgroundColor: colors.paper, borderTopWidth: 1, borderTopColor: colors.line, flexShrink: 0 },
@@ -170,17 +171,17 @@ const styles = StyleSheet.create({
   direction: { color: colors.ink, fontSize: 12, lineHeight: 18, fontWeight: '600' },
   optional: { color: colors.muted, fontSize: 11, lineHeight: 16, textAlign: 'center' },
   actions: { flexDirection: 'row', gap: 12 }, actionCell: { flex: 1, minWidth: 0 },
-  summary: { flexDirection: 'row', backgroundColor: colors.ink, borderRadius: 22, padding: 16, alignItems: 'center' },
+  summary: { flexDirection: 'row', backgroundColor: theme.lavender, borderRadius: 22, padding: 16, alignItems: 'center' },
   summaryCell: { flex: 1, alignItems: 'center', gap: 3 },
-  summaryNumber: { color: colors.white, fontSize: 26, lineHeight: 32, fontWeight: '700' },
-  summaryLabel: { color: '#DFE8D8', fontSize: 12, lineHeight: 18 },
-  summaryDivider: { width: 1, height: 38, backgroundColor: '#55796C' },
+  summaryNumber: { color: colors.ink, fontSize: 26, lineHeight: 32, fontWeight: '700' },
+  summaryLabel: { color: theme.muted, fontSize: 12, lineHeight: 18 },
+  summaryDivider: { width: 1, height: 38, backgroundColor: theme.border },
   section: { gap: 10 }, sectionTitle: { color: colors.ink, fontSize: 18, lineHeight: 24, fontWeight: '700' },
   reviewStop: { borderRadius: 20, backgroundColor: colors.white, borderWidth: 1, borderColor: colors.line, padding: 12, gap: 10 },
-  skippedStop: { backgroundColor: '#EEEEE7' },
+  skippedStop: { backgroundColor: theme.inset },
   stopRow: { flexDirection: 'row', gap: 10, alignItems: 'flex-start' }, stopCopy: { flex: 1, minWidth: 0, gap: 3 },
   position: { minWidth: 32, minHeight: 32, padding: 6, borderRadius: 16, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.pale },
-  skippedPosition: { backgroundColor: '#E0E1D9' }, positionText: { fontSize: 12, color: colors.ink, fontWeight: '700' },
+  skippedPosition: { backgroundColor: theme.border }, positionText: { fontSize: 12, color: colors.ink, fontWeight: '700' },
   stopTitle: { color: colors.ink, fontSize: 15, lineHeight: 21, fontWeight: '600' },
   status: { color: '#356147', fontSize: 12, lineHeight: 18, fontWeight: '600' }, skippedStatus: { color: '#666C61' },
   empty: { padding: 14, borderRadius: 16, backgroundColor: colors.pale, color: colors.ink, fontSize: 13, lineHeight: 20 },
