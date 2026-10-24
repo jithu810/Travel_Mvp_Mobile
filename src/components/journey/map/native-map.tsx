@@ -1,3 +1,4 @@
+import { JourneyActionIcon } from '@/components/journey/journey-action-icon';
 import { nearbyFocus, type NearbyPoint } from '@/lib/journey/nearby';
 import { NearbyLocations } from '../nearby-locations';
 import { useFocusEffect } from 'expo-router';
@@ -219,8 +220,8 @@ export const NativeJourneyMap = memo(function NativeJourneyMap({ data, stops, re
       </Mapbox.MapView>}
       {!ready && <View style={styles.loading} pointerEvents="none" accessibilityLabel="Loading journey map" accessibilityRole="progressbar"><ActivityIndicator color={colors.green} /><Text style={styles.note}>Loading map…</Text></View>}
       {presentation !== 'preview' && <Pressable accessibilityRole="button" accessibilityLabel="Fit journey and reset map orientation"
-        accessibilityState={{ disabled: !ready || !frame }} disabled={!ready || !frame} onPress={() => { if (navigationMode) follow.explore(); fit(); }} style={[styles.fit, { top: 12 + Math.max(0, controlTopInset) }, navigationMode && { top: undefined, bottom: (navigationPadding?.bottom ?? 220) + 36 }]}>
-        <Text style={styles.fitLabel}>↗ Fit journey</Text>
+        accessibilityState={{ disabled: !ready || !frame }} disabled={!ready || !frame} onPress={() => { if (navigationMode) follow.explore(); fit(); }} style={[styles.fit, { top: 12 + Math.max(0, controlTopInset) }, !navigationMode && { width: 44, paddingHorizontal: 10, borderRadius: 22 }, navigationMode && { top: undefined, bottom: (navigationPadding?.bottom ?? 220) + 36 }]}>
+        {navigationMode ? <Text style={styles.fitLabel}>↗ Fit journey</Text> : <JourneyActionIcon name="fit" />}
       </Pressable>}
       {navigationMode && travelCamera && <View pointerEvents="box-none" style={[styles.locationControls, { bottom: (navigationPadding?.bottom ?? 220) + 36 }]}>
         <Pressable accessibilityRole="button" accessibilityLabel="My Location, recenter map" accessibilityHint="Centers on accurate foreground GPS and resumes following. Does not start the trip."

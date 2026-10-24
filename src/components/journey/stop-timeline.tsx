@@ -8,7 +8,7 @@ import { JourneyPhoto } from '@/components/discovery/journey-photo';
 import { colors, ui } from '@/components/discovery/ui';
 import { stopIndexAtOffset } from '@/lib/journey/story-layout';
 
-type CarouselProps = { stops: JourneyStop[]; horizontal: true; selectedId: string | null; onSelect: (id: string) => void; onDetails: (id: string) => void; stacked?: boolean; compact?: boolean; active?: boolean; photoActions?: ReactNode; optionsActions?: ReactNode };
+type CarouselProps = { stops: JourneyStop[]; horizontal: true; selectedId: string | null; onSelect: (id: string) => void; onDetails: (id: string) => void; stacked?: boolean; compact?: boolean; active?: boolean; photoActions?: ReactNode; optionsActions?: ReactNode; creator?: ReactNode };
 export function StopTimeline(props: CarouselProps | { stops: JourneyStop[]; horizontal?: false }) {
   return props.horizontal ? props.stacked ? <StopCardDeck {...props} /> : <HorizontalStopTimeline {...props} /> : <VerticalStopTimeline stops={props.stops} />;
 }

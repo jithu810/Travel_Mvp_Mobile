@@ -19,9 +19,9 @@ export function MapFrame({ data, children, presentation = 'story' }: { data: Jou
     </Text>}
   </View>;
 }
-export function MapFallback({ message = 'Map unavailable for this journey.', retry, compact = false, onExpand }: { message?: string; retry?: () => void; compact?: boolean; onExpand?: () => void }) {
+export function MapFallback({ message = 'Map unavailable for this journey.', retry, compact = false, onExpand, controlTopInset = 0 }: { controlTopInset?: number; message?: string; retry?: () => void; compact?: boolean; onExpand?: () => void }) {
   if (compact) return <Pressable accessibilityRole="button" accessibilityLabel="Expand journey map" onPress={onExpand} style={styles.compactFallback}><Text style={styles.fallbackTitle}>Journey map</Text><Text style={styles.note}>Expand for map details ↗</Text></Pressable>;
-  return <View style={styles.fallback}>
+  return <View style={[styles.fallback, { paddingTop: 20 + Math.max(0, controlTopInset) } ]}>
     <Text style={styles.fallbackTitle}>Map unavailable for this journey.</Text>
     {message !== 'Map unavailable for this journey.' && <Text style={styles.note}>{message}</Text>}
     {retry && <Pressable accessibilityRole="button" onPress={retry} style={styles.retry}><Text style={styles.retryLabel}>Try map again</Text></Pressable>}

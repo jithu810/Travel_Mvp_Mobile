@@ -12,17 +12,23 @@ function harness() {
   const hooks = { memo: fn => fn, useMemo: memo, useCallback: (fn,deps) => memo(() => fn,deps),
     useState: value => { const i=cursor++; if (!(i in slots)) slots[i]=typeof value==='function'?value():value; return [slots[i], v => { slots[i]=typeof v==='function'?v(slots[i]):v; }]; },
     useRef: value => { const i=cursor++; return slots[i]??={current:value}; },
-    useEffect: (fn,deps) => { const i=cursor++; if (!slots[i] || deps.some((v,j)=>slots[i].deps[j]!==v)) { slots[i]?.cleanup?.(); const slot={deps}; slots[i]=slot; effects.push(()=>{slot.cleanup=fn();}); } },
+    useEffect: (fn,deps) => { const i=cursor++; if (!deps || !slots[i] || deps.some((v,j)=>slots[i].deps?.[j]!==v)) { slots[i]?.cleanup?.(); const slot={deps}; slots[i]=slot; effects.push(()=>{slot.cleanup=fn();}); } },
   };
   return { hooks, render(fn, props) { cursor=0;effects=[];const result=fn(props);effects.forEach(fn=>fn());return result; } };
 }
 const native = Object.fromEntries(['Image','View','Text','TextInput','Pressable','ScrollView','KeyboardAvoidingView','ActivityIndicator','Modal'].map(name=>[name,name]));
+native.useWindowDimensions=()=>({width:390,height:844,fontScale:1});
 native.AppState={addEventListener(){return {remove(){}};}};native.Animated={View:'AnimatedView'};native.Keyboard={dismiss(){},addListener(){return {remove(){}};}};native.StyleSheet={create:value=>value};native.Platform={OS:'android'};
 const ui = { colors: {}, ui: {}, Action:'Action', Message:'Message', ScreenHeader:'ScreenHeader' };
 function load(file, modules, hooks=harness().hooks, timers=globalThis) {
   const exports={}; const jsx=(type,props)=>({type,props});
   const code=ts.transpileModule(readFileSync(file,'utf8'), {compilerOptions:{module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX,target:ts.ScriptTarget.ES2022}}).outputText;
   new Function('require','exports','setTimeout','clearTimeout',code)(name=>{ if (name === '@/theme/mobile-theme') return mobileTheme;
+    if(name==='@/components/create/draft-route-illustration')return {DraftRouteIllustration:'DraftRouteIllustration'};
+    if(name==='@/components/journey/swipe-journey-start')return {SwipeAction:'SwipeAction'};
+    if(name==='@/components/create/memory-deck')return {MemoryDeck:'MemoryDeck'};
+    if(name==='@/components/create/editor-action-icon')return {EditorActionIcon:'EditorActionIcon'};
+    if(name==='react-native-safe-area-context')return {useSafeAreaInsets:()=>({top:24,bottom:24,left:0,right:0}),...modules[name]};
     if(name==='@/lib/media/image-variants')return load('src/lib/media/image-variants.ts',{});
     if(name==='../discovery/thumbnail-photo')return {ThumbnailPhoto:'JourneyPhoto'};
     if(name==='@/hooks/use-thumbnail-source')return {useThumbnailSource:()=>({uri:null,onError(){}})};
@@ -34,7 +40,7 @@ function load(file, modules, hooks=harness().hooks, timers=globalThis) {
   },exports,timers.setTimeout,timers.clearTimeout);return exports;
 }
 const destinationHelpers=load('src/lib/discovery/destination-camera.ts',{'../journey/map-data':{hasCoordinates:p=>Number.isFinite(p.longitude)&&Number.isFinite(p.latitude)&&Math.abs(p.longitude)<=180&&Math.abs(p.latitude)<=90}});
-function all(tree,type) { if(!tree||typeof tree!=='object')return [];if(tree.type?.name==='CompactSearchInput')return all(tree.type(tree.props),type);return [...((tree.type===type || tree.type?.name===type)?[tree]:[]),...[tree.props?.children].flat(Infinity).flatMap(child=>all(child,type))]; }
+function all(tree,type) { if(!tree||typeof tree!=='object')return [];if(tree.type?.name==='CompactSearchInput')return all(tree.type(tree.props),type);return [...((tree.type===type || tree.type?.name===type)?[tree]:[]),...[tree.props?.children, ...(tree.type==='MemoryDeck'?[tree.props.leading,...(tree.props.stops.length?[tree.props.actions,...tree.props.stops.map((stop,index)=>tree.props.renderMemory(stop,index,350))]:[tree.props.emptyContent || tree.props.actions])]:[])].flat(Infinity).flatMap(child=>all(child,type))]; }
 const id='11111111-1111-4111-8111-111111111111', uid='22222222-2222-4222-8222-222222222222', sid='33333333-3333-4333-8333-333333333333';
 const model=load('src/lib/create/model.ts', {'../discovery/model':{isJourneyId:value=>/^[0-9a-f-]{36}$/i.test(value)}});
 const photoSave=load('src/lib/create/photo-save.ts', {'./model':model,'../discovery/model':{isJourneyId:value=>/^[0-9a-f-]{36}$/i.test(value)}});
@@ -44,7 +50,7 @@ const place={name:'Varkala',label:'Varkala, Kerala',latitude:8.7,longitude:76.7,
 function screenHarness(initial, photoState = {}) {
   photoState.candidates ??= {}; photoState.errors ??= {};
   photoState.candidates=Object.fromEntries(Object.entries(photoState.candidates).map(([key,p])=>[key,{width:800,height:600,size:1000,mime:'image/png',...p}]));
-  const h=harness(), writes=[],routes=[],alerts=[],uploads=[];let fail=false, uncertain=true, pending=null, prevented=null, canGoBack=true; const dispatches=[];
+  const h=harness(), writes=[],routes=[],alerts=[],uploads=[];let fail=false, uncertain=true, pending=null, prevented=null, canGoBack=true, focusCleanup=null; const dispatches=[];
   const modules={
     '@/lib/create/photo-save':photoSave,
     '@/lib/create/photo-queries':{checkPhotoDraft:async()=>({ownerId:uid,stopIds:(writes.at(-1)?.stops||initial?.stops||[]).map(s=>s.id)}),uploadJourneyPhoto:async(name,photo)=>{uploads.push({name,photo});if(photoState.uploadFailure)throw new model.SaveFailure(photoState.uploadFailure);}},
@@ -55,7 +61,7 @@ function screenHarness(initial, photoState = {}) {
     'expo-router/react-navigation':{usePreventRemove:(enabled,callback)=>{prevented={enabled,callback};}},
     '@/lib/discovery/model':{safePhoto:path=>path.startsWith('https:')?path:null},
     '@/lib/create/memory':memory,'@/components/create/memory-row':{MemoryRow:'MemoryRow'},'@/components/create/memory-editor-sheet':{MemoryEditorSheet:'MemoryEditorSheet'},
-    'expo-router':{useLocalSearchParams:()=>({draft:initial?.id}),useNavigation:()=>({dispatch:action=>dispatches.push(action)}),useRouter:()=>({canGoBack:()=>canGoBack,back:()=>routes.push('back'),push:route=>routes.push(route),replace:route=>routes.push(route)}),useFocusEffect:fn=>h.hooks.useEffect(fn,[fn])},
+    'expo-router':{useLocalSearchParams:()=>({draft:initial?.id}),useNavigation:()=>({dispatch:action=>dispatches.push(action)}),useRouter:()=>({canGoBack:()=>canGoBack,back:()=>routes.push('back'),push:route=>routes.push(route),replace:route=>routes.push(route)}),useFocusEffect:fn=>h.hooks.useEffect(()=>{const cleanup=fn();focusCleanup=cleanup;return cleanup;},[fn])},
     'react-native':{Alert:{alert:(...args)=>alerts.push(args)}},'react-native-safe-area-context':{SafeAreaView:'SafeAreaView'},
     '@/components/discovery/ui':ui,'@/components/create/place-picker':{PlacePicker:'PlacePicker',formStyles:{}},
     '@/components/create/quick-journey-setup':{QuickJourneySetup:'QuickJourneySetup'},'@/lib/create/editor-model':editor,
@@ -64,7 +70,7 @@ function screenHarness(initial, photoState = {}) {
   };
   const {NewJourneyEditor,default:CreateScreen}=load('src/app/create.tsx',modules,h.hooks);
   let reloads=0;
-  return {renderEntry:()=>h.render(CreateScreen,{}),setCanGoBack:value=>{canGoBack=value;},render:(props={})=>h.render(NewJourneyEditor,{ownerId:uid,initial,onReload:()=>reloads++,...props}),writes,routes,alerts,uploads,setFailure:(value=true,ambiguous=true)=>{fail=value;uncertain=ambiguous;},setPending:value=>{pending=value;},prevented:()=>prevented,dispatches,reloads:()=>reloads};
+  return {blur:()=>focusCleanup?.(),renderEntry:()=>h.render(CreateScreen,{}),setCanGoBack:value=>{canGoBack=value;},render:(props={})=>h.render(NewJourneyEditor,{ownerId:uid,initial,onReload:()=>reloads++,...props}),writes,routes,alerts,uploads,setFailure:(value=true,ambiguous=true)=>{fail=value;uncertain=ambiguous;},setPending:value=>{pending=value;},prevented:()=>prevented,dispatches,reloads:()=>reloads};
 }
 test('actual editor quick-start saves privately with zero stops and routes to the saved editable journey',async()=>{
   const h=screenHarness();let tree=h.render();let setup=all(tree,'QuickJourneySetup')[0];
@@ -75,7 +81,7 @@ test('actual editor quick-start saves privately with zero stops and routes to th
   tree=h.render();setup=all(tree,'QuickJourneySetup')[0];setup.props.onStart();setup.props.onStart();await new Promise(setImmediate);
   assert.equal(h.writes.length,1);assert.equal(h.writes[0].status,'draft');assert.deepEqual(h.writes[0].stops,[]);
   assert.deepEqual(h.routes.at(-1),{pathname:'/create',params:{draft:id}});
-  tree=h.render();assert.equal(all(tree,'QuickJourneySetup').length,0);assert.ok(all(tree,'Action').some(n=>n.props.label==='Save Draft'));
+  tree=h.render();assert.equal(all(tree,'QuickJourneySetup').length,0);assert.ok(all(tree,'Pressable').some(n=>n.props.accessibilityLabel==='Save Draft'));
 });
 test('existing editor saves changed stop metadata and version without changing media, IDs or entering Quick Start',async()=>{
   const initial={...model.newForm(id),title:'Saved',destination:place,destinationSlug:'keep-slug',traveler:'family',updatedAt:'2026-10-14T10:00:00.123456Z',coverPath:'journey-media/raw/cover.png',
@@ -88,14 +94,14 @@ test('existing editor saves changed stop metadata and version without changing m
   assert.ok(all(tree,'Text').some(n=>n.props.children==='Memory saved privately.'));
   assert.equal(h.writes[0].updated_at,initial.updatedAt);assert.equal(h.writes[0].cover_image_path,initial.coverPath);
   assert.deepEqual(h.writes[0].stops[0],{id:sid,sequence:1,name:'Beach',description:'New memory',latitude:0,longitude:0,mapbox_place_id:'original-id',photo_path:'journey-media/raw/stop.png',rating:0,day_number:1});
-  all(tree,'Action').find(n=>n.props.label==='Save Draft').props.onPress();await new Promise(setImmediate);
+  all(tree,'Pressable').find(n=>n.props.accessibilityLabel==='Save Draft').props.onPress();await new Promise(setImmediate);
   assert.equal(h.writes[1].updated_at,'2026-10-14T12:00:00Z');assert.equal(h.routes.length,0,'Saving a resumed draft stays in the hub');
 });
 test('conflict UI blocks writes and requires explicit confirmation before reloading; publication remains validated',async()=>{
   const initial={...model.newForm(id),title:'Saved',destination:place,traveler:'solo',updatedAt:'2026-10-14T10:00:00Z'};
-  const h=screenHarness(initial);let tree=h.render();all(tree,'Pressable').find(n=>n.props.accessibilityLabel==='Publish Journey').props.onPress();await new Promise(setImmediate);
-  assert.equal(h.writes.length,0);h.setFailure();tree=h.render();all(tree,'Action').find(n=>n.props.label==='Save Draft').props.onPress();await new Promise(setImmediate);tree=h.render();
-  assert.equal(all(tree,'Action').find(n=>n.props.label==='Save Draft').props.disabled,true);
+  const h=screenHarness(initial);let tree=h.render();assert.equal(all(tree,'SwipeAction').length,0);await new Promise(setImmediate);
+  assert.equal(h.writes.length,0);h.setFailure();tree=h.render();all(tree,'Pressable').find(n=>n.props.accessibilityLabel==='Save Draft').props.onPress();await new Promise(setImmediate);tree=h.render();
+  assert.equal(all(tree,'Pressable').find(n=>n.props.accessibilityLabel==='Save Draft').props.disabled,true);
   all(tree,'Action').find(n=>n.props.label==='Reload saved draft').props.onPress();assert.equal(h.reloads(),0);
   h.alerts[0][2].find(button=>button.text==='Reload').onPress();assert.equal(h.reloads(),1);
 });
@@ -123,12 +129,12 @@ test('destination suggestions debounce, abort obsolete work and select only the 
 const privateForm=()=>({...model.newForm(id),title:'Coast',destination:place,traveler:'solo',days:'3',updatedAt:'2026-10-14T10:00:00Z'});
 const memoryRow=(id,name,extra={})=>({...memory.emptyMemory(id),name,...extra});
 const tick=()=>new Promise(setImmediate);
-test('empty hub has one Add memory action, no empty map, and saves an unlocated named memory only on confirmation',async()=>{
+test('empty hub has one Add memory action and an honest map placeholder, and saves an unlocated named memory only on confirmation',async()=>{
   const h=screenHarness(privateForm());let tree=h.render();
-  assert.equal(all(tree,'DraftMap').length,0);assert.equal(all(tree,'MemoryRow').length,0);
-  assert.equal(all(tree,'Action').filter(n=>n.props.label==='+ Add memory').length,1);
-  assert.equal(all(tree,'Pressable').find(n=>n.props.accessibilityLabel==='Publish Journey').props.disabled,true);
-  all(tree,'Action').find(n=>n.props.label==='+ Add memory').props.onPress();tree=h.render();
+  assert.equal(all(tree,'DraftMap').length,1);assert.equal(all(tree,'MemoryRow').length,0);
+  assert.equal(all(tree,'Pressable').filter(n=>n.props.accessibilityLabel==='Add your first stop').length,1);
+  assert.equal(all(tree,'SwipeAction').length,0);
+  all(tree,'Pressable').find(n=>['Add memory','Add your first stop'].includes(n.props.accessibilityLabel)).props.onPress();tree=h.render();
   let sheet=all(tree,'MemoryEditorSheet')[0];sheet.props.onSave();await tick();tree=h.render();
   assert.equal(h.writes.length,0);assert.ok(all(tree,'MemoryEditorSheet')[0].props.error);
   all(tree,'MemoryEditorSheet')[0].props.onChange({name:'Sunset',description:'Golden light',day:'2',rating:'0'});tree=h.render();
@@ -138,31 +144,31 @@ test('empty hub has one Add memory action, no empty map, and saves an unlocated 
   finish();await tick();tree=h.render();assert.equal(all(tree,'MemoryEditorSheet').length,0);
   const row=all(tree,'MemoryRow')[0];assert.equal(row.props.stop.name,'Sunset');assert.equal(row.props.stop.latitude,null);
   assert.equal(h.writes[0].stops[0].rating,0);assert.equal(h.writes[0].stops[0].day_number,2);
-  assert.equal(all(tree,'Pressable').find(n=>n.props.accessibilityLabel==='Publish Journey').props.disabled,true);
+  assert.equal(!all(tree,'SwipeAction')[0].props.active,true);
   assert.ok(all(tree,'Text').some(n=>String(n.props.children).includes('Add a location to memory 1 (Sunset)')));
 });
 test('located memory saves full journey snapshot including unsaved settings and inherited media',async()=>{
   const h=screenHarness({...privateForm(),coverPath:'journey-media/raw/cover.png',stops:[memoryRow(uid,'Existing',{photoPath:'journey-media/raw/stop.png',description:'Keep',day:'1',rating:'4.5',latitude:0,longitude:0,mapboxId:'original'})]});
   let tree=h.render();assert.equal(all(tree,'DraftMap').length,1);assert.equal(all(tree,'MemoryRow')[0].props.photo,'https://signed.test/stop');
   all(tree,'Pressable').find(n=>n.props.accessibilityLabel==='Journey settings').props.onPress();tree=h.render();
-  all(tree,'QuickJourneySetup')[0].props.onTitle('New title');tree=h.render();
-  all(tree,'Action').find(n=>n.props.label==='+ Add memory').props.onPress();tree=h.render();
+  all(tree,'QuickJourneySetup')[0].props.onTitle('New title');tree=h.render();all(tree,'Modal')[0].props.onRequestClose();tree=h.render();
+  all(tree,'Pressable').find(n=>['Add memory','Add your first stop'].includes(n.props.accessibilityLabel)).props.onPress();tree=h.render();
   all(tree,'MemoryEditorSheet')[0].props.onChange({name:'Cliff',latitude:8.7,longitude:76.7,mapboxId:'cliff'});tree=h.render();
   all(tree,'MemoryEditorSheet')[0].props.onSave();await tick();tree=h.render();
   assert.equal(h.writes[0].title,'New title');assert.equal(h.writes[0].cover_image_path,'journey-media/raw/cover.png');
   assert.deepEqual(h.writes[0].stops.map(s=>s.id),[uid,sid]);assert.equal(h.writes[0].stops[0].description,'Keep');
   assert.equal(h.writes[0].stops[0].photo_path,'journey-media/raw/stop.png');assert.equal(all(tree,'MemoryRow').length,2);
-  assert.equal(all(tree,'Pressable').find(n=>n.props.accessibilityLabel==='Publish Journey').props.disabled,false);
+  assert.equal(!all(tree,'SwipeAction')[0].props.active,false);
 });
 test('reorder and confirmed removal preserve other metadata and need explicit private save',async()=>{
   const h=screenHarness({...privateForm(),stops:[memoryRow(sid,'One',{description:'Keep',photoPath:'journey-media/raw/stop.png'}),memoryRow(uid,'Two',{rating:'0'})]});let tree=h.render();
   all(tree,'MemoryRow')[1].props.onMove(-1);tree=h.render();assert.equal(all(tree,'MemoryRow')[0].props.stop.id,uid);assert.equal(h.writes.length,0);
   all(tree,'MemoryRow')[0].props.onRemove();assert.equal(h.alerts.length,1);tree=h.render();assert.equal(all(tree,'MemoryRow').length,2);
   h.alerts[0][2].find(b=>b.text==='Remove').onPress();tree=h.render();assert.equal(all(tree,'MemoryRow').length,1);assert.equal(h.writes.length,0);
-  all(tree,'Action').find(n=>n.props.label==='Save Draft').props.onPress();await tick();assert.equal(h.writes[0].stops[0].id,sid);assert.equal(h.writes[0].stops[0].sequence,1);assert.equal(h.writes[0].stops[0].photo_path,'journey-media/raw/stop.png');
+  all(tree,'Pressable').find(n=>n.props.accessibilityLabel==='Save Draft').props.onPress();await tick();assert.equal(h.writes[0].stops[0].id,sid);assert.equal(h.writes[0].stops[0].sequence,1);assert.equal(h.writes[0].stops[0].photo_path,'journey-media/raw/stop.png');
 });
 test('memory close and navigation warn for buffered edits; stale discard alerts cannot erase newer input',()=>{
-  const h=screenHarness(privateForm());let tree=h.render();all(tree,'Action').find(n=>n.props.label==='+ Add memory').props.onPress();tree=h.render();
+  const h=screenHarness(privateForm());let tree=h.render();all(tree,'Pressable').find(n=>['Add memory','Add your first stop'].includes(n.props.accessibilityLabel)).props.onPress();tree=h.render();
   all(tree,'MemoryEditorSheet')[0].props.onChange({name:'First'});tree=h.render();all(tree,'MemoryEditorSheet')[0].props.onClose();
   const oldDiscard=h.alerts[0][2].find(b=>b.text==='Discard');all(tree,'MemoryEditorSheet')[0].props.onChange({name:'Newer'});tree=h.render();oldDiscard.onPress();tree=h.render();
   assert.equal(all(tree,'MemoryEditorSheet')[0].props.value.name,'Newer');
@@ -204,17 +210,17 @@ test('compact memory row has discoverable editing and accessible bounded reorder
 test('explicit editor save uploads cover/memory candidates and persists raw paths while preserving other metadata',async()=>{
   const original={...privateForm(),coverPath:'journey-media/raw/cover.png',stops:[memoryRow(sid,'Saved',{photoPath:'journey-media/raw/stop.png',description:'Keep',rating:'0',latitude:0,longitude:0})]};
   const photoState={candidates:{cover:{uri:'file:///cover-local.png'},[sid]:{uri:'file:///stop-local.png'}}};
-  const h=screenHarness(original,photoState);let tree=h.render();const cover=all(tree,'PhotoField')[0];assert.equal(cover.props.candidate.uri,'file:///cover-local.png');assert.equal(h.writes.length,0);
+  const h=screenHarness(original,photoState);let tree=h.render();all(tree,'Pressable').find(n=>n.props.accessibilityLabel==='Edit cover photo').props.onPress();tree=h.render();const cover=all(tree,'PhotoField')[0];assert.equal(cover.props.candidate.uri,'file:///cover-local.png');assert.equal(h.writes.length,0);
   assert.equal(all(tree,'MemoryRow')[0].props.localPhoto,true);assert.equal(all(tree,'MemoryRow')[0].props.photo,'file:///stop-local.png');
   all(tree,'MemoryRow')[0].props.onEdit();tree=h.render();let sheet=all(tree,'MemoryEditorSheet')[0];assert.equal(sheet.props.photoControl.props.candidate.uri,'file:///stop-local.png');
   sheet.props.onSave();await tick();tree=h.render();assert.equal(h.uploads.length,2);assert.equal(h.writes[0].cover_image_path,'journey-media/'+h.uploads[0].name);assert.equal(h.writes[0].stops[0].photo_path,'journey-media/'+h.uploads[1].name);assert.equal(h.writes[0].stops[0].description,'Keep');assert.equal(h.writes[0].stops[0].rating,0);
   assert.equal(JSON.stringify(h.writes).includes('file:///'),false);assert.ok(all(tree,'Text').some(n=>String(n.props.children).includes('Journey and photos saved privately')));assert.equal(h.prevented().enabled,false);
-  assert.equal(Object.keys(photoState.candidates).length,0);all(tree,'Action').find(n=>n.props.label==='Save Draft').props.onPress();await tick();assert.equal(h.uploads.length,2,'Unchanged photos do not upload again');
+  assert.equal(Object.keys(photoState.candidates).length,0);all(tree,'Pressable').find(n=>n.props.accessibilityLabel==='Save Draft').props.onPress();await tick();assert.equal(h.uploads.length,2,'Unchanged photos do not upload again');
   all(tree,'PhotoField')[0].props.onRemove();tree=h.render();assert.equal(all(tree,'PhotoField')[0].props.candidate,undefined);
 });
 test('photo preparation blocks save and close; discarding an unsaved memory photo leaves its saved path intact',async()=>{
   const photoState={busyKey:'cover',candidates:{}};const original={...privateForm(),stops:[memoryRow(sid,'One',{photoPath:'journey-media/raw/stop.png'})]};
-  const h=screenHarness(original,photoState);let tree=h.render();all(tree,'Action').find(n=>n.props.label==='Save Draft').props.onPress();await tick();assert.equal(h.writes.length,0);
+  const h=screenHarness(original,photoState);let tree=h.render();all(tree,'Pressable').find(n=>n.props.accessibilityLabel==='Save Draft').props.onPress();await tick();assert.equal(h.writes.length,0);
   photoState.busyKey=null;photoState.candidates[sid]={uri:'file:///local.png'};tree=h.render();all(tree,'MemoryRow')[0].props.onEdit();tree=h.render();all(tree,'MemoryEditorSheet')[0].props.onClose();
   assert.equal(h.alerts.at(-1)[0],'Discard memory changes?');h.alerts.at(-1)[2].find(b=>b.text==='Discard').onPress();tree=h.render();assert.equal(all(tree,'MemoryRow')[0].props.stop.photoPath,original.stops[0].photoPath);assert.equal(photoState.candidates[sid],undefined);assert.equal(h.writes.length,0);
 });
@@ -228,12 +234,12 @@ test('photo control labels local previews Not saved, has bounded contain preview
 });
 
 test('saved cover removal stages null through explicit save and never triggers an upload',async()=>{
-  const h=screenHarness({...privateForm(),coverPath:'journey-media/raw/cover.png'});let tree=h.render();const cover=all(tree,'PhotoField')[0];assert.equal(cover.props.hasSavedPhoto,true);cover.props.onRemoveSaved();tree=h.render();assert.equal(h.writes.length,0);
-  all(tree,'Action').find(n=>n.props.label==='Save Draft').props.onPress();await tick();assert.equal(h.writes[0].cover_image_path,null);assert.equal(h.uploads.length,0);
+  const h=screenHarness({...privateForm(),coverPath:'journey-media/raw/cover.png'});let tree=h.render();all(tree,'Pressable').find(n=>n.props.accessibilityLabel==='Edit cover photo').props.onPress();tree=h.render();const cover=all(tree,'PhotoField')[0];assert.equal(cover.props.hasSavedPhoto,true);cover.props.onRemoveSaved();tree=h.render();assert.equal(h.writes.length,0);
+  all(tree,'Pressable').find(n=>n.props.accessibilityLabel==='Save Draft').props.onPress();await tick();assert.equal(h.writes[0].cover_image_path,null);assert.equal(h.uploads.length,0);
 });
 
 test('new memory upload failure keeps the saved checkpoint editable and retries without losing version or selection',async()=>{
- const photoState={candidates:{},uploadFailure:'Upload rejected'};const h=screenHarness(privateForm(),photoState);let tree=h.render();all(tree,'Action').find(n=>n.props.label==='+ Add memory').props.onPress();tree=h.render();all(tree,'MemoryEditorSheet')[0].props.onChange({name:'Sunset'});
+ const photoState={candidates:{},uploadFailure:'Upload rejected'};const h=screenHarness(privateForm(),photoState);let tree=h.render();all(tree,'Pressable').find(n=>['Add memory','Add your first stop'].includes(n.props.accessibilityLabel)).props.onPress();tree=h.render();all(tree,'MemoryEditorSheet')[0].props.onChange({name:'Sunset'});
  photoState.candidates={ [sid]:{uri:'file:///memory.png',width:800,height:600,size:1000,mime:'image/png'} };tree=h.render();all(tree,'MemoryEditorSheet')[0].props.onSave();await tick();tree=h.render();
  assert.equal(h.writes.length,1);assert.equal(h.writes[0].stops[0].photo_path,null);assert.equal(all(tree,'MemoryEditorSheet')[0].props.isNew,false);assert.equal(all(tree,'MemoryEditorSheet')[0].props.value.name,'Sunset');assert.ok(photoState.candidates[sid]);
  photoState.uploadFailure=null;all(tree,'MemoryEditorSheet')[0].props.onSave();await tick();tree=h.render();assert.equal(h.writes.length,2);assert.equal(h.writes[1].updated_at,'2026-10-14T12:00:00Z');assert.equal(h.uploads[0].name,h.uploads[1].name);assert.equal(all(tree,'MemoryEditorSheet').length,0);assert.equal(all(tree,'MemoryRow')[0].props.stop.name,'Sunset');
@@ -265,7 +271,7 @@ test('reviewed GPS coordinates do not write or upload until Save memory; full me
   all(tree,'MemoryEditorSheet')[0].props.onSave();await tick();assert.equal(h.writes.length,2);
 });
 test('new GPS memory still requires a name before explicit save',async()=>{
-  const h=screenHarness(privateForm());let tree=h.render();all(tree,'Action').find(n=>n.props.label==='+ Add memory').props.onPress();tree=h.render();
+  const h=screenHarness(privateForm());let tree=h.render();all(tree,'Pressable').find(n=>['Add memory','Add your first stop'].includes(n.props.accessibilityLabel)).props.onPress();tree=h.render();
   all(tree,'MemoryEditorSheet')[0].props.onChange({latitude:0,longitude:0,mapboxId:null});tree=h.render();all(tree,'MemoryEditorSheet')[0].props.onSave();await tick();tree=h.render();
   assert.equal(h.writes.length,0);assert.ok(all(tree,'MemoryEditorSheet')[0].props.error);all(tree,'MemoryEditorSheet')[0].props.onChange({name:'Here'});tree=h.render();all(tree,'MemoryEditorSheet')[0].props.onSave();await tick();assert.equal(h.writes[0].stops[0].latitude,0);
 });
@@ -285,7 +291,7 @@ test('actual memory sheet capture reveals the name, keeps search independent, lo
 test('cover and memory Take Photo actions select camera; only explicit save uploads the prepared candidate',async()=>{
  const state={};const saved=memoryRow(sid,'Keep name',{description:'Keep note',day:'2',rating:'0',photoPath:'journey-media/raw/stop.png',latitude:0,longitude:0});
  const h=screenHarness({...privateForm(),coverPath:'journey-media/raw/cover.png',stops:[saved]},state);let tree=h.render();
- let cover=all(tree,'PhotoField')[0];cover.props.onTakePhoto();assert.equal(state.selected,'cover');assert.equal(state.source,'camera');assert.equal(h.writes.length,0);assert.equal(h.uploads.length,0);
+ all(tree,'Pressable').find(n=>n.props.accessibilityLabel==='Edit cover photo').props.onPress();tree=h.render();let cover=all(tree,'PhotoField')[0];cover.props.onTakePhoto();assert.equal(state.selected,'cover');assert.equal(state.source,'camera');assert.equal(h.writes.length,0);assert.equal(h.uploads.length,0);
  cover.props.onSelect();assert.equal(state.source,'gallery');
  all(tree,'MemoryRow')[0].props.onEdit();tree=h.render();const sheet=all(tree,'MemoryEditorSheet')[0];sheet.props.photoControl.props.onTakePhoto();assert.equal(state.selected,sid);assert.equal(state.source,'camera');assert.equal(h.uploads.length,0);
  state.candidates[sid]={uri:'file:///prepared-camera.jpg',width:800,height:600,size:1000,mime:'image/jpeg'};tree=h.render();assert.equal(all(tree,'MemoryEditorSheet')[0].props.photoControl.props.candidate.uri,'file:///prepared-camera.jpg');assert.equal(h.writes.length,0);
@@ -457,36 +463,21 @@ test('globe preview keeps native attribution while Home retains its original con
   assert.equal(all(reset,'Text').length,0);
 });
 
-test('reference journey editor uses only the actual cover and keeps all main actions outside scrolling', () => {
+test('draft editor puts map first, cover below and publish confirmation outside scroll', () => {
   const state={candidates:{cover:{uri:'file:///unsaved-cover.jpg'}}};
   const h=screenHarness({...privateForm(),coverPath:'https://saved.test/cover.jpg'},state);
-  let tree=h.render();const hero=all(tree,'ScrollView')[0].props.children[0];
-  assert.equal(all(hero,'Image')[0].props.source.uri,'file:///unsaved-cover.jpg');assert.equal(all(hero,'Image')[0].props.accessible,false);
-  assert.ok(all(hero,'Text').some(n=>n.props.children==='Details saved - Photos not saved'));
-  const scroll=all(tree,'ScrollView')[0];assert.equal(all(scroll,'Action').some(n=>n.props.label==='Save Draft'),false);
-  assert.equal(all(scroll,'Pressable').some(n=>n.props.accessibilityLabel==='Publish Journey'),false);
+  let tree=h.render();const scroll=all(tree,'ScrollView')[0];
+  assert.equal(all(tree,'PhotoField').length,0);
+  all(tree,'Pressable').find(n=>n.props.accessibilityLabel==='Edit cover photo').props.onPress();tree=h.render();
+  assert.equal(all(tree,'PhotoField')[0].props.candidate.uri,'file:///unsaved-cover.jpg');
+  assert.equal(all(scroll,'SwipeAction').length,0);
   const footer=tree.props.children[1];assert.equal(footer.props.style.flexShrink,0);
-  assert.ok(all(footer,'Action').some(n=>n.props.label==='Save Draft'&&n.props.secondary));
-  assert.ok(all(footer,'Action').some(n=>n.props.label==='+ Add memory'));
-  const row=footer.props.children[0], [saveSlot,publish]=row.props.children;
-  assert.equal(row.props.style.flexDirection,'row');assert.equal(row.props.style.flexWrap,undefined,'Fixed balanced pair rather than an uneven wrapping row');
-  const publishStyle=publish.props.style({pressed:false})[0];
-  assert.equal(saveSlot.props.style.flex,1);assert.equal(publishStyle.flex,1);
-  assert.equal(saveSlot.props.style.minWidth,0);assert.equal(publishStyle.minWidth,0);
-  assert.equal(publishStyle.minHeight,44);assert.equal(publishStyle.alignItems,'center');
-  assert.equal(all(publish,'Text')[0].props.style[0].textAlign,'center');
-  assert.equal(publish.props.style({pressed:false})[1].backgroundColor,mobileTheme.theme.inset,'Unavailable publish remains visually distinct');
-  assert.equal(publish.props.style({pressed:false})[1].experimental_backgroundImage,'none','Disabled publish clears the primary gradient');
-  assert.equal(publish.props.style({pressed:false})[1].boxShadow,'none','Disabled publish clears the primary shadow');
-  assert.equal(footer.props.style.flexShrink,0);assert.equal(footer.props.style.paddingHorizontal,16);
-  for(const width of [320,360,393,412]) {
-    const cell=(width-2*footer.props.style.paddingHorizontal-row.props.style.gap)/2;
-    assert.ok(cell>=140,width+'dp gives each action a readable target');
-    assert.ok(cell-2*publishStyle.paddingHorizontal>=120,'Publish label has room without shrinking text');
-  }
-  assert.equal(footer.props.children[1].props.label,'+ Add memory','Primary action spans the complete second row');
-  assert.equal(all(footer,'Pressable').find(n=>n.props.accessibilityLabel==='Publish Journey').props.disabled,true);
-  all(tree,'PhotoField')[0].props.onRemove();tree=h.render();assert.equal(all(all(tree,'ScrollView')[0].props.children[0],'Image')[0].props.source.uri,'https://saved.test/cover.jpg');
+  assert.equal(all(footer,'SwipeAction').length,0);
+  assert.ok(all(tree,'Pressable').some(n=>n.props.accessibilityLabel==='Save Draft'));
+  assert.ok(all(tree,'Pressable').some(n=>n.props.accessibilityLabel==='Add your first stop'));
+  assert.equal(all(tree,'MemoryDeck')[0].props.status,'Photos not saved');
+  const map=all(tree,'DraftMap')[0];assert.equal(map.props.topInset,24);assert.ok(map.props.height>=165);
+  all(tree,'PhotoField')[0].props.onRemove();tree=h.render();assert.equal(all(tree,'PhotoField')[0].props.savedUri,'https://saved.test/cover.jpg');
   assert.equal(h.writes.length,0);assert.equal(h.uploads.length,0);
 });
 
@@ -548,7 +539,7 @@ test('memory location shortcuts have equal column bases and details appear after
 
 test('loaded editor owns a single cover back action and entry no longer adds a duplicate header', () => {
   const h=screenHarness(privateForm());const tree=h.render();assert.equal(all(tree,'Pressable').filter(n=>n.props.accessibilityLabel==='Go back').length,1);
-  assert.equal(all(tree,'PhotoField')[0].props.compact,true);
+  assert.equal(all(tree,'PhotoField').length,0,'Cover controls live only inside their popup');
   const back=all(tree,'Pressable').find(n=>n.props.accessibilityLabel==='Go back');back.props.onPress();assert.equal(h.routes.at(-1),'back');h.setCanGoBack(false);back.props.onPress();assert.equal(h.routes.at(-1),'/discover');
   const entry=screenHarness(privateForm()).renderEntry();assert.equal(all(entry,'ScreenHeader').length,0);assert.equal(all(entry,'DraftEditorEntry').length,1);
   const initial=screenHarness().renderEntry();assert.equal(all(initial,'CreateJourneyHeader').length,1);
@@ -643,7 +634,7 @@ test('Create passes selected destination/version and outside-dismiss state witho
     assert.deepEqual(tree.props.edges,['left','right','bottom']);assert.equal(all(tree,'StackScreen')[0].props.options.statusBarStyle,'light');
     all(tree,'View').find(n=>n.props.onTouchStart).props.onTouchStart();tree=h.renderEntry();assert.equal(all(tree,'NewJourneyEditor')[0].props.dismissSearchVersion,1);
     listeners.keyboardDidShow();tree=h.renderEntry();assert.equal(all(tree,'CreateJourneyHeader')[0].props.keyboardOpen,true);assert.equal(all(tree,'NewJourneyEditor')[0].props.keyboardOpen,true);
-    const draft=screenHarness(privateForm()).renderEntry();assert.deepEqual(draft.props.edges,['top','left','right','bottom']);assert.equal(all(draft,'StackScreen')[0].props.options.statusBarStyle,'dark');
+    const draft=screenHarness(privateForm()).renderEntry();assert.deepEqual(draft.props.edges,['left','right','bottom']);assert.equal(all(draft,'StackScreen')[0].props.options.statusBarStyle,'dark');
     const editorTree=screenHarness().render({keyboardOpen:true});assert.equal(all(editorTree,'DraftShortcuts')[0].props.keyboardHidden,true);
   } finally {native.Keyboard.addListener=old;}
   const shared=load('src/components/discovery/ui.tsx',{'expo-router':{useRouter:()=>({})}});
@@ -750,24 +741,14 @@ test('Home proximity uses only already-granted recent location; denied, missing 
   }
 });
 
-test('horizontal memory journal preserves order and measured phone widths without moving fixed save actions', () => {
-  const stops=[memoryRow(sid,'First',{day:'1',rating:'0'}),memoryRow(uid,'Second')];
-  const h=screenHarness({...privateForm(),stops});
-  for(const screenWidth of [320,360,393,412]) {
-    let tree=h.render();let rail=all(tree,'ScrollView').find(n=>n.props.accessibilityLabel==='Journey memories');
-    assert.equal(rail.props.horizontal,true);assert.equal(rail.props.directionalLockEnabled,true);
-    assert.equal(rail.props.keyboardShouldPersistTaps,'handled');
-    const viewport=screenWidth-32-22;
-    rail.props.onLayout({nativeEvent:{layout:{width:viewport}}});tree=h.render();
-    rail=all(tree,'ScrollView').find(n=>n.props.accessibilityLabel==='Journey memories');
-    const cards=all(rail,'MemoryRow');assert.deepEqual(cards.map(n=>n.props.stop.id),stops.map(s=>s.id));
-    assert.ok(cards.every(n=>n.props.cardWidth<viewport&&n.props.cardWidth>=160));
-    assert.equal(all(rail,'Action').length,0);
-    assert.ok(all(tree.props.children[1],'Action').some(n=>n.props.label==='Save Draft'));
-    cards[1].props.onEdit();tree=h.render();assert.equal(all(tree,'MemoryEditorSheet')[0].props.value.id,uid);
-    all(tree,'MemoryEditorSheet')[0].props.onClose();
-  }
-  assert.equal(h.writes.length,0,'Browsing and opening a card never writes');
+test('private memory deck preserves order and edit semantics without moving publish footer', () => {
+ const stops=[memoryRow(sid,'First',{day:'1',rating:'0'}),memoryRow(uid,'Second')];
+ const h=screenHarness({...privateForm(),stops});let tree=h.render();
+ const deck=all(tree,'MemoryDeck')[0];assert.deepEqual(deck.props.stops.map(s=>s.id),stops.map(s=>s.id));
+ assert.equal(all(tree.props.children[1],'SwipeAction').length,1);
+ deck.props.onSelect(uid);tree=h.render();assert.equal(all(tree,'MemoryRow')[1].props.selected,true);
+ all(tree,'MemoryRow')[1].props.onEdit();tree=h.render();assert.equal(all(tree,'MemoryEditorSheet')[0].props.value.id,uid);
+ assert.equal(h.writes.length,0);
 });
 
 test('photo memory card shows real day, zero rating, notes and unsaved photo status while busy locks every action', () => {
@@ -785,7 +766,7 @@ test('memory map receives resolved photos and selection without changing geometr
   const h=screenHarness({...privateForm(),stops:[memoryRow(sid,'First',{latitude:8,longitude:76,photoPath:'journey-media/raw/stop.png'}),memoryRow(uid,'Second',{latitude:9,longitude:77})]},photos);
   let tree=h.render(),map=all(tree,'DraftMap')[0];const geometry=map.props.geometry;
   assert.equal(JSON.parse(map.props.photos)[sid],'file:///local-memory.jpg');assert.equal(JSON.parse(map.props.photos)[uid],null);
-  const rail=all(tree,'ScrollView').find(n=>n.props.accessibilityLabel==='Journey memories');rail.props.onMomentumScrollEnd({nativeEvent:{contentOffset:{x:260}}});tree=h.render();assert.equal(all(tree,'DraftMap')[0].props.selectedId,uid);
+  const rail=all(tree,'MemoryDeck')[0];rail.props.onSelect(uid);tree=h.render();assert.equal(all(tree,'DraftMap')[0].props.selectedId,uid);
   map.props.onSelect(uid);tree=h.render();assert.equal(all(tree,'DraftMap')[0].props.selectedId,uid);assert.equal(all(tree,'MemoryRow')[1].props.selected,true);
   delete photos.candidates[sid];tree=h.render();assert.equal(all(tree,'DraftMap')[0].props.geometry,geometry);assert.equal(JSON.parse(all(tree,'DraftMap')[0].props.photos)[sid],'https://signed.test/stop');
   all(tree,'MemoryRow')[0].props.onEdit();tree=h.render();assert.equal(all(tree,'DraftMap')[0].props.active,false);assert.equal(all(tree,'DraftMap')[0].props.selectedId,sid);
@@ -828,4 +809,43 @@ test('Create memory rows and map previews receive companion URLs while unsaved c
  const h=screenHarness({...privateForm(),stops:[memoryRow(sid,'QA memory',{latitude:8,longitude:76,photoPath:full})]},photos);let tree=h.render();let row=all(tree,'MemoryRow')[0],map=all(tree,'DraftMap')[0];assert.equal(row.props.photo,'file:///candidate.jpg');assert.equal(row.props.photoThumbnail,null);assert.equal(JSON.parse(map.props.thumbnails)[sid],null);assert.equal(JSON.parse(map.props.photos)[sid],'file:///candidate.jpg');const geometry=map.props.geometry;
  delete photos.candidates[sid];tree=h.render();row=all(tree,'MemoryRow')[0];map=all(tree,'DraftMap')[0];assert.equal(row.props.photo,'https://signed.test/full-memory');assert.equal(row.props.photoThumbnail,'https://signed.test/thumb-memory');assert.equal(JSON.parse(map.props.thumbnails)[sid],'https://signed.test/thumb-memory');assert.equal(JSON.parse(map.props.photos)[sid],'https://signed.test/full-memory');assert.equal(map.props.geometry,geometry);
  row.props.onEdit();tree=h.render();assert.equal(all(tree,'MemoryEditorSheet')[0].props.photoControl.props.savedUri,'https://signed.test/full-memory');assert.equal(h.writes.length,0);
+});
+
+
+test('cover popup retains local controls without writes, disables publish and closes without saving',()=>{
+ const state={candidates:{cover:{uri:'file:///cover.jpg'}}};
+ const h=screenHarness({...privateForm(),stops:[memoryRow(sid,'Located',{latitude:0,longitude:0})]},state);let tree=h.render();
+ assert.equal(all(tree,'PhotoField').length,0);assert.equal(all(tree,'SwipeAction')[0].props.active,true);
+ all(tree,'Pressable').find(n=>n.props.accessibilityLabel==='Edit cover photo').props.onPress();tree=h.render();
+ assert.equal(all(tree,'SwipeAction')[0].props.active,false);assert.equal(all(tree,'DraftMap')[0].props.active,false);
+ assert.equal(all(tree,'PhotoField')[0].props.candidate.uri,'file:///cover.jpg');
+ all(tree,'Pressable').find(n=>n.props.accessibilityLabel==='Close cover photo options').props.onPress();tree=h.render();
+ assert.equal(all(tree,'PhotoField').length,0);assert.equal(all(tree,'SwipeAction')[0].props.active,true);
+ assert.equal(state.candidates.cover.uri,'file:///cover.jpg');assert.equal(h.writes.length,0);assert.equal(h.uploads.length,0);
+ state.busyKey='cover';tree=h.render();assert.equal(all(tree,'Pressable').find(n=>n.props.accessibilityLabel==='Edit cover photo').props.disabled,true);
+});
+test('publish confirmation calls current save once and ordinary failures reenable while uncertain stays blocked',async()=>{
+ for(const ambiguous of [false,true]){
+ const h=screenHarness({...privateForm(),stops:[memoryRow(sid,'Located',{latitude:0,longitude:0,photoPath:'journey-media/raw/stop.png'})]});let tree=h.render();
+ const confirmation=all(tree,'SwipeAction')[0];h.setFailure(true,ambiguous);
+ confirmation.props.onComplete();confirmation.props.onComplete();tree=h.render();assert.equal(h.writes.length,1);assert.equal(h.writes[0].status,'published');assert.equal(all(tree,'SwipeAction')[0].props.active,false);
+ await tick();tree=h.render();assert.equal(all(tree,'SwipeAction')[0].props.active,!ambiguous);assert.equal(h.writes.length,1);
+ assert.ok(all(tree,'Text').some(n=>String(n.props.children).includes('changed')));
+ }
+});
+
+
+test('first-stop CTA opens one existing memory buffer with no write, and stale modal/focus callbacks are inert',()=>{
+ const h=screenHarness(privateForm());let tree=h.render();const cta=all(tree,'Pressable').find(n=>n.props.accessibilityLabel==='Add your first stop');
+ assert.equal(all(tree,'SwipeAction').length,0);assert.ok(all(tree,'Text').some(n=>n.props.children==='Add a stop to start building your journey.'));
+ cta.props.onPress();cta.props.onPress();tree=h.render();const sheet=all(tree,'MemoryEditorSheet')[0];assert.equal(sheet.props.isNew,true);assert.equal(sheet.props.value.name,'');
+ cta.props.onPress();tree=h.render();assert.equal(all(tree,'MemoryEditorSheet')[0].props.value,sheet.props.value);assert.equal(h.writes.length,0);assert.equal(h.uploads.length,0);
+ all(tree,'MemoryEditorSheet')[0].props.onClose();tree=h.render();
+ all(tree,'Pressable').find(n=>n.props.accessibilityLabel==='Edit cover photo').props.onPress();tree=h.render();cta.props.onPress();tree=h.render();assert.equal(all(tree,'MemoryEditorSheet').length,0);
+ all(tree,'Pressable').find(n=>n.props.accessibilityLabel==='Close cover photo options').props.onPress();tree=h.render();h.blur();cta.props.onPress();tree=h.render();assert.equal(all(tree,'MemoryEditorSheet').length,0);assert.equal(h.writes.length,0);
+});
+test('empty onboarding guards preparation and ambiguous-save state while secondary private save remains available',async()=>{
+ const photos={busyKey:'cover'};const h=screenHarness(privateForm(),photos);let tree=h.render();let cta=all(tree,'Pressable').find(n=>n.props.accessibilityLabel==='Add your first stop');assert.equal(cta.props.disabled,true);cta.props.onPress();tree=h.render();assert.equal(all(tree,'MemoryEditorSheet').length,0);
+ photos.busyKey=null;tree=h.render();cta=all(tree,'Pressable').find(n=>n.props.accessibilityLabel==='Add your first stop');assert.equal(cta.props.disabled,false);
+ h.setFailure(true,true);all(tree,'Pressable').find(n=>n.props.accessibilityLabel==='Save Draft').props.onPress();await tick();tree=h.render();assert.equal(all(tree,'Pressable').find(n=>n.props.accessibilityLabel==='Add your first stop').props.disabled,true);cta.props.onPress();tree=h.render();assert.equal(all(tree,'MemoryEditorSheet').length,0);assert.equal(h.writes.length,1);assert.equal(h.uploads.length,0);
 });

@@ -117,9 +117,16 @@ test('deck cancels stale animation completion after map selection, background, t
 });
 
 test('social rail is outside read pressables and gesture surfaces and remains available for empty journeys',()=>{
- const t=setup();t.props.photoActions={type:'SocialActions',props:{}};t.props.optionsActions={type:'JourneyOptions',props:{}};let tree=t.render();
+ const t=setup();t.props.photoActions={type:'SocialActions',props:{}};t.props.optionsActions={type:'JourneyOptions',props:{}};t.props.creator={type:'StoryCreator',props:{}};let tree=t.render();
  const rail=all(tree,'View').find(n=>n.props.testID==='stop-photo-actions');assert.ok(rail);assert.equal(rail.props.onPanResponderRelease,undefined);
- for(const read of all(tree,'Pressable')){assert.equal(all(read,'SocialActions').length,0);assert.equal(all(read,'JourneyOptions').length,0);}
- assert.equal(all(find(tree,'AnimatedView'),'SocialActions').length,1);
+ for(const read of all(tree,'Pressable')){assert.equal(all(read,'SocialActions').length,0);assert.equal(all(read,'JourneyOptions').length,0);assert.equal(all(read,'StoryCreator').length,0);}
+ assert.equal(all(find(tree,'AnimatedView'),'SocialActions').length,1);assert.equal(all(find(tree,'AnimatedView'),'StoryCreator').length,1);
  t.props.stops=[];tree=t.render();assert.equal(all(tree,'SocialActions').length,1);assert.equal(all(tree,'JourneyOptions').length,1);t.h.dispose();
+});
+test('deck never emits raw text as a native View child',()=>{
+ const t=setup();const tree=t.render();
+ for(const node of [...all(tree,'View'),...all(tree,'AnimatedView')]){
+  assert.equal([node.props.children].flat(Infinity).some(child=>typeof child==='string'||typeof child==='number'),false);
+ }
+ t.h.dispose();
 });

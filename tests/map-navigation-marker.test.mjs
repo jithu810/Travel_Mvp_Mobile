@@ -12,6 +12,7 @@ function fixture() {
   mapbox.StyleURL = {};
   const frame = { camera: {}, projection: 'mercator', route: { type: 'Feature', properties: {}, geometry: { type: 'MultiLineString', coordinates: [[[0, 0], [0.01, 0]]] } }, fitsViewport: true };
   const mocks = {
+    '@/components/journey/journey-action-icon': { JourneyActionIcon: 'JourneyActionIcon' },
     '@/lib/journey/nearby': { nearbyFocus: () => null }, '../nearby-locations': { NearbyLocations: 'NearbyLocations' },
     'expo-router': { useFocusEffect() {} }, '@/components/discovery/globe/journey-overlays': { JourneyOverlays: 'JourneyOverlays' },
     'react/jsx-runtime': { jsx, jsxs: jsx }, react, '@rnmapbox/maps': { __esModule: true, default: mapbox, ...mapbox },

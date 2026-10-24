@@ -1,3 +1,5 @@
+import { SwipeJourneyStart } from '@/components/journey/swipe-journey-start';
+import { JourneyActionIcon } from '@/components/journey/journey-action-icon';
 import { StatusBar } from 'expo-status-bar';
 import { BrandedLoading } from '@/components/branded-loading';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
@@ -25,12 +27,12 @@ import { selectedStopId } from '@/lib/journey/story-layout';
 import type { PublicJourney } from '@/types/journey';
 
 export default function JourneyStoryScreen() {
-  const params = useLocalSearchParams<{ id: string | string[] }>();
+  const params = useLocalSearchParams<{ id: string | string[]; source?: string }>();
   const id = typeof params.id === 'string' ? params.id : '';
   const loader = useCallback((signal: AbortSignal) => loadPublicJourney(id, signal), [id]);
   const state = useLoad(loader);
   return <SafeAreaView style={ui.safe} edges={state.data ? ['left', 'right', 'bottom'] : ['top', 'left', 'right', 'bottom']}><View style={ui.page}>
-    {state.data ? <JourneyStoryContent key={state.data.id} journey={state.data} refresh={state.refresh} refreshing={state.refreshing} error={state.error} /> : <View style={styles.unavailable}>
+    {state.data ? <JourneyStoryContent key={state.data.id} journey={state.data} saveFirst={params.source === 'search'} refresh={state.refresh} refreshing={state.refreshing} error={state.error} /> : <View style={styles.unavailable}>
       <ScreenHeader title="Journey Story" back />
       {state.loading ? <BrandedLoading message="Opening the journey…" />
         : <View style={styles.message}><Message title={state.error ? 'A small detour' : 'Journey unavailable'} body={state.error || 'This journey may no longer be public. Explore Discover for more stories.'} retry={state.retry} /></View>}
@@ -38,7 +40,7 @@ export default function JourneyStoryScreen() {
   </View></SafeAreaView>;
 }
 
-export function JourneyStoryContent({ journey, refresh, refreshing, error }: { journey: PublicJourney; refresh: () => void; refreshing: boolean; error: string | null }) {
+export function JourneyStoryContent({ journey, refresh, refreshing, error, saveFirst = false }: { journey: PublicJourney; saveFirst?: boolean; refresh: () => void; refreshing: boolean; error: string | null }) {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const [panel, setPanel] = useState<'map' | 'about' | 'stop' | null>(null);
@@ -66,17 +68,14 @@ export function JourneyStoryContent({ journey, refresh, refreshing, error }: { j
   return <View style={styles.screen}>
     {focused && panel === null && <StatusBar style="light" />}
     <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" nestedScrollEnabled>
-      <View style={[styles.preview, { height: Math.max(180, Math.min(280, window.height * 0.3)) }]}>
+      <View style={[styles.preview, { height: Math.max(150, Math.min(280, window.height * 0.30)) }]}>
         {focused && panel === null && <JourneyMap stops={journey.stops} memoryPhotos={memoryPhotos} playRouteWithSelection={requestedId === null} animateMemoryRoute={requestedId === null} selectedId={selectedId} onSelect={select} presentation="expanded" controlTopInset={insets.top} onExpand={openMap} />}
-        <Pressable accessibilityRole="button" accessibilityLabel="Expand journey map" onPress={openMap} style={[styles.expand, { top: insets.top + 4 }]}><Text style={styles.expandLabel}>Full map ↗</Text></Pressable>
+        <Pressable accessibilityRole="button" accessibilityLabel="Expand journey map" onPress={openMap} style={[styles.expand, { top: insets.top + 4 }]}><JourneyActionIcon name="expand" /></Pressable>
       </View>
-      <StopTimeline horizontal stacked active={focused && panel === null} stops={journey.stops} selectedId={selectedId} onSelect={select} onDetails={showStop} photoActions={<SocialActions selectedMemoryId={selectedId} key={'social-' + journey.id} journey={journey} layout="rail" />} optionsActions={<JourneyOptions key={journey.id} id={journey.id} onUse={openTravel} presentation="rail" onAbout={() => setPanel('about')} />} />
-      <View style={styles.storyAuthor}><StoryCreator journey={journey} /></View>
+      <StopTimeline horizontal stacked creator={<StoryCreator journey={journey} />} active={focused && panel === null} stops={journey.stops} selectedId={selectedId} onSelect={select} onDetails={showStop} photoActions={<SocialActions selectedMemoryId={selectedId} key={'social-' + journey.id} journey={journey} layout="rail" saveFirst={saveFirst} />} optionsActions={<JourneyOptions key={journey.id} id={journey.id} onUse={openTravel} presentation="rail" onAbout={() => setPanel('about')} />} />
     </ScrollView>
+    {canOpenTravelMode(journey) && <View style={styles.swipeFooter}><SwipeJourneyStart active={focused && panel === null} onStart={openTravel} /></View>}
     <View pointerEvents="none" testID="journey-status-shade" style={[styles.statusShade, { height: insets.top + 20 }]} />
-    <View style={styles.bottomActions}>
-      {canOpenTravelMode(journey) && <Pressable accessibilityRole="button" accessibilityLabel="Start Journey" accessibilityHint="Opens Travel Mode. Begin Trip starts the timer and location tracking." onPress={openTravel} style={styles.start}><Text style={styles.startLabel}>Start Journey →</Text><Text style={styles.startHint}>Open Travel Mode</Text></Pressable>}
-    </View>
     {panel === 'stop' && <StopStoryViewer journey={journey} selectedId={selectedId} onSelect={select} onClose={() => setPanel(null)} onMap={openMap} />}
     <StorySheet visible={panel === 'map' || panel === 'about'} title={panel === 'map' ? journey.title : 'About this journey'} subtitle={panel === 'map' ? journey.stops.length + (journey.stops.length === 1 ? ' stop' : ' stops') + ' · Journey map' : undefined} onClose={() => setPanel(null)} scrollable={panel !== 'map'}>
       {panel === 'map' ? <>
@@ -121,13 +120,13 @@ const styles = StyleSheet.create({
   story: { padding: 14, gap: 6, borderRadius: 22, backgroundColor: '#F0F3F9', borderWidth: 1, borderColor: '#FFFFFF' },
   compactTitle: { flex: 1, minWidth: 0, minHeight: 44, justifyContent: 'center', paddingHorizontal: 8 },
   title: { color: '#18243B', fontSize: 18, lineHeight: 24, fontWeight: '700' },
-  bottomActions: { paddingHorizontal: 16, paddingTop: 6, paddingBottom: 8, backgroundColor: '#F0F3F9', borderTopWidth: 1, borderColor: '#FFFFFF' },
-  storyAuthor: { paddingHorizontal: 4, paddingVertical: 6 },
+  swipeFooter: { paddingHorizontal: 16, paddingTop: 4, paddingBottom: 8 },
+  storyAuthor: { paddingHorizontal: 4 },
   people: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 44 },
   creator: { width: '34%', minWidth: 0 },
   preview: { marginHorizontal: -16, borderBottomLeftRadius: 28, borderBottomRightRadius: 28, overflow: 'hidden', backgroundColor: '#080F1E' },
   mapOptions: { position: 'absolute', top: 58, right: 8, minHeight: 44, minWidth: 44, borderRadius: 22, backgroundColor: colors.paper, alignItems: 'center', justifyContent: 'center' },
-  expand: { position: 'absolute', top: 4, right: 6, minHeight: 44, minWidth: 64, paddingHorizontal: 10, backgroundColor: colors.paper, borderRadius: 22, justifyContent: 'center', alignItems: 'center' },
+  expand: { position: 'absolute', top: 4, right: 6, minHeight: 44, minWidth: 44, paddingHorizontal: 8, backgroundColor: colors.paper, borderRadius: 22, justifyContent: 'center', alignItems: 'center' },
   expandLabel: { color: colors.ink, fontWeight: '700', fontSize: 12 },
   mapCaption: { paddingTop: 6, flexShrink: 0 }, selectedStop: { minHeight: 48, justifyContent: 'center', gap: 2 },
   routeNote: { color: colors.muted, fontSize: 10, lineHeight: 14, paddingTop: 6, flexShrink: 0 },

@@ -1,3 +1,27 @@
+## Empty private draft first-stop onboarding — 2026-10-24
+- IMPLEMENTED LOCALLY: zero-memory map area has decorative route cue/adventure heading, inviting first-stop card opens existing memory buffer, quiet labelled Cover/Settings/Save draft; guidance replaces empty disabled Publish swipe. No opening writes; duplicate/focus/form/modal/busy/uncertain/photo guards. Nonempty animated stack/readiness unchanged; unlocated named memory stays private until location added.
+- Focused editor/private/public deck66/66, TypeScript, full zero-warning lint, whitespace and Android export4.5MB passed; native/review in docs/qa/draft-empty-state.md with5-source hashes. Read-only actual-schema backend preflight released. Native QA only read-only, no hosted save/upload/publish claims.
+- Local/unpublished; no backend/dependencies/environment/native permissions/build/agent hosted writes/publication. Prior work preserved. iOS/TalkBack/large-font/short-device acceptance pending.
+
+## Private draft actual swipe-away memory stack — 2026-10-24
+- IMPLEMENTED LOCALLY: private editor now uses actual upcoming photo cards behind foreground memory, whole-card rotate/translate210ms swipe-away matching published deck. Reduced motion/bounds/lifecycle cancellation retained. Photo/caption gesture excludes Earlier/Later/remove; guarded private callbacks and four rail actions preserved; browse changes selected ID only.
+- Focused private/public deck+editor63/63, TypeScript, full zero-warning lint, whitespace and Android export4.5MB passed; native/review in docs/qa/draft-memory-stack.md with4-source SHA256 snapshot. Previous full636/636 is earlier editor checkpoint, not rerun for this correction.
+- Local/unpublished; existing draft preflight covers unchanged browsing-only contract. No dependencies/environment/native build/backend/hosted writes/publication; all prior work preserved. Native/iOS/accessibility acceptance distinctions in task QA.
+
+## Private draft map/deck and swipe Publish — 2026-10-24
+- IMPLEMENTED LOCALLY: loaded draft editor map first/edge-to-edge; direct paged memory deck with map selection, edit/Earlier/Later/remove retained, compact Cover/Add/Save/Settings icons. Cover popup reuses existing gallery/camera/removal; settings exact form preserved. Footer explicit swipe Publish uses existing guarded save/upload pipeline; original Journey Start defaults retained.
+- Full636/636 nonPG and final63/63 focused passed, Android export4.5MB/offline compatibility/whitespace passed; final TypeScript/full zero-warning lint passed; native/review evidence in docs/qa/draft-editor-redesign.md. Native CPH2813/Android16 main stack and Cover popup browsing/close observed; no hosted write/photo/camera/reorder/remove acceptance claimed.
+- Local/unpublished; backend actual-schema no-change preflight released, no backend/environment/dependencies/native config/hosted writes/publication. Quick-start/globe and prior work preserved. iOS/TalkBack/large-font/native Publish/camera and broad lifecycle pending.
+
+## Navigation reserved-slot backdrop — 2026-10-24
+- IMPLEMENTED LOCALLY: shared MainNavigationFrame outer root now paints existing page background/gradient behind its reserved bottom slot, removing the extra white rectangle on Create/Journey while retaining the intended rounded navigation pill, selected highlight and all layout/touch behavior.
+- Existing Home/navigation31/31, TypeScript and full zero-warning lint passed. Native CPH2813/Android16 Create confirms white band gone/pill intact; Journey shared-frame behavior verified by inspection only. See docs/qa/navigation-background.md. Local/unpublished, no dependencies/backend/environment/hosted writes/publication; all previous work preserved.
+
+## Journey explore compact deck and swipe entry — 2026-10-24
+- IMPLEMENTED LOCALLY: transparent photo action targets, red outline/solid heart, icon Fit/Full map, compact swipeable cards with Previous/Next above and author inside card under Read story. Gradient swipe capsule sits below card above navigation; opens existing Travel Mode only. Begin Trip remains explicit GPS consent; single-flight lifecycle cancellation/reduced motion/accessibility activation retained.
+- Final630/630 non-PG suite plus Architect isolatedPG1/1 passed, TypeScript, zero-warning full lint and Android export passed. Native CPH2813/Android16: all content fits, map/card selection agrees, partial swipe resets, full swipe reaches ready Travel Mode without Begin Trip. iOS/TalkBack/large fonts/transition capture/broad actual GPS lifecycle pending.
+- Local/unpublished; no dependencies/native config/environment/backend/hosted writes/GitHub/deployment. Read-only backend preflight released; existing dirty work preserved. See docs/qa/journey-explore-redesign.md for15-source SHA256 snapshot, exact validation and native limitations.
+
 ## Extended thumbnail consumers — 2026-10-24
 - Implemented locally: Story JourneyCard, Account/public ProfileJourneyCard, map photo pins and Create/edit memory previews use thumbnail -> original -> bundled default. Local unsaved previews retain their local URI. Stop-story viewer, share export and large stop cards retain originals.
 - Verification: 624/624 tests, TypeScript, zero-warning lint, Android export and whitespace checks passed. Independent reviews complete; stale image-error and map source-pair findings fixed and covered by regressions. Physical-device verification of this extension remains pending.
