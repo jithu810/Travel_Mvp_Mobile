@@ -34,12 +34,23 @@ const all=(tree,type)=>!tree||typeof tree!=='object'?[]:[...(tree.type===type?[t
 test('Share tap freezes the visible memory and compact Like shows zero and authoritative updates',()=>{
  const h=uiHarness();const social={auth:{session:{},loading:false},state:{liked:false,saved:false,likes:0},act(){this.state={liked:true,saved:false,likes:1};},busy:null};
  const native={View:'View',Text:'Text',Pressable:'Pressable',StyleSheet:{create:x=>x},Platform:{OS:'android'}};
- const {SocialActions}=load('src/components/journey/social-actions.tsx',{'react':h.hooks,'react/jsx-runtime':{jsx:(type,props)=>({type,props}),jsxs:(type,props)=>({type,props})},'react-native':native,'expo-router':{useRouter:()=>({}),useFocusEffect(){}},'@/hooks/action-intent':{useActionIntent:()=>({})},'./story-sheet':{StorySheet:'StorySheet'},'./journey-share-sheet':{JourneyShareSheet:'JourneyShareSheet'},'@/lib/social/share-artwork':model,'@/components/discovery/ui':{colors:{}},'@/hooks/use-journey-social':{useJourneySocial:()=>social},'@/lib/social/sharing':sharing});
+ const {SocialActions}=load('src/components/journey/social-actions.tsx',{'react':h.hooks,'react/jsx-runtime':{jsx:(type,props)=>({type,props}),jsxs:(type,props)=>({type,props})},'react-native':native,'expo-router':{useRouter:()=>({}),useFocusEffect(){}},'@/hooks/action-intent':{useActionIntent:()=>({})},'./journey-action-icon':{JourneyActionIcon:'JourneyActionIcon'},'./story-sheet':{StorySheet:'StorySheet'},'./journey-share-sheet':{JourneyShareSheet:'JourneyShareSheet'},'@/lib/social/share-artwork':model,'@/components/discovery/ui':{colors:{}},'@/hooks/use-journey-social':{useJourneySocial:()=>social},'@/lib/social/sharing':sharing});
  const previous=process.env.EXPO_PUBLIC_SITE_URL;process.env.EXPO_PUBLIC_SITE_URL='https://example.test';
- try{let selected='third';const render=()=>h.render(()=>SocialActions({journey,compact:true,selectedMemoryId:selected}));let tree=render();
+ try{let selected='third', layout;const render=()=>h.render(()=>SocialActions({journey,compact:true,selectedMemoryId:selected,layout}));let tree=render();
  const label=()=>all(tree,'Text').map(n=>[n.props.children].flat().join('')).join('|');assert.match(label(),/Like.*0/);
  all(tree,'Pressable').find(n=>n.props.accessibilityLabel==='Like journey').props.onPress();tree=render();assert.match(label(),/Like.*1/);
  all(tree,'Pressable').find(n=>n.props.accessibilityLabel==='Share public journey').props.onPress();selected='first';tree=render();assert.equal(all(tree,'JourneyShareSheet')[0].props.artwork.memoryId,'third');
+ layout='rail';tree=render();
+ const railButtons=all(tree,'Pressable').filter(n=>['Unlike journey','Save journey','Share public journey'].includes(n.props.accessibilityLabel));assert.equal(railButtons.length,3);
+ for(const b of railButtons){const style=Object.assign({},...b.props.style({pressed:false}).filter(Boolean));assert.equal(style.width,44);assert.ok(style.minHeight>=44);}
+ assert.equal(all(tree,'JourneyActionIcon').length,3);assert.ok(all(tree,'JourneyActionIcon').some(n=>n.props.name==='bookmark'));assert.equal(all(tree,'Text').some(n=>String(n.props.children).includes('Share')),false);
+ social.error='Offline';tree=render();all(tree,'Pressable').find(n=>n.props.accessibilityLabel?.startsWith('View journey action feedback')).props.onPress();tree=render();assert.equal(all(tree,'StorySheet')[0].props.visible,true);
+ social.busy='save';tree=render();assert.equal(all(tree,'Pressable').find(n=>n.props.accessibilityLabel==='Save journey').props.disabled,true);
  social.state=null;tree=render();assert.ok(!label().includes('Like · 1'));
  }finally{if(previous===undefined)delete process.env.EXPO_PUBLIC_SITE_URL;else process.env.EXPO_PUBLIC_SITE_URL=previous;}
+});
+
+test('journey action icons are decorative native geometry without text glyph dependencies',()=>{
+ const {JourneyActionIcon}=load('src/components/journey/journey-action-icon.tsx',{'react-native':{View:'View',StyleSheet:{create:x=>x}},'react/jsx-runtime':{jsx:(type,props)=>({type,props}),jsxs:(type,props)=>({type,props})}});
+ for(const name of ['heart','bookmark','share','remix','route','info']){const tree=JourneyActionIcon({name});assert.equal(tree.props.pointerEvents,'none');assert.equal(tree.props.accessibilityElementsHidden,true);assert.equal(all(tree,'Text').length,0);assert.ok(all(tree,'View').length>=3);}
 });

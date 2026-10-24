@@ -1,5 +1,6 @@
+import { StopCardDeck } from './stop-card-deck';
 import { theme } from '@/theme/mobile-theme';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { AccessibilityInfo, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import type { NativeScrollEvent, NativeSyntheticEvent } from 'react-native';
 import type { JourneyStop } from '@/types/journey';
@@ -7,9 +8,9 @@ import { JourneyPhoto } from '@/components/discovery/journey-photo';
 import { colors, ui } from '@/components/discovery/ui';
 import { stopIndexAtOffset } from '@/lib/journey/story-layout';
 
-type CarouselProps = { stops: JourneyStop[]; horizontal: true; selectedId: string | null; onSelect: (id: string) => void; onDetails: (id: string) => void; stacked?: boolean; compact?: boolean };
+type CarouselProps = { stops: JourneyStop[]; horizontal: true; selectedId: string | null; onSelect: (id: string) => void; onDetails: (id: string) => void; stacked?: boolean; compact?: boolean; active?: boolean; photoActions?: ReactNode; optionsActions?: ReactNode };
 export function StopTimeline(props: CarouselProps | { stops: JourneyStop[]; horizontal?: false }) {
-  return props.horizontal ? <HorizontalStopTimeline {...props} /> : <VerticalStopTimeline stops={props.stops} />;
+  return props.horizontal ? props.stacked ? <StopCardDeck {...props} /> : <HorizontalStopTimeline {...props} /> : <VerticalStopTimeline stops={props.stops} />;
 }
 // The private draft screen continues using its existing read-only vertical presentation.
 function VerticalStopTimeline({ stops }: { stops: JourneyStop[] }) {

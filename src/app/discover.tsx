@@ -3,9 +3,9 @@ import { BrandedLoading } from '@/components/branded-loading';
 import { PlacePicker } from '@/components/create/place-picker';
 import type { Place } from '@/lib/create/model';
 import { FloatingNavigation } from '@/components/floating-navigation';
-import { useFocusEffect, useRouter } from 'expo-router';
+import { Stack, useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
-import { Keyboard, Platform, Pressable, StatusBar, StyleSheet, Text, View } from 'react-native';
+import { Keyboard, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { DiscoveryGlobe } from '@/components/discovery/globe/discovery-globe';
 import { DiscoveryPanel } from '@/components/discovery/discovery-panel';
@@ -20,6 +20,7 @@ export default function DiscoverScreen() {
   // Home companion is temporarily unmounted; components, assets, flag and saved preference are preserved.
   const insets = useSafeAreaInsets();
   const state = useLoad(loadPublicJourneys);
+  const initialLoading = state.loading && !state.data;
   const [sheetInteracting, setSheetInteracting] = useState(false);
   const [place, setPlace] = useState<Place | null>(null);
   const [placeVersion, setPlaceVersion] = useState(0);
@@ -39,6 +40,9 @@ export default function DiscoverScreen() {
     }).catch(() => { /* Search falls back to the observed map center without requesting permission. */ });
     return () => { active = false; dismissSearch(); };
   }, [dismissSearch]));
+  const [headerHeight, setHeaderHeight] = useState(56);
+  const headerTop = Math.max(0, insets.top || 0) + 4;
+  const headerClearance = headerTop + headerHeight + 8;
   const [navHeight, setNavHeight] = useState(56);
   const navBottom = Math.max(0, insets.bottom) + 8;
   const navClearance = navBottom + navHeight + 12;
@@ -48,11 +52,6 @@ export default function DiscoverScreen() {
   const [locateVersion, setLocateVersion] = useState(0);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const locate = useCallback((id: string) => { setPlace(null); dismissSearch(); setSelectedId(id); setLocateVersion(version => version + 1); }, [dismissSearch]);
-  useFocusEffect(useCallback(() => {
-    if (Platform.OS === 'web') return;
-    const entry = StatusBar.pushStackEntry({ barStyle: 'dark-content' });
-    return () => StatusBar.popStackEntry(entry);
-  }, []));
   // Coordinates are only in public detail. Resolve one explicit selection, never N+1 card requests.
   const loadSelected = useCallback((signal: AbortSignal) => selectedId ? loadPublicJourney(selectedId, signal) : Promise.resolve(null), [selectedId]);
   const selection = useLoad(loadSelected);
@@ -64,9 +63,10 @@ export default function DiscoverScreen() {
     : !selection.data ? 'This journey is no longer public.'
     : !points.features.length ? 'No mapped stops for this journey. Open its story to explore.'
     : Platform.OS === 'web' ? 'Mapped stops are available in the mobile app. Open the story to explore.' : 'Tap a stop to open ' + selection.data.title) : 'Journeys from our global community');
-  return <SafeAreaView edges={['top', 'left', 'right']} style={s.safe}>
+  return <SafeAreaView edges={['left', 'right']} style={s.safe}>
     <View style={s.page}>
-      <View style={s.header}>
+      <Stack.Screen options={{ statusBarStyle: initialLoading ? 'dark' : 'light' }} />
+      <View style={[s.header, { top: headerTop }]} onLayout={event => setHeaderHeight(event.nativeEvent.layout.height)}>
         <View style={s.search}><PlacePicker label="Search places" homeSearch compact embeddedSuggestions autoSuggest disabled={false}
           dismissVersion={dismissVersion} proximity={userProximity || mapProximity} onSelect={selectPlace} /></View>
         <View accessible accessibilityRole="image" accessibilityLabel="Notifications, coming soon" style={s.iconButton}>
@@ -77,29 +77,31 @@ export default function DiscoverScreen() {
         const { width, height } = event.nativeEvent.layout;
         setLayout(previous => previous.width === width && previous.height === height ? previous : { width, height });
       }}>
-        <View style={s.map}><DiscoveryGlobe points={points} route={route} onOpen={open} bottomInset={railHeight} viewport={layout} selectionId={selectedId} locateVersion={locateVersion} sheetInteracting={sheetInteracting} homeSearch destinationMode={!!place} destination={place} destinationVersion={placeVersion} onCenterChange={mapCenter} /></View>
+        <View style={s.map}><DiscoveryGlobe points={points} route={route} onOpen={open} bottomInset={railHeight} headerInset={headerClearance} viewport={layout} selectionId={selectedId} locateVersion={locateVersion} sheetInteracting={sheetInteracting} homeSearch destinationMode={!!place} destination={place} destinationVersion={placeVersion} onCenterChange={mapCenter} /></View>
         <DiscoveryPanel journeys={journeys} selectedId={selectedId} onLocate={locate} onOpen={open}
           notice={notice} onClear={() => setSelectedId(null)} onRetrySelection={selection.error ? selection.retry : undefined}
           loading={state.loading} refreshing={state.refreshing} error={state.error} onRefresh={state.refresh}
-          onInteraction={setSheetInteracting} onHeight={setRailHeight} availableHeight={layout.height} availableWidth={layout.width} bottomClearance={navClearance + bannerHeight + 12} />
+          onInteraction={setSheetInteracting} onHeight={setRailHeight} availableHeight={layout.height} availableWidth={layout.width} bottomClearance={navClearance + bannerHeight + 12} topClearance={headerClearance} />
       </View>
       <Pressable accessibilityRole="button" accessibilityLabel="Create Journey from Home" onPress={() => router.push('/create')}
         onLayout={event => setBannerHeight(event.nativeEvent.layout.height)} style={[s.banner, { bottom: navClearance }]}>
         <View style={s.bannerCopy}><Text style={s.bannerTitle}>Start your own journey</Text><Text style={s.bannerSubtitle}>Make memories into stories</Text></View>
         <View style={s.bannerAction}><Text style={s.bannerActionText}>Create Journey ↗</Text></View>
       </Pressable>
+      <View pointerEvents="none" testID="home-status-shade" style={[s.statusShade, { height: headerTop + 12 }]} />
       <FloatingNavigation active="explore" onHeight={setNavHeight} />
-      {state.loading && !state.data && <BrandedLoading overlay message="Exploring the world…" />}
+      {initialLoading && <BrandedLoading overlay message="Exploring the world…" />}
     </View>
   </SafeAreaView>;
 }
 const s = StyleSheet.create({
+  statusShade: { position: 'absolute', top: 0, left: 0, right: 0, experimental_backgroundImage: 'linear-gradient(180deg, rgba(5,15,30,0.78) 0%, rgba(5,15,30,0.55) 65%, rgba(5,15,30,0) 100%)' },
   safe: { flex: 1, backgroundColor: theme.background },
   page: { flex: 1, width: '100%', maxWidth: 900, alignSelf: 'center' },
-  header: { backgroundColor: theme.background, minHeight: 52, paddingHorizontal: 18, paddingVertical: 6, flexDirection: 'row', alignItems: 'center', gap: 8, zIndex: 10 },
+  header: { position: 'absolute', left: 0, right: 0, elevation: 10, minHeight: 52, paddingHorizontal: 18, paddingVertical: 6, flexDirection: 'row', alignItems: 'center', gap: 8, zIndex: 10 },
   // Keep the touch area large; only the inner painted surface is compact.
   search: { flex: 1, minWidth: 0, minHeight: 44, justifyContent: 'center' },
-  iconButton: { width: 44, minHeight: 44, flexShrink: 0, alignItems: 'center', justifyContent: 'center' },
+  iconButton: { backgroundColor: theme.surface, borderRadius: 22, width: 44, minHeight: 44, flexShrink: 0, alignItems: 'center', justifyContent: 'center' },
   bell: { width: 22, height: 22, alignItems: 'center', justifyContent: 'center' },
   bellBody: { width: 14, height: 15, borderWidth: 1.8, borderColor: theme.muted, borderTopLeftRadius: 9, borderTopRightRadius: 9 },
   bellRim: { width: 20, height: 2, backgroundColor: theme.muted },

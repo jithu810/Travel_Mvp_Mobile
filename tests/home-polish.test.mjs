@@ -7,14 +7,16 @@ const mobileTheme = {};
 new Function('exports', ts.transpileModule(readFileSync('src/theme/mobile-theme.ts', 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText)(mobileTheme);
 
 
-function load(file, dependencies, state = null) {
+function load(file, dependencies, state = null, hookOverrides = {}) {
   const exports = {};
   const jsx = (type, props) => ({ type, props });
-  const react = { memo: fn => fn, useState: initial => typeof state === 'function' ? state(initial) : [state ?? initial, () => {}], useMemo: fn => fn(), useCallback: fn => fn };
+  const react = { memo: fn => fn, useState: initial => typeof state === 'function' ? state(initial) : [state ?? initial, () => {}], useMemo: fn => fn(), useCallback: fn => fn, ...hookOverrides };
   const rn = { StyleSheet: { create: value => value }, Platform: { OS: 'web' }, StatusBar: {} };
   for (const name of ['View', 'Text', 'Pressable', 'Image']) rn[name] = name;
   const source = ts.transpileModule(readFileSync(file, 'utf8'), { compilerOptions: { jsx: ts.JsxEmit.ReactJSX, module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
   new Function('require', 'exports', source)(name => { if (name === '@/theme/mobile-theme') return mobileTheme;
+    if (name === './travel-photo-placeholder') return load('src/components/discovery/travel-photo-placeholder.tsx', {});
+    if (name === 'expo-status-bar') return {StatusBar:'StatusBar'};
     if (name === 'react') return react;
     if (name === 'react/jsx-runtime') return { jsx, jsxs: jsx, Fragment: 'Fragment' };
     if (name === 'react-native') return { ...rn, ...dependencies[name] };
@@ -25,7 +27,7 @@ function load(file, dependencies, state = null) {
     if(name==='@/hooks/use-load' && !(name in dependencies))return {useLoad:()=>({data:null,refresh:()=>{}})};
     if(name==='@/lib/profile/edit-queries')return {loadOwnProfile:()=>Promise.resolve(null)};
     if(name==='@/lib/discovery/model' && !(name in dependencies))return {safePhoto:()=>null};
-    if(name==='expo-router')return {useFocusEffect:()=>{},useGlobalSearchParams:()=>({}),...dependencies[name]};
+    if(name==='expo-router')return {Stack:{Screen:'StackScreen'},useFocusEffect:()=>{},useGlobalSearchParams:()=>({}),...dependencies[name]};
     if (name in dependencies) return name==='@/lib/discovery/map'?{worldCamera:{centerCoordinate:[35,18]},...dependencies[name]}:dependencies[name];
     if(name==='@/components/branded-loading')return {BrandedLoading:'BrandedLoading'};throw Error(name);
   }, exports);
@@ -114,8 +116,8 @@ test('Home embeds place search; Account and navigation retain existing routes an
   const tree = home.default();
   const all = nodes(tree);
   assert.ok(!all.some(n => n.props?.accessibilityLabel === 'Journey Creator logo'));
-  const header = tree.props.children.props.children[0];
-  assert.equal(header.props.style.flexDirection, 'row');
+  const header = tree.props.children.props.children[1];
+  assert.equal(header.props.style[0].flexDirection, 'row');
   assert.equal(header.props.children.length, 2);
   const search = header.props.children[0];
   assert.equal(search.props.style.flex, 1);
@@ -129,8 +131,12 @@ test('Home embeds place search; Account and navigation retain existing routes an
   assert.equal(picker.props.embeddedSuggestions, true);
   assert.equal(picker.props.destinationOnly, undefined, 'Addresses remain searchable');
   assert.equal(picker.props.onPress, undefined, 'Search never navigates');
-  assert.equal(header.props.style.gap, 8);
-  assert.equal(header.props.style.minHeight, 52);
+  assert.equal(header.props.style[0].gap, 8);
+  assert.equal(header.props.style[0].minHeight, 52);
+  assert.equal(header.props.style[0].position,'absolute');assert.equal(header.props.style[0].backgroundColor,undefined);assert.equal(header.props.style[1].top,4);
+  const shade=all.find(n=>n.props?.testID==='home-status-shade');assert.equal(shade.props.pointerEvents,'none');
+  assert.equal(all.find(n=>n.type==='Globe').props.headerInset,68);
+  assert.equal(all.find(n=>n.type==='Panel').props.topClearance,68);
   for (const control of header.props.children.slice(1)) {
     assert.equal(control.props.style.width, 44);
     assert.equal(control.props.style.minHeight, 44);
@@ -140,10 +146,10 @@ test('Home embeds place search; Account and navigation retain existing routes an
     assert.equal(icon.props.style.height, 22);
   }
   for (const width of [320, 360, 412]) {
-    const reserved = 2 * header.props.style.paddingHorizontal + 44 + header.props.style.gap;
+    const reserved = 2 * header.props.style[0].paddingHorizontal + 44 + header.props.style[0].gap;
     assert.ok(width - reserved >= 150, 'Remaining Search width on common narrow phones');
   }
-  assert.deepEqual(tree.props.edges, ['top', 'left', 'right']);
+  assert.deepEqual(tree.props.edges, ['left', 'right']);
   assert.ok(!all.some(n => n.type === 'Text' && ['JC', 'Journey Creator'].includes(n.props.children)));
   for (const [label, route] of [['Open account', '/account'], ['Search journeys and creators', '/search?view=search'], ['Browse public stories', '/search?view=stories'], ['Create Journey from Home', '/create'], ['Create Journey', '/create']]) {
     all.find(n => n.props?.accessibilityLabel === label).props.onPress();
@@ -183,17 +189,22 @@ function card(cover = journey.cover, failed = null, expanded = true) {
   }, failed);
   return { calls, all: nodes(component.HomeJourneyCard({ journey: { ...journey, cover }, expanded, width: 300, selected: false, onOpen: id => calls.push(['open', id]), onLocate: id => calls.push(['locate', id]) })) };
 }
-test('Home preserves full cover frame and card dimensions in both sheet states', () => {
+test('Home fills photo frames without blurred side panels and uses 16:9 expanded covers', () => {
   for (const expanded of [false, true]) {
     const { all } = card(journey.cover, null, expanded);
     const images = all.filter(n => n.type === 'Image');
-    assert.equal(images.length, 2);
-    assert.equal(images.find(n => n.props.accessibilityLabel).props.resizeMode, 'contain');
-    const backdrop = images.find(n => !n.props.accessibilityLabel);
-    assert.equal(backdrop.props.resizeMode, 'cover');
-    assert.equal(backdrop.props.accessible, false);
-    assert.ok(backdrop.props.blurRadius > 0);
-    assert.ok(images.every(n => n.props.source.uri === journey.cover));
+    assert.equal(images.length, 1);
+    const photo = images[0];
+    assert.equal(photo.props.resizeMode, 'cover');
+    assert.equal(photo.props.accessibilityLabel, journey.title + ' cover photo');
+    assert.equal(photo.props.blurRadius, undefined);
+    assert.equal(photo.props.source.uri, journey.cover);
+    const frame = all.find(n => n.props?.children === photo);
+    const frameStyle = Object.assign({}, ...frame.props.style.filter(Boolean));
+    assert.equal(frameStyle.overflow, 'hidden');
+    assert.equal(frameStyle.width, expanded ? '100%' : 96);
+    assert.equal(frameStyle.height, expanded ? Math.round(300 * 9 / 16) : 84);
+    if (expanded) assert.equal(frameStyle.aspectRatio, 16 / 9);
   }
 });
 test('Home retains title, author, count, Locate and both Story entry points', () => {
@@ -205,12 +216,52 @@ test('Home retains title, author, count, Locate and both Story entry points', ()
 });
 test('missing/failed photos retain fallback and a changed URI recovers', () => {
   for (const [uri, failed] of [[null, null], [journey.cover, journey.cover]]) {
-    assert.ok(card(uri, failed).all.some(n => n.props?.accessibilityLabel === 'No journey cover photo available'));
+    assert.ok(card(uri, failed).all.some(n => n.props?.accessibilityLabel === 'No journey cover photo available. Coast. Journey story'));
   }
-  assert.equal(card('https://example.invalid/new.jpg', journey.cover).all.filter(n => n.type === 'Image').length, 2);
+  assert.equal(card('https://example.invalid/new.jpg', journey.cover).all.filter(n => n.type === 'Image').length, 1);
+});
+
+test('Home image failure falls back, a new URI recovers and card measurement remains live', () => {
+  let failedUri = null;
+  const component = load('src/components/discovery/home-journey-card.tsx', {
+    '@/lib/discovery/model': { journeyFacts: j => j.stops.length + ' stops' }, './ui': { colors },
+  }, () => [failedUri, value => { failedUri = value; }]);
+  let measured;
+  const props = { journey, expanded: true, width: 300, selected: true, onOpen() {}, onLocate() {}, onHeight: value => { measured = value; } };
+  let tree = component.HomeJourneyCard(props);
+  tree.props.onLayout({ nativeEvent: { layout: { height: 310 } } });
+  assert.equal(measured, 310);
+  assert.equal(nodes(tree).find(n => n.props?.accessibilityLabel === 'Locate journey: Coastal weekend').props.accessibilityState.selected, true);
+  nodes(tree).find(n => n.type === 'Image').props.onError();
+  assert.equal(failedUri, journey.cover);
+  assert.ok(nodes(component.HomeJourneyCard(props)).some(n => n.props?.accessibilityLabel === 'No journey cover photo available. Coast. Journey story'));
+  tree = component.HomeJourneyCard({ ...props, journey: { ...journey, cover: 'https://example.invalid/landscape.jpg' } });
+  assert.equal(nodes(tree).find(n => n.type === 'Image').props.source.uri, 'https://example.invalid/landscape.jpg');
+});
+
+test('Home missing and failed covers use a static branded fallback with expanded-only destination caption', () => {
+  for (const expanded of [false, true]) for (const [uri, failed] of [[null, null], [journey.cover, journey.cover]]) {
+    const { all } = card(uri, failed, expanded);
+    assert.ok(!all.some(n => n.type === 'Image'));
+    const fallback = all.find(n => n.props?.accessibilityLabel === 'No journey cover photo available. Coast. Journey story');
+    assert.equal(fallback.props.accessible, true);
+    const art = nodes(fallback).find(n => n.props?.pointerEvents === 'none');
+    assert.equal(art.props.accessible, false);
+    assert.equal(art.props.accessibilityElementsHidden, true);
+    assert.equal(art.props.importantForAccessibility, 'no-hide-descendants');
+    assert.ok(nodes(art).some(n => n.props?.style?.borderStyle === 'dotted'));
+    assert.ok(!nodes(art).some(n => n.type === 'Text'));
+    const caption = nodes(fallback).filter(n => n.type === 'Text');
+    assert.equal(caption.length, expanded ? 2 : 0);
+    if (expanded) {
+      assert.equal(caption[0].props.children, journey.destination);
+      assert.equal(caption[0].props.numberOfLines, 1);
+      assert.equal(caption[1].props.children, 'Journey story');
+    }
+  }
 });
 test('sheet overlay clearance keeps peek/compact controls above pill and expanded final actions scrollable', () => {
-  for (const expanded of [false, true]) for (const availableHeight of [190, 436, 720]) for (const bottomClearance of [94, 118, 150]) {
+  for (const expanded of [false, true]) for (const availableHeight of [190, 436, 720]) for (const bottomClearance of [94, 118, 150]) for (const topClearance of [0, 96, 500]) {
     let sheetArea, published, bounds;
     const offset = { current: 0 };
     const component = load('src/components/discovery/discovery-panel.tsx', {
@@ -222,9 +273,9 @@ test('sheet overlay clearance keeps peek/compact controls above pill and expande
       } },
       './home-journey-card': { HomeJourneyCard: 'Card' }, './ui': { colors },
     });
-    const tree = component.DiscoveryPanel({ journeys: [journey], availableHeight, availableWidth: 360, bottomClearance, onHeight: h => { published = h; } });
+    const tree = component.DiscoveryPanel({ journeys: [journey], availableHeight, availableWidth: 360, bottomClearance, topClearance, onHeight: h => { published = h; } });
     const clearance = Math.min(bottomClearance, availableHeight - 44);
-    assert.equal(sheetArea, availableHeight - clearance);
+    assert.equal(sheetArea, availableHeight - clearance - Math.min(topClearance, Math.max(0, availableHeight - clearance - 44)));
     assert.equal(bounds.collapsed, Math.min(sheetArea, 266), 'Collapsed sheet budgets its chrome and full compact card');
     assert.ok(bounds.expanded >= bounds.collapsed && bounds.expanded <= sheetArea);
     assert.equal(published, 44 + clearance);
@@ -318,9 +369,9 @@ test('Home omits companion switch and scene even when saved preference is enable
   for (const enabled of [false, true]) {
     choice.enabled = enabled;
     const tree = home.default(), all = nodes(tree), children = tree.props.children.props.children;
-    assert.equal(children.filter(Boolean).length, 4);
-    assert.equal(children[1].type, 'View');
-    assert.equal(children[3].type, 'Navigation');
+    assert.equal(children.filter(Boolean).length, 6);
+    assert.equal(children[2].type, 'View');
+    assert.equal(children[5].type, 'Navigation');
     assert.ok(!all.some(n => n.type === 'CompanionToggle' || n.type === 'TravelCompanion'));
     assert.equal(all.find(n => n.type === 'Navigation').props.active, 'explore');
     assert.equal(all.find(n => n.type === 'Navigation').props.companionGuide, undefined);
@@ -333,4 +384,24 @@ test('Home omits companion switch and scene even when saved preference is enable
   assert.ok(nodes(loadingTree).some(n=>n.type==='Globe'),'Live map stays mounted under the overlay');
   collection={data:[],loading:false,refreshing:true};assert.ok(!nodes(home.default()).some(n=>n.type==='BrandedLoading'));
   collection={data:null,loading:false,error:'Offline'};assert.ok(!nodes(home.default()).some(n=>n.type==='BrandedLoading'));
+});
+
+test('Home assigns native-screen dark loading icons then light globe icons without a competing component owner',()=>{
+ let cursor=0,collection={data:null,loading:true};const slots=[];
+ const memo=(fn,deps)=>{const i=cursor++;if(!slots[i]||deps.some((v,j)=>v!==slots[i].deps[j]))slots[i]={deps,value:fn()};return slots[i].value;};
+ const hooks={useState:initial=>{const i=cursor++;if(!(i in slots))slots[i]=initial;return [slots[i],v=>{slots[i]=typeof v==='function'?v(slots[i]):v;}];},useCallback:(fn,deps)=>memo(()=>fn,deps),useMemo:memo};
+ const focus=fn=>{const i=cursor++;if(slots[i]?.fn!==fn){slots[i]?.cleanup?.();slots[i]={fn,cleanup:fn()};}};
+ const Home=load('src/app/discover.tsx',{
+  'expo-router':{useRouter:()=>({}),useFocusEffect:focus},
+  'react-native':{Platform:{OS:'android'},Keyboard:{dismiss(){}}},
+  'react-native-safe-area-context':{SafeAreaView:'SafeAreaView',useSafeAreaInsets:()=>({top:30,bottom:20})},
+  '@/components/floating-navigation':{FloatingNavigation:'Navigation'},'@/components/discovery/globe/discovery-globe':{DiscoveryGlobe:'Globe'},'@/components/discovery/discovery-panel':{DiscoveryPanel:'Panel'},
+  '@/hooks/use-load':{useLoad:()=>collection},'@/lib/discovery/map':{worldCamera:{centerCoordinate:[35,18]},discoveryPoints:()=>({features:[]})},'@/lib/discovery/travel':{discoveryRoute:()=>null},'@/lib/discovery/presentation':{spaceColor:'#080F1E'},'@/lib/discovery/queries':{loadPublicJourneys(){},loadPublicJourney(){}},
+ },null,hooks).default;
+ const render=()=>{cursor=0;return Home();};
+ let tree=render();assert.ok(nodes(tree).some(n=>n.type==='BrandedLoading'));assert.equal(nodes(tree).find(n=>n.type==='StackScreen').props.options.statusBarStyle,'dark');
+ collection={data:[],loading:false};tree=render();assert.ok(!nodes(tree).some(n=>n.type==='BrandedLoading'));assert.equal(nodes(tree).find(n=>n.type==='StackScreen').props.options.statusBarStyle,'light');
+ tree=render();assert.equal(nodes(tree).filter(n=>n.type==='StackScreen').length,1);
+ assert.equal(nodes(tree).filter(n=>n.type==='StatusBar').length,0,'Native route owns transition style without a competing Expo status component');slots.forEach(s=>s?.cleanup?.());
+
 });

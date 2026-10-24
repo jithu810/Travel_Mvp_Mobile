@@ -23,8 +23,8 @@ function load(file, modules, hooks=harness().hooks, timers=globalThis) {
   const exports={}; const jsx=(type,props)=>({type,props});
   const code=ts.transpileModule(readFileSync(file,'utf8'), {compilerOptions:{module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX,target:ts.ScriptTarget.ES2022}}).outputText;
   new Function('require','exports','setTimeout','clearTimeout',code)(name=>{ if (name === '@/theme/mobile-theme') return mobileTheme;
-    if(name==='@/lib/journey/nearby')return load('src/lib/journey/nearby.ts',{}); if(name.endsWith('/nearby-locations'))return {NearbyLocations:'NearbyLocations'}; if(name==='@/components/branded-loading')return {BrandedLoading:'BrandedLoading'};if(name==='@/lib/discovery/destination-camera')return destinationHelpers;if(name==='@/hooks/use-discovery-sheet')return modules[name] || {useDiscoverySheet:()=>({height:56,expanded:true,responders:{handle:{},content:{}},offset:{current:0},setScrollOffset(){},toggle(){}})};if(name==='@/components/create/create-journey-header')return {CreateJourneyHeader:'CreateJourneyHeader'};if(name==='react')return hooks;if(name==='react/jsx-runtime')return {jsx,jsxs:jsx,Fragment:'Fragment'};
-    if(name==='react-native')return {...native,...modules[name]};if(name in modules)return modules[name];throw Error(name);
+    if(name==='@/lib/journey/nearby')return load('src/lib/journey/nearby.ts',{}); if(name.endsWith('/nearby-locations'))return {NearbyLocations:'NearbyLocations'}; if(name==='@/components/branded-loading')return {BrandedLoading:'BrandedLoading'};if(name==='@/lib/discovery/destination-camera')return destinationHelpers;if(name==='@/hooks/use-discovery-sheet')return modules[name] || {useDiscoverySheet:()=>({height:56,expanded:true,responders:{handle:{},content:{}},offset:{current:0},setScrollOffset(){},toggle(){}})};if(name==='@/components/create/create-journey-header')return {CreateJourneyHeader:'CreateJourneyHeader'};if(name==='expo-status-bar')return {StatusBar:'StatusBar'};if(name==='react')return hooks;if(name==='react/jsx-runtime')return {jsx,jsxs:jsx,Fragment:'Fragment'};
+    if(name==='react-native')return {...native,...modules[name]};if(name==='expo-router')return {Stack:{Screen:'StackScreen'},...modules[name]};if(name in modules)return modules[name];throw Error(name);
   },exports,timers.setTimeout,timers.clearTimeout);return exports;
 }
 const destinationHelpers=load('src/lib/discovery/destination-camera.ts',{'../journey/map-data':{hasCoordinates:p=>Number.isFinite(p.longitude)&&Number.isFinite(p.latitude)&&Math.abs(p.longitude)<=180&&Math.abs(p.latitude)<=90}});
@@ -428,7 +428,7 @@ test('globe preview keeps native attribution while Home retains its original con
     '@/lib/discovery/map':{worldCamera,selectedJourneyId:()=>null},
     '@/lib/discovery/camera':{discoveryPadding:()=>({paddingTop:12}),locateCamera:()=>null,maxDiscoveryZoom:16},
     '@/lib/discovery/locate-transition':{createLocateTransition:()=>({})},'@/lib/discovery/idle-motion':{createIdleMotion:()=>({})},
-    '@/lib/discovery/globe-style':{},'../ui':ui,'@/lib/discovery/presentation':{},'./fallback':{GlobeLoading:'GlobeLoading'},'./journey-overlays':{JourneyOverlays:'JourneyOverlays'},
+    '@/lib/discovery/globe-style':{globeLogoPosition:{top:12,left:12},globeAttributionPosition:{top:12,right:56}},'../ui':ui,'@/lib/discovery/presentation':{},'./fallback':{GlobeLoading:'GlobeLoading'},'./journey-overlays':{JourneyOverlays:'JourneyOverlays'},
   });
   const props={points:{features:[]},route:[],onOpen(){},retry(){},bottomInset:0,viewport:{width:360,height:120},selectionId:null,locateVersion:0,sheetInteracting:true};
   let tree=NativeGlobe({...props,preview:true});let map=all(tree,'MapView')[0].props;
@@ -601,7 +601,7 @@ test('Create native globe flies to real destinations, replaces repeated flights,
     '@rnmapbox/maps':{__esModule:true,default:mapbox},'expo-router':{useFocusEffect:fn=>h.hooks.useEffect(fn,[fn])},
     'react-native':{AppState:{currentState:'active',addEventListener:(name,fn)=>{appChange=fn;return {remove(){}};}},AccessibilityInfo:{isReduceMotionEnabled:async()=>false,addEventListener:(name,fn)=>{motionChange=fn;return {remove(){}};}}},
     '@/lib/discovery/map':{worldCamera:{centerCoordinate:[35,18],zoomLevel:0.8},selectedJourneyId:()=>null},'@/lib/discovery/camera':{discoveryPadding:()=>({}),locateCamera:()=>null,maxDiscoveryZoom:16,locateDuration:900},
-    '@/lib/discovery/locate-transition':{createLocateTransition:()=>({select(){},cancel(){}})},'@/lib/discovery/idle-motion':{createIdleMotion:()=>motion},'@/lib/discovery/globe-style':{},'../ui':ui,'@/lib/discovery/presentation':{},'./fallback':{GlobeLoading:'GlobeLoading'},'./journey-overlays':{JourneyOverlays:'JourneyOverlays'},
+    '@/lib/discovery/locate-transition':{createLocateTransition:()=>({select(){},cancel(){}})},'@/lib/discovery/idle-motion':{createIdleMotion:()=>motion},'@/lib/discovery/globe-style':{globeLogoPosition:{top:12,left:12},globeAttributionPosition:{top:12,right:56}},'../ui':ui,'@/lib/discovery/presentation':{},'./fallback':{GlobeLoading:'GlobeLoading'},'./journey-overlays':{JourneyOverlays:'JourneyOverlays'},
   },h.hooks);
   let props={preview:true,destinationMode:true,destination:null,destinationVersion:0,points:{features:[]},route:[],onOpen(){},retry(){},bottomInset:0,viewport:{width:344,height:192},selectionId:null,locateVersion:0,sheetInteracting:true};
   let tree=h.render(NativeGlobe,props);all(tree,'Camera')[0].props.ref.current={setCamera:command=>commands.push(command)};await tick();all(tree,'MapView')[0].props.onDidFinishLoadingMap();tree=h.render(NativeGlobe,props);
@@ -669,18 +669,19 @@ test('Home native globe flies to real destinations, replaces repeated flights, m
     '@rnmapbox/maps':{__esModule:true,default:mapbox},'expo-router':{useFocusEffect:fn=>h.hooks.useEffect(fn,[fn])},
     'react-native':{AppState:{currentState:'active',addEventListener:(name,fn)=>{appChange=fn;return {remove(){}};}},AccessibilityInfo:{isReduceMotionEnabled:async()=>false,addEventListener:(name,fn)=>{motionChange=fn;return {remove(){}};}}},
     '@/lib/discovery/map':{worldCamera:{centerCoordinate:[35,18],zoomLevel:0.8},selectedJourneyId:()=>null},'@/lib/discovery/camera':{discoveryPadding:()=>({paddingBottom:260,paddingTop:12}),locateCamera:()=>null,maxDiscoveryZoom:16,locateDuration:900},
-    '@/lib/discovery/locate-transition':{createLocateTransition:()=>({select(){},cancel(){}})},'@/lib/discovery/idle-motion':{createIdleMotion:()=>motion},'@/lib/discovery/globe-style':{},'../ui':ui,'@/lib/discovery/presentation':{},'./fallback':{GlobeLoading:'GlobeLoading'},'./journey-overlays':{JourneyOverlays:'JourneyOverlays'},
+    '@/lib/discovery/locate-transition':{createLocateTransition:()=>({select(){},cancel(){}})},'@/lib/discovery/idle-motion':{createIdleMotion:()=>motion},'@/lib/discovery/globe-style':{globeLogoPosition:{top:12,left:12},globeAttributionPosition:{top:12,right:56}},'../ui':ui,'@/lib/discovery/presentation':{},'./fallback':{GlobeLoading:'GlobeLoading'},'./journey-overlays':{JourneyOverlays:'JourneyOverlays'},
   },h.hooks);
-  let props={preview:false,homeSearch:true,destinationMode:true,destination:null,destinationVersion:0,points:{features:[]},route:[],onOpen(){},retry(){},bottomInset:260,viewport:{width:344,height:640},selectionId:null,locateVersion:0,sheetInteracting:true};
+  let props={headerInset:100,preview:false,homeSearch:true,destinationMode:true,destination:null,destinationVersion:0,points:{features:[]},route:[],onOpen(){},retry(){},bottomInset:260,viewport:{width:344,height:640},selectionId:null,locateVersion:0,sheetInteracting:true};
   let tree=h.render(NativeGlobe,props);all(tree,'Camera')[0].props.ref.current={setCamera:command=>commands.push(command)};await tick();all(tree,'MapView')[0].props.onDidFinishLoadingMap();tree=h.render(NativeGlobe,props);
   assert.equal(all(tree,'MapView')[0].props.scrollEnabled,true);assert.equal(all(tree,'Camera')[0].props.maxZoomLevel,16);
+  assert.equal(all(tree,'MapView')[0].props.compassPosition.top,112);assert.equal(all(tree,'MapView')[0].props.logoPosition.top,112);assert.equal(all(tree,'MapView')[0].props.attributionPosition.top,112);
   props={...props,destination:place,destinationVersion:1};tree=h.render(NativeGlobe,props);assert.deepEqual(commands.at(-1).centerCoordinate,[place.longitude,place.latitude]);assert.equal(commands.at(-1).zoomLevel,10);assert.equal(commands.at(-1).padding.paddingBottom,260);assert.equal(commands.at(-1).animationMode,'flyTo');assert.equal(commands.at(-1).animationDuration,1000);
   let marker=all(tree,'ShapeSource').find(n=>n.props.id==='create-destination').props.shape;assert.deepEqual(marker.features[0].geometry.coordinates,[place.longitude,place.latitude]);
   const next={...place,name:'New town',latitude:10,longitude:77};props={...props,destination:next,destinationVersion:2};tree=h.render(NativeGlobe,props);assert.deepEqual(commands.at(-1).centerCoordinate,[77,10]);
   const before=commands.length;props={...props,destinationVersion:3};tree=h.render(NativeGlobe,props);assert.equal(commands.length,before+1,'Selecting same place again refocuses');
   props={...props,viewport:{width:344,height:72}};tree=h.render(NativeGlobe,props);assert.equal(commands.at(-1).centerCoordinate,undefined,'Keyboard/layout refit cannot recenter a manual pan');
   const world=all(tree,'Pressable')[0], worldStyle=Object.assign({},...world.props.style.filter(Boolean));
-  assert.equal(worldStyle.bottom,300,'Home world control stays above journey rail');
+  assert.equal(worldStyle.top,140,'Home World control sits below header and branding');assert.equal(worldStyle.bottom,undefined);
   assert.equal(worldStyle.minHeight,36);assert.equal(worldStyle.paddingHorizontal,12);
   assert.equal(worldStyle.minHeight+world.props.hitSlop.top+world.props.hitSlop.bottom,44,'Smaller visual keeps a 44-point touch target');
   const count=commands.length;all(tree,'MapView')[0].props.onTouchStart();tree=h.render(NativeGlobe,props);assert.equal(commands.length,count);

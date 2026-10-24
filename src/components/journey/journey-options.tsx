@@ -1,3 +1,4 @@
+import { JourneyActionIcon } from './journey-action-icon';
 import { primaryControl } from '@/theme/mobile-theme';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useCallback, useRef, useState, useSyncExternalStore } from 'react';
@@ -9,7 +10,7 @@ import { useActionIntent } from '@/hooks/action-intent';
 import { remixStore } from '@/lib/remix/model';
 import { StorySheet } from './story-sheet';
 import { remixJourney } from '@/lib/remix/queries';
-export function JourneyOptions({ id, onUse, inlineFeedback = false, menu }: { id: string; onUse: () => void; inlineFeedback?: boolean; menu?: { visible: boolean; onClose: () => void; onAbout: () => void } }) {
+export function JourneyOptions({ id, onUse, inlineFeedback = false, menu, presentation, onAbout }: { id: string; onUse: () => void; inlineFeedback?: boolean; presentation?: 'rail'; onAbout?: () => void; menu?: { visible: boolean; onClose: () => void; onAbout: () => void } }) {
   const router = useRouter();
   const [feedbackOpen, setFeedbackOpen] = useState(false);
   const focus = useRef({ active: false, generation: 0, userId: null as string | null });
@@ -36,6 +37,16 @@ export function JourneyOptions({ id, onUse, inlineFeedback = false, menu }: { id
       if (intent.consume(intent.pending.token)) void copy();
     }
   }, [userId, auth.loading, id, intent, copy]));
+  if (presentation === 'rail') return <View style={styles.rail}>
+    <Pressable accessibilityRole="button" accessibilityLabel={state.copyId ? 'Open private copy' : 'Remix This Journey'} accessibilityHint="Requires sign-in. Creates or opens your private draft." disabled={auth.loading || state.busy || (state.blocked && !state.copyId)} accessibilityState={{ disabled: auth.loading || state.busy || (state.blocked && !state.copyId) }} onPress={() => { if (state.copyId) router.push({ pathname: '/draft/[id]', params: { id: state.copyId } }); else void copy(); }} style={[styles.railButton, (auth.loading || state.busy || (state.blocked && !state.copyId)) && { opacity: 0.6 }]}>{state.busy ? <ActivityIndicator color={colors.ink} /> : <JourneyActionIcon name="remix" />}</Pressable>
+    <Pressable accessibilityRole="button" accessibilityLabel="Customize stops" accessibilityHint="Choose stops before creating your own editable draft." onPress={() => router.push({ pathname: '/customize/[id]', params: { id } })} style={styles.railButton}><JourneyActionIcon name="route" /></Pressable>
+    <Pressable accessibilityRole="button" accessibilityLabel="About this journey" onPress={onAbout} style={styles.railButton}><JourneyActionIcon name="info" /></Pressable>
+    {(state.error || state.blocked) && <Pressable accessibilityRole="button" accessibilityLabel={state.error || 'Check your Account drafts before retrying Remix'} onPress={() => setFeedbackOpen(true)} style={styles.railFeedback}><Text accessibilityLiveRegion="polite" style={styles.remixLabel}>!</Text></Pressable>}
+    <StorySheet visible={feedbackOpen} title="Remix journey" onClose={() => setFeedbackOpen(false)}>
+      {state.error && <Text accessibilityRole="alert" style={ui.body}>{state.error}</Text>}
+      {state.blocked && <Action label="Check Account drafts" onPress={() => { setFeedbackOpen(false); router.push('/account'); }} />}
+    </StorySheet>
+  </View>;
   const actions = <View style={styles.card}>
     <View style={styles.buttons}>
     <Pressable accessibilityRole="button" accessibilityLabel="Use This Journey" accessibilityHint="Use all stops. Opens Travel Mode. Begin Trip starts the timer and location tracking." onPress={onUse} style={({ pressed }) => [styles.use, pressed && { opacity: 0.7 }]}><Text style={styles.useLabel}>↗ Use all stops</Text></Pressable>
@@ -73,6 +84,7 @@ export function JourneyOptions({ id, onUse, inlineFeedback = false, menu }: { id
 }
 
 const styles = StyleSheet.create({
+  rail: { gap: 3 }, railButton: { width: 44, minHeight: 44, borderRadius: 14, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center' }, railFeedback: { position: 'absolute', right: 48, top: 0, width: 44, minHeight: 44, borderRadius: 22, backgroundColor: colors.pale, alignItems: 'center', justifyContent: 'center' },
   menuOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.35)' },
   menuBackdrop: { position: 'absolute', top: 0, bottom: 0, left: 0, right: 0 },
   menuPanel: { maxHeight: '80%', backgroundColor: colors.paper, borderTopLeftRadius: 24, borderTopRightRadius: 24 },

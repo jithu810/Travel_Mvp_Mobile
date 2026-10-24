@@ -46,7 +46,7 @@ test('native space styling uses the supported atmosphere API with restrained sta
   const native = readFileSync('src/components/discovery/globe/native-globe.tsx', 'utf8');
   assert.ok(native.includes('<Mapbox.Atmosphere style={globeAtmosphere} />'));
   assert.ok(native.includes('Mapbox.StyleURL.Outdoors'));
-  assert.ok(native.includes('logoPosition={globeLogoPosition}'));
+  assert.ok(native.includes('top: globeLogoPosition.top + headerInset'));
   assert.ok(native.includes('Mapbox.StyleURL.SatelliteStreet'));
   assert.ok(native.includes('onMapLoadingError={mapError}'));
 });
@@ -65,8 +65,8 @@ test('panel has an explicit accessible toggle, vertical expanded scrolling, real
   assert.ok(card.includes('onLocate(journey.id)'));
   assert.ok(card.includes('onOpen(journey.id)'));
   const home = readFileSync('src/app/discover.tsx', 'utf8');
-  assert.ok(home.includes("if (Platform.OS === 'web') return;"));
-  assert.ok(home.includes('StatusBar.popStackEntry(entry)'));
+  assert.ok(home.includes("<Stack.Screen options={{ statusBarStyle: initialLoading ? 'dark' : 'light' }} />"));
+  assert.ok(!home.includes('StatusBar.pushStackEntry'));
 });
 
 const require = createRequire(import.meta.url);

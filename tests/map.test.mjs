@@ -87,7 +87,7 @@ test('web fallback is isolated from the native SDK and Story places an interacti
   assert.equal(story.includes('<StoryHeader '), false);
   assert.ok(story.includes('presentation="expanded"'));
   assert.ok(story.includes("scrollable={panel !== 'map'}"));
-  const positions = ['accessibilityLabel="About this journey"', 'presentation="expanded"', '<StopTimeline horizontal stacked ', '<SocialActions ', '<JourneyOptions '].map(s => story.indexOf(s));
+  const positions = ['presentation="expanded"', '<StopTimeline horizontal stacked ', '<SocialActions ', '<JourneyOptions '].map(s => story.indexOf(s));
   assert.ok(positions.every(p => p >= 0));
   assert.deepEqual(positions, [...positions].sort((a, b) => a - b));
 });

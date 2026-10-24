@@ -44,6 +44,9 @@ function load(path, modules, hooks = harness(false).hooks, timers = globalThis) 
   const require = name => {
     if (name === '@/theme/mobile-theme') return mobileTheme;
     if(name==='@/lib/journey/nearby')return load('src/lib/journey/nearby.ts',{}); if(name.endsWith('/nearby-locations'))return {NearbyLocations:'NearbyLocations'}; if (name === 'react/jsx-runtime') return { jsx, jsxs: jsx };
+    if (name === './journey-action-icon') return { JourneyActionIcon: 'JourneyActionIcon' };
+    if (name === './stop-card-deck') return { StopCardDeck: 'StopCardDeck' };
+    if (name === 'expo-status-bar') return {StatusBar:'StatusBar'};
     if (name === 'react') return hooks;
     if (name === 'expo-router') return { useFocusEffect: fn => hooks.useEffect(fn, [fn]), ...modules[name] };
     if (name === 'react-native-safe-area-context') return { ...modules[name], useSafeAreaInsets: () => ({ top: 24, bottom: 24, left: 0, right: 0 }) };
@@ -60,7 +63,7 @@ function load(path, modules, hooks = harness(false).hooks, timers = globalThis) 
 function find(tree, type) {
   if (!tree || typeof tree !== 'object') return null;
   if (tree.type === type) return tree;
-  for (const child of [tree.props?.children, tree.props?.footer].flat(Infinity)) {
+  for (const child of [tree.props?.children, tree.props?.footer, tree.props?.photoActions, tree.props?.optionsActions].flat(Infinity)) {
     const match = find(child, type);
     if (match) return match;
   }
@@ -68,7 +71,7 @@ function find(tree, type) {
 }
 function all(tree, type) {
   if (!tree || typeof tree !== 'object') return [];
-  return [...(tree.type === type ? [tree] : []), ...[tree.props?.children, tree.props?.footer].flat(Infinity).flatMap(child => all(child, type))];
+  return [...(tree.type === type ? [tree] : []), ...[tree.props?.children, tree.props?.footer, tree.props?.photoActions, tree.props?.optionsActions].flat(Infinity).flatMap(child => all(child, type))];
 }
 const native = {
   StyleSheet: { create: value => value }, View: 'View', Text: 'Text', Pressable: 'Pressable', FlatList: 'FlatList',
@@ -155,22 +158,22 @@ test('Story preserves map browsing while Use opens Travel directly and Remix rem
   assert.ok(find(tree, 'ScrollView'), 'Map, story and deck scroll above fixed actions');
   assert.equal(find(tree, 'StoryHeader'), null);
   assert.equal(find(tree, 'StopTimeline').props.stacked, true);
+  assert.equal(find(tree,'StatusBar').props.style,'light');
+  assert.equal(find(tree,'JourneyMap').props.controlTopInset,24);
+  assert.equal(all(tree,'Pressable').find(n=>n.props.accessibilityLabel==='Expand journey map').props.style.at(-1).top,28);
+  const shade=all(tree,'View').find(n=>n.props.testID==='journey-status-shade');assert.equal(shade.props.pointerEvents,'none');assert.equal(shade.props.style.at(-1).height,44);
   assert.equal(find(tree, 'JourneyMap').props.playRouteWithSelection, true);
   assert.equal(find(tree, 'StopTimeline').props.selectedId, 'first');
   find(tree, 'StopTimeline').props.onSelect('second');
   tree = h.render(Screen, props);
   assert.equal(find(tree, 'JourneyMap').props.selectedId, 'second');
-  assert.equal(find(tree, 'JourneyOptions').props.menu.visible, false);
-  all(tree, 'Pressable').find(n => n.props.accessibilityLabel === 'Journey actions').props.onPress();
-  tree = h.render(Screen, props);
-  assert.equal(find(tree, 'JourneyOptions').props.menu.visible, true);
-
-  assert.equal(find(tree, 'JourneyOptions').props.inlineFeedback, true);
-  find(tree, 'JourneyOptions').props.menu.onClose();
-  tree = h.render(Screen, props);
-  assert.equal(find(tree, 'JourneyOptions').props.menu.visible, false);
-  all(tree, 'Pressable').find(n => n.props.accessibilityLabel === 'Journey actions').props.onPress();
-  tree = h.render(Screen, props);
+  assert.equal(find(tree, 'JourneyOptions').props.presentation, 'rail');
+  assert.equal(all(tree, 'JourneyOptions').length, 1);
+  assert.equal(all(tree, 'SocialActions').length, 1);
+  assert.ok(!all(tree, 'Pressable').some(n => n.props.accessibilityLabel === 'Journey actions'));
+  find(tree, 'JourneyOptions').props.onAbout();tree=h.render(Screen,props);
+  assert.equal(find(tree,'StorySheet').props.visible,true);assert.equal(find(tree,'StatusBar'),null);
+  find(tree,'StorySheet').props.onClose();tree=h.render(Screen,props);
   find(tree, 'JourneyOptions').props.onUse();
   tree = h.render(Screen, props);
   assert.deepEqual(routes, [{ pathname: '/travel/[id]', params: { id: journeyId } }]);
@@ -208,7 +211,7 @@ test('Story preserves map browsing while Use opens Travel directly and Remix rem
   tree = h.render(Screen, props);
   assert.equal(find(tree, 'StopStoryViewer'), null);
   assert.equal(all(tree, 'JourneyMap').length, 1);
-  all(tree, 'Pressable').find(n => n.props.accessibilityLabel === 'Journey actions').props.onPress();
+  find(tree,'JourneyOptions').props.onAbout();
   tree = h.render(Screen, props);
   assert.equal(all(tree, 'JourneyMap').length, 0, 'About also unmounts the preview');
   find(tree, 'StorySheet').props.onClose();
@@ -1561,17 +1564,6 @@ test('editor photo overlays use actual ordered markers; idle playback yields to 
   h.dispose();assert.equal(listeners.size,0);
 });
 
-test('published memory deck pages one card in creator order with accessible bounded controls and map-driven selection', () => {
-  const h=harness(), selections=[];
-  const {StopTimeline}=load('src/components/journey/stop-timeline.tsx',{'react-native':native,'@/components/discovery/journey-photo':{JourneyPhoto:'JourneyPhoto'},'@/components/discovery/ui':ui,'@/lib/journey/story-layout':layout},h.hooks);
-  const props={horizontal:true,stacked:true,stops:[stop('first'),stop('second'),stop('third')],selectedId:'first',onSelect:id=>selections.push(id),onDetails(){}};
-  const Deck=StopTimeline(props).type;let tree=h.render(Deck,props);tree.props.onLayout({nativeEvent:{layout:{width:320}}});tree=h.render(Deck,props);
-  assert.equal(all(tree,'FlatList').length,1,'No separate thumbnail strip');let cards=find(tree,'FlatList');assert.equal(cards.props.pagingEnabled,true);assert.equal(cards.props.directionalLockEnabled,true);assert.equal(cards.props.snapToInterval,320);assert.deepEqual(cards.props.data,props.stops);
-  const button=label=>all(tree,'Pressable').find(n=>n.props.accessibilityLabel===label);
-  assert.equal(button('Previous memory').props.disabled,true);button('Next memory').props.onPress();assert.deepEqual(selections,['second']);
-  const offsets=[];cards.props.ref.current={scrollToOffset:v=>offsets.push(v)};props.selectedId='third';tree=h.render(Deck,props);assert.equal(offsets.at(-1).offset,640);assert.equal(button('Next memory').props.disabled,true);
-  cards=find(tree,'FlatList');cards.props.onScrollBeginDrag();cards.props.onMomentumScrollEnd({nativeEvent:{contentOffset:{x:320}}});assert.equal(selections.at(-1),'second');h.dispose();assert.equal(h.lateUpdates(),0);
-});
 
 test('Travel marker switches between compact dot and map-aligned direction above preserved routes', () => {
  const h=nativeMapHarness([mappedStop('a',0,76,8),mappedStop('b',1,76.01,8.01)]);
@@ -1588,4 +1580,53 @@ test('Travel marker switches between compact dot and map-aligned direction above
    const dot=all(tree,'CircleLayer').find(n=>n.props.id==='travel-position-dot');
    assert.equal(dot.props.style.circleRadius,5); assert.equal(dot.props.style.circleStrokeWidth,2);
  } finally {h.dispose();}
+});
+
+test('rail JourneyOptions preserves anonymous Remix, existing private copy, blocked feedback and About/customize routes', async () => {
+  for (const mode of ['anonymous', 'signed-in', 'existing', 'blocked']) {
+    const h = harness();
+    const routes = [], intents = [], copies = [];
+    let uses = 0, about = 0;
+    const state = { busy: false, copyId: mode === 'existing' ? 'private-copy' : null, blocked: mode === 'blocked', error: mode === 'blocked' ? 'Check your drafts' : null };
+    const component = load('src/components/journey/journey-options.tsx', {
+      'expo-router': { useRouter: () => ({ push: route => routes.push(route) }) }, 'react-native': native,
+      '../discovery/ui': { ...ui, Action: 'Action' },
+      '@/hooks/session-context': { useSessionState: () => ({ loading: false, session: mode === 'anonymous' ? null : { user: { id: 'owner' } } }) },
+      '@/hooks/action-intent': { useActionIntent: () => ({ pending: null, begin: (id, action) => { intents.push([id, action]); return true; } }) },
+      '@/lib/remix/model': { remixStore: { get: () => state, subscribe: () => () => {}, run: async (_key, task) => task() } },
+      '@/lib/remix/queries': { remixJourney: async (id, user) => { copies.push([id, user]); return 'new-copy'; } },
+      './story-sheet': { StorySheet: 'StorySheet' },
+      'react-native-safe-area-context': { SafeAreaView: 'SafeAreaView' },
+    }, h.hooks);
+    let tree = h.render(component.JourneyOptions, { id: journeyId, onUse: () => uses++, presentation:'rail', onAbout:()=>about++ });
+    all(tree,'Pressable').find(n=>n.props.accessibilityLabel==='About this journey').props.onPress();assert.equal(about,1);
+    all(tree,'Pressable').find(n=>n.props.accessibilityLabel==='Customize stops').props.onPress();assert.deepEqual(routes.pop(),{pathname:'/customize/[id]',params:{id:journeyId}});
+    assert.equal(all(tree,'JourneyActionIcon').length,3);
+    const remix = all(tree, 'Pressable').find(n => n.props.accessibilityLabel === (mode === 'existing' ? 'Open private copy' : 'Remix This Journey'));
+    if (mode === 'blocked') {
+      assert.equal(remix.props.disabled, true);
+      all(tree,'Pressable').find(n=>n.props.accessibilityLabel==='Check your drafts').props.onPress();tree=h.render(component.JourneyOptions,{id:journeyId,onUse:()=>{},presentation:'rail'});assert.equal(find(tree,'StorySheet').props.visible,true);
+      find(tree, 'Action').props.onPress();
+      assert.equal(routes.at(-1), '/account');
+    } else {
+      remix.props.onPress(); await new Promise(resolve => setImmediate(resolve));
+      if (mode === 'anonymous') { assert.deepEqual(intents, [[journeyId, 'remix']]); assert.equal(routes.at(-1), '/auth'); }
+      else assert.deepEqual(routes.at(-1), { pathname: '/draft/[id]', params: { id: mode === 'existing' ? 'private-copy' : 'new-copy' } });
+      assert.equal(copies.length, mode === 'signed-in' ? 1 : 0);
+    }
+    if(mode!=='blocked')assert.equal(find(tree,'StorySheet').props.visible,false);
+  }
+});
+test('StorySheet owns dark status icons only while visible and releases ownership when closed',()=>{
+ const {StorySheet}=load('src/components/journey/story-sheet.tsx',{'react-native':native,'react-native-safe-area-context':{SafeAreaView:'SafeAreaView'},'@/components/discovery/ui':ui});
+ const props={title:'Feedback',onClose(){},children:'Message'};
+ assert.equal(find(StorySheet({...props,visible:false}),'StatusBar'),null);
+ assert.equal(find(StorySheet({...props,visible:true}),'StatusBar').props.style,'dark');
+});
+test('edge-to-edge preview moves Fit and compass below inset without changing Travel defaults',()=>{
+ const h=nativeMapHarness([mappedStop('a',0,76,8),mappedStop('b',1,77,9)]);
+ let tree=h.measure();assert.equal(find(tree,'MapView').props.compassPosition.top,12);
+ let fit=all(tree,'Pressable').find(n=>n.props.accessibilityLabel==='Fit journey and reset map orientation');assert.equal(fit.props.style[1].top,12);
+ h.props.controlTopInset=36;tree=h.render();assert.equal(find(tree,'MapView').props.compassPosition.top,48);fit=all(tree,'Pressable').find(n=>n.props.accessibilityLabel==='Fit journey and reset map orientation');assert.equal(fit.props.style[1].top,48);
+ h.props.navigationMode=true;h.props.navigationPadding={top:90,bottom:200};tree=h.render();assert.equal(find(tree,'MapView').props.compassPosition.bottom,236);h.dispose();
 });

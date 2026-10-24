@@ -1,8 +1,9 @@
+import { StatusBar } from 'expo-status-bar';
 import { BrandedLoading } from '@/components/branded-loading';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, Message, ScreenHeader, ui } from '@/components/discovery/ui';
 import { StopStoryViewer } from '@/components/journey/stop-story-viewer';
 import { SocialActions } from '@/components/journey/social-actions';
@@ -28,7 +29,7 @@ export default function JourneyStoryScreen() {
   const id = typeof params.id === 'string' ? params.id : '';
   const loader = useCallback((signal: AbortSignal) => loadPublicJourney(id, signal), [id]);
   const state = useLoad(loader);
-  return <SafeAreaView style={ui.safe}><View style={ui.page}>
+  return <SafeAreaView style={ui.safe} edges={state.data ? ['left', 'right', 'bottom'] : ['top', 'left', 'right', 'bottom']}><View style={ui.page}>
     {state.data ? <JourneyStoryContent key={state.data.id} journey={state.data} refresh={state.refresh} refreshing={state.refreshing} error={state.error} /> : <View style={styles.unavailable}>
       <ScreenHeader title="Journey Story" back />
       {state.loading ? <BrandedLoading message="Opening the journey…" />
@@ -39,7 +40,8 @@ export default function JourneyStoryScreen() {
 
 export function JourneyStoryContent({ journey, refresh, refreshing, error }: { journey: PublicJourney; refresh: () => void; refreshing: boolean; error: string | null }) {
   const router = useRouter();
-  const [panel, setPanel] = useState<'map' | 'about' | 'stop' | 'options' | null>(null);
+  const insets = useSafeAreaInsets();
+  const [panel, setPanel] = useState<'map' | 'about' | 'stop' | null>(null);
   const [focused, setFocused] = useState(true);
   useFocusEffect(useCallback(() => {
     setFocused(true);
@@ -62,24 +64,19 @@ export function JourneyStoryContent({ journey, refresh, refreshing, error }: { j
   const memoryPhotos = useMemo(() => Object.fromEntries(journey.stops.map(stop => [stop.id, stop.photo])), [journey.stops]);
   const missing = buildMapData(journey.stops).missing;
   return <View style={styles.screen}>
+    {focused && panel === null && <StatusBar style="light" />}
     <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" nestedScrollEnabled>
-      <View style={styles.toolbar}>
-        <Pressable accessibilityRole="button" accessibilityLabel="Go back" onPress={() => router.canGoBack() ? router.back() : router.replace('/discover')} style={styles.toolbarButton}><Text style={styles.toolbarText}>‹</Text></Pressable>
-        <Pressable accessibilityRole="button" accessibilityLabel="About this journey" onPress={() => setPanel('about')} style={styles.compactTitle}><Text numberOfLines={1} style={styles.title}>{journey.title}</Text><Text numberOfLines={1} style={styles.note}>{journey.destination} · {journey.durationDays !== null ? journey.durationDays + (journey.durationDays === 1 ? ' day' : ' days') : travelerLabel(journey.travelerType)} · Details ⌄</Text></Pressable>
-        <Pressable accessibilityRole="button" accessibilityLabel="Journey actions" onPress={() => setPanel('options')} style={styles.toolbarButton}><Text style={styles.toolbarText}>•••</Text></Pressable>
-      </View>
       <View style={[styles.preview, { height: Math.max(180, Math.min(280, window.height * 0.3)) }]}>
-        {focused && panel === null && <JourneyMap stops={journey.stops} memoryPhotos={memoryPhotos} playRouteWithSelection={requestedId === null} animateMemoryRoute={requestedId === null} selectedId={selectedId} onSelect={select} presentation="expanded" onExpand={openMap} />}
-        <Pressable accessibilityRole="button" accessibilityLabel="Expand journey map" onPress={openMap} style={styles.expand}><Text style={styles.expandLabel}>Full map ↗</Text></Pressable>
+        {focused && panel === null && <JourneyMap stops={journey.stops} memoryPhotos={memoryPhotos} playRouteWithSelection={requestedId === null} animateMemoryRoute={requestedId === null} selectedId={selectedId} onSelect={select} presentation="expanded" controlTopInset={insets.top} onExpand={openMap} />}
+        <Pressable accessibilityRole="button" accessibilityLabel="Expand journey map" onPress={openMap} style={[styles.expand, { top: insets.top + 4 }]}><Text style={styles.expandLabel}>Full map ↗</Text></Pressable>
       </View>
-      <StopTimeline horizontal stacked stops={journey.stops} selectedId={selectedId} onSelect={select} onDetails={showStop} />
+      <StopTimeline horizontal stacked active={focused && panel === null} stops={journey.stops} selectedId={selectedId} onSelect={select} onDetails={showStop} photoActions={<SocialActions selectedMemoryId={selectedId} key={'social-' + journey.id} journey={journey} layout="rail" />} optionsActions={<JourneyOptions key={journey.id} id={journey.id} onUse={openTravel} presentation="rail" onAbout={() => setPanel('about')} />} />
+      <View style={styles.storyAuthor}><StoryCreator journey={journey} /></View>
     </ScrollView>
+    <View pointerEvents="none" testID="journey-status-shade" style={[styles.statusShade, { height: insets.top + 20 }]} />
     <View style={styles.bottomActions}>
-      <View style={styles.people}><View style={styles.creator}><StoryCreator journey={journey} /></View><SocialActions selectedMemoryId={selectedId} key={'social-' + journey.id} journey={journey} compact /></View>
       {canOpenTravelMode(journey) && <Pressable accessibilityRole="button" accessibilityLabel="Start Journey" accessibilityHint="Opens Travel Mode. Begin Trip starts the timer and location tracking." onPress={openTravel} style={styles.start}><Text style={styles.startLabel}>Start Journey →</Text><Text style={styles.startHint}>Open Travel Mode</Text></Pressable>}
     </View>
-    <JourneyOptions key={journey.id} id={journey.id} onUse={openTravel} inlineFeedback
-      menu={{ visible: panel === 'options', onClose: () => setPanel(null), onAbout: () => setPanel('about') }} />
     {panel === 'stop' && <StopStoryViewer journey={journey} selectedId={selectedId} onSelect={select} onClose={() => setPanel(null)} onMap={openMap} />}
     <StorySheet visible={panel === 'map' || panel === 'about'} title={panel === 'map' ? journey.title : 'About this journey'} subtitle={panel === 'map' ? journey.stops.length + (journey.stops.length === 1 ? ' stop' : ' stops') + ' · Journey map' : undefined} onClose={() => setPanel(null)} scrollable={panel !== 'map'}>
       {panel === 'map' ? <>
@@ -111,10 +108,11 @@ export function JourneyStoryContent({ journey, refresh, refreshing, error }: { j
         <Pressable accessibilityRole="button" accessibilityLabel="Refresh journey" disabled={refreshing} accessibilityState={{ disabled: refreshing }} onPress={refresh} style={styles.textAction}>{refreshing ? <ActivityIndicator color={colors.ink} /> : <Text style={styles.link}>Refresh journey ↻</Text>}</Pressable>
       </> : null}
     </StorySheet>
-    {(error || refreshing) && <Pressable accessibilityRole="button" accessibilityLabel={error ? 'Journey refresh failed. View details.' : 'Refreshing journey'} accessibilityLiveRegion="polite" onPress={() => setPanel('about')} style={styles.refreshStatus}><Text style={styles.link}>{refreshing ? '↻' : '!'}</Text></Pressable>}
+    {(error || refreshing) && <Pressable accessibilityRole="button" accessibilityLabel={error ? 'Journey refresh failed. View details.' : 'Refreshing journey'} accessibilityLiveRegion="polite" onPress={() => setPanel('about')} style={[styles.refreshStatus, { top: insets.top + 14 }]}><Text style={styles.link}>{refreshing ? '↻' : '!'}</Text></Pressable>}
   </View>;
 }
 const styles = StyleSheet.create({
+  statusShade: { position: 'absolute', top: 0, left: 0, right: 0, experimental_backgroundImage: 'linear-gradient(180deg, rgba(5,15,30,0.78) 0%, rgba(5,15,30,0.55) 65%, rgba(5,15,30,0) 100%)' },
   screen: { flex: 1, minHeight: 0 },
   content: { paddingHorizontal: 16, paddingTop: 0, paddingBottom: 12, gap: 8 },
   toolbar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
@@ -124,9 +122,11 @@ const styles = StyleSheet.create({
   compactTitle: { flex: 1, minWidth: 0, minHeight: 44, justifyContent: 'center', paddingHorizontal: 8 },
   title: { color: '#18243B', fontSize: 18, lineHeight: 24, fontWeight: '700' },
   bottomActions: { paddingHorizontal: 16, paddingTop: 6, paddingBottom: 8, backgroundColor: '#F0F3F9', borderTopWidth: 1, borderColor: '#FFFFFF' },
+  storyAuthor: { paddingHorizontal: 4, paddingVertical: 6 },
   people: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 44 },
   creator: { width: '34%', minWidth: 0 },
-  preview: { marginHorizontal: -16, borderRadius: 0, overflow: 'hidden', backgroundColor: '#080F1E' },
+  preview: { marginHorizontal: -16, borderBottomLeftRadius: 28, borderBottomRightRadius: 28, overflow: 'hidden', backgroundColor: '#080F1E' },
+  mapOptions: { position: 'absolute', top: 58, right: 8, minHeight: 44, minWidth: 44, borderRadius: 22, backgroundColor: colors.paper, alignItems: 'center', justifyContent: 'center' },
   expand: { position: 'absolute', top: 4, right: 6, minHeight: 44, minWidth: 64, paddingHorizontal: 10, backgroundColor: colors.paper, borderRadius: 22, justifyContent: 'center', alignItems: 'center' },
   expandLabel: { color: colors.ink, fontWeight: '700', fontSize: 12 },
   mapCaption: { paddingTop: 6, flexShrink: 0 }, selectedStop: { minHeight: 48, justifyContent: 'center', gap: 2 },
