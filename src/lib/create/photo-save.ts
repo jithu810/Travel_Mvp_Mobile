@@ -1,14 +1,17 @@
 import { SaveFailure, validateForm, type CreateForm, type Saved, type createSaveController } from './model';
 import { isJourneyId } from '../discovery/model';
 import type { LocalPhoto } from './photo-model';
+import { storedThumbnailsEnabled, thumbnailObjectName } from '../media/image-variants';
 type SavePort = ReturnType<typeof createSaveController>['save'];
 export type PhotoSavePorts = {
   save: SavePort;
   checkDraft: (form: CreateForm, signal: AbortSignal) => Promise<{ ownerId: string; stopIds: string[] }>;
   upload: (objectName: string, photo: LocalPhoto, signal: AbortSignal) => Promise<void>;
   uuid: () => string;
+  prepareThumbnail?: (photo: LocalPhoto, signal: AbortSignal) => Promise<LocalPhoto>;
+  removeThumbnail?: (photo: LocalPhoto) => void;
 };
-type Upload = { objectName: string; path: string; state: 'allocated' | 'uploaded' | 'unknown' };
+type Upload = { objectName: string; path: string; state: 'allocated' | 'uploaded' | 'unknown'; thumbnail?: Upload };
 export type PhotoSaveResult = { kind: 'saved'; saved: Saved; form: CreateForm } | { kind: 'error'; message: string; uncertain?: boolean } | { kind: 'blocked' };
 export function photoObjectName(owner: string, journey: string, key: string, uuid: string, mime: string) {
   if (![owner,journey,uuid].every(isJourneyId) || key !== 'cover' && !isJourneyId(key)) throw new SaveFailure('Invalid photo ownership or memory ID.');
@@ -17,11 +20,12 @@ export function photoObjectName(owner: string, journey: string, key: string, uui
   return owner + '/' + journey + '/' + (key === 'cover' ? 'cover' : 'stops/' + key) + '/' + uuid + '.' + ext;
 }
 export function createPhotoSaveController(ports: PhotoSavePorts) {
+  const paired = storedThumbnailsEnabled();
   let busy = false, blocked = false;
   // Editor-lifetime ledger. No remote deletion, overwrites or automatic write retries.
   const uploads = new Map<string, Upload>();
   return {
-    getUploads: () => [...uploads.values()].map(entry => ({ ...entry })),
+    getUploads: () => [...uploads.values()].map(entry => ({ ...entry, ...(entry.thumbnail ? { thumbnail: { ...entry.thumbnail } } : {}) })),
     async save(form: CreateForm, status: 'draft' | 'published', candidates: Record<string, LocalPhoto>, signal: AbortSignal,
       progress: (message: string) => void = () => {}, checkpoint: (form: CreateForm) => void = () => {}): Promise<PhotoSaveResult> {
       if (busy || blocked) return { kind: 'blocked' };
@@ -60,15 +64,33 @@ export function createPhotoSaveController(ports: PhotoSavePorts) {
           const ledgerKey = JSON.stringify([draft.ownerId,current.id,key,photo.uri]);
           let entry = uploads.get(ledgerKey);
           if (!entry) {
-            const objectName = photoObjectName(draft.ownerId,current.id,key,ports.uuid(),photo.mime);
-            entry = { objectName, path: 'journey-media/' + objectName, state: 'allocated' }; uploads.set(ledgerKey,entry);
+            const legacy = photoObjectName(draft.ownerId,current.id,key,ports.uuid(),photo.mime);
+            const objectName = paired ? legacy.replace(/\.(jpg|png|webp)$/, '.full-v1.$1') : legacy;
+            const thumb = paired ? thumbnailObjectName(objectName) : null;
+            entry = { objectName, path: 'journey-media/' + objectName, state: 'allocated', ...(thumb ? { thumbnail: { objectName: thumb, path: 'journey-media/' + thumb, state: 'allocated' as const } } : {}) }; uploads.set(ledgerKey,entry);
           }
           if (entry.state === 'unknown') throw new SaveFailure('An upload result is unconfirmed. Reload/check your draft before another save; no upload will be retried automatically.',true);
+          if (entry.thumbnail?.state === 'unknown') throw new SaveFailure('A thumbnail upload is unconfirmed. Check your draft before another save.',true);
+          let thumbnail: LocalPhoto | undefined;
+          try {
+          if (entry.thumbnail && entry.thumbnail.state !== 'uploaded') {
+            if (!ports.prepareThumbnail || !ports.removeThumbnail) throw new SaveFailure('Thumbnail preparation is unavailable. Your saved photos are unchanged.');
+            try { thumbnail = await ports.prepareThumbnail(photo,signal); }
+            catch { throw new SaveFailure('Thumbnail preparation failed. Your saved photos are unchanged.'); }
+            cancelled();
+            if (thumbnail.uri === photo.uri || thumbnail.mime !== 'image/jpeg' || ![thumbnail.width,thumbnail.height].every(n => Number.isInteger(n) && n > 0 && n <= 512) || !Number.isSafeInteger(thumbnail.size) || thumbnail.size <= 0 || thumbnail.size > 1024*1024) throw new SaveFailure('Invalid prepared thumbnail.');
+          }
           if (entry.state !== 'uploaded') {
             progress('Uploading photo ' + (index+1) + ' of ' + entries.length + '...');
             try { await ports.upload(entry.objectName,photo,signal); entry.state = 'uploaded'; }
             catch (error) { if (!(error instanceof SaveFailure) || error.uncertain) entry.state = 'unknown'; throw error; }
           }
+          cancelled();
+          if (entry.thumbnail && entry.thumbnail.state !== 'uploaded' && thumbnail) {
+            try { await ports.upload(entry.thumbnail.objectName,thumbnail,signal); entry.thumbnail.state = 'uploaded'; }
+            catch (error) { if (!(error instanceof SaveFailure) || error.uncertain) entry.thumbnail.state = 'unknown'; throw error; }
+          }
+          } finally { if (thumbnail && thumbnail.uri !== photo.uri) { try { ports.removeThumbnail?.(thumbnail); } catch { /* Generated local cleanup is best effort. */ } } }
           paths[key] = entry.path;
         }
         cancelled();

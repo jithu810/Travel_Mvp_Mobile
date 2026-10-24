@@ -1,14 +1,14 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { JourneyPhoto } from '../discovery/journey-photo';
+import { ThumbnailPhoto } from '../discovery/thumbnail-photo';
 import { colors } from '../discovery/ui';
 import type { StopInput } from '@/lib/create/model';
-export function MemoryRow({ stop, index, total, photo, cardWidth = 248, selected = false, localPhoto = false, disabled, onEdit, onMove, onRemove, onPhotoError }: {
-  stop: StopInput; index: number; total: number; photo: string | null; cardWidth?: number; selected?: boolean; localPhoto?: boolean; disabled: boolean;
+export function MemoryRow({ stop, index, total, photo, photoThumbnail, cardWidth = 248, selected = false, localPhoto = false, disabled, onEdit, onMove, onRemove, onPhotoError }: {
+  stop: StopInput; index: number; total: number; photo: string | null; photoThumbnail?: string | null; cardWidth?: number; selected?: boolean; localPhoto?: boolean; disabled: boolean;
   onPhotoError?: () => void; onEdit: () => void; onMove: (offset: number) => void; onRemove: () => void;
 }) {
   return <View style={[s.card, { width: cardWidth }, selected && { borderColor: '#326A8C', borderWidth: 2 }]}>
     <Pressable accessibilityRole="button" accessibilityLabel={'Edit memory ' + (index + 1) + ': ' + (stop.name || 'Unnamed')} accessibilityState={{ selected, disabled }} disabled={disabled} onPress={onEdit} style={s.main}>
-      <View style={s.thumb}>{photo ? <JourneyPhoto uri={photo} label={stop.name + ' photo'} ratio={1.6} thumbnail onError={onPhotoError} /> : <Text style={s.symbol}>⌖</Text>}</View>
+      <View style={s.thumb}><ThumbnailPhoto uri={photo} thumbnailUri={localPhoto ? null : photoThumbnail} label={stop.name + ' photo'} ratio={1.6} variant="stop" onOriginalError={onPhotoError} /></View>
       <View style={s.text}><Text numberOfLines={2} style={s.name}>{index + 1}. {stop.name || 'Name this memory'}</Text>
         {(stop.day || stop.rating) && <Text style={s.meta}>{[stop.day && ('Day ' + stop.day), stop.rating && (stop.rating + '/5 ★')].filter(Boolean).join(' · ')}</Text>}
         {localPhoto && <Text style={s.note}>Photo - Not saved</Text>}

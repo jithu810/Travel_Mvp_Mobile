@@ -38,7 +38,8 @@ export function normalizeStops(value: unknown, detail = false): JourneyStop[] {
   }).sort((a, b) => a.sequence - b.sequence);
 }
 
-// Only call for get_public_journeys: the RPC guarantees published-only rows.
+// get_public_journeys guarantees published-only rows. Authenticated account
+// Saved rows also qualify after explicit published/non-demo/saved=true guards.
 // Never normalize arbitrary journeys-table or owner-visible detail rows as cards.
 export function normalizePublicJourney(value: unknown): PublicJourney | null {
   const row = object(value);

@@ -4,6 +4,7 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Image, Platform, Pressable, StatusBar, Text, useWindowDimensions, View } from 'react-native';
 import { JourneyPhoto } from '@/components/discovery/journey-photo';
+import { ThumbnailPhoto } from '@/components/discovery/thumbnail-photo';
 import { journeyFacts } from '@/lib/discovery/model';
 import { profileUIStyles as s } from './profile-styles';
 import type { PublicJourney } from '@/types/journey';
@@ -98,7 +99,7 @@ export function ProfileJourneyCard({ journey }: { journey: PublicJourney }) {
   const router = useRouter();
   return <Pressable accessibilityRole="button" accessibilityLabel={'Open journey: ' + journey.title + ', ' + journey.destination}
     onPress={() => router.push({ pathname: '/journey/[id]', params: { id: journey.id } })} style={({ pressed }) => [s.card, s.journeyCard, pressed && s.pressed]}>
-    <View style={s.thumbnail}><JourneyPhoto uri={journey.cover} ratio={0.9} thumbnail label={journey.title + ' cover photo'} /></View>
+    <View style={s.thumbnail}><ThumbnailPhoto uri={journey.cover} thumbnailUri={journey.coverThumbnail} ratio={0.9} label={journey.title + ' cover photo'} /></View>
     <View style={s.cardCopy}>
       {journey.destination !== 'Destination not specified' && <Text numberOfLines={1} style={s.destination}>⌖ {journey.destination}</Text>}
       <Text numberOfLines={2} style={s.cardTitle}>{journey.title}</Text>

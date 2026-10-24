@@ -1,5 +1,7 @@
 node_modules/
 .expo/
+.local-tests/
+__pycache__/
 dist/
 web-build/
 expo-env.d.ts

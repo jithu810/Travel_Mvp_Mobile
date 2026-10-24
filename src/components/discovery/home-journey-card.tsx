@@ -11,12 +11,15 @@ export const HomeJourneyCard = memo(function HomeJourneyCard({ journey, expanded
   onOpen: (id: string) => void; onLocate: (id: string) => void; onHeight?: (height: number) => void;
 }) {
   const [failedUri, setFailedUri] = useState<string | null>(null);
+  const [failedThumbnail, setFailedThumbnail] = useState<string | null>(null);
+  const thumbnail = journey.coverThumbnail && journey.coverThumbnail !== failedThumbnail ? journey.coverThumbnail : null;
+  const cover = thumbnail || journey.cover;
   return <View style={[s.card, { width }, selected && s.selected]} onLayout={event => onHeight?.(event.nativeEvent.layout.height)}>
     <Pressable accessibilityRole="button" accessibilityLabel={'Open journey: ' + journey.title + ', ' + journey.destination}
       accessibilityHint="Opens Journey Story" onPress={() => onOpen(journey.id)} style={[s.story, expanded && s.expandedStory]}>
       <View style={[s.cover, expanded && s.expandedCover, expanded && { height: Math.round(width * 9 / 16) }]}>
-        {journey.cover && failedUri !== journey.cover
-          ? <Image key={journey.cover} source={{ uri: journey.cover }} accessibilityLabel={journey.title + ' cover photo'} style={s.image} resizeMode="cover" onError={() => setFailedUri(journey.cover)} />
+        {cover && failedUri !== cover
+          ? <Image key={cover} source={{ uri: cover }} accessibilityLabel={journey.title + ' cover photo'} style={s.image} resizeMode="cover" onError={() => { if (thumbnail) setFailedThumbnail(thumbnail); else setFailedUri(cover); }} />
           : <TravelPhotoPlaceholder compact={!expanded} label={'Default travel photo. No journey cover photo available. ' + journey.destination + '. Explore journey'} />}
       </View>
       <View style={[s.content, expanded && s.expandedContent]}>

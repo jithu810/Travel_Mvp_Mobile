@@ -62,17 +62,18 @@ export function DiscoveryPanel({ journeys, selectedId, onLocate, onOpen, notice,
     <View style={[s.list, !expanded && { marginBottom: clearance }]} {...sheet.responders.content}>
     {[false, true].map(listExpanded => <View key={String(listExpanded)} style={[s.list, { display: expanded === listExpanded ? 'flex' : 'none' }]}>
     <FlatList horizontal={!listExpanded}
+      initialNumToRender={listExpanded ? 3 : 2} maxToRenderPerBatch={2} windowSize={3} updateCellsBatchingPeriod={50}
       onScroll={event => { if (listExpanded) sheet.offset.current = event.nativeEvent.contentOffset.y; }} scrollEventThrottle={16}
-      data={journeys.slice(0, visible)} keyExtractor={item => item.id} style={s.list}
+      data={expanded === listExpanded ? journeys.slice(0, visible) : []} keyExtractor={item => item.id} style={s.list}
       showsHorizontalScrollIndicator={false} showsVerticalScrollIndicator={listExpanded}
       contentContainerStyle={[s.items, listExpanded && s.expandedItems, listExpanded && { paddingBottom: clearance + 10 }]}
       renderItem={({ item }) => <HomeJourneyCard journey={item} expanded={listExpanded} width={discoveryCardWidth(availableWidth, listExpanded)}
         selected={selectedId === item.id} onOpen={onOpen} onLocate={onLocate} onHeight={listExpanded ? undefined : measureCard} />}
-      ListEmptyComponent={<View style={s.empty}>
+      ListEmptyComponent={expanded !== listExpanded ? null : <View style={s.empty}>
         {loading ? <><ActivityIndicator color={colors.ink} /><Text style={s.hint}>Finding your next journey…</Text></>
           : <Text style={s.emptyText}>{error ? 'A small detour. Tap Refresh to try again.' : 'The next story is still to come. No public journeys yet.'}</Text>}
       </View>}
-      ListFooterComponent={visible < journeys.length
+      ListFooterComponent={expanded !== listExpanded ? null : visible < journeys.length
         ? <Pressable accessibilityRole="button" accessibilityLabel="More journeys" onPress={() => setVisible(count => count + 24)} style={s.more}><Text style={s.refreshText}>More journeys →</Text></Pressable>
         : listExpanded && journeys.length > 0 ? <Text style={s.end}>You’re up to date with recent journeys.</Text> : null}
     /></View>)}

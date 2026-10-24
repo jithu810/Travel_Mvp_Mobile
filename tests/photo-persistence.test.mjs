@@ -99,3 +99,32 @@ test('cancellation during an upload prevents a later RPC and preserves the exact
  const api=createPhotoSaveController({save:metadata.save,checkDraft:async()=>({ownerId:owner,stopIds:[sid]}),uuid:()=>other,upload:async()=>{abort.abort();}});
  const result=await api.save(form(),'draft',{cover:photo()},abort.signal);assert.equal(result.kind,'error');assert.equal(api.getUploads()[0].state,'uploaded');
 });
+
+function pairedController(options={}) {
+ const previous=process.env.EXPO_PUBLIC_STORED_THUMBNAILS_ENABLED;process.env.EXPO_PUBLIC_STORED_THUMBNAILS_ENABLED='true';
+ const uploads=[],writes=[],removed=[];let rejectThumb=options.failure;
+ const thumbnail={uri:'file:///generated-thumb',width:512,height:384,size:900,mime:'image/jpeg'};
+ const api=createPhotoSaveController({save:async snapshot=>{writes.push(snapshot);return {kind:'saved',saved:{id,status:'draft',updated_at:version}};},checkDraft:async()=>({ownerId:owner,stopIds:[sid]}),uuid:()=>other,
+  prepareThumbnail:async()=>options.invalid ? {...thumbnail,width:513}:options.patch ? {...thumbnail,...options.patch}:thumbnail,removeThumbnail:p=>removed.push(p.uri),
+  upload:async(name,p)=>{uploads.push({name,p});if(name.includes('.thumb-')&&rejectThumb)throw rejectThumb;}});
+ if(previous===undefined)delete process.env.EXPO_PUBLIC_STORED_THUMBNAILS_ENABLED;else process.env.EXPO_PUBLIC_STORED_THUMBNAILS_ENABLED=previous;
+ return {...api,uploads,writes,removed,recover(){rejectThumb=null;},run:()=>api.save(form(),'draft',{cover:photo()},new AbortController().signal)};
+}
+test('enabled paired upload confirms full and512JPEG before metadata, cleans generated only',async()=>{
+ const c=pairedController();const result=await c.run();assert.equal(result.kind,'saved');assert.equal(c.uploads.length,2);
+ assert.match(c.uploads[0].name,/\.full-v1\.png$/);assert.match(c.uploads[1].name,/\.thumb-512-v1\.jpg$/);
+ assert.equal(c.writes[0].coverPath,'journey-media/'+c.uploads[0].name);assert.deepEqual(c.removed,['file:///generated-thumb']);
+ assert.equal(c.getUploads()[0].state,'uploaded');assert.equal(c.getUploads()[0].thumbnail.state,'uploaded');
+});
+test('known thumbnail failure preserves metadata and retries only rejected companion; unknown blocks',async()=>{
+ const c=pairedController({failure:new model.SaveFailure('Denied')});assert.equal((await c.run()).kind,'error');assert.equal(c.writes.length,0);assert.equal(c.getUploads()[0].state,'uploaded');assert.equal(c.getUploads()[0].thumbnail.state,'allocated');c.recover();assert.equal((await c.run()).kind,'saved');assert.equal(c.uploads.length,3);assert.equal(c.uploads[1].name,c.uploads[2].name);
+ const uncertain=pairedController({failure:new model.SaveFailure('Unknown',true)});assert.equal((await uncertain.run()).uncertain,true);assert.equal(uncertain.writes.length,0);assert.equal(uncertain.getUploads()[0].thumbnail.state,'unknown');assert.equal((await uncertain.run()).kind,'blocked');assert.equal(uncertain.uploads.length,2);
+});
+test('invalid prepared thumbnail sends neither upload nor marked metadata and cleans local derivative',async()=>{
+ const c=pairedController({invalid:true});assert.equal((await c.run()).kind,'error');assert.equal(c.uploads.length,0);assert.equal(c.writes.length,0);assert.deepEqual(c.removed,['file:///generated-thumb']);
+});
+test('thumbnail boundary rejects noninteger/oversized bytes or source alias without deleting original',async()=>{
+ for(const patch of [{size:1024*1024+1},{size:4.5},{uri:photo().uri}]){
+  const c=pairedController({patch});assert.equal((await c.run()).kind,'error');assert.equal(c.uploads.length,0);assert.equal(c.writes.length,0);assert.ok(!c.removed.includes(photo().uri));
+ }
+});

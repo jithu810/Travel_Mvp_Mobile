@@ -60,6 +60,21 @@ test('Home markers use each stop own resolved HTTPS photo and retain plain fallb
   const points = discoveryPoints(journey);
   assert.deepEqual(points.features.map(p => p.properties.photo), ['https://example.com/stop.jpg', null, null, null]);
 });
+test('Home marker thumbnail property preserves original photos, coordinates and stable marker identity',()=>{
+ const journey={id:'thumbs',stops:[{...stop('one',0,8,76),photo:'https://example.com/full.jpg',photoThumbnail:'https://example.com/thumb.jpg'},
+  {...stop('unsafe',1,9,77),photo:'https://example.com/original.jpg',photoThumbnail:'journey-media/private/unsigned.jpg'},
+  {...stop('thumb-only',2,10,78),photo:null,photoThumbnail:'https://example.com/only-thumb.jpg'}]};
+ const points=discoveryPoints(journey);assert.deepEqual(points.features.map(p=>p.properties.photoThumbnail),['https://example.com/thumb.jpg',null,'https://example.com/only-thumb.jpg']);assert.deepEqual(points.features.map(p=>p.properties.photo),['https://example.com/full.jpg','https://example.com/original.jpg',null]);assert.deepEqual(points.features.map(p=>[p.id,p.geometry.coordinates]),[['one',[76,8]],['unsafe',[77,9]],['thumb-only',[78,10]]]);
+});
+test('coincident markers select one source pair and never combine different stops original and thumbnail',()=>{
+ const make=stops=>discoveryPoints({id:'same-place',stops}).features[0];
+ let point=make([{...stop('legacy-first',0,8,76),photo:'https://example.com/a.jpg'},
+  {...stop('new-second',1,8,76),photo:'https://example.com/b.full.jpg',photoThumbnail:'https://example.com/b.thumb.jpg'}]);
+ assert.equal(point.properties.photo,'https://example.com/a.jpg');assert.equal(point.properties.photoThumbnail,null);assert.equal(point.id,'legacy-first');assert.deepEqual(point.geometry.coordinates,[76,8]);
+ point=make([{...stop('thumb-first',0,8,76),photo:null,photoThumbnail:'https://example.com/a.thumb.jpg'},
+  {...stop('full-second',1,8,76),photo:'https://example.com/b.full.jpg',photoThumbnail:'https://example.com/b.thumb.jpg'}]);
+ assert.equal(point.properties.photo,null);assert.equal(point.properties.photoThumbnail,'https://example.com/a.thumb.jpg');
+});
 
 const { discoveryRoute, travelLegs, travelLine, travelPosition, createTravelPlayback } = createRequire(import.meta.url)(join(output, 'lib/discovery/travel.js'));
 test('decorative route follows stored order and never draws across missing stops or animates duplicates', () => {
@@ -105,7 +120,8 @@ test('travel playback advances once per completion with dwell and cancels stale 
 test('native overlay refreshes image snapshots, handles failure, and has no per-frame React position updates', () => {
   const overlay = readFileSync('src/components/discovery/globe/journey-overlays.tsx', 'utf8');
   assert.ok(overlay.includes('fadeDuration={0}') && overlay.includes('annotation.current?.refresh()'));
-  assert.ok(overlay.includes('onError={() => setFailed(true)}'));
+  assert.ok(overlay.includes('useThumbnailSource(point.properties.photo, point.properties.photoThumbnail)'));
+  assert.ok(overlay.includes('onError={() => { if (uri) onError(); }}'));
   assert.ok(overlay.includes('onSelected={() => onOpen(point.properties.journeyId)}'));
   assert.ok(overlay.includes('Mapbox.Animated.ShapeSource') && overlay.includes('playback.cancel(); progress.removeListener(listener)'));
   assert.ok(!overlay.includes('setInterval') && !overlay.includes('setCoordinate'));

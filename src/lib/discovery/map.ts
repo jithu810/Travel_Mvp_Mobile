@@ -5,12 +5,15 @@ import { buildMapData, hasCoordinates } from '../journey/map-data';
 export const worldCamera = { centerCoordinate: [35, 18], zoomLevel: 0.8, heading: 0, pitch: 0 };
 export function discoveryPoints(journey: PublicJourney | null) {
   const seen = new Set<string>();
-  const photos = new Map<string, string>();
+  const photos = new Map<string, { original: string | null; thumbnail: string | null }>();
   for (const stop of journey?.stops || []) {
     const photo = safePhoto(stop.photo);
-    if (hasCoordinates(stop) && photo?.startsWith('https://')) {
+    const thumbnail = safePhoto(stop.photoThumbnail);
+    if (hasCoordinates(stop)) {
       const coordinate = [stop.longitude, stop.latitude].join(',');
-      if (!photos.has(coordinate)) photos.set(coordinate, photo);
+      const original = photo?.startsWith('https://') ? photo : null;
+      const preview = thumbnail?.startsWith('https://') ? thumbnail : null;
+      if (!photos.has(coordinate) && (original || preview)) photos.set(coordinate, { original, thumbnail: preview });
     }
   }
   const markers = journey ? buildMapData(journey.stops).markers : [];
@@ -24,7 +27,7 @@ export function discoveryPoints(journey: PublicJourney | null) {
         type: 'Feature' as const, id: marker.id,
         geometry: { type: 'Point' as const, coordinates: marker.coordinate },
         properties: { journeyId: journey!.id, name: marker.name,
-          photo: photos.get(key) || null },
+          photo: photos.get(key)?.original || null, photoThumbnail: photos.get(key)?.thumbnail || null },
       }];
     }),
   };

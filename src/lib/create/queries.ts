@@ -2,6 +2,7 @@ import { hydrateDraft } from './editor-model';
 import { supabase } from '../supabase/client';
 import { object, safePhoto } from '../discovery/model';
 import { SaveFailure, type SavePayload, type Saved } from './model';
+import { storedThumbnailsEnabled, thumbnailStoragePath } from '../media/image-variants';
 export async function saveNewJourney(payload: SavePayload, ownerId: string, signal: AbortSignal = new AbortController().signal): Promise<Saved> {
   if (signal.aborted) throw new SaveFailure('Save cancelled before submission.');
   if (!supabase) throw new SaveFailure('Journey saving is not configured.');
@@ -53,13 +54,29 @@ export async function loadEditableDraft(id: string, ownerId: string, signal: Abo
 export async function loadEditorPhotos(paths: string[], ownerId: string, signal: AbortSignal): Promise<Record<string, string>> {
   if (!paths.length) return {};
   if (!supabase || signal.aborted) throw new Error('Photo previews unavailable.');
-  const { data, error } = await supabase.auth.getUser();
-  if (error || data.user?.id !== ownerId || signal.aborted) throw new Error('Photo previews unavailable.');
-  const objects = [...new Set(paths.filter(path => path.startsWith('journey-media/') && safePhoto(path)))];
+  const client = supabase;
+  let identityChanged = false;
+  const subscription = client.auth.onAuthStateChange?.((_event, session) => {
+    if (session?.user.id !== ownerId) identityChanged = true;
+  }).data.subscription;
+  async function verifyOwner() {
+    if (identityChanged || signal.aborted) throw new Error('Photo previews unavailable.');
+    const { data, error } = await client.auth.getUser();
+    if (error || data.user?.id !== ownerId || identityChanged || signal.aborted) throw new Error('Photo previews unavailable.');
+  }
+  try {
+  await verifyOwner();
+  const originals = paths.filter(path => path.startsWith('journey-media/') && safePhoto(path));
+  const objects = [...new Set(originals.flatMap(path => {
+    const thumbnail = storedThumbnailsEnabled() ? thumbnailStoragePath(path) : null;
+    return thumbnail ? [path,thumbnail] : [path];
+  }))];
   if (!objects.length) return {};
-  const { data: photos, error: photoError } = await supabase.storage.from('journey-media').createSignedUrls(objects.map(path => path.slice('journey-media/'.length)), 3600);
+  const { data: photos, error: photoError } = await client.storage.from('journey-media').createSignedUrls(objects.map(path => path.slice('journey-media/'.length)), 3600);
   if (photoError || signal.aborted) throw new Error('Photo previews unavailable.');
+  await verifyOwner();
   const result: Record<string, string> = {};
   photos?.forEach((photo, index) => { if (photo.signedUrl && !photo.error) result[objects[index]] = photo.signedUrl; });
   return result;
+  } finally { subscription?.unsubscribe(); }
 }

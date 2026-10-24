@@ -1,7 +1,9 @@
+import { thumbnailStoragePath } from '@/lib/media/image-variants';
 import { theme, primaryControl } from '@/theme/mobile-theme';
 import { BrandedLoading } from '@/components/branded-loading';
 import { createPhotoSaveController } from '@/lib/create/photo-save';
 import { checkPhotoDraft, uploadJourneyPhoto } from '@/lib/create/photo-queries';
+import { prepareThumbnail, removeThumbnail } from '@/lib/create/thumbnail-device';
 import { useEditorPhotos } from '@/hooks/use-editor-photos';
 import { useLocalPhotos } from '@/hooks/use-local-photos';
 import { PhotoField } from '@/components/create/photo-field';
@@ -25,8 +27,8 @@ import { JourneyMap } from '@/components/journey/map/journey-map';
 import { useSessionState } from '@/hooks/session-context';
 import { coordinates, createSaveController, moveStop, newForm, previewStops, type CreateForm, type Place, type StopInput } from '@/lib/create/model';
 import { loadEditableDraft, saveNewJourney } from '@/lib/create/queries';
-const DraftMap = memo(function DraftMap({ geometry, photos, selectedId, onSelect, active }: { geometry: string; photos: string; selectedId: string | null; onSelect: (id: string) => void; active: boolean }) {
-  const stops = useMemo(() => previewStops(JSON.parse(geometry) as StopInput[]), [geometry]);
+const DraftMap = memo(function DraftMap({ geometry, photos, thumbnails, selectedId, onSelect, active }: { geometry: string; photos: string; thumbnails: string; selectedId: string | null; onSelect: (id: string) => void; active: boolean }) {
+  const stops = useMemo(() => { const thumbs = JSON.parse(thumbnails) as Record<string, string | null>; return previewStops(JSON.parse(geometry) as StopInput[]).map(stop => ({ ...stop, photoThumbnail: thumbs[stop.id] || null })); }, [geometry, thumbnails]);
   const memoryPhotos = useMemo(() => JSON.parse(photos) as Record<string, string | null>, [photos]);
   return <View style={{ height: 180, borderRadius: 18, overflow: 'hidden' }}><JourneyMap stops={stops} presentation="expanded" memoryPhotos={memoryPhotos} animateMemoryRoute={active} selectedId={selectedId} onSelect={onSelect} /></View>;
 });
@@ -54,7 +56,7 @@ export function NewJourneyEditor({ ownerId, initial, onReload, onDestinationFocu
   const controller = useMemo(() => {
     const metadata = createSaveController((payload, signal) => saveNewJourney(payload,ownerId,signal));
     return createPhotoSaveController({ save: metadata.save, checkDraft: (form,signal) => checkPhotoDraft(form,ownerId,signal),
-      upload: (objectName,photo,signal) => uploadJourneyPhoto(objectName,photo,ownerId,signal), uuid: randomUUID });
+      upload: (objectName,photo,signal) => uploadJourneyPhoto(objectName,photo,ownerId,signal), uuid: randomUUID, prepareThumbnail, removeThumbnail });
   }, [ownerId]);
   const [savePhase, setSavePhase] = useState('Saving journey...');
   const [busy, setBusy] = useState(false), [error, setError] = useState<string | null>(null), [message, setMessage] = useState<string | null>(null);
@@ -73,6 +75,7 @@ export function NewJourneyEditor({ ownerId, initial, onReload, onDestinationFocu
   const pathsKey = JSON.stringify([form.coverPath, ...form.stops.map(stop => stop.photoPath)].filter((path): path is string => !!path));
   const photos = useEditorPhotos(pathsKey,ownerId);
   const memoryPhotos = JSON.stringify(Object.fromEntries(form.stops.map(stop => [stop.id, localPhotos.candidates[stop.id]?.uri || (stop.photoPath ? stop.photoPath.startsWith('journey-media/') ? photos.data?.[stop.photoPath] || null : safePhoto(stop.photoPath) : null)])));
+  const memoryThumbnails = JSON.stringify(Object.fromEntries(form.stops.map(stop => [stop.id, !localPhotos.candidates[stop.id] && stop.photoPath ? photos.data?.[thumbnailStoragePath(stop.photoPath) || ''] || null : null])));
   const latest = useRef({ form, memoryEdit, candidates: localPhotos.candidates });
   useEffect(() => { latest.current = { form, memoryEdit, candidates: localPhotos.candidates }; }, [form, memoryEdit, localPhotos.candidates]);
   usePreventRemove(dirty || memoryChanged(memoryEdit) || busy || hasLocalPhotos || photoBusy, ({ data }) => {
@@ -179,13 +182,13 @@ export function NewJourneyEditor({ ownerId, initial, onReload, onDestinationFocu
     </View>
       <PhotoField compact label="Cover photo" candidate={localPhotos.candidates.cover} savedUri={form.coverPath ? form.coverPath.startsWith('journey-media/') ? photos.data?.[form.coverPath] : safePhoto(form.coverPath) : null}
         busy={localPhotos.busyKey === 'cover'} disabled={disabled} error={localPhotos.errors.cover} onSelect={() => { if (!lock.current && !disabled) localPhotos.select('cover'); }} onTakePhoto={() => { if (!lock.current && !disabled) localPhotos.select('cover', 'camera'); }} onRemove={() => localPhotos.remove('cover')} hasSavedPhoto={!!form.coverPath} onRemoveSaved={() => change({ coverPath: null })} onPreviewError={photos.refreshPreview} />
-      {form.stops.some(stop => coordinates(stop.latitude, stop.longitude)) && <DraftMap geometry={geometry} photos={memoryPhotos} selectedId={form.stops.some(stop => stop.id === selectedMemoryId) ? selectedMemoryId : null} onSelect={setSelectedMemoryId} active={!settingsOpen && !memoryEdit && !busy && !photoBusy} />}
+      {form.stops.some(stop => coordinates(stop.latitude, stop.longitude)) && <DraftMap geometry={geometry} photos={memoryPhotos} thumbnails={memoryThumbnails} selectedId={form.stops.some(stop => stop.id === selectedMemoryId) ? selectedMemoryId : null} onSelect={setSelectedMemoryId} active={!settingsOpen && !memoryEdit && !busy && !photoBusy} />}
       <View style={createStyles.memoriesSection}>
       <View style={createStyles.memoriesBand}><Text accessibilityRole="header" style={createStyles.memoriesHeading}>Memories · {form.stops.length}/50</Text></View>
       {!form.stops.length && <View style={createStyles.emptyMemories}><View accessible={false} style={createStyles.emptySymbol}><Text style={createStyles.emptySymbolText}>⌖</Text></View><Text style={createStyles.emptyTitle}>Your journey starts here</Text><Text style={createStyles.emptyBody}>Add a place or simply name a moment. Notes are optional, and you can come back whenever you have time.</Text></View>}
       {form.stops.length > 0 && <ScrollView horizontal accessibilityLabel="Journey memories" accessibilityHint="Swipe left or right to browse memories; tap a card to edit" showsHorizontalScrollIndicator={false} directionalLockEnabled nestedScrollEnabled keyboardShouldPersistTaps="handled" style={createStyles.memoryScroll} contentContainerStyle={createStyles.memoryCards} onMomentumScrollEnd={event => selectVisibleMemory(event.nativeEvent.contentOffset.x)} onScrollEndDrag={event => { if (!event.nativeEvent.velocity?.x) selectVisibleMemory(event.nativeEvent.contentOffset.x); }} onLayout={event => setMemoryListWidth(event.nativeEvent.layout.width)}>
       {form.stops.map((stop, index) => <MemoryRow key={stop.id} cardWidth={memoryCardWidth} selected={selectedMemoryId === stop.id} stop={stop} index={index} total={form.stops.length} disabled={disabled}
-        localPhoto={!!localPhotos.candidates[stop.id]} photo={localPhotos.candidates[stop.id]?.uri || (stop.photoPath ? stop.photoPath.startsWith('journey-media/') ? photos.data?.[stop.photoPath] || null : safePhoto(stop.photoPath) : null)}
+        localPhoto={!!localPhotos.candidates[stop.id]} photoThumbnail={!localPhotos.candidates[stop.id] && stop.photoPath ? photos.data?.[thumbnailStoragePath(stop.photoPath) || ''] || null : null} photo={localPhotos.candidates[stop.id]?.uri || (stop.photoPath ? stop.photoPath.startsWith('journey-media/') ? photos.data?.[stop.photoPath] || null : safePhoto(stop.photoPath) : null)}
         onEdit={() => { if (!disabled && !lock.current && !localPhotos.isBusy()) { setSelectedMemoryId(stop.id); setError(null); setMemoryEdit({ value: { ...stop }, baseline: { ...stop }, isNew: false }); } }}
         onPhotoError={photos.refreshPreview} onMove={offset => change({ stops: moveStop(form.stops, index, offset) })} onRemove={() => removeMemory(stop)} />)}
       </ScrollView>}

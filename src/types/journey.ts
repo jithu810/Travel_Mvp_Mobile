@@ -8,6 +8,7 @@ export type JourneyStop = {
   sequence: number;
   dayNumber: number | null;
   photo: string | null;
+  photoThumbnail?: string | null;
   rating: number | null;
   latitude: number | null;
   longitude: number | null;
@@ -24,5 +25,6 @@ export type PublicJourney = {
   durationDays: number | null;
   likes: number | null;
   cover: string | null;
+  coverThumbnail?: string | null;
   stops: JourneyStop[];
 };

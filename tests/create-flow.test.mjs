@@ -17,18 +17,24 @@ function harness() {
   return { hooks, render(fn, props) { cursor=0;effects=[];const result=fn(props);effects.forEach(fn=>fn());return result; } };
 }
 const native = Object.fromEntries(['Image','View','Text','TextInput','Pressable','ScrollView','KeyboardAvoidingView','ActivityIndicator','Modal'].map(name=>[name,name]));
-native.Animated={View:'AnimatedView'};native.Keyboard={dismiss(){},addListener(){return {remove(){}};}};native.StyleSheet={create:value=>value};native.Platform={OS:'android'};
+native.AppState={addEventListener(){return {remove(){}};}};native.Animated={View:'AnimatedView'};native.Keyboard={dismiss(){},addListener(){return {remove(){}};}};native.StyleSheet={create:value=>value};native.Platform={OS:'android'};
 const ui = { colors: {}, ui: {}, Action:'Action', Message:'Message', ScreenHeader:'ScreenHeader' };
 function load(file, modules, hooks=harness().hooks, timers=globalThis) {
   const exports={}; const jsx=(type,props)=>({type,props});
   const code=ts.transpileModule(readFileSync(file,'utf8'), {compilerOptions:{module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX,target:ts.ScriptTarget.ES2022}}).outputText;
   new Function('require','exports','setTimeout','clearTimeout',code)(name=>{ if (name === '@/theme/mobile-theme') return mobileTheme;
+    if(name==='@/lib/media/image-variants')return load('src/lib/media/image-variants.ts',{});
+    if(name==='../discovery/thumbnail-photo')return {ThumbnailPhoto:'JourneyPhoto'};
+    if(name==='@/hooks/use-thumbnail-source')return {useThumbnailSource:()=>({uri:null,onError(){}})};
+    if(name==='../media/image-variants')return load('src/lib/media/image-variants.ts',{});
+    if(name==='@/lib/create/thumbnail-device')return {prepareThumbnail:async()=>{throw Error('Thumbnail not enabled in this test');},removeThumbnail(){}};
+    if(name==='@/components/discovery/compact-search-input')return load('src/components/discovery/compact-search-input.tsx',{},hooks);
     if(name==='@/lib/journey/nearby')return load('src/lib/journey/nearby.ts',{}); if(name.endsWith('/nearby-locations'))return {NearbyLocations:'NearbyLocations'}; if(name==='@/components/branded-loading')return {BrandedLoading:'BrandedLoading'};if(name==='@/lib/discovery/destination-camera')return destinationHelpers;if(name==='@/hooks/use-discovery-sheet')return modules[name] || {useDiscoverySheet:()=>({height:56,expanded:true,responders:{handle:{},content:{}},offset:{current:0},setScrollOffset(){},toggle(){}})};if(name==='@/components/create/create-journey-header')return {CreateJourneyHeader:'CreateJourneyHeader'};if(name==='expo-status-bar')return {StatusBar:'StatusBar'};if(name==='react')return hooks;if(name==='react/jsx-runtime')return {jsx,jsxs:jsx,Fragment:'Fragment'};
     if(name==='../home-control-icon')return {HomeControlIcon:'HomeControlIcon'};if(name==='react-native')return {...native,...modules[name]};if(name==='expo-router')return {Stack:{Screen:'StackScreen'},...modules[name]};if(name in modules)return modules[name];throw Error(name);
   },exports,timers.setTimeout,timers.clearTimeout);return exports;
 }
 const destinationHelpers=load('src/lib/discovery/destination-camera.ts',{'../journey/map-data':{hasCoordinates:p=>Number.isFinite(p.longitude)&&Number.isFinite(p.latitude)&&Math.abs(p.longitude)<=180&&Math.abs(p.latitude)<=90}});
-function all(tree,type) { if(!tree||typeof tree!=='object')return [];return [...((tree.type===type || tree.type?.name===type)?[tree]:[]),...[tree.props?.children].flat(Infinity).flatMap(child=>all(child,type))]; }
+function all(tree,type) { if(!tree||typeof tree!=='object')return [];if(tree.type?.name==='CompactSearchInput')return all(tree.type(tree.props),type);return [...((tree.type===type || tree.type?.name===type)?[tree]:[]),...[tree.props?.children].flat(Infinity).flatMap(child=>all(child,type))]; }
 const id='11111111-1111-4111-8111-111111111111', uid='22222222-2222-4222-8222-222222222222', sid='33333333-3333-4333-8333-333333333333';
 const model=load('src/lib/create/model.ts', {'../discovery/model':{isJourneyId:value=>/^[0-9a-f-]{36}$/i.test(value)}});
 const photoSave=load('src/lib/create/photo-save.ts', {'./model':model,'../discovery/model':{isJourneyId:value=>/^[0-9a-f-]{36}$/i.test(value)}});
@@ -42,7 +48,7 @@ function screenHarness(initial, photoState = {}) {
   const modules={
     '@/lib/create/photo-save':photoSave,
     '@/lib/create/photo-queries':{checkPhotoDraft:async()=>({ownerId:uid,stopIds:(writes.at(-1)?.stops||initial?.stops||[]).map(s=>s.id)}),uploadJourneyPhoto:async(name,photo)=>{uploads.push({name,photo});if(photoState.uploadFailure)throw new model.SaveFailure(photoState.uploadFailure);}},
-    '@/hooks/use-editor-photos':{useEditorPhotos:()=>({data:{'journey-media/raw/stop.png':'https://signed.test/stop'},error:null,refreshPreview(){}})},
+    '@/hooks/use-editor-photos':{useEditorPhotos:()=>({data:{'journey-media/raw/stop.png':'https://signed.test/stop',...photoState.previews},error:null,refreshPreview(){}})},
     '@/components/create/photo-field':{PhotoField:'PhotoField'},
     '@/hooks/use-local-photos':{useLocalPhotos:()=>({candidates:photoState.candidates||{},errors:photoState.errors||{},busyKey:photoState.busyKey||null,acceptSaved:saved=>{photoState.candidates=Object.fromEntries(Object.entries(photoState.candidates).filter(([key,p])=>saved[key]?.uri!==p.uri));},isBusy:()=>!!photoState.busyKey,select:(key,source='gallery')=>{photoState.selected=key;photoState.source=source;},remove:key=>{delete photoState.candidates?.[key];}})},
     '@/lib/create/id':{randomUUID:()=>initial ? sid : id,idsAvailable:true},
@@ -712,7 +718,7 @@ test('Home selection wires coordinates and repeat flight versions without naviga
     '../../assets/journey-creator-logo.png':'logo','expo-router':{useRouter:()=>({push:r=>routes.push(r)}),useFocusEffect:()=>{}},
     'react-native-safe-area-context':{SafeAreaView:'SafeAreaView',useSafeAreaInsets:()=>({bottom:24})},
     '@/components/discovery/globe/discovery-globe':{DiscoveryGlobe:'Globe'},'@/components/discovery/discovery-panel':{DiscoveryPanel:'Panel'},
-    '@/hooks/use-load':{useLoad:()=>({data:[]})},'@/lib/discovery/map':{discoveryPoints:()=>({features:[]}),worldCamera:{centerCoordinate:[35,18]}},
+    '@/hooks/use-load':{useLoad:()=>({data:[],refresh(){}})},'@/lib/discovery/map':{discoveryPoints:()=>({features:[]}),worldCamera:{centerCoordinate:[35,18]}},
     '@/lib/discovery/travel':{discoveryRoute:()=>[]},'@/lib/discovery/presentation':{},'@/lib/discovery/queries':{},
   },h.hooks);
   let tree=h.render(Home,{});let picker=all(tree,'PlacePicker')[0];assert.equal(picker.props.proximity.longitude,35);
@@ -735,7 +741,7 @@ test('Home proximity uses only already-granted recent location; denied, missing 
       'expo-location':{getForegroundPermissionsAsync:async()=>{if(mode==='error')throw Error('Unavailable');return {granted:mode!=='denied'};},requestForegroundPermissionsAsync:async()=>{permissionRequests++;throw Error('No prompt allowed');},getLastKnownPositionAsync:async options=>{positionReads++;assert.equal(options.maxAge,300000);return mode==='missing'?null:{coords:{longitude:76,latitude:9}};}},
       'react-native-safe-area-context':{SafeAreaView:'SafeAreaView',useSafeAreaInsets:()=>({bottom:0})},
       '@/components/discovery/globe/discovery-globe':{DiscoveryGlobe:'Globe'},'@/components/discovery/discovery-panel':{DiscoveryPanel:'Panel'},
-      '@/hooks/use-load':{useLoad:()=>({data:[]})},'@/lib/discovery/map':{discoveryPoints:()=>({features:[]}),worldCamera:{centerCoordinate:[35,18]}},
+      '@/hooks/use-load':{useLoad:()=>({data:[],refresh(){}})},'@/lib/discovery/map':{discoveryPoints:()=>({features:[]}),worldCamera:{centerCoordinate:[35,18]}},
       '@/lib/discovery/travel':{discoveryRoute:()=>[]},'@/lib/discovery/presentation':{},'@/lib/discovery/queries':{},
     },h.hooks);
     h.render(Home,{});await tick();const tree=h.render(Home,{}),picker=all(tree,'PlacePicker')[0];
@@ -816,4 +822,10 @@ test('journey settings keeps validation failures open and creation controls expo
   const patches=[];tree=QuickJourneySetup({form:privateForm(),editing:true,disabled:false,onTitle(){},onDestination(){},onChange:p=>patches.push(p),onStart(){}});
   const description=all(tree,'TextInput').find(n=>n.props.accessibilityLabel==='Journey description (optional)');assert.equal(description.props.maxLength,5000);description.props.onChangeText('A new note');assert.deepEqual(patches,[{description:'A new note'}]);
   assert.equal(all(tree,'Action')[0].props.label,'Save Changes');assert.equal(all(tree,'PlacePicker')[0].props.destinationOnly,true);
+});
+test('Create memory rows and map previews receive companion URLs while unsaved candidates and full edit controls retain originals',()=>{
+ const full='journey-media/'+uid+'/'+id+'/stops/'+sid+'/'+uid+'.full-v1.jpg';const thumb=full.replace('.full-v1.jpg','.thumb-512-v1.jpg');const photos={candidates:{[sid]:{uri:'file:///candidate.jpg'}},previews:{[full]:'https://signed.test/full-memory',[thumb]:'https://signed.test/thumb-memory'}};
+ const h=screenHarness({...privateForm(),stops:[memoryRow(sid,'QA memory',{latitude:8,longitude:76,photoPath:full})]},photos);let tree=h.render();let row=all(tree,'MemoryRow')[0],map=all(tree,'DraftMap')[0];assert.equal(row.props.photo,'file:///candidate.jpg');assert.equal(row.props.photoThumbnail,null);assert.equal(JSON.parse(map.props.thumbnails)[sid],null);assert.equal(JSON.parse(map.props.photos)[sid],'file:///candidate.jpg');const geometry=map.props.geometry;
+ delete photos.candidates[sid];tree=h.render();row=all(tree,'MemoryRow')[0];map=all(tree,'DraftMap')[0];assert.equal(row.props.photo,'https://signed.test/full-memory');assert.equal(row.props.photoThumbnail,'https://signed.test/thumb-memory');assert.equal(JSON.parse(map.props.thumbnails)[sid],'https://signed.test/thumb-memory');assert.equal(JSON.parse(map.props.photos)[sid],'https://signed.test/full-memory');assert.equal(map.props.geometry,geometry);
+ row.props.onEdit();tree=h.render();assert.equal(all(tree,'MemoryEditorSheet')[0].props.photoControl.props.savedUri,'https://signed.test/full-memory');assert.equal(h.writes.length,0);
 });

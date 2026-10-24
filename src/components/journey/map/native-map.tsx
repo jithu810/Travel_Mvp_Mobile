@@ -77,8 +77,8 @@ export const NativeJourneyMap = memo(function NativeJourneyMap({ data, stops, re
   }, [memoryPreview, onSelect, navigationMode, nearbyPoints, reduceMotion]);
   const memoryPoints = useMemo(() => ({ type: 'FeatureCollection' as const, features: data.markers.map(marker => ({
     type: 'Feature' as const, id: marker.id, geometry: { type: 'Point' as const, coordinates: marker.coordinate },
-    properties: { journeyId: marker.id, name: marker.name, photo: memoryPhotos?.[marker.id] || null },
-  })) }), [data.markers, memoryPhotos]);
+    properties: { journeyId: marker.id, name: marker.name, photo: memoryPhotos?.[marker.id] || null, photoThumbnail: stops.find(stop => stop.id === marker.id)?.photoThumbnail || null },
+  })) }), [data.markers, memoryPhotos, stops]);
   const moveToLocation = useCallback((command: TravelCameraCommand) => {
     // GPS/camera observers can receive AppState before this component's listener.
     if (!mounted.current || AppState.currentState !== 'active') return;
