@@ -3,6 +3,7 @@ import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import type { PublicJourney } from '@/types/journey';
 import { journeyFacts } from '@/lib/discovery/model';
 import { colors } from './ui';
+import { TravelPhotoPlaceholder } from './travel-photo-placeholder';
 
 export const HomeJourneyCard = memo(function HomeJourneyCard({ journey, expanded, width, selected, onOpen, onLocate, onHeight }: {
   journey: PublicJourney; expanded: boolean; width: number; selected: boolean;
@@ -12,11 +13,10 @@ export const HomeJourneyCard = memo(function HomeJourneyCard({ journey, expanded
   return <View style={[s.card, { width }, selected && s.selected]} onLayout={event => onHeight?.(event.nativeEvent.layout.height)}>
     <Pressable accessibilityRole="button" accessibilityLabel={'Open journey: ' + journey.title + ', ' + journey.destination}
       accessibilityHint="Opens Journey Story" onPress={() => onOpen(journey.id)} style={[s.story, expanded && s.expandedStory]}>
-      <View style={[s.cover, expanded && s.expandedCover, expanded && { height: Math.round(width / 2.6) }]}>
+      <View style={[s.cover, expanded && s.expandedCover, expanded && { height: Math.round(width * 9 / 16) }]}>
         {journey.cover && failedUri !== journey.cover
-          ? <><Image source={{ uri: journey.cover }} accessible={false} accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={s.backdrop} resizeMode="cover" blurRadius={18} />
-            <Image key={journey.cover} source={{ uri: journey.cover }} accessibilityLabel={journey.title + ' cover photo'} style={s.image} resizeMode="contain" onError={() => setFailedUri(journey.cover)} /></>
-          : <View style={s.placeholder} accessible accessibilityLabel="No journey cover photo available"><Text style={s.placeholderIcon}>↗</Text></View>}
+          ? <Image key={journey.cover} source={{ uri: journey.cover }} accessibilityLabel={journey.title + ' cover photo'} style={s.image} resizeMode="cover" onError={() => setFailedUri(journey.cover)} />
+          : <TravelPhotoPlaceholder destination={journey.destination} caption={expanded} label={'No journey cover photo available. ' + journey.destination + '. Journey story'} />}
       </View>
       <View style={[s.content, expanded && s.expandedContent]}>
         <Text numberOfLines={1} style={s.destination}>{journey.destination}</Text>
@@ -39,11 +39,8 @@ const s = StyleSheet.create({
   story: { flexDirection: 'row', padding: 10, paddingBottom: 4, gap: 10 },
   expandedStory: { flexDirection: 'column', padding: 0, gap: 0 },
   cover: { width: 96, height: 84, borderRadius: 12, overflow: 'hidden', backgroundColor: colors.pale },
-  expandedCover: { width: '100%', height: undefined, aspectRatio: 2.6, borderRadius: 0 },
+  expandedCover: { width: '100%', height: undefined, aspectRatio: 16 / 9, borderRadius: 0 },
   image: { position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' },
-  backdrop: { position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', opacity: 0.45 },
-  placeholder: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.pale },
-  placeholderIcon: { fontSize: 24, color: '#2C63AF' },
   content: { flex: 1, minWidth: 0, gap: 3, paddingHorizontal: 4, paddingVertical: 4 },
   expandedContent: { paddingHorizontal: 14, paddingTop: 10 },
   destination: { color: '#2C63AF', fontSize: 10, fontWeight: '600' },

@@ -1,3 +1,4 @@
+import { JourneyActionIcon } from './journey-action-icon';
 import { JourneyShareSheet } from './journey-share-sheet';
 import { createShareArtwork, type ShareArtwork } from '@/lib/social/share-artwork';
 import { useFocusEffect, useRouter } from 'expo-router';
@@ -10,7 +11,9 @@ import { colors } from '@/components/discovery/ui';
 import { useJourneySocial } from '@/hooks/use-journey-social';
 import { sharePublicJourney } from '@/lib/social/sharing';
 
-export function SocialActions({ journey, compact = false, selectedMemoryId }: { journey: PublicJourney; compact?: boolean; selectedMemoryId?: string | null }) {
+export function SocialActions({ journey, compact = false, selectedMemoryId, layout }: { journey: PublicJourney; compact?: boolean; selectedMemoryId?: string | null; layout?: 'rail' }) {
+  const rail = layout === 'rail';
+  const overlayFeedback = compact || rail;
   const social = useJourneySocial(journey.id, journey.likes);
   const router = useRouter();
   const intent = useActionIntent();
@@ -51,30 +54,34 @@ export function SocialActions({ journey, compact = false, selectedMemoryId }: { 
     {shareMessage && <Text selectable accessibilityLiveRegion="polite" style={styles.note}>{shareMessage}</Text>}
     {!social.auth.session && !social.auth.loading && !social.message && <Text style={styles.note}>Like and Save require sign-in. Public journeys can be shared without an account.</Text>}
   </View>;
-  return <View style={[styles.section, compact && styles.compactSection]}>
-    <View style={[styles.row, compact && styles.compactRow]}>
+  return <View style={[styles.section, compact && styles.compactSection, rail && styles.railSection]}>
+    <View style={[styles.row, compact && styles.compactRow, rail && styles.railRow]}>
       <Pressable accessibilityRole="button" accessibilityLabel={social.state?.liked ? 'Unlike journey' : 'Like journey'}
         accessibilityState={{ disabled, selected: social.state?.liked ?? false }} disabled={disabled}
-        onPress={() => { act('like'); }} style={({ pressed }) => [styles.button, compact && styles.compactButton, social.state?.liked && styles.active, disabled && styles.disabled, pressed && styles.pressed]}>
-        {social.busy === 'like' ? <ActivityIndicator color={colors.ink} /> : <Text style={[styles.label, compact && styles.compactLabel]}>{compact ? (social.state?.liked ? '♥ Like' : '♡ Like') : social.state?.liked ? '♥ Unlike' : '♡ Like'}{likes !== null && likes !== undefined ? ' · ' + likes : ''}</Text>}
+        onPress={() => { act('like'); }} style={({ pressed }) => [styles.button, compact && styles.compactButton, rail && styles.railButton, social.state?.liked && styles.active, disabled && styles.disabled, pressed && styles.pressed]}>
+        {social.busy === 'like' ? <ActivityIndicator color={colors.ink} /> : rail ? <View style={styles.iconCount}><JourneyActionIcon name="heart" selected={social.state?.liked} />{likes !== null && likes !== undefined && <Text maxFontSizeMultiplier={1.2} numberOfLines={1} style={styles.count}>{likes}</Text>}</View> : <Text style={[styles.label, compact && styles.compactLabel]}>{(compact ? (social.state?.liked ? '♥ Like' : '♡ Like') : social.state?.liked ? '♥ Unlike' : '♡ Like') + (likes !== null && likes !== undefined ? ' · ' + likes : '')}</Text>}
       </Pressable>
       <Pressable accessibilityRole="button" accessibilityLabel={social.state?.saved ? 'Remove journey from Saved' : 'Save journey'}
         accessibilityState={{ disabled, selected: social.state?.saved ?? false }} disabled={disabled}
-        onPress={() => { act('save'); }} style={({ pressed }) => [styles.button, compact && styles.compactButton, social.state?.saved && styles.active, disabled && styles.disabled, pressed && styles.pressed]}>
-        {social.busy === 'save' ? <ActivityIndicator color={colors.ink} /> : <Text style={[styles.label, compact && styles.compactLabel]}>{social.state?.saved ? (compact ? 'Saved' : 'Saved ✓') : 'Save'}</Text>}
+        onPress={() => { act('save'); }} style={({ pressed }) => [styles.button, compact && styles.compactButton, rail && styles.railButton, social.state?.saved && styles.active, disabled && styles.disabled, pressed && styles.pressed]}>
+        {social.busy === 'save' ? <ActivityIndicator color={colors.ink} /> : rail ? <JourneyActionIcon name="bookmark" selected={social.state?.saved} /> : <Text style={[styles.label, compact && styles.compactLabel]}>{social.state?.saved ? (compact ? 'Saved' : 'Saved ✓') : 'Save'}</Text>}
       </Pressable>
       <Pressable ref={shareButton} accessibilityRole="button" accessibilityLabel="Share public journey"
         accessibilityState={{ disabled: sharing }} disabled={sharing} onPress={() => { const next = createShareArtwork(journey, selectedMemoryId, process.env.EXPO_PUBLIC_SITE_URL); if (next && selectedMemoryId !== undefined) setArtwork(next); else void shareLink(); }}
-        style={({ pressed }) => [styles.button, compact && styles.compactButton, pressed && styles.pressed]}>
-        {sharing ? <ActivityIndicator color={colors.ink} /> : <Text style={[styles.label, compact && styles.compactLabel]}>{compact ? 'Share' : 'Share ↗'}</Text>}
+        style={({ pressed }) => [styles.button, compact && styles.compactButton, rail && styles.railButton, pressed && styles.pressed]}>
+        {sharing ? <ActivityIndicator color={colors.ink} /> : rail ? <JourneyActionIcon name="share" /> : <Text style={[styles.label, compact && styles.compactLabel]}>{compact ? 'Share' : 'Share ↗'}</Text>}
       </Pressable>
-      {compact && (social.error || social.auth.error || social.message || shareMessage) && <Pressable accessibilityRole="button" accessibilityLiveRegion="polite" accessibilityLabel={'View journey action feedback: ' + (social.error || social.auth.error || social.message || shareMessage || '')} onPress={() => setFeedbackOpen(true)} style={styles.status}><Text style={styles.label}>!</Text></Pressable>}
+      {overlayFeedback && (social.error || social.auth.error || social.message || shareMessage) && <Pressable accessibilityRole="button" accessibilityLiveRegion="polite" accessibilityLabel={'View journey action feedback: ' + (social.error || social.auth.error || social.message || shareMessage || '')} onPress={() => setFeedbackOpen(true)} style={[styles.status, rail && styles.railStatus]}><Text style={styles.label}>!</Text></Pressable>}
     </View>
     {artwork && <JourneyShareSheet key={artwork.memoryId || artwork.journeyId} artwork={artwork} message={shareMessage} onClose={() => setArtwork(null)} onShareLink={shareLink} />}
-    {compact ? <StorySheet visible={feedbackOpen} title="Journey actions" onClose={() => setFeedbackOpen(false)}>{feedback}</StorySheet> : feedback}
+    {overlayFeedback ? <StorySheet visible={feedbackOpen} title="Journey actions" onClose={() => setFeedbackOpen(false)}>{feedback}</StorySheet> : feedback}
   </View>;
 }
 const styles = StyleSheet.create({
+  iconCount: { alignItems: 'center' }, count: { color: '#243E68', fontSize: 9, lineHeight: 11, fontWeight: '700' },
+  railSection: { marginTop: 0, gap: 0 }, railRow: { flexDirection: 'column', flexWrap: 'nowrap', gap: 3 },
+  railButton: { width: 44, minWidth: 44, minHeight: 44, flexBasis: 'auto', flexGrow: 0, paddingHorizontal: 2, paddingVertical: 3, borderRadius: 14, backgroundColor: 'rgba(255,255,255,0.94)' },
+  railLabel: { fontSize: 10, lineHeight: 15, textAlign: 'center' }, railStatus: { position: 'absolute', right: 48, top: 0 },
   compactSection: { flex: 1, minWidth: 0, marginTop: 0 },
   compactRow: { flexWrap: 'wrap', gap: 3 },
   compactButton: { minWidth: 44, flexBasis: 44, paddingHorizontal: 3, paddingVertical: 4, backgroundColor: 'transparent', borderWidth: 0 },

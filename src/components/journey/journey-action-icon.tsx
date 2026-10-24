@@ -1,0 +1,25 @@
+import { StyleSheet, View } from 'react-native';
+
+type IconName = 'heart' | 'bookmark' | 'share' | 'remix' | 'route' | 'info';
+// Small native vector primitives keep these controls independent of font glyphs.
+export function JourneyActionIcon({ name, selected = false }: { name: IconName; selected?: boolean }) {
+  const color = selected ? '#6555CF' : '#243E68';
+  const line = { backgroundColor: color };
+  return <View pointerEvents="none" accessible={false} accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={s.frame}>
+    {name === 'heart' && <View style={s.heart}><View style={[s.heartSquare, line]} /><View style={[s.heartLeft, line]} /><View style={[s.heartRight, line]} /></View>}
+    {name === 'bookmark' && <><View style={[s.bookmark, { borderColor: color, backgroundColor: selected ? color : 'transparent' }]} /><View style={s.notch} /><View style={[s.notchOutline, { borderColor: color }]} /></>}
+    {name === 'share' && <><View style={[s.shareBase, { borderColor: color }]} /><View style={[s.shareShaft, line]} /><View style={[s.shareHead, { borderColor: color }]} /></>}
+    {name === 'remix' && <><View style={[s.remixTop, { borderColor: color }]} /><View style={[s.remixBottom, { borderColor: color }]} /><View style={[s.arrowTop, { borderColor: color }]} /><View style={[s.arrowBottom, { borderColor: color }]} /></>}
+    {name === 'route' && <><View style={[s.routeLine, { borderColor: color }]} /><View style={[s.routeStart, { borderColor: color }]} /><View style={[s.routeEnd, { borderColor: color }]} /></>}
+    {name === 'info' && <><View style={[s.infoCircle, { borderColor: color }]} /><View style={[s.infoDot, line]} /><View style={[s.infoStem, line]} /></>}
+  </View>;
+}
+const s = StyleSheet.create({
+  notchOutline: { position: 'absolute', left: 8, bottom: -1, width: 8, height: 8, borderLeftWidth: 2, borderTopWidth: 2, transform: [{ rotate: '45deg' }] },
+  frame: { width: 24, height: 24 }, heart: { position: 'absolute', left: 4, top: 6, width: 16, height: 16, transform: [{ rotate: '-45deg' }] }, heartSquare: { width: 14, height: 14, position: 'absolute' }, heartLeft: { width: 14, height: 14, borderRadius: 7, position: 'absolute', top: -7 }, heartRight: { width: 14, height: 14, borderRadius: 7, position: 'absolute', left: 7 },
+  bookmark: { position: 'absolute', left: 5, top: 2, width: 14, height: 20, borderWidth: 2, borderTopLeftRadius: 2, borderTopRightRadius: 2 }, notch: { position: 'absolute', left: 7, bottom: 0, width: 0, height: 0, borderLeftWidth: 5, borderRightWidth: 5, borderBottomWidth: 5, borderLeftColor: 'transparent', borderRightColor: 'transparent', borderBottomColor: '#FFFFFF' },
+  shareBase: { position: 'absolute', left: 3, bottom: 2, width: 17, height: 12, borderWidth: 2, borderTopWidth: 0, borderRadius: 3 }, shareShaft: { position: 'absolute', left: 11, top: 3, width: 2, height: 13 }, shareHead: { position: 'absolute', left: 7, top: 3, width: 10, height: 10, borderLeftWidth: 2, borderTopWidth: 2, transform: [{ rotate: '45deg' }] },
+  remixTop: { position: 'absolute', left: 3, top: 4, width: 17, height: 7, borderLeftWidth: 2, borderTopWidth: 2, borderTopLeftRadius: 6 }, remixBottom: { position: 'absolute', right: 3, bottom: 4, width: 17, height: 7, borderRightWidth: 2, borderBottomWidth: 2, borderBottomRightRadius: 6 }, arrowTop: { position: 'absolute', right: 3, top: 1, width: 7, height: 7, borderTopWidth: 2, borderRightWidth: 2, transform: [{ rotate: '45deg' }] }, arrowBottom: { position: 'absolute', left: 3, bottom: 1, width: 7, height: 7, borderBottomWidth: 2, borderLeftWidth: 2, transform: [{ rotate: '45deg' }] },
+  routeLine: { position: 'absolute', left: 6, top: 5, width: 13, height: 14, borderTopWidth: 2, borderRightWidth: 2, borderBottomWidth: 2, borderTopRightRadius: 6, borderBottomRightRadius: 6 }, routeStart: { position: 'absolute', left: 2, top: 2, width: 7, height: 7, borderWidth: 2, borderRadius: 4, backgroundColor: '#FFFFFF' }, routeEnd: { position: 'absolute', left: 2, bottom: 2, width: 7, height: 7, borderWidth: 2, borderRadius: 4, backgroundColor: '#FFFFFF' },
+  infoCircle: { position: 'absolute', left: 2, top: 2, width: 20, height: 20, borderWidth: 2, borderRadius: 10 }, infoDot: { position: 'absolute', left: 11, top: 6, width: 2, height: 2, borderRadius: 1 }, infoStem: { position: 'absolute', left: 11, top: 10, width: 2, height: 8, borderRadius: 1 },
+});

@@ -1,3 +1,4 @@
+import { StatusBar } from 'expo-status-bar';
 import { theme } from '@/theme/mobile-theme';
 import type { ReactNode } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -7,6 +8,7 @@ import { colors } from '@/components/discovery/ui';
 export function StorySheet({ visible, title, subtitle, onClose, children, scrollable = true }: { visible: boolean; title: string; subtitle?: string; onClose: () => void; children: ReactNode; scrollable?: boolean }) {
   return <Modal visible={visible} animationType="slide" presentationStyle="fullScreen" onRequestClose={onClose}>
     <SafeAreaView style={styles.safe}>
+      {visible && <StatusBar style="dark" />}
       <View style={styles.header}><View style={styles.heading}><Text accessibilityRole="header" numberOfLines={subtitle ? 2 : undefined} style={styles.title}>{title}</Text>{subtitle && <Text style={styles.subtitle}>{subtitle}</Text>}</View><Pressable accessibilityRole="button" accessibilityLabel={subtitle ? 'Close journey map' : 'Close ' + title} onPress={onClose} style={styles.close}><Text style={styles.closeLabel}>Close</Text></Pressable></View>
       {scrollable ? <ScrollView contentContainerStyle={styles.content}>{children}</ScrollView> : <View style={styles.fill}>{children}</View>}
     </SafeAreaView>

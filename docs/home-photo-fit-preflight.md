@@ -1,0 +1,68 @@
+# Home photo fitting: backend preflight
+
+Owner: Backend Developer. Completed 2026-10-23 08:19 IST (02:49 UTC).
+Scope: Home discovery cover rendering only: consistent expanded 16:9 frame and cover crop without blurred sidebars. Upload/crop persistence, Journey redesign and stop decks are excluded and require an affected-scope preflight.
+
+## Baseline and target
+
+- Mobile revision `aba76832ce967503caf5d8692faf019ed3f583ca`; observed branch `codex/home-photo-fit` (Architect prepared from main). Baseline untracked `.github/`, `cd`, `eas` preserved. No tracked changes at inspection.
+- Confirmed configured project ref from the local environment URL, without printing keys: `gwybjhqgnrpouwcdvusi`. Supabase project listing confirms ACTIVE_HEALTHY, ap-northeast-2, Postgres 17.11. This is the existing hosted application backend, not an isolated test target.
+- Read-only reference Web repository revision `428182a0454c8f536c56024eeb0497f4f4a05c81`, branch `backend/integrity-hardening`. Its dirty baseline includes deleted `.env.example`, modified AGENTS.md/package.json/demo-seed/schema-test scripts, added eas.json, and untracked configuration, backend reports/scripts/audits and migration variants. All are protected and untouched.
+- Read Mobile AGENTS.md, PROJECT_STATUS.md, ROADMAP.md, Web docs/multi-agent-workflow.md and installed Supabase skill. No Next.js code is involved.
+
+## Checks actually run and observed evidence
+
+Supabase connector calls: list_projects, list_migrations and metadata-only execute_sql SELECTs. Inspected information_schema.columns, pg_class/pg_namespace, pg_policies, role_table_grants, pg_proc/pg_get_functiondef, pg_constraint, pg_indexes and storage.buckets configuration. No user-table rows, storage object rows, credentials, signed URLs or user identities were retrieved. No write SQL, write RPC, upload, migration, seed or hosted configuration change was executed.
+
+- Database: live journeys.cover_image_path and journey_stops.photo_path are text. Existing coordinate, publication, duration/title, FK and unique journey/sequence constraints and discovery/user/attribution indexes are present. Rendering crop needs no new column, dimension constraint or index.
+- API/RPC: inspected actual public.get_public_journeys(text,text,uuid) and private.public_journeys definitions. The public wrapper delegates to the stable private SECURITY DEFINER function with empty search_path; its explicit projection includes cover_image_path and filters published journeys with valid discovery metadata, limit 100. Existing get_journey_detail/private.journey_detail definitions return cover/photo paths and enforce published-or-owner gating. These read functions are executable by anon and authenticated. None need replacement.
+- Client read contract: src/lib/discovery/queries.ts uses isolated publicSupabase; resolvePhotos signs existing journey-media paths for 3600 seconds and falls back safely when unavailable. src/lib/supabase/public.ts does not attach the saved user's session; cancellation/timeouts remain. No new request or transformation endpoint is necessary.
+- RLS/permissions: journeys, journey_stops and storage.objects have RLS enabled. Anon has SELECT on journey tables, authenticated existing CRUD; policies enforce published-or-owner reads and owner writes, with UPDATE USING/WITH CHECK. Separate customize_stops_rpc policies exist. Fitting does not change these boundaries, grants, ownership or authentication.
+- Storage: journey-media is private, 15,728,640-byte limit; JPEG/PNG/WebP allowed. Its SELECT policy permits owner paths or references from published/owned journeys and stops. INSERT requires authenticated ownership/path relationship to a journey. No journey-media UPDATE/DELETE policy was returned. Existing profile-avatars is separate. Original files remain intact; display cropping requires no bucket setting, object rewrite or new policy.
+- Root cause in HomeJourneyCard: foreground uses resizeMode="contain" over an additional blurred cover image. Expanded frame is 2.6:1. This creates the reported side panels for portrait photos. It is a local display choice, independent of uploaded resolution.
+
+## Migration comparison and drift
+
+Mobile has no registered migration directory; docs/backend/copy-journey-selected.review.sql is review-only. Inspected its proposed selected_copy_requests schema and README alongside live metadata. Live private.standalone_selected_copy_receipts exists instead; public.copy_journey_selected delegates to private.standalone_copy_journey_selected. The proposed review contract therefore is not the live implementation. It must not be applied as though absent/unapplied functionality.
+
+Inventoried Web SQL including pending/untracked work: core_schema, public_discovery, journey_details, journey_creation, journey_media_15mb, social_loop, travel_tracks, field_test_destinations, legacy_media_review, rpc_integrity_hardening, copy_journey_selected; standalone, permissions-fixed, JWT-correction and rerunnable variants, plus audits/patch. Read relevant core/discovery/detail/creation/media definitions and pending hardening entry sections. Live discovery/detail/storage contracts agree with the relevant existing media-read intent; live discovery includes later destination/creator additions and sequence rename. Current 15 MiB bucket matches journey_media_15mb.
+
+Hosted list_migrations returned an empty list. This does NOT mean the schema is empty or any migration is safe to replay. Observed objects clearly exist. Pending hardening proposes private.legacy_journey_media_approvals and journey_rpc policies; neither appears in inspected live table/policy metadata. Thus the protected hardening baseline is not represented in current live objects. Complete repository-wide equivalence, pending write-function internals and every migration variant were not certified; this scoped comparison covers objects required for Home photo reads. Do not reconcile unrelated drift during this feature.
+
+## Decision and safe verification plan
+
+**No backend change required for this scope.** Existing paths, signed-photo access and API projection support rendering the same image into a fixed frame. No migration ordering/deployment dependency is introduced. Do not replay repository migrations against this hosted project; divergent selected-copy variants and pending hardening have separate compatibility/review requirements.
+
+Use local synthetic photo fixtures or mocked URLs: portrait, landscape, square, tiny, missing, failed and changed URI. Verify expanded 16:9 sizing, cover crop without distortion/blurred sidebars, existing compact-card dimensions, neutral fallback/recovery, labels, Locate/Read story callbacks and selected states. Check panel scrolling/measurement and native rendering in the running development client. Run relevant existing tests, typecheck and lint. No upload, save, copy, delete or live test records are needed. Public browsing may use existing authorized reads only. No database fixture target is needed because no SQL changes are proposed; if scope expands to persistent cropping or uploads, pause and identify a disposable local target with synthetic fixtures and anon/owner/other-user authorization cases before writes. Recovery is reverting only the owned rendering diff while preserving unrelated work; original media is unchanged.
+
+Backend preflight complete; Architect must record release of the implementation gate. Native visual validation remains for QA. Live Supabase changes: **not authorized**. Publication/commit/merge/deployment: not performed. This report is local/unpublished.
+
+## Scope delta: branded missing/failed cover fallback
+
+Backend Developer, 2026-10-23 08:31 IST (03:01 UTC). Same confirmed project `gwybjhqgnrpouwcdvusi`; same Mobile HEAD `aba76832ce967503caf5d8692faf019ed3f583ca`, branch `codex/home-photo-fit`. Existing dirty Home component/test, status/roadmap edits and untracked reports/baseline files preserved. Architect reports product-owner physical confirmation of the preceding photo-fitting change; this metadata check does not independently establish device success.
+
+Extension: render a static native-View illustration when cover is absent or fails: pale map contours, dotted route/pins, expanded destination and Journey story label; compact decoration only. Same photo frames, existing model fields and image failure semantics. No fetched replacement photo, new asset upload or persisted/generated location information.
+
+Re-ran metadata-only SELECT of relevant live columns, actual public/private discovery RPC definitions, journey-media bucket configuration, Storage read policy and storage.objects RLS; re-ran list_migrations. Cover/photo paths and title/destination columns remain text; published discovery RPC still returns cover_image_path, title, destination_name and destination_slug through the same bounded published projection. Storage remains private JPEG/PNG/WebP, 15 MiB, existing owner/published-reference SELECT policy, RLS enabled. Migration history remains empty; earlier recorded repository/review SQL drift remains unresolved and must not be replayed. No migration files or data-contract changes were introduced by the existing local rendering work.
+
+**Decision: no backend change required for this bounded extension.** Decoration and destination label derive only from already-loaded model data; no DB columns/constraints/indexes, RPC/API, RLS/grant/role, Storage settings or upload changes are needed. Previously inspected permissions remain applicable because no new data access is introduced. No user rows, credentials or Storage object rows retrieved; no hosted writes.
+
+Isolated test plan: mocked null/error/changed-URI covers in compact and expanded cards; assert unchanged frame dimensions, accessible missing-photo description, noninteractive/hidden decorative shapes, bounded destination label and retained open/locate callbacks. Visually check narrow/wide cards, large text and no network fetch for fallback. Verify original valid images still fill frames. No database fixtures or live mutations needed; any expansion to persisted metadata/uploads reopens preflight. Architect may release this delta's gate after recording this addendum. Live Supabase changes remain unauthorized; no deployment/publication performed.
+
+## Scope delta: Home globe behind status bar and floating search
+
+Backend Developer, 2026-10-23 21:14 IST (15:44 UTC). Mobile branch codex/home-photo-fit, HEAD aba76832ce967503caf5d8692faf019ed3f583ca; all prior dirty Home/Journey/map/social/status/test/report work and untracked baseline preserved. Same confirmed existing hosted project gwybjhqgnrpouwcdvusi.
+
+Requested presentation only: Home globe fills behind time/battery; existing search and notification controls float over globe below safe top inset. Existing destination search/location/query semantics unchanged; notification presentation does not introduce a new notifications service or table.
+
+Fresh read-only metadata checks retrieved actual public.get_public_journeys/private.public_journeys and public.get_journey_detail definitions and effective anon/authenticated execute privileges. Current discovery remains explicit published-only projection ordered by published_at/id, limit100, with existing cover/destination/creator/stop fields; public detail wrapper unchanged. Existing private journey-media15MiB bucket and owner/published-reference Storage SELECT policy rechecked. Hosted migration history still empty; private table inventory still standalone_selected_copy_receipts, confirming prior recorded review/hardening drift persists. Repository baseline contains no new migrations introduced by accumulated UI work. No credentials, user rows or Storage object rows retrieved; no live writes.
+
+**Decision: no backend change required** for Home edge-to-edge/controls placement. No DB schema/constraints/indexes, RPC/API, RLS/grants/roles, Storage or location permission changes needed. Earlier domain preflight evidence remains applicable; this delta does not broaden data access. Architect may record gate release before coding.
+
+Safe isolated UI plan: mocked inset0/24/48, focused/unfocused Home, place search open/close/keyboard and selected destination, panel collapsed/expanded, globe loading/error/native fallback. Verify top shade/status contrast,44dp controls below cutout, search suggestion touch/scroll ownership and stale/cancelled query behavior unchanged; no notification behavior invented. Ensure globe gestures/World/Mapbox attribution and panel/nav clearances stay accessible; status styles restore on Journey/Account/auth transitions. Native device screenshots and direct interactions required for actual edge-to-edge/cutout/keyboard acceptance; no new location capture, hosted write or fixture records needed. Only this report appended; no application/server/dependency/publication changes.
+
+Architect gate RELEASED 2026-10-23: reviewed live metadata and scoped migration comparison above. Implement only Home rendering and related tests; no uploads, Journey changes or backend writes. All existing baseline work remains protected.
+
+Architect delta gate RELEASED 2026-10-23: reviewed current metadata recheck and local decorative fallback scope. Implement only Home fallback rendering/test changes. No migration, network illustration, upload or Journey redesign authorized in this slice.
+
+Architect Home edge-to-edge gate RELEASED 2026-10-23: live discovery/detail/media contract recheck reviewed. Implement Home overlay header/status layout and optional globe/panel insets only, preserve search/location/panel behavior and all prior work. No hosted writes/dependency/native config/publication changes.

@@ -7,10 +7,10 @@ import { HomeJourneyCard } from './home-journey-card';
 import { colors } from './ui';
 
 export function DiscoveryPanel({ journeys, selectedId, onLocate, onOpen, notice, onClear, onRetrySelection,
-  loading, refreshing, error, onRefresh, onHeight, onInteraction, availableHeight, availableWidth, bottomClearance = 0 }: {
+  loading, refreshing, error, onRefresh, onHeight, onInteraction, availableHeight, availableWidth, bottomClearance = 0, topClearance = 0 }: {
   journeys: PublicJourney[]; selectedId: string | null; onLocate: (id: string) => void; onOpen: (id: string) => void;
   notice: string; onClear: () => void; onRetrySelection?: () => void; loading: boolean; refreshing: boolean;
-  error: string | null; onRefresh: () => void; onHeight: (height: number) => void; onInteraction: (active: boolean) => void; availableHeight: number; availableWidth: number; bottomClearance?: number;
+  error: string | null; onRefresh: () => void; onHeight: (height: number) => void; onInteraction: (active: boolean) => void; availableHeight: number; availableWidth: number; bottomClearance?: number; topClearance?: number;
 }) {
   // Keep the peek handle and compact cards above the fixed pill. Expanded content
   // scrolls underneath it, with enough trailing space to expose the final actions.
@@ -19,7 +19,8 @@ export function DiscoveryPanel({ journeys, selectedId, onLocate, onOpen, notice,
   const [chromeHeight, setChromeHeight] = useState(110);
   const [cardHeight, setCardHeight] = useState(142);
   const measureCard = useCallback((height: number) => setCardHeight(previous => Math.max(previous, height)), []);
-  const space = Math.max(0, availableHeight - clearance);
+  const topReserve = Math.min(Math.max(0, topClearance), Math.max(0, availableHeight - clearance - 44));
+  const space = Math.max(0, availableHeight - clearance - topReserve);
   const collapsed = Math.min(space, chromeHeight + cardHeight + 14);
   const sheet = useDiscoverySheet(space, publishHeight, onInteraction, { peek: Math.min(44, space), collapsed, expanded: Math.max(collapsed, space - 96) });
   const { expanded } = sheet;

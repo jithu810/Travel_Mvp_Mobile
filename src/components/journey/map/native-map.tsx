@@ -26,7 +26,7 @@ export async function configureMap(token: string) {
   await Mapbox.setAccessToken(token);
   configuredToken = token;
 }
-export const NativeJourneyMap = memo(function NativeJourneyMap({ data, stops, retry, selectedId, onSelect, presentation = 'story', onExpand, currentPosition, navigationRoute, navigationMode = false, navigationPadding, destinationId, travelCamera, memoryPhotos, animateMemoryRoute = true, playRouteWithSelection = false }: {
+export const NativeJourneyMap = memo(function NativeJourneyMap({ data, stops, retry, selectedId, onSelect, presentation = 'story', onExpand, currentPosition, navigationRoute, navigationMode = false, navigationPadding, destinationId, travelCamera, memoryPhotos, animateMemoryRoute = true, playRouteWithSelection = false, controlTopInset = 0 }: {
   data: JourneyMapData; stops: JourneyStop[]; retry: () => void; selectedId?: string | null; onSelect?: (id: string) => void;
 } & MapDisplayProps) {
   const camera = useRef<Camera>(null);
@@ -165,7 +165,7 @@ export const NativeJourneyMap = memo(function NativeJourneyMap({ data, stops, re
       {frame && <Mapbox.MapView key={style} style={styles.map} projection={navigationMode ? 'mercator' : frame.projection} styleURL={navigationMode ? Mapbox.StyleURL.Street : style === 'satellite' ? Mapbox.StyleURL.SatelliteStreet : Mapbox.StyleURL.Outdoors}
         onPress={presentation === 'preview' ? () => { if (mounted.current) onExpand?.(); } : undefined}
         scrollEnabled={presentation !== 'preview'} zoomEnabled={presentation !== 'preview'} rotateEnabled={presentation !== 'preview'} pitchEnabled={false} surfaceView={false} requestDisallowInterceptTouchEvent
-        compassEnabled={presentation !== 'preview'} compassPosition={navigationMode ? { bottom: (navigationPadding?.bottom ?? 220) + 36, right: 12 } : { top: 12, right: 12 }} scaleBarEnabled={false} logoEnabled attributionEnabled
+        compassEnabled={presentation !== 'preview'} compassPosition={navigationMode ? { bottom: (navigationPadding?.bottom ?? 220) + 36, right: 12 } : { top: 12 + Math.max(0, controlTopInset), right: 12 }} scaleBarEnabled={false} logoEnabled attributionEnabled
         logoPosition={navigationMode ? { bottom: (navigationPadding?.bottom ?? 220) + 8, left: 12 } : undefined}
         attributionPosition={navigationMode ? { bottom: (navigationPadding?.bottom ?? 220) + 8, right: 12 } : undefined}
         onCameraChanged={state => {
@@ -219,7 +219,7 @@ export const NativeJourneyMap = memo(function NativeJourneyMap({ data, stops, re
       </Mapbox.MapView>}
       {!ready && <View style={styles.loading} pointerEvents="none" accessibilityLabel="Loading journey map" accessibilityRole="progressbar"><ActivityIndicator color={colors.green} /><Text style={styles.note}>Loading map…</Text></View>}
       {presentation !== 'preview' && <Pressable accessibilityRole="button" accessibilityLabel="Fit journey and reset map orientation"
-        accessibilityState={{ disabled: !ready || !frame }} disabled={!ready || !frame} onPress={() => { if (navigationMode) follow.explore(); fit(); }} style={[styles.fit, navigationMode && { top: undefined, bottom: (navigationPadding?.bottom ?? 220) + 36 }]}>
+        accessibilityState={{ disabled: !ready || !frame }} disabled={!ready || !frame} onPress={() => { if (navigationMode) follow.explore(); fit(); }} style={[styles.fit, { top: 12 + Math.max(0, controlTopInset) }, navigationMode && { top: undefined, bottom: (navigationPadding?.bottom ?? 220) + 36 }]}>
         <Text style={styles.fitLabel}>↗ Fit journey</Text>
       </Pressable>}
       {navigationMode && travelCamera && <View pointerEvents="box-none" style={[styles.locationControls, { bottom: (navigationPadding?.bottom ?? 220) + 36 }]}>

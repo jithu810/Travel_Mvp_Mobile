@@ -20,8 +20,8 @@ let configured: string | null = null;
 export async function configureGlobe(token: string) {
   if (configured !== token) { await Mapbox.setAccessToken(token); configured = token; }
 }
-export const NativeGlobe = memo(function NativeGlobe({ points, route, onOpen, retry, bottomInset, viewport, selectionId, locateVersion, sheetInteracting, preview = false, homeSearch = false, onCenterChange, destinationMode = false, destination = null, destinationVersion = 0 }: {
-  points: DiscoveryPoints; route: [number, number][][]; onOpen: (id: string) => void; retry: () => void; bottomInset: number;
+export const NativeGlobe = memo(function NativeGlobe({ points, route, onOpen, retry, bottomInset, headerInset = 0, viewport, selectionId, locateVersion, sheetInteracting, preview = false, homeSearch = false, onCenterChange, destinationMode = false, destination = null, destinationVersion = 0 }: {
+  points: DiscoveryPoints; route: [number, number][][]; onOpen: (id: string) => void; retry: () => void; bottomInset: number; headerInset?: number;
   viewport: Viewport; selectionId: string | null; locateVersion: number; sheetInteracting: boolean; preview?: boolean; homeSearch?: boolean; onCenterChange?: (center: [number, number]) => void; destinationMode?: boolean; destination?: DestinationFocus | null; destinationVersion?: number;
 }) {
   const overview = preview ? previewCamera : worldCamera;
@@ -77,8 +77,15 @@ export const NativeGlobe = memo(function NativeGlobe({ points, route, onOpen, re
     return () => clearTimeout(timeout);
   }, [ready, failed, style, mapError]);
   useEffect(() => { transition.select(requestKey); }, [transition, requestKey]);
-  const target = useMemo(() => locateCamera(points, viewport, bottomInset), [points, viewport, bottomInset]);
-  const padding = useMemo(() => preview ? { paddingTop: 4, paddingBottom: 4, paddingLeft: 4, paddingRight: 4 } : discoveryPadding(viewport, bottomInset), [viewport, bottomInset, preview]);
+  const padding = useMemo(() => {
+    if (preview) return { paddingTop: 4, paddingBottom: 4, paddingLeft: 4, paddingRight: 4 };
+    const base = discoveryPadding(viewport, bottomInset);
+    return { ...base, paddingTop: headerInset > 0 ? Math.min(Math.max(base.paddingTop, headerInset + 24), Math.max(0, viewport.height - base.paddingBottom - 1)) : base.paddingTop };
+  }, [viewport, bottomInset, preview, headerInset]);
+  const target = useMemo(() => {
+    const frame = locateCamera(points, headerInset > 0 ? { ...viewport, height: Math.max(1, viewport.height - headerInset - 24) } : viewport, bottomInset);
+    return frame && headerInset > 0 ? { ...frame, padding } : frame;
+  }, [points, viewport, bottomInset, headerInset, padding]);
   const selectionKey = selectionId ? JSON.stringify([selectionId, locateVersion, points.features]) : '';
   const layoutKey = JSON.stringify([viewport, padding]);
   useEffect(() => {
@@ -158,8 +165,8 @@ export const NativeGlobe = memo(function NativeGlobe({ points, route, onOpen, re
     <Mapbox.MapView style={s.map} projection="globe" styleURL={style === 'satellite' ? Mapbox.StyleURL.SatelliteStreet : Mapbox.StyleURL.Outdoors}
       scrollEnabled={!preview || destinationMode} zoomEnabled={!preview || destinationMode} rotateEnabled={!preview || destinationMode} pitchEnabled={false} surfaceView={false}
       requestDisallowInterceptTouchEvent compassEnabled={!preview || destinationMode} compassFadeWhenNorth scaleBarEnabled={false} logoEnabled attributionEnabled
-      compassPosition={{ top: 12, right: 12 }}
-      logoPosition={globeLogoPosition} attributionPosition={globeAttributionPosition}
+      compassPosition={{ top: headerInset + 12, right: 12 }}
+      logoPosition={{ ...globeLogoPosition, top: globeLogoPosition.top + headerInset }} attributionPosition={{ ...globeAttributionPosition, top: globeAttributionPosition.top + headerInset }}
       onTouchStart={() => { if (destinationMode) Keyboard.dismiss(); mapTouch.current = true; setTravel(null); transition.cancel(); motion.touch(true); }}
       onTouchEnd={event => { mapTouch.current = event.nativeEvent.touches.length > 0; motion.touch(mapTouch.current); }}
       onTouchCancel={() => { mapTouch.current = false; motion.touch(false); }} onCameraChanged={state => observe(state)}
@@ -198,7 +205,7 @@ export const NativeGlobe = memo(function NativeGlobe({ points, route, onOpen, re
     <NearbyLocations points={nearby} onClose={() => setNearby([])} onSelect={id => { setNearby([]); const point = points.features.find(p => String(p.id) === id); if (point) onOpen(point.properties.journeyId); }} />
     {!ready && <View style={[StyleSheet.absoluteFill, s.noTouches]}><GlobeLoading bottomInset={bottomInset} /></View>}
     {(!preview || (destinationMode && viewport.height >= 140)) && <Pressable accessibilityRole="button" accessibilityLabel="Reset globe to world view" disabled={!ready}
-      accessibilityState={{ disabled: !ready }} onPress={reset} hitSlop={homeSearch ? { top: 4, bottom: 4, left: 4, right: 4 } : undefined} style={[s.reset, homeSearch && s.compactReset, { bottom: destinationMode && !homeSearch ? 8 : bottomInset + 40 }]}>
+      accessibilityState={{ disabled: !ready }} onPress={reset} hitSlop={homeSearch ? { top: 4, bottom: 4, left: 4, right: 4 } : undefined} style={[s.reset, homeSearch && s.compactReset, { bottom: headerInset > 0 ? undefined : destinationMode && !homeSearch ? 8 : bottomInset + 40, top: headerInset > 0 ? headerInset + 40 : undefined }]}>
       <Text style={[s.resetText, homeSearch && s.compactResetText]}>↗ World</Text>
     </Pressable>}
   </View>;
