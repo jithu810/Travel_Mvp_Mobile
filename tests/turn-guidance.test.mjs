@@ -203,3 +203,97 @@ test('failed rerouting withholds instructions but preserves accepted turn progre
   assert.equal(controller.get().guidance.maneuverIndex, 2, 'Failed replacement must not restart the previous turn sequence');
   assert.equal(calls, 2); controller.stop();
 });
+
+
+test('right-turn confirmation hides the previous 30 m without changing accepted progress or completion gates', () => {
+  let time = 100000;
+  const xy = (x, y) => [x / 111195, y / 111195];
+  const points = [xy(0, 0), xy(100, 0), xy(100, -100), xy(200, -100)];
+  const route = { distance: 300, duration: 30, geometry: { type: 'LineString', coordinates: points },
+    steps: points.map((point, i) => ({ location: point, geometry: [point, points[Math.min(i + 1, 3)]],
+      instruction: ['Head east', 'Turn right onto South Road', 'Turn left onto East Road', 'Destination'][i],
+      type: i === 0 ? 'depart' : i === 3 ? 'arrive' : 'turn', modifier: i === 1 ? 'right' : 'left',
+      distance: i === 3 ? 0 : 100, duration: 10 })) };
+  const controller = createGuidance(navigationFix, () => time);
+  const at = (x, y, ms = 1000, patch = {}) => {
+    time += ms;
+    const [longitude, latitude] = xy(x, y);
+    return controller.update(route, { longitude, latitude, accuracy: 5, timestamp: time, ...patch });
+  };
+  at(0, 0); at(40, 0);
+  const approach = at(70, 0);
+  assert.equal(Math.round(approach.distanceToManeuver), 30);
+  assert.equal(approach.confirmingTurn, false);
+  const pending = at(100, -15);
+  assert.equal(pending.status, 'ready'); assert.equal(pending.confirmingTurn, true);
+  assert.equal(pending.message, 'Confirming turn'); assert.equal(pending.distanceToManeuver, null);
+  assert.equal(pending.maneuverIndex, 1); assert.equal(pending.maneuver, approach.maneuver);
+  assert.deepEqual(pending.remainingGeometry, approach.remainingGeometry);
+  assert.equal(pending.remainingDistance, approach.remainingDistance);
+  assert.equal(at(100, -15, 0), pending, 'Duplicate GPS retains confirmation');
+  assert.equal(at(100, -19, 500).maneuverIndex, 1, 'Movement without one second cannot advance');
+  const stationary = at(100, -15, 500);
+  assert.equal(stationary.confirmingTurn, true); assert.equal(stationary.distanceToManeuver, null);
+  assert.equal(stationary.maneuverIndex, 1, 'Fresh stationary reading cannot advance');
+  assert.equal(at(100, -17).maneuverIndex, 1, 'Less than three metres cannot confirm');
+  const confirmed = at(100, -19);
+  assert.equal(confirmed.confirmingTurn, false); assert.equal(confirmed.maneuverIndex, 2);
+  assert.equal(confirmed.maneuver.instruction, 'Turn left onto East Road');
+  assert.ok(confirmed.distanceToManeuver > 80 && confirmed.distanceToManeuver < 82);
+  assert.notDeepEqual(confirmed.remainingGeometry, approach.remainingGeometry);
+});
+
+
+test('navigation subscribers receive confirmation and GPS holds clear it without stale instructions', async () => {
+  let time = 100000;
+  const route = road(), controller = createNavigation(async () => route, () => time);
+  let notifications = 0;
+  const unsubscribe = controller.subscribe(() => { notifications++; });
+  const base = { status: 'active', foreground: true, focused: true,
+    destination: { id: 'target', longitude: d[0], latitude: d[1] } };
+  const at = (longitude, latitude, accuracy = 5) => {
+    time += 1000;
+    controller.update({ ...base, position: { longitude, latitude, accuracy, timestamp: time } });
+  };
+  at(0, 0); await flush(); at(0.0004, 0); at(0.00073, 0);
+  const before = notifications;
+  at(0.001, 0.00015);
+  assert.ok(notifications > before);
+  assert.equal(controller.get().guidance.confirmingTurn, true);
+  assert.equal(controller.get().guidance.distanceToManeuver, null);
+  at(0.001, 0.00015, 26);
+  assert.equal(controller.get().guidance.holdReason, 'gps');
+  assert.equal(controller.get().guidance.maneuver, null);
+  assert.notEqual(controller.get().guidance.confirmingTurn, true);
+  controller.stop(); unsubscribe();
+});
+
+
+test('controller publishes a confirmation-only change when every other guidance field is unchanged', async () => {
+  const route = road();
+  let guidance = { status: 'ready', message: 'Same message', maneuver: route.steps[1], maneuverIndex: 1,
+    distanceToManeuver: null, remainingDistance: 230, remainingGeometry: route.geometry, confirmingTurn: false };
+  const isolated = load('src/lib/journey/navigation.ts', {
+    './turn-guidance': { ...model, createGuidance: () => ({ update: () => guidance, reset() {} }) },
+    './off-route': load('src/lib/journey/off-route.ts', { './turn-guidance': model }),
+  });
+  let time = 100000, notifications = 0;
+  const controller = isolated.createNavigation(async () => route, () => time);
+  const unsubscribe = controller.subscribe(() => { notifications++; });
+  const input = { status: 'active', foreground: true, focused: true,
+    position: { longitude: 0, latitude: 0, accuracy: 5, timestamp: time },
+    destination: { id: 'target', longitude: d[0], latitude: d[1] } };
+  controller.update(input); await flush();
+  const count = notifications;
+  guidance = { ...guidance, confirmingTurn: true };
+  time += 1000;
+  controller.update({ ...input, position: { ...input.position, timestamp: time } });
+  assert.equal(notifications, count + 1);
+  assert.equal(controller.get().guidance.confirmingTurn, true);
+  guidance = { ...guidance, confirmingTurn: false };
+  time += 1000;
+  controller.update({ ...input, position: { ...input.position, timestamp: time } });
+  assert.equal(notifications, count + 2);
+  assert.equal(controller.get().guidance.confirmingTurn, false);
+  controller.stop(); unsubscribe();
+});

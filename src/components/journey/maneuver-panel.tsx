@@ -7,9 +7,9 @@ export function ManeuverPanel({ guidance, message }: { guidance?: Guidance | nul
   const step = guidance?.status === 'ready' ? guidance.maneuver : null;
   // Mapbox's arrival text can say "You have arrived". An upcoming endpoint is not a verified visit.
   const instruction = step?.type === 'arrive' ? 'Destination ahead · Complete stop manually' : step?.instruction;
-  const distance = step && guidance?.distanceToManeuver != null ? guidanceDistance(guidance.distanceToManeuver) : null;
+  const distance = step && !guidance?.confirmingTurn && guidance?.distanceToManeuver != null ? guidanceDistance(guidance.distanceToManeuver) : null;
   const remaining = step && guidance?.remainingDistance != null ? guidanceDistance(guidance.remainingDistance) + ' remaining · GPS estimate' : null;
-  const status = instruction || guidance?.message || message;
+  const status = step && guidance?.confirmingTurn ? 'Confirming turn' : instruction || guidance?.message || message;
   return <View testID="maneuver-panel" accessible accessibilityLabel={[distance, status, remaining].filter(Boolean).join('. ')} style={styles.panel}>
     <Text accessible={false} style={styles.icon}>{step ? maneuverIcon(step) : '◇'}</Text>
     <View style={styles.content}>
