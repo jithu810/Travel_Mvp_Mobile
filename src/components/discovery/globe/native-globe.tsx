@@ -11,6 +11,7 @@ import { createLocateTransition, cinematicLocateDuration } from '@/lib/discovery
 import { createIdleMotion } from '@/lib/discovery/idle-motion';
 import { nextGlobeStyle, globeLogoPosition, globeAttributionPosition, worldCountryLabels, type GlobeStyle } from '@/lib/discovery/globe-style';
 import { colors } from '../ui';
+import { HomeControlIcon } from '../home-control-icon';
 import { globeAtmosphere, spaceColor } from '@/lib/discovery/presentation';
 import { GlobeFallback, GlobeLoading } from './fallback';
 import { JourneyOverlays } from './journey-overlays';
@@ -78,7 +79,7 @@ export const NativeGlobe = memo(function NativeGlobe({ points, route, onOpen, re
   }, [ready, failed, style, mapError]);
   useEffect(() => { transition.select(requestKey); }, [transition, requestKey]);
   const padding = useMemo(() => {
-    if (preview) return { paddingTop: 4, paddingBottom: 4, paddingLeft: 4, paddingRight: 4 };
+    if (preview) return { paddingTop: headerInset + 4, paddingBottom: 4, paddingLeft: 4, paddingRight: 4 };
     const base = discoveryPadding(viewport, bottomInset);
     return { ...base, paddingTop: headerInset > 0 ? Math.min(Math.max(base.paddingTop, headerInset + 24), Math.max(0, viewport.height - base.paddingBottom - 1)) : base.paddingTop };
   }, [viewport, bottomInset, preview, headerInset]);
@@ -204,9 +205,9 @@ export const NativeGlobe = memo(function NativeGlobe({ points, route, onOpen, re
     </Mapbox.MapView>
     <NearbyLocations points={nearby} onClose={() => setNearby([])} onSelect={id => { setNearby([]); const point = points.features.find(p => String(p.id) === id); if (point) onOpen(point.properties.journeyId); }} />
     {!ready && <View style={[StyleSheet.absoluteFill, s.noTouches]}><GlobeLoading bottomInset={bottomInset} /></View>}
-    {(!preview || (destinationMode && viewport.height >= 140)) && <Pressable accessibilityRole="button" accessibilityLabel="Reset globe to world view" disabled={!ready}
-      accessibilityState={{ disabled: !ready }} onPress={reset} hitSlop={homeSearch ? { top: 4, bottom: 4, left: 4, right: 4 } : undefined} style={[s.reset, homeSearch && s.compactReset, { bottom: headerInset > 0 ? undefined : destinationMode && !homeSearch ? 8 : bottomInset + 40, top: headerInset > 0 ? headerInset + 40 : undefined }]}>
-      <Text style={[s.resetText, homeSearch && s.compactResetText]}>↗ World</Text>
+    {(!preview || (destinationMode && viewport.height - headerInset >= 112)) && <Pressable accessibilityRole="button" accessibilityLabel="Reset globe to world view" disabled={!ready}
+      accessibilityState={{ disabled: !ready }} onPress={reset} hitSlop={homeSearch ? { top: 4, bottom: 4, left: 4, right: 4 } : undefined} style={[s.reset, (homeSearch || (preview && destinationMode)) && s.compactReset, { bottom: homeSearch ? bottomInset + 16 : preview && destinationMode ? 8 : headerInset > 0 ? undefined : destinationMode ? 8 : bottomInset + 40, top: !homeSearch && !preview && headerInset > 0 ? headerInset + 40 : undefined }]}>
+      {homeSearch || (preview && destinationMode) ? <View style={s.worldSurface}><HomeControlIcon name="world" /></View> : <Text style={s.resetText}>↗ World</Text>}
     </Pressable>}
   </View>;
 });
@@ -214,7 +215,7 @@ const s = StyleSheet.create({
   frame: { flex: 1, backgroundColor: spaceColor }, map: { flex: 1, backgroundColor: spaceColor },
   noTouches: { pointerEvents: 'none' },
   reset: { position: 'absolute', bottom: 38, left: 16, minHeight: 44, paddingHorizontal: 16, justifyContent: 'center', borderRadius: 24, backgroundColor: colors.white, elevation: 2 },
-  compactReset: { minHeight: 36, paddingHorizontal: 12, borderRadius: 20 },
-  compactResetText: { fontSize: 11 },
+  compactReset: { width: 44, minHeight: 44, paddingHorizontal: 0, alignItems: 'center', backgroundColor: 'transparent', elevation: 0 },
+  worldSurface: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.white, elevation: 2 },
   resetText: { color: colors.ink, fontSize: 12, fontWeight: '600' },
 });

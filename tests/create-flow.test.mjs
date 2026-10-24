@@ -24,7 +24,7 @@ function load(file, modules, hooks=harness().hooks, timers=globalThis) {
   const code=ts.transpileModule(readFileSync(file,'utf8'), {compilerOptions:{module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX,target:ts.ScriptTarget.ES2022}}).outputText;
   new Function('require','exports','setTimeout','clearTimeout',code)(name=>{ if (name === '@/theme/mobile-theme') return mobileTheme;
     if(name==='@/lib/journey/nearby')return load('src/lib/journey/nearby.ts',{}); if(name.endsWith('/nearby-locations'))return {NearbyLocations:'NearbyLocations'}; if(name==='@/components/branded-loading')return {BrandedLoading:'BrandedLoading'};if(name==='@/lib/discovery/destination-camera')return destinationHelpers;if(name==='@/hooks/use-discovery-sheet')return modules[name] || {useDiscoverySheet:()=>({height:56,expanded:true,responders:{handle:{},content:{}},offset:{current:0},setScrollOffset(){},toggle(){}})};if(name==='@/components/create/create-journey-header')return {CreateJourneyHeader:'CreateJourneyHeader'};if(name==='expo-status-bar')return {StatusBar:'StatusBar'};if(name==='react')return hooks;if(name==='react/jsx-runtime')return {jsx,jsxs:jsx,Fragment:'Fragment'};
-    if(name==='react-native')return {...native,...modules[name]};if(name==='expo-router')return {Stack:{Screen:'StackScreen'},...modules[name]};if(name in modules)return modules[name];throw Error(name);
+    if(name==='../home-control-icon')return {HomeControlIcon:'HomeControlIcon'};if(name==='react-native')return {...native,...modules[name]};if(name==='expo-router')return {Stack:{Screen:'StackScreen'},...modules[name]};if(name in modules)return modules[name];throw Error(name);
   },exports,timers.setTimeout,timers.clearTimeout);return exports;
 }
 const destinationHelpers=load('src/lib/discovery/destination-camera.ts',{'../journey/map-data':{hasCoordinates:p=>Number.isFinite(p.longitude)&&Number.isFinite(p.latitude)&&Math.abs(p.longitude)<=180&&Math.abs(p.latitude)<=90}});
@@ -337,7 +337,8 @@ test('private history resumes actual drafts and keeps all-drafts, empty, loading
 
 test('compact creation keeps CTA outside the only controls scroller and history in a separate sibling', () => {
   const h=screenHarness();const page=h.render().props.children;
-  assert.equal(page.type,'View');assert.equal(page.props.style.flex,1);assert.equal(page.props.style.minHeight,0);
+  assert.equal(page.type,'View');assert.equal(page.props.style.flex,undefined);assert.equal(page.props.style.flexShrink,1);assert.equal(page.props.style.minHeight,0);
+  assert.equal(h.render().props.style.flexShrink,1);assert.equal(h.render().props.style.flex,undefined,'Quick Start uses natural height so the globe receives slack');
   assert.deepEqual(page.props.children.map(n=>n.type?.name || n.type),['QuickJourneySetup','DraftShortcuts']);
   const {QuickJourneySetup}=load('src/components/create/quick-journey-setup.tsx',{'../discovery/ui':ui,'./place-picker':{PlacePicker:'PlacePicker',formStyles:{}}});
   const tree=QuickJourneySetup({form:model.newForm(id),disabled:false,onTitle(){},onDestination(){},onChange(){},onStart(){},feedback:{type:'Text',props:{children:'Check destination'}}});
@@ -401,22 +402,25 @@ test('compact header retains back navigation and discover fallback with unchange
   }
 });
 
-test('Create globe header fills the shared margins with no back/title overlay and preserves measured renderer props', () => {
+test('Create globe header fills behind status inset and reserves legal/camera space without title overlay', () => {
   const routes=[];let height=640,back=true;
   const h=harness();const {CreateJourneyHeader}=load('src/components/create/create-journey-header.tsx',{
     'expo-router':{useRouter:()=>({canGoBack:()=>back,back:()=>routes.push('back'),replace:r=>routes.push(r)})},
-    'react-native':{useWindowDimensions:()=>({height,width:360})},
+    'react-native':{useWindowDimensions:()=>({height,width:360})},'react-native-safe-area-context':{useSafeAreaInsets:()=>({top:30})},
     '../discovery/globe/discovery-globe':{DiscoveryGlobe:'DiscoveryGlobe'},'@/lib/discovery/map':{discoveryPoints:()=>({type:'FeatureCollection',features:[]})},
   },h.hooks);
   for(const screenHeight of [568,640,851,915]) {
     height=screenHeight;let tree=h.render(CreateJourneyHeader,{});
-    const bannerHeight=tree.props.style[1].height;assert.ok(bannerHeight>=112&&bannerHeight<=240);
+    const bannerHeight=tree.props.style[1].height;assert.ok(bannerHeight>=142&&bannerHeight<=270);assert.equal(tree.props.style[1].flexGrow,1,'Globe receives available flex space beyond its responsive base');
     tree.props.onLayout({nativeEvent:{layout:{width:360,height:bannerHeight}}});tree=h.render(CreateJourneyHeader,{});
     const globe=all(tree,'DiscoveryGlobe')[0];assert.equal(globe.props.preview,true);assert.equal(globe.props.destinationMode,true);assert.equal(globe.props.sheetInteracting,true);
     assert.deepEqual(globe.props.points.features,[]);assert.deepEqual(globe.props.route,[]);assert.equal(globe.props.selectionId,null);
-    assert.deepEqual(globe.props.viewport,{width:360,height:bannerHeight});assert.equal(globe.props.bottomInset,0);
+    assert.deepEqual(globe.props.viewport,{width:360,height:bannerHeight});assert.equal(globe.props.bottomInset,0);assert.equal(globe.props.headerInset,30);
   }
-  const tree=h.render(CreateJourneyHeader,{});assert.equal(all(tree,'Pressable').length,0);assert.equal(all(tree,'Text').length,0);assert.equal(tree.props.style[0].alignSelf,'stretch');assert.equal(tree.props.style[0].marginHorizontal,8);
+  const tree=h.render(CreateJourneyHeader,{});assert.equal(all(tree,'Pressable').length,0);assert.equal(all(tree,'Text').length,0);assert.equal(tree.props.style[0].alignSelf,'stretch');assert.equal(tree.props.style[0].marginHorizontal,undefined);assert.equal(tree.props.style[0].marginTop,undefined);assert.equal(tree.props.style[0].borderBottomLeftRadius,24);
+  const shade=all(tree,'View').find(n=>n.props.testID==='create-status-shade');assert.equal(shade.props.pointerEvents,'none');assert.equal(shade.props.style[1].height,42);
+  assert.equal(h.render(CreateJourneyHeader,{keyboardOpen:true}).props.style[1].height,102);
+  assert.equal(h.render(CreateJourneyHeader,{keyboardOpen:true}).props.style[1].flexGrow,0,'Keyboard hero never consumes leftover form space');
 });
 
 test('globe preview keeps native attribution while Home retains its original controls and world camera', () => {
@@ -428,7 +432,7 @@ test('globe preview keeps native attribution while Home retains its original con
     '@/lib/discovery/map':{worldCamera,selectedJourneyId:()=>null},
     '@/lib/discovery/camera':{discoveryPadding:()=>({paddingTop:12}),locateCamera:()=>null,maxDiscoveryZoom:16},
     '@/lib/discovery/locate-transition':{createLocateTransition:()=>({})},'@/lib/discovery/idle-motion':{createIdleMotion:()=>({})},
-    '@/lib/discovery/globe-style':{globeLogoPosition:{top:12,left:12},globeAttributionPosition:{top:12,right:56}},'../ui':ui,'@/lib/discovery/presentation':{},'./fallback':{GlobeLoading:'GlobeLoading'},'./journey-overlays':{JourneyOverlays:'JourneyOverlays'},
+    '@/lib/discovery/globe-style':{globeLogoPosition:{top:12,left:12},globeAttributionPosition:{top:12,right:56}},'../home-control-icon':{HomeControlIcon:'HomeControlIcon'},'../ui':ui,'@/lib/discovery/presentation':{},'./fallback':{GlobeLoading:'GlobeLoading'},'./journey-overlays':{JourneyOverlays:'JourneyOverlays'},
   });
   const props={points:{features:[]},route:[],onOpen(){},retry(){},bottomInset:0,viewport:{width:360,height:120},selectionId:null,locateVersion:0,sheetInteracting:true};
   let tree=NativeGlobe({...props,preview:true});let map=all(tree,'MapView')[0].props;
@@ -438,6 +442,13 @@ test('globe preview keeps native attribution while Home retains its original con
   tree=NativeGlobe(props);map=all(tree,'MapView')[0].props;
   assert.equal(map.scrollEnabled,true);assert.equal(map.zoomEnabled,true);assert.equal(map.rotateEnabled,true);assert.equal(map.compassEnabled,true);
   assert.equal(all(tree,'Pressable')[0].props.accessibilityLabel,'Reset globe to world view');assert.deepEqual(all(tree,'Camera')[0].props.defaultSettings,worldCamera);
+  tree=NativeGlobe({...props,homeSearch:true,headerInset:90,bottomInset:300,viewport:{width:360,height:800}});
+  const reset=all(tree,'Pressable')[0];
+  assert.equal(reset.props.style[2].bottom,316);
+  assert.equal(reset.props.style[2].top,undefined);
+  assert.ok(reset.props.style[1].width>=44 && reset.props.style[1].minHeight>=44);
+  assert.equal(all(reset,'HomeControlIcon')[0].props.name,'world');
+  assert.equal(all(reset,'Text').length,0);
 });
 
 test('reference journey editor uses only the actual cover and keeps all main actions outside scrolling', () => {
@@ -623,8 +634,10 @@ test('Create passes selected destination/version and outside-dismiss state witho
   try {
     const h=screenHarness();let tree=h.renderEntry();let entry=all(tree,'NewJourneyEditor')[0];entry.props.onDestinationFocus(place);tree=h.renderEntry();let header=all(tree,'CreateJourneyHeader')[0];assert.equal(header.props.destination,place);
     const version=header.props.destinationVersion;all(tree,'NewJourneyEditor')[0].props.onDestinationFocus(place);tree=h.renderEntry();assert.equal(all(tree,'CreateJourneyHeader')[0].props.destinationVersion,version+1);
-    tree.props.children.props.onTouchStart();tree=h.renderEntry();assert.equal(all(tree,'NewJourneyEditor')[0].props.dismissSearchVersion,1);
+    assert.deepEqual(tree.props.edges,['left','right','bottom']);assert.equal(all(tree,'StackScreen')[0].props.options.statusBarStyle,'light');
+    all(tree,'View').find(n=>n.props.onTouchStart).props.onTouchStart();tree=h.renderEntry();assert.equal(all(tree,'NewJourneyEditor')[0].props.dismissSearchVersion,1);
     listeners.keyboardDidShow();tree=h.renderEntry();assert.equal(all(tree,'CreateJourneyHeader')[0].props.keyboardOpen,true);assert.equal(all(tree,'NewJourneyEditor')[0].props.keyboardOpen,true);
+    const draft=screenHarness(privateForm()).renderEntry();assert.deepEqual(draft.props.edges,['top','left','right','bottom']);assert.equal(all(draft,'StackScreen')[0].props.options.statusBarStyle,'dark');
     const editorTree=screenHarness().render({keyboardOpen:true});assert.equal(all(editorTree,'DraftShortcuts')[0].props.keyboardHidden,true);
   } finally {native.Keyboard.addListener=old;}
   const shared=load('src/components/discovery/ui.tsx',{'expo-router':{useRouter:()=>({})}});
@@ -681,9 +694,9 @@ test('Home native globe flies to real destinations, replaces repeated flights, m
   const before=commands.length;props={...props,destinationVersion:3};tree=h.render(NativeGlobe,props);assert.equal(commands.length,before+1,'Selecting same place again refocuses');
   props={...props,viewport:{width:344,height:72}};tree=h.render(NativeGlobe,props);assert.equal(commands.at(-1).centerCoordinate,undefined,'Keyboard/layout refit cannot recenter a manual pan');
   const world=all(tree,'Pressable')[0], worldStyle=Object.assign({},...world.props.style.filter(Boolean));
-  assert.equal(worldStyle.top,140,'Home World control sits below header and branding');assert.equal(worldStyle.bottom,undefined);
-  assert.equal(worldStyle.minHeight,36);assert.equal(worldStyle.paddingHorizontal,12);
-  assert.equal(worldStyle.minHeight+world.props.hitSlop.top+world.props.hitSlop.bottom,44,'Smaller visual keeps a 44-point touch target');
+  assert.equal(worldStyle.top,undefined);assert.equal(worldStyle.bottom,276,'Home World control sits just above the measured panel');
+  assert.equal(worldStyle.minHeight,44);assert.equal(worldStyle.paddingHorizontal,0);
+  assert.ok(worldStyle.minHeight>=44,'Small globe icon retains a 44-point touch target');
   const count=commands.length;all(tree,'MapView')[0].props.onTouchStart();tree=h.render(NativeGlobe,props);assert.equal(commands.length,count);
   appChange('background');h.render(NativeGlobe,props);props={...props,destination:place,destinationVersion:4};h.render(NativeGlobe,props);assert.equal(commands.length,count);
   appChange('active');h.render(NativeGlobe,props);assert.deepEqual(commands.at(-1).centerCoordinate,[place.longitude,place.latitude]);

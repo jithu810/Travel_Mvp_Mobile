@@ -3,6 +3,7 @@ import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import type { PublicJourney } from '@/types/journey';
 import { journeyFacts } from '@/lib/discovery/model';
 import { colors } from './ui';
+import { HomeControlIcon } from './home-control-icon';
 import { TravelPhotoPlaceholder } from './travel-photo-placeholder';
 
 export const HomeJourneyCard = memo(function HomeJourneyCard({ journey, expanded, width, selected, onOpen, onLocate, onHeight }: {
@@ -16,7 +17,7 @@ export const HomeJourneyCard = memo(function HomeJourneyCard({ journey, expanded
       <View style={[s.cover, expanded && s.expandedCover, expanded && { height: Math.round(width * 9 / 16) }]}>
         {journey.cover && failedUri !== journey.cover
           ? <Image key={journey.cover} source={{ uri: journey.cover }} accessibilityLabel={journey.title + ' cover photo'} style={s.image} resizeMode="cover" onError={() => setFailedUri(journey.cover)} />
-          : <TravelPhotoPlaceholder destination={journey.destination} caption={expanded} label={'No journey cover photo available. ' + journey.destination + '. Journey story'} />}
+          : <TravelPhotoPlaceholder compact={!expanded} label={'Default travel photo. No journey cover photo available. ' + journey.destination + '. Explore journey'} />}
       </View>
       <View style={[s.content, expanded && s.expandedContent]}>
         <Text numberOfLines={1} style={s.destination}>{journey.destination}</Text>
@@ -27,9 +28,9 @@ export const HomeJourneyCard = memo(function HomeJourneyCard({ journey, expanded
     </Pressable>
     <View style={s.actions}>
       <Pressable accessibilityRole="button" accessibilityLabel={'Locate journey: ' + journey.title} accessibilityState={{ selected }}
-        onPress={() => onLocate(journey.id)} style={s.locate}><Text style={s.locateText}>{selected ? 'Selected on map ↗' : 'Locate ↗'}</Text></Pressable>
+        onPress={() => onLocate(journey.id)} style={[s.locate, selected && s.selectedAction]}><HomeControlIcon name="locate" selected={selected} size={28} /><Text style={[s.actionLabel, selected && s.selectedLabel]}>Locate</Text></Pressable>
       <Pressable accessibilityRole="button" accessibilityLabel={'Read story: ' + journey.title}
-        onPress={() => onOpen(journey.id)} style={s.locate}><Text style={s.openText}>Read story →</Text></Pressable>
+        onPress={() => onOpen(journey.id)} style={s.locate}><HomeControlIcon name="story" size={28} /><Text style={s.actionLabel}>Read story</Text></Pressable>
     </View>
   </View>;
 });
@@ -47,8 +48,9 @@ const s = StyleSheet.create({
   title: { color: '#14243F', fontSize: 15, lineHeight: 19, fontWeight: '700' },
   creator: { color: colors.muted, fontSize: 10, lineHeight: 14 },
   facts: { color: colors.muted, fontSize: 10, lineHeight: 14 },
-  actions: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 10 },
-  locate: { minHeight: 44, justifyContent: 'center', paddingHorizontal: 4 },
-  locateText: { fontSize: 11, fontWeight: '600', color: '#2C63AF' },
-  openText: { fontSize: 11, fontWeight: '600', color: '#14243F' },
+  actions: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 10, paddingBottom: 4, gap: 8 },
+  locate: { minWidth: 76, minHeight: 56, flexShrink: 1, paddingHorizontal: 10, paddingVertical: 6, gap: 4, justifyContent: 'center', alignItems: 'center', borderRadius: 16 },
+  actionLabel: { color: '#243E68', fontSize: 11, lineHeight: 14, fontWeight: '600', textAlign: 'center', flexShrink: 1 },
+  selectedLabel: { color: '#6555CF' },
+  selectedAction: { backgroundColor: '#E6E0FF' },
 });
