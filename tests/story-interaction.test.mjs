@@ -44,6 +44,8 @@ function load(path, modules, hooks = harness(false).hooks, timers = globalThis) 
   const require = name => {
     if (name === '@/theme/mobile-theme') return mobileTheme;
     if(name==='@/lib/journey/nearby')return load('src/lib/journey/nearby.ts',{}); if(name.endsWith('/nearby-locations'))return {NearbyLocations:'NearbyLocations'}; if (name === 'react/jsx-runtime') return { jsx, jsxs: jsx };
+    if (name === '@/components/journey/swipe-journey-start') return { SwipeJourneyStart: 'SwipeJourneyStart' };
+    if (name === '@/components/journey/journey-action-icon') return { JourneyActionIcon: 'JourneyActionIcon' };
     if (name === './journey-action-icon') return { JourneyActionIcon: 'JourneyActionIcon' };
     if (name === './stop-card-deck') return { StopCardDeck: 'StopCardDeck' };
     if (name === 'expo-status-bar') return {StatusBar:'StatusBar'};
@@ -155,7 +157,10 @@ test('Story preserves map browsing while Use opens Travel directly and Remix rem
   }, h.hooks);
   const props = { journey, refresh: () => {}, refreshing: false, error: null };
   let tree = h.render(Screen, props);
-  assert.ok(find(tree, 'ScrollView'), 'Map, story and deck scroll above fixed actions');
+  assert.ok(find(tree, 'ScrollView'), 'Map and cards retain an accessible short-screen scroll fallback');
+  assert.equal(find(find(tree, 'ScrollView'), 'SwipeJourneyStart'), null, 'Swipe stays below the card scroll area');
+  assert.ok(find(tree, 'SwipeJourneyStart'));
+  assert.equal(find(tree, 'StopTimeline').props.creator.type, 'StoryCreator');
   assert.equal(find(tree, 'StoryHeader'), null);
   assert.equal(find(tree, 'StopTimeline').props.stacked, true);
   assert.equal(find(tree,'StatusBar').props.style,'light');
@@ -221,7 +226,8 @@ test('Story preserves map browsing while Use opens Travel directly and Remix rem
   find(tree, 'StopTimeline').props.onSelect('unknown');
   tree = h.render(Screen, props);
   assert.equal(find(tree, 'StopTimeline').props.selectedId, 'first');
-  assert.equal(all(tree, 'Pressable').some(item => item.props.accessibilityLabel === 'Start Journey'), true);
+  assert.ok(find(tree, 'SwipeJourneyStart'));
+  assert.equal(find(tree, 'SwipeJourneyStart').props.active, true);
   find(tree, 'JourneyMap').props.onExpand(); tree = h.render(Screen, props);
   const start = all(tree, 'Pressable').find(item => item.props.accessibilityLabel === 'Start Journey');
   assert.ok(start);
@@ -1629,4 +1635,12 @@ test('edge-to-edge preview moves Fit and compass below inset without changing Tr
  let fit=all(tree,'Pressable').find(n=>n.props.accessibilityLabel==='Fit journey and reset map orientation');assert.equal(fit.props.style[1].top,12);
  h.props.controlTopInset=36;tree=h.render();assert.equal(find(tree,'MapView').props.compassPosition.top,48);fit=all(tree,'Pressable').find(n=>n.props.accessibilityLabel==='Fit journey and reset map orientation');assert.equal(fit.props.style[1].top,48);
  h.props.navigationMode=true;h.props.navigationPadding={top:90,bottom:200};tree=h.render();assert.equal(find(tree,'MapView').props.compassPosition.bottom,236);h.dispose();
+});
+
+
+test('map unavailable fallback respects edge-to-edge status inset',()=>{
+ const {MapFallback}=load('src/components/journey/map/map-frame.tsx',{'react-native':native,'@/components/discovery/ui':ui});
+ let tree=MapFallback({controlTopInset:36,retry:()=>{}});
+ assert.equal(tree.props.style.at(-1).paddingTop,56);
+ tree=MapFallback({});assert.equal(tree.props.style.at(-1).paddingTop,20);
 });

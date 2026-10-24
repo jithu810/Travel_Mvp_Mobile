@@ -1,12 +1,13 @@
 import { StyleSheet, View } from 'react-native';
 
-type IconName = 'heart' | 'bookmark' | 'share' | 'remix' | 'route' | 'info';
-// Small native vector primitives keep these controls independent of font glyphs.
-export function JourneyActionIcon({ name, selected = false }: { name: IconName; selected?: boolean }) {
-  const color = selected ? '#6555CF' : '#243E68';
+type IconName = 'heart' | 'bookmark' | 'share' | 'remix' | 'route' | 'info' | 'expand' | 'fit';
+// Decorative native geometry keeps icons independent of emoji/font rendering.
+export function JourneyActionIcon({ name, selected = false, color: customColor }: { name: IconName; selected?: boolean; color?: string }) {
+  const color = name === 'heart' ? '#EF3340' : customColor ?? (selected ? '#6555CF' : '#243E68');
   const line = { backgroundColor: color };
   return <View pointerEvents="none" accessible={false} accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={s.frame}>
-    {name === 'heart' && <View style={s.heart}><View style={[s.heartSquare, line]} /><View style={[s.heartLeft, line]} /><View style={[s.heartRight, line]} /></View>}
+    {(name === 'expand' || name === 'fit') && <><View style={[s.corner, { left: 2, top: 2, borderLeftWidth: 2, borderTopWidth: 2, borderColor: color }]} /><View style={[s.corner, { right: 2, bottom: 2, borderRightWidth: 2, borderBottomWidth: 2, borderColor: color }]} />{name === 'fit' && <View style={[s.fitCenter, { borderColor: color }]} />}</>}
+    {name === 'heart' && <View style={s.heart}>{selected ? <><View style={[s.heartSquare, line]} /><View style={[s.heartLeft, line]} /><View style={[s.heartRight, line]} /></> : <><View style={[s.heartSquare, { borderColor: color, borderLeftWidth: 2, borderBottomWidth: 2 }]} /><View style={[s.heartOutlineTop, { borderColor: color }]} /><View style={[s.heartOutlineRight, { borderColor: color }]} /></>}</View>}
     {name === 'bookmark' && <><View style={[s.bookmark, { borderColor: color, backgroundColor: selected ? color : 'transparent' }]} /><View style={s.notch} /><View style={[s.notchOutline, { borderColor: color }]} /></>}
     {name === 'share' && <><View style={[s.shareBase, { borderColor: color }]} /><View style={[s.shareShaft, line]} /><View style={[s.shareHead, { borderColor: color }]} /></>}
     {name === 'remix' && <><View style={[s.remixTop, { borderColor: color }]} /><View style={[s.remixBottom, { borderColor: color }]} /><View style={[s.arrowTop, { borderColor: color }]} /><View style={[s.arrowBottom, { borderColor: color }]} /></>}
@@ -15,6 +16,8 @@ export function JourneyActionIcon({ name, selected = false }: { name: IconName; 
   </View>;
 }
 const s = StyleSheet.create({
+  heartOutlineTop: { position: 'absolute', top: -7, left: 0, width: 14, height: 8, borderTopLeftRadius: 7, borderTopRightRadius: 7, borderWidth: 2, borderBottomWidth: 0 }, heartOutlineRight: { position: 'absolute', top: 0, left: 13, width: 8, height: 14, borderTopRightRadius: 7, borderBottomRightRadius: 7, borderWidth: 2, borderLeftWidth: 0 },
+  corner: { position: 'absolute', width: 8, height: 8 }, fitCenter: { position: 'absolute', top: 8, left: 8, width: 8, height: 8, borderWidth: 2, borderRadius: 4 },
   notchOutline: { position: 'absolute', left: 8, bottom: -1, width: 8, height: 8, borderLeftWidth: 2, borderTopWidth: 2, transform: [{ rotate: '45deg' }] },
   frame: { width: 24, height: 24 }, heart: { position: 'absolute', left: 4, top: 6, width: 16, height: 16, transform: [{ rotate: '-45deg' }] }, heartSquare: { width: 14, height: 14, position: 'absolute' }, heartLeft: { width: 14, height: 14, borderRadius: 7, position: 'absolute', top: -7 }, heartRight: { width: 14, height: 14, borderRadius: 7, position: 'absolute', left: 7 },
   bookmark: { position: 'absolute', left: 5, top: 2, width: 14, height: 20, borderWidth: 2, borderTopLeftRadius: 2, borderTopRightRadius: 2 }, notch: { position: 'absolute', left: 7, bottom: 0, width: 0, height: 0, borderLeftWidth: 5, borderRightWidth: 5, borderBottomWidth: 5, borderLeftColor: 'transparent', borderRightColor: 'transparent', borderBottomColor: '#FFFFFF' },

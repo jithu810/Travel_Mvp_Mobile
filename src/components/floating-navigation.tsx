@@ -1,3 +1,4 @@
+import { theme } from '@/theme/mobile-theme';
 import type { ReactNode } from 'react';
 import { useCallback, useState } from 'react';
 import { useFocusEffect, useGlobalSearchParams, usePathname, useRouter } from 'expo-router';
@@ -59,13 +60,14 @@ export function MainNavigationFrame({ children }: { children: ReactNode }) {
   const [height, setHeight] = useState(56);
   const visible = path === '/search' || path === '/create' || path === '/account' || path.startsWith('/journey/') || path.startsWith('/profile/');
   const active: Destination = path === '/search' ? view === 'stories' ? 'story' : 'search' : path === '/create' ? 'create' : path === '/account' ? 'account' : path.startsWith('/journey/') ? 'story' : null;
-  return <View style={styles.frame}>
+  return <View style={[styles.frame, styles.backdrop]}>
     <View style={[styles.frame, visible && { paddingBottom: height + 16 }]}>{children}</View>
     {visible && <FloatingNavigation active={active} onHeight={setHeight} />}
   </View>;
 }
 const styles = StyleSheet.create({
   frame: { flex: 1 },
+  backdrop: { backgroundColor: theme.background, experimental_backgroundImage: theme.backgroundGradient },
   bar: { position: 'absolute', zIndex: 20, elevation: 5, alignSelf: 'center',
     flexDirection: 'row', alignItems: 'stretch', gap: 3, padding: 4, borderRadius: 32,
     backgroundColor: 'rgba(242, 246, 255, 0.97)', borderWidth: 1, borderColor: '#DCE6F5',

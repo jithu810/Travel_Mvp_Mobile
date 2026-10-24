@@ -84,7 +84,7 @@ export function JourneyOptions({ id, onUse, inlineFeedback = false, menu, presen
 }
 
 const styles = StyleSheet.create({
-  rail: { gap: 3 }, railButton: { width: 44, minHeight: 44, borderRadius: 14, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center' }, railFeedback: { position: 'absolute', right: 48, top: 0, width: 44, minHeight: 44, borderRadius: 22, backgroundColor: colors.pale, alignItems: 'center', justifyContent: 'center' },
+  rail: { gap: 3, flexDirection: 'row' }, railButton: { width: 44, minHeight: 44, borderRadius: 14, backgroundColor: 'transparent', alignItems: 'center', justifyContent: 'center' }, railFeedback: { position: 'absolute', right: 48, top: 0, width: 44, minHeight: 44, borderRadius: 22, backgroundColor: colors.pale, alignItems: 'center', justifyContent: 'center' },
   menuOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.35)' },
   menuBackdrop: { position: 'absolute', top: 0, bottom: 0, left: 0, right: 0 },
   menuPanel: { maxHeight: '80%', backgroundColor: colors.paper, borderTopLeftRadius: 24, borderTopRightRadius: 24 },

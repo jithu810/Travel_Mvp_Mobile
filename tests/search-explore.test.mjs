@@ -55,6 +55,26 @@ test('Explore tile navigates with source marker and falls back after image failu
   tree.props.children.props.onError();tree=render();assert.equal(tree.props.children.type,'Image');assert.match(tree.props.children.props.accessibilityLabel,/Default travel photo/);
   journey.cover='https://example.test/b.jpg';assert.equal(render().props.children.type,'JourneyPhoto');journey.cover=null;assert.equal(render().props.children.type,'Image');
 });
+test('Search source reaches the single existing social action owner',()=>{
+  const source=readFileSync('src/app/journey/[id].tsx','utf8');assert.match(source,/saveFirst=\{params.source === 'search'\}/);assert.match(source,/<SocialActions[^>]*saveFirst=\{saveFirst\}/);assert.equal((source.match(/<SocialActions /g)||[]).length,1);
+});
+test('Bookmark moves first only when requested, preserving sign-in, selected, busy and retry handling',()=>{
+  const calls=[], intents=[],routes=[];let social={auth:{session:null,loading:false},state:null,busy:null,act:x=>calls.push(x),load:()=>calls.push('load')};
+  const {SocialActions}=load('src/components/journey/social-actions.tsx',{
+    'react/jsx-runtime':runtime,react:{useState:x=>[x,()=>{}],useRef:x=>({current:x}),useCallback:x=>x},
+    'react-native':{...native,ActivityIndicator:'ActivityIndicator',Share:{}},
+    'expo-router':{useRouter:()=>({push:x=>routes.push(x)}),useFocusEffect(){}},
+    '@/hooks/action-intent':{useActionIntent:()=>({begin:(id,action)=>{intents.push([id,action]);return true;}})},
+    '@/hooks/use-journey-social':{useJourneySocial:()=>social},'./journey-action-icon':{JourneyActionIcon:'Icon'},'./journey-share-sheet':{JourneyShareSheet:'ShareSheet'},'./story-sheet':{StorySheet:'Sheet'},
+    '@/components/discovery/ui':{colors:{}},'@/lib/social/share-artwork':{createShareArtwork(){}},'@/lib/social/sharing':{sharePublicJourney(){}},
+  });
+  const render=saveFirst=>all(SocialActions({journey:{id:'a',likes:0},layout:'rail',saveFirst}));
+  const buttons=tree=>tree.filter(n=>n.type==='Pressable');let tree=render(true);assert.equal(buttons(tree)[0].props.accessibilityLabel,'Save journey');assert.equal(tree.filter(n=>n.type==='Icon'&&n.props.name==='bookmark').length,1);buttons(tree)[0].props.onPress();assert.deepEqual(intents,[['a','save']]);assert.deepEqual(routes,['/auth']);assert.deepEqual(calls,[]);
+  assert.equal(buttons(render(false))[0].props.accessibilityLabel,'Like journey');
+  social={...social,auth:{session:{},loading:false},state:{saved:true,liked:false,likes:0}};tree=render(true);assert.equal(buttons(tree)[0].props.accessibilityLabel,'Remove journey from Saved');assert.equal(buttons(tree)[0].props.accessibilityState.selected,true);buttons(tree)[0].props.onPress();assert.deepEqual(calls,['save']);
+  social.busy='save';tree=render(true);assert.equal(buttons(tree)[0].props.disabled,true);assert.ok(tree.some(n=>n.type==='ActivityIndicator'));
+  social.busy=null;social.error='Offline';tree=render(true);const sheet=tree.find(n=>n.type==='Sheet');all(sheet.props.children).find(n=>n.type==='Pressable').props.onPress();assert.deepEqual(calls,['save','load']);
+});
 function stateHarness() {
   const slots=[];let cursor=0,effects=[];
   const memo=(fn,deps)=>{const i=cursor++;if(!slots[i]||deps.some((v,j)=>v!==slots[i].deps[j]))slots[i]={value:fn(),deps};return slots[i].value;};
