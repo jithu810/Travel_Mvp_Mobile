@@ -2,7 +2,7 @@ import { useRouter } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import type { PublicJourney } from '@/types/journey';
 import { journeyFacts, travelerLabel } from '@/lib/discovery/model';
-import { JourneyPhoto } from './journey-photo';
+import { ThumbnailPhoto } from './thumbnail-photo';
 import { colors } from './ui';
 
 export function JourneyCard({ journey }: { journey: PublicJourney }) {
@@ -11,7 +11,7 @@ export function JourneyCard({ journey }: { journey: PublicJourney }) {
     onPress={() => router.push({ pathname: '/journey/[id]', params: { id: journey.id } })}
     style={({ pressed }) => [styles.card, pressed && { opacity: 0.85 }]}>
     <View style={styles.cover}>
-      <JourneyPhoto uri={journey.cover} label={journey.title + ' cover photo'} />
+      <ThumbnailPhoto uri={journey.cover} thumbnailUri={journey.coverThumbnail} label={journey.title + ' cover photo'} />
       <View style={styles.badge}><Text style={styles.badgeText}>{travelerLabel(journey.travelerType)}</Text></View>
     </View>
     <View style={styles.content}>

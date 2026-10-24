@@ -1,0 +1,33 @@
+# Thumbnail coverage delta preflight
+
+Backend Developer, **2026-10-24 04:53:54–04:54:09 UTC /10:23:54–10:24:09 IST**. User authorizes local expansion of thumbnail rendering to Story, JourneyCard/ProfileJourneyCard, map pins and Create memory rows. No Storage/schema changes, backfill, live writes or publication authorized for this follow-up. Decision: **no backend/database/Storage changes needed**. Architect gate paused until report/test plan recorded.
+
+## Baseline and current-schema evidence
+
+Mobile main c878bd303c4687d0185b9cdd36c89268c4ceb51d; preserve accumulated dirty Search/Saved/Home/image app/types/tests/reports, env example/ignore and unrelated .github/, cd, eas. Existing approved thumbnail-policy migration and private one-upload QA evidence are historical baseline, not permission for additional writes. No Web writes.
+
+Fresh SELECT-only catalogs on confirmed shared target gwybjhqgnrpouwcdvusi: journey-media remains private15MiB JPEG/PNG/WebP; storage.objects RLS=true. Existing owner INSERT and original read predicates inspected unchanged. Applied journey_media_thumbnail_v1_read remains SELECT for anon/authenticated with exact UUID/stem full-v1 mapping and published-or-owner cover **or stop** reference; predicate MD5 **74d2a552d9c793f70685edccc7f78052** matches postapply audit. Source review artifact SHA256 remains **823C43BE7241B364ACD5B640A80179EB65AC53F389809906C59FBC88985F7C24**. It already authorizes marked stop-photo companions as well as covers; no additional policy needed.
+
+Actual function-definition hashes/ACLs freshly inspected: private.public_journeys c5b1809af087edc7c92491a5fdc6ce9b, private.journey_detail39613298a4c55a41ada066697a2e7d78, public.get_account_journeys5651ec6b86447043ba40e07c346bf010, public.save_journey5b0fc2023c7f6cfa0e1125d939975b0e. Existing public/details/profile projections provide canonical cover/ordered stop photo paths; companions derive locally from markers, not new DB columns. Original published/public membership and owner draft checks remain necessary. Existing constraints/indexes and RPC permissions suffice; no API or writes change.
+
+Migration history still exactly20261024041322 journey_media_thumbnail_v1_read. Re-inventoried protected Web migrations and alternatives: core/discovery/details/creation/media/social/tracks/destinations through October4 remain baseline intent; pending October5 media review/hardening and October20 hardened selected-copy not installed (legacy review and media authorization tables absent). Installed standalone selected-copy receipt remains, including historical alternative/correction branches. No newly introduced repository migration or live drift affecting this delta. Do not reconcile/replay those branches. Prior complete comparison remains in explore-grid-backend-preflight.md; current additive thumbnail activation documented in qa/thumbnail-activation.md.
+
+No personal rows, object lists, signed URLs or image bytes retrieved; current metadata only. Current feature does not authorize another test upload or reuse historical approval.
+
+## Local interface plan and privacy
+
+- Add optional JourneyStop.photoThumbnail alongside existing photo; preserve canonical/full photo for large Story/full photo/share/export and fallback. Existing coverThumbnail covers JourneyCard/ProfileJourneyCard without changing their query contract.
+- Extend existing resolvePhotos to derive only marked full-v1 stop companions when capability exactly true, batch through existing bounded anonymous signer cache and retain original URLs. Profile/Saved loaders already reuse resolvePhotos. Flag off/unmarked legacy paths perform no sibling probing. Partial/denied/missing companion returns original fallback, never synthetic success.
+- Create memory previews use loadEditorPhotos with authenticated client and caller identity. Extend its returned path-to-signed-URL map with valid derived companion keys; preserve original keys so editor/full view remains unchanged. Do not put private editor URLs into public shared cache. UI can choose companion for saved compact rows/maps, while local unsaved candidates continue using their original local preview and Not saved status.
+- Before returning editor signed results verify identity again and abort-check; loader remains keyed to owner+paths. An auth change while signing must not render previous owner's previews. Existing useEditorPhotos renews55min/focus/foreground and throttles image-error refresh15sec; preserve those behaviors and safe path whitelist. Private membership must not become global cache.
+- Map data/UI owner must explicitly choose photoThumbnail for small pins and retain photo as fallback, without changing coordinates, marker identity, selection, camera ownership or attribution. Backend owns only assigned type/query contracts; request ownership if hook signatures need expansion.
+
+## Safe tests and acceptance
+
+Synthetic/mock-only: marked stop and cover derive correct companion; mixed legacy/HTTPS/missing/denied rows retain originals, no probes flagoff; duplicate paths sign once with bounded batch/cache; public detail still checks membership fresh; Profile/Saved and Story stop props retain original+optional thumbnail; editor signs through authenticated owner context, rejects wrong/changed user and aborted late completion, no shared public cache, partial companion error leaves original. Regression for editor original raw paths/save payload, unsaved candidate priority/Not saved, renewal and retry. UI tests thumbnail->original->fallback and changed URI recovery across Story/cards/pins/memory rows, preserving navigation/accessibility/maps/selection.
+
+Run relevant tests/typecheck/lint and independent stable review. Physical native rendering/performance and actual thumbnail requests are separate evidence; no live upload/publish/backfill needed. Previous private QA pair may be viewed read-only only if separately scoped by Architect; do not mutate it. Recovery uses focused local file edits; no migration or hosted rollback needed. Publication remains unauthorized, and user requires changed-file list before any future push.
+
+Changed file at preflight: this report only. Required next step: Architect records no-change rationale/test plan and assigns query/type/UI paths before coding.
+
+Architect gate RELEASED 2026-10-24 Asia/Kolkata after completed read-only no-change delta. Scope LOCAL only: Story/Profile cards, existing map photo pins, Create memory rows plus optional thumbnail URI plumbing/tests. Original fields remain unchanged for large cards/viewer/share. No Storage/RLS/config/data writes, backfill or GitHub publication authorized.

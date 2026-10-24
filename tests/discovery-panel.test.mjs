@@ -59,7 +59,7 @@ test('panel has an explicit accessible toggle, vertical expanded scrolling, real
   assert.ok(panel.includes('sheet.responders.handle') && panel.includes('sheet.responders.content'));
   assert.ok(!panel.includes('PanResponder'));
   const card = readFileSync('src/components/discovery/home-journey-card.tsx', 'utf8');
-  assert.ok(card.includes('source={{ uri: journey.cover }}'));
+  assert.ok(card.includes('source={{ uri: cover }}'));
   assert.ok(card.includes('onError='));
   assert.ok(card.includes('No journey cover photo available'));
   assert.ok(card.includes('onLocate(journey.id)'));

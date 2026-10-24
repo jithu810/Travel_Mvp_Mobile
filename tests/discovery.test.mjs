@@ -108,7 +108,7 @@ const fakeClient = {
 };
 requireCompiled.cache[publicModulePath] = { id: publicModulePath, filename: publicModulePath, loaded: true, exports: { publicSupabase: fakeClient } };
 const queries = requireCompiled(join(output, 'lib/discovery/queries.js'));
-function setup(values, failMedia = false) { responses = values; requests = []; mediaFailure = failMedia; }
+function setup(values, failMedia = false) { queries.invalidatePublicJourneys(); responses = values; requests = []; mediaFailure = failMedia; }
 const signal = () => new AbortController().signal;
 
 test('discovery loader is bounded to the existing latest-100 RPC and filters demo/draft projections', async () => {

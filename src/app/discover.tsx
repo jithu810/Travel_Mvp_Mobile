@@ -4,8 +4,8 @@ import { PlacePicker } from '@/components/create/place-picker';
 import type { Place } from '@/lib/create/model';
 import { FloatingNavigation } from '@/components/floating-navigation';
 import { Stack, useFocusEffect, useRouter } from 'expo-router';
-import { useCallback, useMemo, useState } from 'react';
-import { Keyboard, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { AppState, Keyboard, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { DiscoveryGlobe } from '@/components/discovery/globe/discovery-globe';
 import { DiscoveryPanel } from '@/components/discovery/discovery-panel';
@@ -13,13 +13,20 @@ import { useLoad } from '@/hooks/use-load';
 import { discoveryPoints, worldCamera } from '@/lib/discovery/map';
 import { discoveryRoute } from '@/lib/discovery/travel';
 import { spaceColor } from '@/lib/discovery/presentation';
-import { loadPublicJourney, loadPublicJourneys } from '@/lib/discovery/queries';
+import { invalidatePublicJourneys, loadPublicJourney, loadPublicJourneys } from '@/lib/discovery/queries';
 
 export default function DiscoverScreen() {
   const router = useRouter();
   // Home companion is temporarily unmounted; components, assets, flag and saved preference are preserved.
   const insets = useSafeAreaInsets();
   const state = useLoad(loadPublicJourneys);
+  const reloadPublic = state.refresh;
+  const refreshPublic = () => { invalidatePublicJourneys(); state.refresh(); };
+  useFocusEffect(useCallback(() => { reloadPublic(); }, [reloadPublic]));
+  useEffect(() => {
+    const listener = AppState.addEventListener('change', next => { if (next === 'active') reloadPublic(); });
+    return () => listener.remove();
+  }, [reloadPublic]);
   const initialLoading = state.loading && !state.data;
   const [sheetInteracting, setSheetInteracting] = useState(false);
   const [place, setPlace] = useState<Place | null>(null);
@@ -80,7 +87,7 @@ export default function DiscoverScreen() {
         <View style={s.map}><DiscoveryGlobe points={points} route={route} onOpen={open} bottomInset={railHeight} headerInset={headerClearance} viewport={layout} selectionId={selectedId} locateVersion={locateVersion} sheetInteracting={sheetInteracting} homeSearch destinationMode={!!place} destination={place} destinationVersion={placeVersion} onCenterChange={mapCenter} /></View>
         <DiscoveryPanel journeys={journeys} selectedId={selectedId} onLocate={locate} onOpen={open}
           notice={notice} onClear={() => setSelectedId(null)} onRetrySelection={selection.error ? selection.retry : undefined}
-          loading={state.loading} refreshing={state.refreshing} error={state.error} onRefresh={state.refresh}
+          loading={state.loading} refreshing={state.refreshing} error={state.error} onRefresh={refreshPublic}
           onInteraction={setSheetInteracting} onHeight={setRailHeight} availableHeight={layout.height} availableWidth={layout.width} bottomClearance={navClearance + bannerHeight + 12} topClearance={headerClearance} />
       </View>
       <Pressable accessibilityRole="button" accessibilityLabel="Create Journey from Home" onPress={() => router.push('/create')}

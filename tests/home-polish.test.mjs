@@ -10,11 +10,15 @@ new Function('exports', ts.transpileModule(readFileSync('src/theme/mobile-theme.
 function load(file, dependencies, state = null, hookOverrides = {}) {
   const exports = {};
   const jsx = (type, props) => ({ type, props });
-  const react = { memo: fn => fn, useState: initial => typeof state === 'function' ? state(initial) : [state ?? initial, () => {}], useMemo: fn => fn(), useCallback: fn => fn, ...hookOverrides };
+  const react = { useRef:()=>({current:null}),useEffect:()=>{}, memo: fn => fn, useState: initial => typeof state === 'function' ? state(initial) : [state ?? initial, () => {}], useMemo: fn => fn(), useCallback: fn => fn, ...hookOverrides };
   const rn = { StyleSheet: { create: value => value }, Platform: { OS: 'web' }, StatusBar: {} };
-  for (const name of ['View', 'Text', 'Pressable', 'Image']) rn[name] = name;
+  for (const name of ['View', 'Text', 'Pressable', 'Image', 'TextInput']) rn[name] = name;
   const source = ts.transpileModule(readFileSync(file, 'utf8'), { compilerOptions: { jsx: ts.JsxEmit.ReactJSX, module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
   new Function('require', 'exports', source)(name => { if (name === '@/theme/mobile-theme') return mobileTheme;
+    if(name==='@/lib/discovery/queries')return {invalidatePublicJourneys(){},...dependencies[name]};
+    if(name==='@/components/discovery/compact-search-input')return load('src/components/discovery/compact-search-input.tsx',{},null,{useRef:()=>({current:null})});
+    if(name==='@/lib/social/saved-queries')return {loadSavedJourneys:async()=>[]};
+    if(name==='@/components/journey/journey-action-icon')return {JourneyActionIcon:'JourneyActionIcon'};
     if (name === '../../../assets/images/journey-photo-fallback.png') return 17;
     if (name === './travel-photo-placeholder') return load('src/components/discovery/travel-photo-placeholder.tsx', {});
     if (name === './home-control-icon') return load('src/components/discovery/home-control-icon.tsx', {});
@@ -25,7 +29,7 @@ function load(file, dependencies, state = null, hookOverrides = {}) {
     if(name==='@/hooks/use-companion-preference'&&!(name in dependencies))return {useCompanionPreference:()=>({enabled:false,available:true,status:'ready',setEnabled:()=>{},registerDisable:()=>{}})};
     if(name==='@/components/companion/companion-toggle'&&!(name in dependencies))return {CompanionToggle:()=>null};
     if(name==='@/components/create/place-picker')return {PlacePicker:'PlacePicker'};
-    if(name==='@/hooks/session-context' && !(name in dependencies))return {useSessionState:()=>({session:null})};
+    if(name==='@/hooks/session-context' && !(name in dependencies))return {useSessionState:()=>({session:null,loading:false})};
     if(name==='@/hooks/use-load' && !(name in dependencies))return {useLoad:()=>({data:null,refresh:()=>{}})};
     if(name==='@/lib/profile/edit-queries')return {loadOwnProfile:()=>Promise.resolve(null)};
     if(name==='@/lib/discovery/model' && !(name in dependencies))return {safePhoto:()=>null};
@@ -55,9 +59,10 @@ test('Search and Story share one public list while preserving independent query 
   let collection = { data: [{ id: 'a', destination: 'Coast' }, { id: 'b', destination: 'Hills' }], loading: false };
   const state = [];
   const component = load('src/app/search.tsx', {
-    'expo-router': { useLocalSearchParams: () => ({ view }) },
+    'expo-router': { useLocalSearchParams: () => ({ view }), useRouter:()=>({}), useFocusEffect(){} },
     'react-native': { TextInput: 'TextInput', FlatList: 'FlatList', KeyboardAvoidingView: 'KeyboardAvoidingView', RefreshControl: 'RefreshControl' },
     'react-native-safe-area-context': { SafeAreaView: 'SafeAreaView' },
+    '@/components/discovery/explore-tile': { ExploreTile: 'ExploreTile' },
     '@/components/discovery/journey-card': { JourneyCard: 'JourneyCard' },
     '@/components/discovery/ui': { colors, ui: {}, ScreenHeader: 'ScreenHeader', Message: 'Message', LoadingCards: 'LoadingCards' },
     '@/hooks/use-load': { useLoad: () => collection },
@@ -96,7 +101,7 @@ test('Account uses the loaded profile avatar and falls back after image failure'
 });
 test('Home embeds place search; Account and navigation retain existing routes and geometry', () => {
   for (const bottomInset of [0, 24, 48]) {
-  const pushed = [];
+  const pushed = []; const refreshOrder=[];
   const navigation = load('src/components/floating-navigation.tsx', {
     'expo-router': { useRouter: () => ({ navigate: route => pushed.push(route) }) },
     'react-native-safe-area-context': { useSafeAreaInsets: () => ({ bottom: bottomInset, left: 0, right: 0 }) },
@@ -109,11 +114,11 @@ test('Home embeds place search; Account and navigation retain existing routes an
     'react-native-safe-area-context': { SafeAreaView: 'SafeAreaView', useSafeAreaInsets: () => ({ bottom: bottomInset }) },
     '@/components/discovery/globe/discovery-globe': { DiscoveryGlobe: 'Globe' },
     '@/components/discovery/discovery-panel': { DiscoveryPanel: 'Panel' },
-    '@/components/discovery/ui': { colors }, '@/hooks/use-load': { useLoad: () => ({ data: [], loading: false }) },
+    '@/components/discovery/ui': { colors }, '@/hooks/use-load': { useLoad: () => ({ data: [], loading: false, refresh:()=>refreshOrder.push('refresh') }) },
     '@/lib/discovery/map': { discoveryPoints: () => ({ features: [] }) },
     '@/lib/discovery/travel': { discoveryRoute: () => null },
     '@/lib/discovery/presentation': { spaceColor: '#080F1E' },
-    '@/lib/discovery/queries': { loadPublicJourney: () => {}, loadPublicJourneys: () => {} },
+    '@/lib/discovery/queries': { invalidatePublicJourneys:()=>refreshOrder.push('invalidate'), loadPublicJourney: () => {}, loadPublicJourneys: () => {} },
   });
   const tree = home.default();
   const all = nodes(tree);
@@ -161,7 +166,7 @@ test('Home embeds place search; Account and navigation retain existing routes an
   assert.equal(bell.props.onPress, undefined);
   assert.equal(bell.props.accessibilityRole, 'image');
   assert.ok(all.some(n => n.type === 'Globe'));
-  assert.ok(all.some(n => n.type === 'Panel'));
+  assert.ok(all.some(n => n.type === 'Panel'));all.find(n=>n.type==='Panel').props.onRefresh();assert.deepEqual(refreshOrder,['invalidate','refresh']);
   const explore = all.find(n => n.props?.accessibilityLabel === 'Explore');
   const count = pushed.length; explore.props.onPress(); assert.equal(pushed.length, count);
   assert.equal(explore.props.accessibilityState.selected, true);
@@ -303,6 +308,15 @@ test('sheet overlay clearance keeps peek/compact controls above pill and expande
     const all = nodes(tree);
     const lists = all.filter(n => n.type === 'FlatList');
     assert.equal(lists.length, 2);
+    const active = lists.find(n => n.props.horizontal === !expanded);
+    const hidden = lists.find(n => n !== active);
+    assert.equal(active.props.data.length, 1);
+    assert.equal(hidden.props.data.length, 0, 'Hidden Home list cannot request image sources');
+    assert.equal(hidden.props.ListEmptyComponent, null);
+    assert.equal(hidden.props.ListFooterComponent, null);
+    assert.equal(active.props.initialNumToRender, expanded ? 3 : 2);
+    assert.equal(active.props.maxToRenderPerBatch, 2);
+    assert.equal(active.props.windowSize, 3);
     const vertical = lists.find(n => !n.props.horizontal);
     assert.ok(vertical.props.contentContainerStyle.at(-1).paddingBottom > clearance);
     vertical.props.onScroll({ nativeEvent: { contentOffset: { y: 60 } } });
@@ -381,7 +395,7 @@ test('Home omits companion switch and scene even when saved preference is enable
     'react-native-safe-area-context':{SafeAreaView:'SafeAreaView',useSafeAreaInsets:()=>({bottom:24})},
     '@/components/discovery/globe/discovery-globe':{DiscoveryGlobe:'Globe'},
     '@/components/discovery/discovery-panel':{DiscoveryPanel:'Panel'},
-    '@/hooks/use-load':{useLoad:()=>collection},
+    '@/hooks/use-load':{useLoad:()=>({refresh(){},...collection})},
     '@/lib/discovery/map':{discoveryPoints:()=>({features:[]})},'@/lib/discovery/travel':{discoveryRoute:()=>null},
     '@/lib/discovery/presentation':{spaceColor:'#080F1E'},'@/lib/discovery/queries':{loadPublicJourney:()=>{},loadPublicJourneys:()=>{}},
   });
@@ -415,7 +429,7 @@ test('Home assigns native-screen dark loading icons then light globe icons witho
   'react-native':{Platform:{OS:'android'},Keyboard:{dismiss(){}}},
   'react-native-safe-area-context':{SafeAreaView:'SafeAreaView',useSafeAreaInsets:()=>({top:30,bottom:20})},
   '@/components/floating-navigation':{FloatingNavigation:'Navigation'},'@/components/discovery/globe/discovery-globe':{DiscoveryGlobe:'Globe'},'@/components/discovery/discovery-panel':{DiscoveryPanel:'Panel'},
-  '@/hooks/use-load':{useLoad:()=>collection},'@/lib/discovery/map':{worldCamera:{centerCoordinate:[35,18]},discoveryPoints:()=>({features:[]})},'@/lib/discovery/travel':{discoveryRoute:()=>null},'@/lib/discovery/presentation':{spaceColor:'#080F1E'},'@/lib/discovery/queries':{loadPublicJourneys(){},loadPublicJourney(){}},
+  '@/hooks/use-load':{useLoad:()=>({refresh(){},...collection})},'@/lib/discovery/map':{worldCamera:{centerCoordinate:[35,18]},discoveryPoints:()=>({features:[]})},'@/lib/discovery/travel':{discoveryRoute:()=>null},'@/lib/discovery/presentation':{spaceColor:'#080F1E'},'@/lib/discovery/queries':{loadPublicJourneys(){},loadPublicJourney(){}},
  },null,hooks).default;
  const render=()=>{cursor=0;return Home();};
  let tree=render();assert.ok(nodes(tree).some(n=>n.type==='BrandedLoading'));assert.equal(nodes(tree).find(n=>n.type==='StackScreen').props.options.statusBarStyle,'dark');
@@ -423,4 +437,16 @@ test('Home assigns native-screen dark loading icons then light globe icons witho
  tree=render();assert.equal(nodes(tree).filter(n=>n.type==='StackScreen').length,1);
  assert.equal(nodes(tree).filter(n=>n.type==='StatusBar').length,0,'Native route owns transition style without a competing Expo status component');slots.forEach(s=>s?.cleanup?.());
 
+});
+test('Home image lists expose data only in active layout and More keeps every journey reachable',()=>{
+ let expanded=false,cursor=0;const slots=[];const rows=Array.from({length:61},(_,i)=>({...journey,id:String(i)}));
+ const component=load('src/components/discovery/discovery-panel.tsx',{
+  'react-native':{Animated:{View:'AnimatedView',add:(a,b)=>a+b},FlatList:'FlatList'},
+  '@/lib/discovery/presentation':{discoveryCardWidth:()=>300},'@/hooks/use-discovery-sheet':{useDiscoverySheet:()=>({height:200,expanded,offset:{current:0},responders:{handle:{},content:{}}})},'./home-journey-card':{HomeJourneyCard:'Card'},'./ui':{colors},
+ },initial=>{const i=cursor++;if(!(i in slots))slots[i]=initial;return [slots[i],value=>{slots[i]=typeof value==='function'?value(slots[i]):value;}];});
+ const render=()=>{cursor=0;return nodes(component.DiscoveryPanel({journeys:rows,availableHeight:720,availableWidth:360,onHeight(){}})).filter(n=>n.type==='FlatList');};
+ for(const size of [24,48,61]) {
+  const lists=render(),active=lists.find(n=>n.props.horizontal===!expanded),hidden=lists.find(n=>n!==active);assert.equal(active.props.data.length,size);assert.equal(hidden.props.data.length,0);assert.equal(hidden.props.ListFooterComponent,null);assert.equal(hidden.props.ListEmptyComponent,null);
+  if(size<61){active.props.ListFooterComponent.props.onPress();expanded=!expanded;}
+ }
 });

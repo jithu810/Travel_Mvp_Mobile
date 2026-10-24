@@ -5,18 +5,18 @@ import type { DiscoveryPoints } from '@/lib/discovery/map';
 import { createTravelPlayback, travelLegs, travelLine, travelPosition, type TravelLeg } from '@/lib/discovery/travel';
 import type { Coordinate } from '@/lib/journey/map-data';
 import { colors } from '../ui';
+import { useThumbnailSource } from '@/hooks/use-thumbnail-source';
 
 const PhotoPin = memo(function PhotoPin({ point, onOpen, selected = false }: { selected?: boolean; point: DiscoveryPoints['features'][number]; onOpen: (id: string) => void }) {
   const annotation = useRef<PointAnnotation>(null);
-  const [failed, setFailed] = useState(false);
-  const uri = point.properties.photo;
-  useEffect(() => { annotation.current?.refresh(); }, [selected]);
-  if (!uri || failed) return null; // The original green circle remains beneath every photo.
+  const { uri, onError } = useThumbnailSource(point.properties.photo, point.properties.photoThumbnail);
+  useEffect(() => { annotation.current?.refresh(); }, [selected, uri]);
   return <Mapbox.PointAnnotation ref={annotation} id={'photo-' + point.id} coordinate={point.geometry.coordinates}
     onSelected={() => onOpen(point.properties.journeyId)}>
     <View collapsable={false} style={[s.photoRing, selected && { borderColor: '#63D4EF' }]}>
-      <Image accessibilityLabel={'Photo at ' + point.properties.name} source={{ uri }} style={s.photo}
-        resizeMode="cover" fadeDuration={0} onLoad={() => annotation.current?.refresh()} onError={() => setFailed(true)} />
+      <Image key={uri || 'default'} accessibilityLabel={uri ? 'Photo at ' + point.properties.name : 'Default travel photo at ' + point.properties.name}
+        source={uri ? { uri } : require('../../../../assets/images/journey-photo-fallback.png')} style={s.photo}
+        resizeMode="cover" fadeDuration={0} onLoad={() => annotation.current?.refresh()} onError={() => { if (uri) onError(); }} />
     </View>
   </Mapbox.PointAnnotation>;
 });
@@ -58,7 +58,7 @@ export function JourneyOverlays({ points, route, onOpen, playing, playbackKey, d
       <Mapbox.LineLayer id="discovery-travel-line-color" belowLayerID="discovery-pins"
         style={{ lineColor: '#4A9D7C', lineWidth: 2.5, lineOpacity: 0.9, lineDasharray: [2, 2], lineCap: 'round' }} />
     </Mapbox.ShapeSource>}
-    {points.features.filter(point => point.properties.photo).map(point => <PhotoPin key={point.id + point.properties.photo}
+    {points.features.filter(point => point.properties.photo || point.properties.photoThumbnail).map(point => <PhotoPin key={point.id}
       point={point} onOpen={onPointOpen ? () => onPointOpen(String(point.id)) : onOpen} selected={selectedId === point.id} />)}
     {hasLegs && playing && <TravelingPlane key={playbackKey} legs={legs} />}
   </>;

@@ -3,6 +3,7 @@ import { isJourneyId } from '../discovery/model';
 import { SaveFailure, type CreateForm } from './model';
 import type { LocalPhoto } from './photo-model';
 import { readPreparedPhoto } from './photo-device';
+import { isThumbnailObjectName, storedThumbnailsEnabled, thumbnailObjectName } from '../media/image-variants';
 async function viewer(expectedOwner: string, signal: AbortSignal) {
   if (!supabase || signal.aborted) throw new SaveFailure('Photo saving is unavailable or cancelled.');
   const { data, error } = await supabase.auth.getUser();
@@ -25,10 +26,16 @@ export async function uploadJourneyPhoto(objectName: string, photo: LocalPhoto, 
   const cover = segments.length === 4 && segments[2] === 'cover';
   const memory = segments.length === 5 && segments[2] === 'stops' && isJourneyId(segments[3]);
   const filename = segments.at(-1) || '';
-  if (segments[0] !== owner || !isJourneyId(segments[1]) || !(cover || memory) || !ext || !filename.endsWith('.'+ext) || !isJourneyId(filename.slice(0,-ext.length-1))) throw new SaveFailure('Invalid photo Storage object name.');
+  const legacy = !!ext && filename.endsWith('.'+ext) && isJourneyId(filename.slice(0,-ext.length-1));
+  const full = storedThumbnailsEnabled() && thumbnailObjectName(objectName) !== null && !!ext && filename.endsWith('.full-v1.'+ext);
+  const thumbnail = storedThumbnailsEnabled() && isThumbnailObjectName(objectName) && photo.mime === 'image/jpeg'
+    && [photo.width,photo.height].every(n => Number.isInteger(n) && n > 0 && n <= 512)
+    && Number.isSafeInteger(photo.size) && photo.size > 0 && photo.size <= 1024*1024;
+  if (segments[0] !== owner || !isJourneyId(segments[1]) || !(cover || memory) || !(legacy || full || thumbnail)) throw new SaveFailure('Invalid photo Storage object name.');
   let bytes: ArrayBuffer;
   try { bytes = await readPreparedPhoto(photo); }
   catch (error) { throw new SaveFailure(error instanceof Error ? error.message : 'The prepared photo could not be read. Select it again.'); }
+  if (thumbnail && (bytes.byteLength <= 0 || bytes.byteLength > 1024*1024)) throw new SaveFailure('Invalid thumbnail upload size.');
   if (signal.aborted) throw new SaveFailure('Upload cancelled before submission.');
   // The installed upload API does not accept AbortSignal. Existing client timeout
   // remains in force; do not claim cancelling the editor cancels a server write.
