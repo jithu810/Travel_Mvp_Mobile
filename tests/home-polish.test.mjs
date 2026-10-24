@@ -15,7 +15,9 @@ function load(file, dependencies, state = null, hookOverrides = {}) {
   for (const name of ['View', 'Text', 'Pressable', 'Image']) rn[name] = name;
   const source = ts.transpileModule(readFileSync(file, 'utf8'), { compilerOptions: { jsx: ts.JsxEmit.ReactJSX, module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
   new Function('require', 'exports', source)(name => { if (name === '@/theme/mobile-theme') return mobileTheme;
+    if (name === '../../../assets/images/journey-photo-fallback.png') return 17;
     if (name === './travel-photo-placeholder') return load('src/components/discovery/travel-photo-placeholder.tsx', {});
+    if (name === './home-control-icon') return load('src/components/discovery/home-control-icon.tsx', {});
     if (name === 'expo-status-bar') return {StatusBar:'StatusBar'};
     if (name === 'react') return react;
     if (name === 'react/jsx-runtime') return { jsx, jsxs: jsx, Fragment: 'Fragment' };
@@ -142,8 +144,8 @@ test('Home embeds place search; Account and navigation retain existing routes an
     assert.equal(control.props.style.minHeight, 44);
     assert.equal(control.props.style.flexShrink, 0);
     const icon = control.props.children;
-    assert.equal(icon.props.style.width, 22);
-    assert.equal(icon.props.style.height, 22);
+    assert.equal(icon.props.style.width, 34);
+    assert.equal(icon.props.style.height, 34);
   }
   for (const width of [320, 360, 412]) {
     const reserved = 2 * header.props.style[0].paddingHorizontal + 44 + header.props.style[0].gap;
@@ -216,7 +218,7 @@ test('Home retains title, author, count, Locate and both Story entry points', ()
 });
 test('missing/failed photos retain fallback and a changed URI recovers', () => {
   for (const [uri, failed] of [[null, null], [journey.cover, journey.cover]]) {
-    assert.ok(card(uri, failed).all.some(n => n.props?.accessibilityLabel === 'No journey cover photo available. Coast. Journey story'));
+    assert.ok(card(uri, failed).all.some(n => n.props?.accessibilityLabel === 'Default travel photo. No journey cover photo available. Coast. Explore journey'));
   }
   assert.equal(card('https://example.invalid/new.jpg', journey.cover).all.filter(n => n.type === 'Image').length, 1);
 });
@@ -232,34 +234,51 @@ test('Home image failure falls back, a new URI recovers and card measurement rem
   tree.props.onLayout({ nativeEvent: { layout: { height: 310 } } });
   assert.equal(measured, 310);
   assert.equal(nodes(tree).find(n => n.props?.accessibilityLabel === 'Locate journey: Coastal weekend').props.accessibilityState.selected, true);
+  for (const label of ['Locate journey: Coastal weekend', 'Read story: Coastal weekend']) {
+    const action = nodes(tree).find(n => n.props?.accessibilityLabel === label);
+    const style = Object.assign({}, ...[action.props.style].flat().filter(Boolean));
+    assert.ok(style.minWidth >= 44 && style.minHeight >= 56);
+    assert.equal(style.height, undefined, 'Action can grow with larger text');
+    const text = nodes(action).find(n => n.type === 'Text');
+    assert.equal(text.props.children, label.startsWith('Locate') ? 'Locate' : 'Read story');
+    assert.equal(text.props.numberOfLines, undefined, 'Visible title can wrap at large font sizes');
+    const icon = nodes(action).find(n => n.props?.accessibilityElementsHidden);
+    assert.equal(icon.props.style[1].transform[0].scale, 28 / 24);
+  }
   nodes(tree).find(n => n.type === 'Image').props.onError();
   assert.equal(failedUri, journey.cover);
-  assert.ok(nodes(component.HomeJourneyCard(props)).some(n => n.props?.accessibilityLabel === 'No journey cover photo available. Coast. Journey story'));
+  assert.ok(nodes(component.HomeJourneyCard(props)).some(n => n.props?.accessibilityLabel === 'Default travel photo. No journey cover photo available. Coast. Explore journey'));
   tree = component.HomeJourneyCard({ ...props, journey: { ...journey, cover: 'https://example.invalid/landscape.jpg' } });
   assert.equal(nodes(tree).find(n => n.type === 'Image').props.source.uri, 'https://example.invalid/landscape.jpg');
+  const {HomeControlIcon}=load('src/components/discovery/home-control-icon.tsx',{});
+  const world=HomeControlIcon({name:'world'});
+  assert.equal(world.props.style[0].width,24);assert.equal(world.props.style[1],false,'World keeps its original icon size');
 });
 
-test('Home missing and failed covers use a static branded fallback with expanded-only destination caption', () => {
+test('Home missing and failed covers use supplied default photo with readable native caption', () => {
   for (const expanded of [false, true]) for (const [uri, failed] of [[null, null], [journey.cover, journey.cover]]) {
     const { all } = card(uri, failed, expanded);
-    assert.ok(!all.some(n => n.type === 'Image'));
-    const fallback = all.find(n => n.props?.accessibilityLabel === 'No journey cover photo available. Coast. Journey story');
+    const fallback = all.find(n => n.props?.accessibilityLabel === 'Default travel photo. No journey cover photo available. Coast. Explore journey');
     assert.equal(fallback.props.accessible, true);
-    const art = nodes(fallback).find(n => n.props?.pointerEvents === 'none');
+    const art = nodes(fallback).find(n => n.props?.accessibilityElementsHidden);
     assert.equal(art.props.accessible, false);
-    assert.equal(art.props.accessibilityElementsHidden, true);
     assert.equal(art.props.importantForAccessibility, 'no-hide-descendants');
-    assert.ok(nodes(art).some(n => n.props?.style?.borderStyle === 'dotted'));
-    assert.ok(!nodes(art).some(n => n.type === 'Text'));
+    const image = nodes(art).find(n => n.type === 'Image');
+    assert.equal(image.props.source, 17);assert.equal(image.props.resizeMode, 'cover');
     const caption = nodes(fallback).filter(n => n.type === 'Text');
-    assert.equal(caption.length, expanded ? 2 : 0);
-    if (expanded) {
-      assert.equal(caption[0].props.children, journey.destination);
-      assert.equal(caption[0].props.numberOfLines, 1);
-      assert.equal(caption[1].props.children, 'Journey story');
-    }
+    assert.equal(caption.length, 1);assert.equal(caption[0].props.children, 'Explore journey');
+    const textStyle=Object.assign({},...caption[0].props.style.filter(Boolean));
+    assert.equal(textStyle.color,'#FFFFFF');assert.equal(textStyle.fontSize,expanded?12:10);
+    assert.ok(!caption.some(n=>n.props.children===journey.destination));
   }
 });
+test('Journey generic fallback has a distinct caption and honest accessibility label',()=>{
+ const {TravelPhotoPlaceholder}=load('src/components/discovery/travel-photo-placeholder.tsx',{});
+ const tree=TravelPhotoPlaceholder({variant:'stop'});
+ assert.match(tree.props.accessibilityLabel,/Default travel photo/);
+ assert.equal(nodes(tree).find(n=>n.type==='Text').props.children,'See this stop');
+});
+
 test('sheet overlay clearance keeps peek/compact controls above pill and expanded final actions scrollable', () => {
   for (const expanded of [false, true]) for (const availableHeight of [190, 436, 720]) for (const bottomClearance of [94, 118, 150]) for (const topClearance of [0, 96, 500]) {
     let sheetArea, published, bounds;

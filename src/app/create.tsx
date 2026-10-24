@@ -16,7 +16,7 @@ import { selectDestination } from '@/lib/create/editor-model';
 import { useLoad } from '@/hooks/use-load';
 import { loadPrivateDrafts } from '@/lib/remix/queries';
 import { randomUUID, idsAvailable } from '@/lib/create/id';
-import { useFocusEffect, useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
+import { Stack, useFocusEffect, useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Image, Keyboard, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -150,7 +150,7 @@ export function NewJourneyEditor({ ownerId, initial, onReload, onDestinationFocu
     try { void save('draft', memorySnapshot(form, memoryEdit), true); }
     catch (failure) { setError(failure instanceof Error ? failure.message : 'Check this memory before saving.'); }
   }
-  if (!form.updatedAt) return <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+  if (!form.updatedAt) return <KeyboardAvoidingView style={{ flexShrink: 1, minHeight: 0 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
     <View style={createStyles.quickPage}>
       <QuickJourneySetup dismissSearchVersion={dismissSearchVersion} form={form} disabled={disabled} saving={busy} onTitle={title => { titleEdited.current = true; change({ title }); }}
         onDestination={destination => { change(selectDestination(form, destination, titleEdited.current)); onDestinationFocus?.(destination); }} onChange={change} onStart={() => { void save('draft'); }} feedback={<>
@@ -283,7 +283,7 @@ export default function CreateScreen() {
   useFocusEffect(useCallback(() => {
     if (!auth.loading && !auth.session && !prompted.current) { prompted.current = true; router.push({ pathname: '/auth', params: { context: 'create' } }); }
   }, [auth.loading, auth.session, router]));
-  return <SafeAreaView style={ui.safe}><View style={ui.page} onTouchStart={!draftId ? () => setDismissSearchVersion(n => n + 1) : undefined}>{draftId ? (!auth.session || auth.loading) && <ScreenHeader title="Your journey" back compact /> : <CreateJourneyHeader destination={focus?.ownerId === userId ? focus?.place : null} destinationVersion={focus?.version} keyboardOpen={keyboardOpen} />}
+  return <SafeAreaView edges={draftId ? ['top', 'left', 'right', 'bottom'] : ['left', 'right', 'bottom']} style={ui.safe}><Stack.Screen options={{ statusBarStyle: draftId ? 'dark' : 'light' }} /><View style={ui.page} onTouchStart={!draftId ? () => setDismissSearchVersion(n => n + 1) : undefined}>{draftId ? (!auth.session || auth.loading) && <ScreenHeader title="Your journey" back compact /> : <CreateJourneyHeader destination={focus?.ownerId === userId ? focus?.place : null} destinationVersion={focus?.version} keyboardOpen={keyboardOpen} />}
     {auth.loading ? <ActivityIndicator /> : !auth.session ? <View style={ui.list}><Message title="Make your next chapter" body="Sign in to create a journey. Nothing is created until you save or publish." retry={() => router.push({ pathname: '/auth', params: { context: 'create' } })} action="Sign in to create" /></View>
       : draftId ? <DraftEditorEntry key={auth.session.user.id + ':' + draftId} id={draftId} ownerId={auth.session.user.id} />
         : !idsAvailable ? <View style={ui.list}><Message title="An app update is needed" body="Update this development client before creating journeys." /></View> : <NewJourneyEditor key={auth.session.user.id} ownerId={auth.session.user.id} onDestinationFocus={focusDestination} dismissSearchVersion={dismissSearchVersion} keyboardOpen={keyboardOpen} />}
@@ -325,7 +325,7 @@ const createStyles = StyleSheet.create({
   publishLabel: { color: colors.white, fontSize: 14, lineHeight: 20, fontWeight: '600', textAlign: 'center' },
   publishDisabled: { backgroundColor: theme.inset, experimental_backgroundImage: 'none', boxShadow: 'none', borderColor: colors.line },
   publishLabelDisabled: { color: colors.muted },
-  quickPage: { flex: 1, minHeight: 0, paddingHorizontal: 16, paddingBottom: 8, gap: 4 },
+  quickPage: { flexShrink: 1, minHeight: 0, paddingHorizontal: 16, paddingBottom: 8, gap: 4 },
   history: { flexShrink: 0, marginTop: 12, gap: 4 },
   historyHeader: { minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: 4 },
   historyBalance: { width: 88 },
