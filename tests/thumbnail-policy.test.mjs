@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
 import {existsSync,mkdirSync,mkdtempSync,readFileSync,realpathSync} from 'node:fs';
-import {join,resolve,sep} from 'node:path';
+import {join,sep} from 'node:path';
+import {fileURLToPath} from 'node:url';
 import {spawnSync} from 'node:child_process';
 import net from 'node:net';
 const bin=process.env.THUMBNAIL_PG_BIN || 'D:/Travel_Mvp/.local-tests/customize-stops-pg/pgsql/bin';
@@ -10,7 +11,7 @@ const available=['initdb','pg_ctl','psql'].every(name=>existsSync(exe(name)));
 const owner='11111111-1111-4111-8111-111111111111',other='22222222-2222-4222-8222-222222222222';
 const published='33333333-3333-4333-8333-333333333333',draft='44444444-4444-4444-8444-444444444444',photo='55555555-5555-4555-8555-555555555555',stop='66666666-6666-4666-8666-666666666666';
 test('review Storage policy on a new disposable PG cluster: public/owner/other/path/rollback boundaries',{skip:!available,timeout:90000},async()=>{
- const workspace=realpathSync(process.cwd());assert.equal(workspace.toLowerCase(),resolve('D:/Travel_Mvp_Mobile').toLowerCase(),'Explicit Mobile target required');
+ const workspace=realpathSync(fileURLToPath(new URL('../',import.meta.url)));
  const outputs=join(workspace,'.local-tests');mkdirSync(outputs,{recursive:true});
  const directory=mkdtempSync(join(outputs,'thumbnail-policy-'));
  assert.ok(realpathSync(directory).startsWith(workspace+sep));const data=join(directory,'data');assert.equal(existsSync(data),false);
@@ -44,7 +45,7 @@ test('review Storage policy on a new disposable PG cluster: public/owner/other/p
    ('profile-avatars','${owner}/${published}/cover/${photo}.thumb-512-v1.jpg');`);
   const as=(role,uid,query)=>psql(`set role ${role};set request.jwt.claim.sub='${uid}';${query}`);
   assert.equal(as('anon','','select count(*) from storage.objects'), '1');
-  psql(readFileSync('docs/backend/image-thumbnails.review.sql','utf8'));
+  psql(readFileSync(join(workspace,'docs/backend/image-thumbnails.review.sql'),'utf8'));
   assert.equal(as('anon','','select count(*) from storage.objects'),'3','Published cover+stop companion plus existing original');
   assert.equal(as('authenticated',other,'select count(*) from storage.objects'),'3','Other account cannot see owner draft or arbitrary siblings');
   assert.equal(as('authenticated',owner,'select count(*) from storage.objects'),'6','Existing owner policy remains unchanged, including owner uploads');
