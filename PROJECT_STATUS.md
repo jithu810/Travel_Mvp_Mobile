@@ -1,3 +1,8 @@
+## Turn confirmation display - 2026-10-24
+- IMPLEMENTED LOCALLY in isolated codex/turn-confirmation-display worktree: outgoing-turn confirmation shows Confirming turn and hides stale maneuver distance; existing fresh-fix/1-second/3-metre progress gates, accepted route trim and navigation arrow unchanged.
+- Verified: full 646/646 tests (zero skips), TypeScript, full zero-warning lint, offline Expo compatibility (offline reliability caveat), Android export 1633 modules/4.5 MB. Independent QA 19/19 and independent review found no actionable application issues; documented phone-path typo corrected. Physical-device GPS/TalkBack/iOS acceptance pending.
+- Read-only live-schema backend preflight: no changes required. No dependency/environment/native configuration changes, publication or live writes. Original Mobile checkout and Web working files preserved. Evidence and complete PR #9 overlap comparison: docs/qa/turn-confirmation-display.md. Local/unpublished.
+
 ## Empty private draft first-stop onboarding — 2026-10-24
 - IMPLEMENTED LOCALLY: zero-memory map area has decorative route cue/adventure heading, inviting first-stop card opens existing memory buffer, quiet labelled Cover/Settings/Save draft; guidance replaces empty disabled Publish swipe. No opening writes; duplicate/focus/form/modal/busy/uncertain/photo guards. Nonempty animated stack/readiness unchanged; unlocated named memory stays private until location added.
 - Focused editor/private/public deck66/66, TypeScript, full zero-warning lint, whitespace and Android export4.5MB passed; native/review in docs/qa/draft-empty-state.md with5-source hashes. Read-only actual-schema backend preflight released. Native QA only read-only, no hosted save/upload/publish claims.

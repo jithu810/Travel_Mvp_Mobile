@@ -90,7 +90,7 @@ export function createNavigation(load: Loader, now = Date.now, timers: Timers = 
     if (!next.route) { next = { ...next, guidance: null }; progress.reset(); }
     const a = state.guidance, b = next.guidance;
     if (state.session === next.session && state.key === next.key && state.status === next.status && state.message === next.message && state.route === next.route
-      && a?.status === b?.status && a?.message === b?.message && a?.maneuver === b?.maneuver
+      && a?.status === b?.status && a?.message === b?.message && a?.confirmingTurn === b?.confirmingTurn && a?.maneuver === b?.maneuver
       && a?.maneuverIndex === b?.maneuverIndex && a?.distanceToManeuver === b?.distanceToManeuver && a?.remainingDistance === b?.remainingDistance
       && !!state.routeOutdated === !!next.routeOutdated && state.reroute?.phase === next.reroute?.phase
       && state.reroute?.message === next.reroute?.message && state.reroute?.retryAt === next.reroute?.retryAt && state.retryAvailable === next.retryAvailable && state.gpsHeld === next.gpsHeld) return;

@@ -7,7 +7,7 @@ export type RouteStep = {
   distance: number; duration: number; geometry: Coordinate[];
 };
 export type Guidance = {
-  status: 'ready' | 'waiting' | 'unavailable'; message: string; holdReason?: 'gps' | 'progress'; recoveryRequested?: boolean;
+  status: 'ready' | 'waiting' | 'unavailable'; message: string; confirmingTurn?: boolean; holdReason?: 'gps' | 'progress'; recoveryRequested?: boolean;
   maneuver: RouteStep | null; maneuverIndex: number | null;
   distanceToManeuver: number | null; remainingDistance: number | null;
   remainingGeometry?: RoadRoute['geometry'];
@@ -142,8 +142,8 @@ export function createGuidance(validFix: (position: Position | null, now: number
     const target = measured[Math.min(index + 1, measured.length - 1)];
     const total = measured.at(-1)!.offset + measured.at(-1)!.length;
     if (!(total > 0)) return unavailable('Turn instructions have no usable route geometry', 'unavailable');
-    return { status: 'ready', message: 'GPS estimate along the calculated route', maneuver: target.step,
-      maneuverIndex: Math.min(index + 1, measured.length - 1), distanceToManeuver: Math.max(0, target.offset - progress),
+    return { status: 'ready', message: candidate ? 'Confirming turn' : 'GPS estimate along the calculated route', confirmingTurn: candidate !== null, maneuver: target.step,
+      maneuverIndex: Math.min(index + 1, measured.length - 1), distanceToManeuver: candidate ? null : Math.max(0, target.offset - progress),
       remainingDistance: Math.max(0, (total - progress) / total * next.distance) };
   };
   return { update(next: RoadRoute, position: Position | null) {
