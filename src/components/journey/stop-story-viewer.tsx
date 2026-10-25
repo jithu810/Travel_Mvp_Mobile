@@ -13,6 +13,10 @@ export function StopStoryViewer({ journey, selectedId, onSelect, onClose, onMap 
   const { height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const [notesId, setNotesId] = useState<string | null>(null);
+  // The map credit sits just below the header, clear of the header and the bottom caption sheet.
+  const [headerHeight, setHeaderHeight] = useState(88);
+  // The map also ends above the caption sheet so the Mapbox logo (bottom-left) stays visible.
+  const [captionHeight, setCaptionHeight] = useState(180);
   const index = journey.stops.findIndex(stop => stop.id === selectedId);
   const stop = journey.stops[index];
   const expanded = Boolean(stop && notesId === stop.id);
@@ -45,10 +49,10 @@ export function StopStoryViewer({ journey, selectedId, onSelect, onClose, onMap 
   return <Modal visible animationType="fade" presentationStyle="fullScreen" onRequestClose={() => expanded ? setNotesId(null) : onClose()}>
     <View style={styles.screen} testID="stop-story-viewer">
       <StatusBar style="dark" />
-      {stop && <View style={styles.photo}><JourneyPhoto uri={stop.photo} label={stop.name + ' photo'} fill /></View>}
+      {stop && <View style={styles.photo}><JourneyPhoto uri={stop.photo} label={stop.name + ' photo'} fill map={{ points: [stop], creditTop: insets.top + headerHeight, bottomInset: insets.bottom + captionHeight }} mapLabel={'Map of ' + stop.name + '. No photo yet.'} /></View>}
       <View pointerEvents="none" style={[styles.statusBarBacking, { height: insets.top }]} />
       <SafeAreaView style={styles.safe}>
-        <View style={styles.header}>
+        <View style={styles.header} onLayout={event => { const height = Math.round(event.nativeEvent.layout.height); if (height > 0) setHeaderHeight(previous => previous === height ? previous : height); }}>
           <View accessible accessibilityRole="progressbar" accessibilityLabel="Journey stop progress" accessibilityValue={{ min: 1, max: Math.max(1, journey.stops.length), now: Math.max(1, index + 1), text: stop ? 'Stop ' + (index + 1) + ' of ' + journey.stops.length : 'No stops available' }} style={styles.progress}>
             {journey.stops.map((item, i) => <View key={item.id} testID={'story-segment-' + (i + 1)} style={[styles.segment, i < index && styles.completed, i === index && styles.current]} />)}
           </View>
@@ -63,7 +67,7 @@ export function StopStoryViewer({ journey, selectedId, onSelect, onClose, onMap 
             <Pressable testID="story-tap-next" accessible={false} importantForAccessibility="no" disabled={!next} onPress={() => move(1)} style={styles.tapZone} />
           </View>}
         </View>
-        <View style={styles.caption} pointerEvents={expanded ? 'none' : 'auto'} accessibilityElementsHidden={expanded} importantForAccessibility={expanded ? 'no-hide-descendants' : 'auto'}>
+        <View style={styles.caption} onLayout={event => { const height = Math.round(event.nativeEvent.layout.height); if (height > 0) setCaptionHeight(previous => previous === height ? previous : height); }} pointerEvents={expanded ? 'none' : 'auto'} accessibilityElementsHidden={expanded} importantForAccessibility={expanded ? 'no-hide-descendants' : 'auto'}>
           {stop ? <>
             <Text accessibilityRole="header" numberOfLines={2} style={styles.title}>{stop.name}</Text>
             {journey.destination !== 'Destination not specified' && <Text accessibilityLabel={'Journey destination: ' + journey.destination} numberOfLines={1} style={styles.destination}>{journey.destination}</Text>}

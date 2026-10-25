@@ -16,6 +16,8 @@ import { useLocalPhotos } from '@/hooks/use-local-photos';
 import { PhotoField } from '@/components/create/photo-field';
 import { MemoryEditorSheet } from '@/components/create/memory-editor-sheet';
 import { MemoryRow } from '@/components/create/memory-row';
+import { SourceAttribution } from '@/components/remix/source-attribution';
+import { needsRemixPhotoHint, remixPhotoHint } from '@/lib/remix/model';
 import { emptyMemory, memoryChanged, memorySnapshot, publicationIssue, type MemoryEdit } from '@/lib/create/memory';
 import { safePhoto } from '@/lib/discovery/model';
 import { usePreventRemove } from 'expo-router/react-navigation';
@@ -189,6 +191,8 @@ export function NewJourneyEditor({ ownerId, initial, onReload, onDestinationFocu
     const value = emptyMemory(randomUUID()); setError(null); setMessage(null); setMemoryEdit({ value, baseline: { ...value }, isNew: true });
   }
   const readiness = publicationIssue(form);
+  // Guidance only: photos stay optional and never gate publishing.
+  const photoHint = needsRemixPhotoHint(form.sourceId, form.stops, Object.keys(localPhotos.candidates));
   const editorActions = <View style={createStyles.actionRail}>
     <Pressable accessibilityRole="button" accessibilityLabel="Edit cover photo" disabled={disabled} accessibilityState={{ disabled, expanded: coverOpen }} onPress={() => { if (!disabled && !lock.current && !localPhotos.isBusy()) setCoverOpen(true); }} style={[createStyles.railButton, disabled && { opacity: 0.5 }]}><EditorActionIcon name="cover" light={form.stops.length > 0} /></Pressable>
     <Pressable accessibilityRole="button" accessibilityLabel="Add memory" disabled={disabled || form.stops.length >= 50} accessibilityState={{ disabled: disabled || form.stops.length >= 50 }} onPress={addMemory} style={[createStyles.railButton, (disabled || form.stops.length >= 50) && { opacity: 0.5 }]}><EditorActionIcon name="add" light={form.stops.length > 0} /></Pressable>
@@ -210,11 +214,12 @@ export function NewJourneyEditor({ ownerId, initial, onReload, onDestinationFocu
     {editorFocused && <StatusBar style={settingsOpen || coverOpen || memoryEdit ? 'dark' : 'light'} />}
     <DraftMap geometry={geometry} photos={memoryPhotos} thumbnails={memoryThumbnails} selectedId={selectedId} onSelect={setSelectedMemoryId} active={editorFocused && !settingsOpen && !coverOpen && !memoryEdit && !busy && !photoBusy} height={Math.max(180, Math.min(270, window.height * 0.29))} topInset={insets.top} />
     <View pointerEvents="none" style={[createStyles.statusShade, { height: insets.top + 20 }]} />
-      <MemoryDeck emptyContent={firstStop} title={form.title} status={busy ? savePhase : photoBusy ? 'Preparing photo…' : uncertain ? 'Needs attention' : dirty ? 'Unsaved changes' : hasLocalPhotos ? 'Photos not saved' : 'Saved privately'} leading={<Pressable accessibilityRole="button" accessibilityLabel="Go back" onPress={() => router.canGoBack() ? router.back() : router.replace('/discover')} style={createStyles.heroBack}><Text accessible={false} style={createStyles.heroBackText}>‹</Text></Pressable>} stops={form.stops} selectedId={selectedId} onSelect={setSelectedMemoryId} active={editorFocused && !settingsOpen && !coverOpen && !memoryEdit && !busy && !photoBusy} actions={editorActions} renderMemory={(stop, index, cardWidth, swipe) => <MemoryRow deck swipeHandlers={swipe?.handlers} canInteract={swipe?.canInteract} key={stop.id} cardWidth={cardWidth} selected={selectedId === stop.id} stop={stop} index={index} total={form.stops.length} disabled={disabled}
+      <MemoryDeck emptyContent={firstStop} title={form.title} credit={form.sourceId ? <SourceAttribution key={form.sourceId} id={form.sourceId} variant="editor" /> : undefined} status={busy ? savePhase : photoBusy ? 'Preparing photo…' : uncertain ? 'Needs attention' : dirty ? 'Unsaved changes' : hasLocalPhotos ? 'Photos not saved' : 'Saved privately'} leading={<Pressable accessibilityRole="button" accessibilityLabel="Go back" onPress={() => router.canGoBack() ? router.back() : router.replace('/discover')} style={createStyles.heroBack}><Text accessible={false} style={createStyles.heroBackText}>‹</Text></Pressable>} stops={form.stops} selectedId={selectedId} onSelect={setSelectedMemoryId} active={editorFocused && !settingsOpen && !coverOpen && !memoryEdit && !busy && !photoBusy} actions={editorActions} renderMemory={(stop, index, cardWidth, swipe) => <MemoryRow deck swipeHandlers={swipe?.handlers} canInteract={swipe?.canInteract} key={stop.id} cardWidth={cardWidth} selected={selectedId === stop.id} stop={stop} index={index} total={form.stops.length} disabled={disabled}
         localPhoto={!!localPhotos.candidates[stop.id]} photoThumbnail={!localPhotos.candidates[stop.id] && stop.photoPath ? photos.data?.[thumbnailStoragePath(stop.photoPath) || ''] || null : null} photo={localPhotos.candidates[stop.id]?.uri || (stop.photoPath ? stop.photoPath.startsWith('journey-media/') ? photos.data?.[stop.photoPath] || null : safePhoto(stop.photoPath) : null)}
         onEdit={() => { if (!disabled && !lock.current && !localPhotos.isBusy()) { setSelectedMemoryId(stop.id); setError(null); setMemoryEdit({ value: { ...stop }, baseline: { ...stop }, isNew: false }); } }}
         onPhotoError={photos.refreshPreview} onMove={offset => change({ stops: moveStop(form.stops, index, offset) })} onRemove={() => removeMemory(stop)} />} />
 
+      {photoHint && <Text testID="remix-photo-hint" style={createStyles.photoHint}>{remixPhotoHint}</Text>}
       {photos.error && <Text style={ui.body}>Some photo previews are unavailable. Original photos remain preserved.</Text>}
       {error && !memoryEdit && <Text accessibilityRole="alert" style={ui.body}>{error}</Text>}
       {message && <Text accessibilityLiveRegion="polite" style={ui.body}>{message}</Text>}
@@ -328,6 +333,7 @@ const createStyles = StyleSheet.create({
   statusShade: { position: 'absolute', top: 0, left: 0, right: 0, experimental_backgroundImage: 'linear-gradient(180deg, rgba(5,15,30,0.78) 0%, rgba(5,15,30,0) 100%)' },
   actionRail: { gap: 2 }, railButton: { width: 44, minHeight: 44, justifyContent: 'center', alignItems: 'center' },
   publishReason: { color: theme.muted, fontSize: 11, lineHeight: 16 },
+  photoHint: { color: theme.muted, fontSize: 12, lineHeight: 18, paddingHorizontal: 4 },
   settingsOverlay: { flex: 1, backgroundColor: 'rgba(15, 24, 43, 0.38)' },
   settingsAvoid: { flex: 1, justifyContent: 'flex-end' },
   settingsPanel: { maxHeight: '98%', width: '100%', maxWidth: 560, alignSelf: 'center', padding: 14, gap: 8, borderTopLeftRadius: 30, borderTopRightRadius: 30, borderWidth: 1, borderColor: '#FFFFFF', backgroundColor: '#EDF1F8', experimental_backgroundImage: 'linear-gradient(135deg, #FFF8F1 0%, #EDF1F8 55%, #E2EAF6 100%)' },

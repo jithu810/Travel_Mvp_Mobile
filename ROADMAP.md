@@ -1,3 +1,7 @@
+## Remix without inherited photos (Mobile) - 2026-10-25
+- IMPLEMENTED LOCALLY and unit-tested: static map placeholders for photo-less places, stops and draft covers, direct-source remix credits (editor, draft screen, Account drafts, published journey) and an optional add-photos hint. Pending: device check, final review, publication approval.
+- FOLLOW-UP (deferred): journey cards on Home/Explore/Search/Profile keep the stock photo until the list RPCs return stop or destination coordinates.
+
 ## Journey Buddy map flicker correction - 2026-10-25
 - IMPLEMENTED LOCALLY: deduplicate idle/camera pin projections, reuse accepted relative pin geometry, ignore subpixel camera jitter and retain conservative protection during actual motion/loading. Initial map ownership and invalid-camera cache edge cases are covered. Page layout, root overlay layering and native drag are unchanged.
 - VERIFIED:680/680 non-PG regressions including52Buddy/floating cases, TypeScript, zero-warning current-source lint and whitespace checks. Android export1714modules/56assets/4,081,544bytes; selected exported sources match final code. Offline Expo compatibility passes with reliability caveat. Independent review reports no remaining actionable findings on61-file snapshot8db188794999ab396e83b063bf48c9e96755896e7306d64e03b3e3d446484b18.

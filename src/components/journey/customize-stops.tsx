@@ -127,7 +127,7 @@ export function CustomizeStops({ journey }: { journey: PublicJourney }) {
       </> : stop ? <>
         <View style={styles.progressRow}><Text accessibilityLiveRegion="polite" style={styles.progress}>Stop {selection.cursor + 1} of {ordered.length}</Text><Text style={styles.caption}>{selected.length} selected · {skipped.length} skipped</Text></View>
         <View {...gesture.panHandlers} style={styles.card}>
-          <JourneyPhoto uri={stop.photo} label={stop.name} ratio={2.3} />
+          <JourneyPhoto uri={stop.photo} label={stop.name} ratio={2.3} map={{ points: [stop] }} mapLabel={'Map of ' + (stop.name || 'this stop') + '. No photo yet.'} />
           <View style={styles.cardBody}>
             <Text style={ui.eyebrow}>ORIGINAL STOP {selection.cursor + 1}{stop.dayNumber ? ' · DAY ' + stop.dayNumber : ''}</Text>
             <Text accessibilityRole="header" style={styles.cardTitle}>{stop.name || 'Unnamed stop'}</Text>

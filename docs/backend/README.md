@@ -1,5 +1,7 @@
 # Selected-stop copy contract: pending backend dependency
 
+> SUPERSEDED, do not apply: `copy-journey-selected.review.sql`. The live standalone `copy_journey_selected` omits inherited media (verified read-only 2026-10-25); this draft still copies media via `copy_media_path`.
+
 `copy-journey-selected.review.sql` is proposed SQL for review. It is not installed, not registered in backend migration history, and has not been applied to any hosted resource. Mobile confirmation requires this RPC; existing all-stop `copy_journey` stays unchanged. Before enabling confirmation in a release, integrate this artifact through a newly generated backend migration and verify it against the deployed schema/RLS in an isolated database.
 
 RPC: `copy_journey_selected(source_id uuid, selected_stop_ids uuid[], draft_id uuid) -> uuid`. The client generates a draft UUID once for each immutable confirmation request and sends only source stop IDs. The function ignores caller ID order and copies the source sequence into compact 1-based draft sequence, fresh stop UUIDs, durable media references, source attribution, and a private non-demo editable draft. No source journey or stop is updated; route geometry is not stored or copied. One stop is valid; empty, null, duplicate, foreign, invalid-coordinate or >50-stop selections fail atomically. Published demo sources are excluded to match Mobile's existing public normalization.

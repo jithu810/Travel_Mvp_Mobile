@@ -42,7 +42,9 @@ export function hydrateDraft(value: unknown, values: unknown, id: string, owner:
   if (new Set(stops.map(stop => stop.id)).size !== stops.length) throw new Error('Draft stop IDs are duplicated. Nothing has been changed.');
   const destination = row.destination_name && coordinates(row.destination_latitude, row.destination_longitude)
     ? { name: row.destination_name, label: row.destination_name, latitude: row.destination_latitude as number, longitude: row.destination_longitude as number, mapboxId: null } : null;
-  return { id, title: row.title, description: row.description ?? '', descriptionWasNull: row.description === null,
+  // Lineage is display-only attribution; a missing or malformed value just omits the credit.
+  const source = typeof row.copied_from_journey_id === 'string' && isJourneyId(row.copied_from_journey_id) && row.copied_from_journey_id !== id ? row.copied_from_journey_id : null;
+  return { ...(source ? { sourceId: source } : {}), id, title: row.title, description: row.description ?? '', descriptionWasNull: row.description === null,
     destination, destinationSlug: row.destination_slug ?? undefined, traveler: (row.traveler_type ?? '') as CreateForm['traveler'],
     days: String(row.duration_days), updatedAt: row.updated_at, coverPath: row.cover_image_path, stops };
 }

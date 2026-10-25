@@ -55,6 +55,9 @@ function load(path, modules, hooks = harness(false).hooks, timers = globalThis) 
     if (name === '@/components/journey/journey-action-icon') return { JourneyActionIcon: 'JourneyActionIcon' };
     if (name === './journey-action-icon') return { JourneyActionIcon: 'JourneyActionIcon' };
     if (name === './stop-card-deck') return { StopCardDeck: 'StopCardDeck' };
+    if (name === '@/components/remix/source-attribution') return { SourceAttribution: 'SourceAttribution' };
+    if (name === '@/components/discovery/static-map-photo' && !Object.hasOwn(modules, name)) return { StaticMapCredit: 'StaticMapCredit' };
+    if (name === '@/lib/media/static-map' && !Object.hasOwn(modules, name)) return load('src/lib/media/static-map.ts', {});
     if (name === 'expo-status-bar') return {StatusBar:'StatusBar'};
     if (name === 'react') return hooks;
     if (name === 'expo-router') return { useFocusEffect: fn => hooks.useEffect(fn, [fn]), ...modules[name] };

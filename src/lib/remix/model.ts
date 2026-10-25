@@ -33,3 +33,39 @@ export function createRemixStore() {
   };
 }
 export const remixStore = createRemixStore();
+// Attribution copy for a remix's direct parent (journeys.copied_from_journey_id).
+export const unavailableSourceCopy = 'Remixed from an original journey that is currently unavailable.';
+export function remixCredit(prefix: 'Remix of' | 'Remixed from', source: { title: string; creatorName: string } | null): string {
+  if (!source) return unavailableSourceCopy;
+  return prefix + ' ' + source.title + (source.creatorName ? ' · by ' + source.creatorName : '');
+}
+// A remix draft without any place photo shows maps until the owner adds photos.
+export const remixPhotoHint = 'Add your own photos — places show a map until you do.';
+export function needsRemixPhotoHint(sourceId: string | null | undefined, stops: readonly { id: string; photoPath?: string | null }[], localPhotoIds: readonly string[]) {
+  return Boolean(sourceId) && stops.length > 0 && !stops.some(stop => stop.photoPath || localPhotoIds.includes(stop.id));
+}
+// Account draft cards credit the direct parent when it was looked up, a generic
+// line when the lookup was skipped or failed, and the unavailable copy when the
+// parent is no longer public.
+export const genericRemixCredit = 'Remix of another journey';
+export type RemixSource = { title: string; creatorName: string };
+export function draftRemixCredit(source: RemixSource | null | undefined) {
+  return source === undefined ? genericRemixCredit : remixCredit('Remix of', source);
+}
+// Runs at most `limit` tasks at once; results keep input order. An abort stops
+// queued items from starting and rejects at once, without waiting for running tasks
+// (which receive the same signal through their own lookups).
+export async function mapLimited<T, R>(items: readonly T[], limit: number, task: (item: T) => Promise<R>, signal?: AbortSignal): Promise<R[]> {
+  const cancelled = () => new Error('Request cancelled.');
+  if (signal?.aborted) throw cancelled();
+  const results: R[] = new Array(items.length);
+  let next = 0;
+  const worker = async () => { while (next < items.length && !signal?.aborted) { const index = next++; results[index] = await task(items[index]); } };
+  const all = Promise.all(Array.from({ length: Math.max(1, Math.min(limit, items.length)) }, worker));
+  if (!signal) { await all; return results; }
+  let onAbort = () => {};
+  const aborted = new Promise<never>((_resolve, reject) => { onAbort = () => reject(cancelled()); signal.addEventListener('abort', onAbort, { once: true }); });
+  try { await Promise.race([all, aborted]); } finally { signal.removeEventListener('abort', onAbort); }
+  if (signal.aborted) throw cancelled();
+  return results;
+}
