@@ -1,8 +1,11 @@
+import { buddyGeometryStub } from './helpers/buddy-geometry-stub.mjs';
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { readFileSync } from 'node:fs';
 import ts from 'typescript';
 function load(path, modules) {
+  modules={'@/hooks/use-buddy-geometry':buddyGeometryStub,...modules};
+  modules={'@/hooks/use-journey-buddy':{useBuddyScreen(){}},...modules};
   const exports = {};
   new Function('require', 'exports', ts.transpileModule(readFileSync(path, 'utf8'), {compilerOptions: {jsx: ts.JsxEmit.ReactJSX, module: ts.ModuleKind.CommonJS}}).outputText)(id => { assert.ok(id in modules, id); return modules[id]; }, exports);
   return exports;

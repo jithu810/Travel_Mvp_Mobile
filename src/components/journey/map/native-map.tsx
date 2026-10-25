@@ -15,6 +15,9 @@ import type { TravelCameraCommand } from '@/lib/journey/travel-camera';
 import type { JourneyStop } from '@/types/journey';
 import type { JourneyMapData } from '@/lib/journey/map-data';
 import { MapFallback, type MapDisplayProps } from './map-frame';
+import { useBuddyProtectedBounds } from '@/hooks/use-buddy-geometry';
+import { journeyBuddyControls } from '@/lib/buddy/map-controls';
+import { useBuddyMapPins } from '@/hooks/use-buddy-map-pins';
 
 // Bundled PNG keeps the navigation arrow independent of map fonts and networking.
 const travelArrowImage = { uri: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABwAAAAcCAYAAAByDd+UAAAAeElEQVR4nO3TUQqAIBCEYU/TFTtrpzGIAhvcds3ZLcQfetP56qGUZn8on40JZmgs8EKWdTsedzQURMwdDQUlzA0NBTXsE5CKhoJWjIZqvwIVrI1KUVAc0+oCy5FaeA7hZlT6Ctb5x8vmtxRg86UW6PUOA4rYnN3aARXgn2yondtvAAAAAElFTkSuQmCC' };
@@ -31,6 +34,8 @@ export const NativeJourneyMap = memo(function NativeJourneyMap({ data, stops, re
   data: JourneyMapData; stops: JourneyStop[]; retry: () => void; selectedId?: string | null; onSelect?: (id: string) => void;
 } & MapDisplayProps) {
   const camera = useRef<Camera>(null);
+  const bottom = navigationPadding?.bottom ?? 220;
+  const fitProtection = useBuddyProtectedBounds(), locationProtection = useBuddyProtectedBounds();
   const memoryPreview = memoryPhotos !== undefined && !navigationMode;
   const [focused, setFocused] = useState(true);
   const [memoryIdle, setMemoryIdle] = useState(false);
@@ -49,6 +54,11 @@ export const NativeJourneyMap = memo(function NativeJourneyMap({ data, stops, re
   const [reduceMotion, setReduceMotion] = useState(true);
   const { style, ready } = mapState;
   const failed = style === 'failed';
+  const pinCoordinates = useMemo(() => data.markers.map(marker => marker.coordinate), [data.markers]);
+  const pins = useBuddyMapPins(pinCoordinates, ready && !failed);
+  const { setFrame: setPinFrame } = pins;
+  const projectControls = useCallback((rect: { x: number; y: number; width: number; height: number }) => { setPinFrame(rect); return journeyBuddyControls(rect, navigationMode, bottom, controlTopInset, presentation !== 'preview'); }, [setPinFrame, navigationMode, bottom, controlTopInset, presentation]);
+  const controlsProtection = useBuddyProtectedBounds(projectControls);
   const selected = data.markers.find(marker => marker.id === selectedId);
   const frame = useMemo(() => frameJourneyMap(stops, viewport, navigationMode
     ? { paddingTop: navigationPadding?.top ?? 80, paddingBottom: navigationPadding?.bottom ?? 220, paddingLeft: 28, paddingRight: 28 }
@@ -158,18 +168,20 @@ export const NativeJourneyMap = memo(function NativeJourneyMap({ data, stops, re
   }, [ready, failed, frame, mapError, appActive]);
   if (failed) return <MapFallback message={navigationMode ? "Road map unavailable. Check the connection and Mapbox style access, then retry." : "The map couldn’t load. You can still browse the journey’s stops."} retry={retry} compact={presentation === 'preview'} onExpand={onExpand} />;
   return <View style={[styles.card, presentation !== 'story' && { flex: 1, borderWidth: 0, borderRadius: navigationMode ? 0 : 18 }]}>
-    <View style={[styles.viewport, presentation !== 'story' && { height: undefined, flex: 1 }]} onLayout={event => {
+    <View {...controlsProtection} style={[styles.viewport, presentation !== 'story' && { height: undefined, flex: 1 }]} onLayout={event => {
       if (!mounted.current) return;
       const { width, height } = event.nativeEvent.layout;
+      controlsProtection.onLayout();
       setViewport(previous => previous.width === width && previous.height === height ? previous : { width, height });
     }}>
-      {frame && <Mapbox.MapView key={style} style={styles.map} projection={navigationMode ? 'mercator' : frame.projection} styleURL={navigationMode ? Mapbox.StyleURL.Street : style === 'satellite' ? Mapbox.StyleURL.SatelliteStreet : Mapbox.StyleURL.Outdoors}
+      {frame && <Mapbox.MapView key={style} ref={pins.mapRef} style={styles.map} projection={navigationMode ? 'mercator' : frame.projection} styleURL={navigationMode ? Mapbox.StyleURL.Street : style === 'satellite' ? Mapbox.StyleURL.SatelliteStreet : Mapbox.StyleURL.Outdoors}
         onPress={presentation === 'preview' ? () => { if (mounted.current) onExpand?.(); } : undefined}
         scrollEnabled={presentation !== 'preview'} zoomEnabled={presentation !== 'preview'} rotateEnabled={presentation !== 'preview'} pitchEnabled={false} surfaceView={false} requestDisallowInterceptTouchEvent
         compassEnabled={presentation !== 'preview'} compassPosition={navigationMode ? { bottom: (navigationPadding?.bottom ?? 220) + 36, right: 12 } : { top: 12 + Math.max(0, controlTopInset), right: 12 }} scaleBarEnabled={false} logoEnabled attributionEnabled
         logoPosition={navigationMode ? { bottom: (navigationPadding?.bottom ?? 220) + 8, left: 12 } : undefined}
         attributionPosition={navigationMode ? { bottom: (navigationPadding?.bottom ?? 220) + 8, right: 12 } : undefined}
         onCameraChanged={state => {
+          pins.cameraChanged(state.properties);
           if (!mounted.current || (navigationMode && travelCamera && !canMove())) return;
           pose.current = state.properties;
           // Native Mapbox gestures interrupt its animator; do not fight the gesture with another command.
@@ -178,7 +190,7 @@ export const NativeJourneyMap = memo(function NativeJourneyMap({ data, stops, re
         onTouchStart={memoryPreview ? () => { touching.current = true; setMemoryIdle(false); cancelTransition(); } : undefined}
         onTouchEnd={memoryPreview ? () => { touching.current = false; } : undefined}
         onTouchCancel={memoryPreview ? () => { touching.current = false; } : undefined}
-        onMapIdle={() => { if (mounted.current) { transitioning.current = false; if (memoryPreview && !touching.current) setMemoryIdle(true); } }}
+        onMapIdle={state => { pins.idle(state.properties); if (mounted.current) { transitioning.current = false; if (memoryPreview && !touching.current) setMemoryIdle(true); } }}
         onDidFinishLoadingMap={() => {
           if (mounted.current) setMapState(previous => previous.style === style && !previous.ready ? { ...previous, ready: true } : previous);
         }} onMapLoadingError={mapError}>
@@ -219,12 +231,12 @@ export const NativeJourneyMap = memo(function NativeJourneyMap({ data, stops, re
           playing={nearby.length === 0 && animateMemoryRoute && focused && appActive && !reduceMotion && memoryIdle && (!selectedId || playRouteWithSelection)} />}
       </Mapbox.MapView>}
       {!ready && <View style={styles.loading} pointerEvents="none" accessibilityLabel="Loading journey map" accessibilityRole="progressbar"><ActivityIndicator color={colors.green} /><Text style={styles.note}>Loading map…</Text></View>}
-      {presentation !== 'preview' && <Pressable accessibilityRole="button" accessibilityLabel="Fit journey and reset map orientation"
+      {presentation !== 'preview' && <Pressable {...fitProtection} accessibilityRole="button" accessibilityLabel="Fit journey and reset map orientation"
         accessibilityState={{ disabled: !ready || !frame }} disabled={!ready || !frame} onPress={() => { if (navigationMode) follow.explore(); fit(); }} style={[styles.fit, { top: 12 + Math.max(0, controlTopInset) }, !navigationMode && { width: 44, paddingHorizontal: 10, borderRadius: 22 }, navigationMode && { top: undefined, bottom: (navigationPadding?.bottom ?? 220) + 36 }]}>
         {navigationMode ? <Text style={styles.fitLabel}>↗ Fit journey</Text> : <JourneyActionIcon name="fit" />}
       </Pressable>}
       {navigationMode && travelCamera && <View pointerEvents="box-none" style={[styles.locationControls, { bottom: (navigationPadding?.bottom ?? 220) + 36 }]}>
-        <Pressable accessibilityRole="button" accessibilityLabel="My Location, recenter map" accessibilityHint="Centers on accurate foreground GPS and resumes following. Does not start the trip."
+        <Pressable {...locationProtection} accessibilityRole="button" accessibilityLabel="My Location, recenter map" accessibilityHint="Centers on accurate foreground GPS and resumes following. Does not start the trip."
           accessibilityState={{ selected: follow.following }} onPress={() => { const result = follow.recenter(); if (!result.moved) Alert.alert('My Location', result.message); }} style={[styles.recenter, follow.following && { borderColor: colors.green }]}>
           <Text style={styles.fitLabel}>◎ My Location</Text>
         </Pressable>

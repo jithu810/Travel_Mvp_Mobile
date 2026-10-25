@@ -9,6 +9,7 @@ import { journeyFacts } from '@/lib/discovery/model';
 import { profileUIStyles as s } from './profile-styles';
 import type { PublicJourney } from '@/types/journey';
 import { draftRemixCredit, type RemixSource } from '@/lib/remix/model';
+import { useBuddyProtectedBounds } from '@/hooks/use-buddy-geometry';
 export { profileStyles } from './profile-styles';
 
 export function ProfileHeader({ onSettings }: { onSettings: () => void }) {
@@ -18,7 +19,8 @@ export function ProfileHeader({ onSettings }: { onSettings: () => void }) {
     const entry = StatusBar.pushStackEntry({ barStyle: 'dark-content' });
     return () => StatusBar.popStackEntry(entry);
   }, []));
-  return <SafeAreaView edges={['top']} style={s.headerSafe}><View style={s.toolbar}>
+  const protection = useBuddyProtectedBounds();
+  return <SafeAreaView edges={['top']} style={s.headerSafe}><View {...protection} style={s.toolbar}>
     <Pressable accessibilityRole="button" accessibilityLabel="Go back" onPress={() => router.canGoBack() ? router.back() : router.replace('/discover')} style={({ pressed }) => [s.tool, pressed && s.pressed]}><Text style={s.back}>‹</Text></Pressable>
     <Image source={require('../../../assets/journey-creator-logo.png')} accessible={false} style={s.logo} />
     <Text numberOfLines={1} style={s.brand}>Journey Creator</Text>
@@ -45,7 +47,8 @@ export function ProfileIdentity({ name, username, bio, avatar, count, owner = fa
   const size = width < 360 ? 56 : 60;
   const [expandedBio, setExpandedBio] = useState<string | null>(null);
   const bioExpanded = expandedBio === bio;
-  return <View style={s.identity}>
+  const protection = useBuddyProtectedBounds();
+  return <View {...protection} style={s.identity}>
     <AtlasDecoration />
     <View style={s.identityRow}>
       <View style={[s.avatar, { width: size, height: size, borderRadius: size / 2 }]}>
@@ -76,7 +79,8 @@ type Collection = 'published' | 'drafts';
 export function ProfileCollections({ publishedCount, draftCount, selected, onSelect }: {
   publishedCount: number | null; draftCount: number | null; selected: Collection; onSelect: (tab: Collection) => void;
 }) {
-  return <View accessibilityRole="tablist" style={s.collections}>
+  const protection = useBuddyProtectedBounds();
+  return <View {...protection} accessibilityRole="tablist" style={s.collections}>
     {([{ key: 'published', count: publishedCount, title: 'Published', note: 'Shared with the world', symbol: '◎' },
       { key: 'drafts', count: draftCount, title: 'Drafts', note: 'Only you can see', symbol: '✎' }] as const).map(item => <Pressable key={item.key}
       accessibilityRole="tab" accessibilityLabel={(item.key === 'published' ? 'Published journeys, ' : 'Private drafts, ') + (item.count === null ? 'count unavailable' : item.count)} accessibilityState={{ selected: selected === item.key }}
@@ -88,7 +92,8 @@ export function ProfileCollections({ publishedCount, draftCount, selected, onSel
 }
 
 export function ProfileTabs({ selected, onSelect, drafts = false }: { selected: Collection; onSelect: (tab: Collection) => void; drafts?: boolean }) {
-  return <View accessibilityRole="tablist" style={s.tabs}>
+  const protection = useBuddyProtectedBounds();
+  return <View {...protection} accessibilityRole="tablist" style={s.tabs}>
     {(['published', ...(drafts ? ['drafts'] : [])] as Collection[]).map(tab => <Pressable key={tab} accessibilityRole="tab" accessibilityState={{ selected: selected === tab }}
       accessibilityLabel={tab === 'published' ? 'Published journeys' : 'Private drafts'} onPress={() => onSelect(tab)} style={({ pressed }) => [s.tab, selected === tab && s.activeTab, pressed && s.pressed]}>
       <Text style={[s.tabText, selected === tab && s.activeTabText]}>{tab === 'published' ? 'Published' : 'Drafts'}</Text>
@@ -98,7 +103,8 @@ export function ProfileTabs({ selected, onSelect, drafts = false }: { selected: 
 
 export function ProfileJourneyCard({ journey }: { journey: PublicJourney }) {
   const router = useRouter();
-  return <Pressable accessibilityRole="button" accessibilityLabel={'Open journey: ' + journey.title + ', ' + journey.destination}
+  const protection = useBuddyProtectedBounds();
+  return <Pressable {...protection} accessibilityRole="button" accessibilityLabel={'Open journey: ' + journey.title + ', ' + journey.destination}
     onPress={() => router.push({ pathname: '/journey/[id]', params: { id: journey.id } })} style={({ pressed }) => [s.card, s.journeyCard, pressed && s.pressed]}>
     <View style={s.thumbnail}><ThumbnailPhoto uri={journey.cover} thumbnailUri={journey.coverThumbnail} ratio={0.9} label={journey.title + ' cover photo'} /></View>
     <View style={s.cardCopy}>
@@ -112,7 +118,8 @@ export function ProfileJourneyCard({ journey }: { journey: PublicJourney }) {
 
 export function ProfileDraftCard({ draft, onDeleted }: { draft: { id: string; title: string; sourceId?: string; source?: RemixSource | null }; onDeleted: () => void }) {
   const router = useRouter();
-  return <View style={s.card}>
+  const protection = useBuddyProtectedBounds();
+  return <View {...protection} style={s.card}>
     <Pressable accessibilityRole="button" accessibilityLabel={'Continue: ' + draft.title + (draft.sourceId ? ', ' + draftRemixCredit(draft.source) : '')} onPress={() => router.push({ pathname: '/create', params: { draft: draft.id } })}
       style={({ pressed }) => [s.draftMain, pressed && s.pressed]}>
       <View accessible={false} style={s.draftPlaceholder}><Text style={s.draftSymbol}>↗</Text></View>

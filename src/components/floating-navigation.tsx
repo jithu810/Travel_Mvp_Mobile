@@ -8,6 +8,7 @@ import { useSessionState } from '@/hooks/session-context';
 import { useLoad } from '@/hooks/use-load';
 import { loadOwnProfile } from '@/lib/profile/edit-queries';
 import { safePhoto } from '@/lib/discovery/model';
+import { useBuddyProtectedBounds } from '@/hooks/use-buddy-geometry';
 
 type Destination = 'explore' | 'search' | 'create' | 'story' | 'account' | null;
 function AccountAvatar() {
@@ -30,7 +31,8 @@ function NavigationIcon({ name }: { name: Exclude<Destination, null> }) {
   if (name === 'story') return <View style={styles.book}><View style={styles.bookPage} /><View style={styles.bookPage} /></View>;
   return <View style={styles.globe}><View style={styles.meridian} /><View style={styles.equator} /></View>;
 }
-export function FloatingNavigation({ active, onHeight, companionGuide = false }: { active: Destination; onHeight?: (height: number) => void; companionGuide?: boolean }) {
+export function FloatingNavigation({ active, onHeight }: { active: Destination; onHeight?: (height: number) => void }) {
+  const protection = useBuddyProtectedBounds();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const items = [
@@ -40,12 +42,11 @@ export function FloatingNavigation({ active, onHeight, companionGuide = false }:
     { key: 'story', label: 'Story', accessible: 'Browse public stories', route: '/search?view=stories' },
     { key: 'account', label: 'Account', accessible: 'Open account', route: '/account' },
   ] as const;
-  return <View style={[styles.bar, { bottom: Math.max(0, insets.bottom) + 8, left: Math.max(16, insets.left + 8), right: Math.max(16, insets.right + 8) }]}
-    onLayout={event => onHeight?.(event.nativeEvent.layout.height)} onStartShouldSetResponder={() => true} onResponderTerminationRequest={() => false}>
+  return <View {...protection} style={[styles.bar, { bottom: Math.max(0, insets.bottom) + 8, left: Math.max(16, insets.left + 8), right: Math.max(16, insets.right + 8) }]}
+    onLayout={event => { protection.onLayout(); onHeight?.(event.nativeEvent.layout.height); }} onStartShouldSetResponder={() => true} onResponderTerminationRequest={() => false}>
     {items.map(item => <Pressable key={item.key} accessibilityRole="button" accessibilityLabel={item.accessible}
       accessibilityState={{ selected: active === item.key }} onPress={() => { if (active !== item.key) router.navigate(item.route); }}
       style={({ pressed }) => [styles.item, active === item.key && styles.selected, pressed && styles.pressed]}>
-      {item.key === 'create' && companionGuide && <View pointerEvents="none" accessible={false} importantForAccessibility="no-hide-descendants" style={styles.companionGuide} />}
       <View accessible={false} importantForAccessibility="no-hide-descendants" style={styles.iconSlot}><NavigationIcon name={item.key} /></View>
       <Text style={[styles.label, active === item.key && styles.active]}>{item.label}</Text>
     </Pressable>)}
@@ -74,7 +75,6 @@ const styles = StyleSheet.create({
     shadowColor: '#14251F', shadowOpacity: 0.12, shadowRadius: 8, shadowOffset: { width: 0, height: 3 } },
   item: { flex: 1, minWidth: 0, minHeight: 46, borderRadius: 26, paddingHorizontal: 4, paddingVertical: 4,
     alignItems: 'center', justifyContent: 'center', gap: 0 },
-  companionGuide: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, borderRadius: 26, borderWidth: 2, borderColor: '#D3A94B', backgroundColor: 'rgba(241, 210, 128, 0.12)' },
   selected: { backgroundColor: '#C9DFFF' }, pressed: { opacity: 0.65 },
   iconSlot: { height: 26, width: 28, alignItems: 'center', justifyContent: 'center' },
   avatar: { width: 24, height: 24, borderRadius: 12 },

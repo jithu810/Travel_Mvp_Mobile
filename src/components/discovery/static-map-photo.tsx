@@ -1,6 +1,8 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { Image, StyleSheet, Text, View, type LayoutChangeEvent } from 'react-native';
-import { canDrawStaticMap, mapPoints, staticMapCreditText, staticMapHasInlineCredit, staticMapInlineCreditText, staticMapUrl, type MapPoint } from '@/lib/media/static-map';
+import { canDrawStaticMap, mapPoints, staticMapBrandingRects, staticMapCreditText, staticMapHasInlineCredit, staticMapInlineCreditText, staticMapUrl, type MapPoint } from '@/lib/media/static-map';
+import { useBuddyProtectedBounds } from '@/hooks/use-buddy-geometry';
+import type { BuddyRect } from '@/lib/buddy/model';
 
 // Photo-less places and journeys can show a static map of their coordinates.
 // creditTop moves the inline credit below a screen's own top overlay (header);
@@ -40,8 +42,13 @@ export type StaticMapState = ReturnType<typeof useStaticMap>;
 
 // Decorative image; the surrounding slot owns the accessibility label. Wide maps carry
 // the Mapbox logo plus an inline text credit; narrow ones rely on StaticMapCredit.
+// While a branded map shows, Journey Buddy keeps clear of its credit and logo corners.
 export function StaticMapLayer({ state }: { state: StaticMapState }) {
-  return <View pointerEvents="none" accessible={false} accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={[s.fill, { bottom: state.bottomInset }]} onLayout={state.onLayout} testID="static-map-photo">
+  const branded = Boolean(state.uri && state.inlineCredit), creditTop = state.creditTop;
+  const project = useCallback((rect: BuddyRect): readonly BuddyRect[] => branded ? staticMapBrandingRects(rect, creditTop) : [], [branded, creditTop]);
+  const protection = useBuddyProtectedBounds(project);
+  const { onLayout: layout } = state;
+  return <View {...protection} pointerEvents="none" accessible={false} accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={[s.fill, { bottom: state.bottomInset }]} onLayout={event => { protection.onLayout(); layout(event); }} testID="static-map-photo">
     {state.uri && <Image key={state.uri} source={{ uri: state.uri }} style={s.image} resizeMode="cover" onError={state.onError} />}
     {state.uri && state.inlineCredit && <Text testID="static-map-inline-credit" numberOfLines={1} style={[s.inline, { top: 4 + state.creditTop }]}>{staticMapInlineCreditText}</Text>}
   </View>;
@@ -50,8 +57,9 @@ export function StaticMapLayer({ state }: { state: StaticMapState }) {
 // One attribution line per screen or list that shows small (< 160 px) map thumbnails,
 // rendered only when at least one of those thumbnails can actually draw a map.
 export function StaticMapCredit({ points }: { points: readonly MapPoint[] | null | undefined }) {
+  const protection = useBuddyProtectedBounds();
   if (!canDrawStaticMap(points)) return null;
-  return <Text testID="static-map-credit" accessibilityLabel="Maps by Mapbox and OpenStreetMap" style={s.credit}>{staticMapCreditText}</Text>;
+  return <View {...protection}><Text testID="static-map-credit" accessibilityLabel="Maps by Mapbox and OpenStreetMap" style={s.credit}>{staticMapCreditText}</Text></View>;
 }
 
 const s = StyleSheet.create({

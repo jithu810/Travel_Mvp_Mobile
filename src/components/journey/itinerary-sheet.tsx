@@ -2,12 +2,14 @@ import { theme, raisedSurface } from '@/theme/mobile-theme';
 import { useMemo, useState, type ReactNode } from 'react';
 import { PanResponder, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { colors } from '@/components/discovery/ui';
+import { useBuddyProtectedBounds, useBuddyScroll } from '@/hooks/use-buddy-geometry';
 
 // Two snap positions; only the handle owns dragging, leaving maps and lists interactive.
 export function ItinerarySheet({ title, subtitle, children, footer, compact = false, maxDetailsHeight, maxSheetHeight, onHeightChange }: {
   title: string; subtitle: string; children: ReactNode; footer?: ReactNode; compact?: boolean; maxDetailsHeight?: number; maxSheetHeight?: number; onHeightChange?: (height: number) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
+  const protection = useBuddyProtectedBounds(), scroll = useBuddyScroll();
   const [headerHeight, setHeaderHeight] = useState(68);
   const [footerHeight, setFooterHeight] = useState(0);
   const { height, fontScale } = useWindowDimensions();
@@ -18,7 +20,7 @@ export function ItinerarySheet({ title, subtitle, children, footer, compact = fa
     onPanResponderTerminationRequest: () => true,
   }), []);
   const detailsHeight = Math.max(0, Math.min(260, height * 0.3, maxDetailsHeight ?? Infinity, (maxSheetHeight ?? Infinity) - headerHeight - footerHeight));
-  return <View style={[styles.sheet, compact && styles.compactSheet]} onLayout={event => onHeightChange?.(event.nativeEvent.layout.height)}>
+  return <View {...protection} style={[styles.sheet, compact && styles.compactSheet]} onLayout={event => { protection.onLayout(); onHeightChange?.(event.nativeEvent.layout.height); }}>
     <View {...drag.panHandlers} onLayout={event => setHeaderHeight(event.nativeEvent.layout.height)}>
       <Pressable accessibilityRole="button" accessibilityLabel={expanded ? 'Collapse itinerary and details' : 'Expand itinerary and details'}
         accessibilityHint="Drag up to expand or down to collapse. You can also double tap."
@@ -27,7 +29,7 @@ export function ItinerarySheet({ title, subtitle, children, footer, compact = fa
         <View style={styles.row}><View style={styles.heading}><Text numberOfLines={summaryLines} style={[styles.title, compact && styles.compactTitle]}>{title}</Text><Text accessibilityLiveRegion="polite" numberOfLines={summaryLines} style={[styles.subtitle, compact && styles.compactSubtitle]}>{subtitle}</Text></View><Text style={styles.chevron}>{expanded ? '⌄' : '⌃'}</Text></View>
       </Pressable>
     </View>
-    {expanded && <ScrollView style={{ maxHeight: detailsHeight }} contentContainerStyle={styles.content} nestedScrollEnabled>{children}</ScrollView>}
+    {expanded && <ScrollView {...scroll} style={{ maxHeight: detailsHeight }} contentContainerStyle={styles.content} nestedScrollEnabled>{children}</ScrollView>}
     {footer && <View style={[styles.footer, compact && styles.compactFooter]} onLayout={event => setFooterHeight(event.nativeEvent.layout.height)}>{footer}</View>}
   </View>;
 }

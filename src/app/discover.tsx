@@ -3,6 +3,8 @@ import { BrandedLoading } from '@/components/branded-loading';
 import { PlacePicker } from '@/components/create/place-picker';
 import type { Place } from '@/lib/create/model';
 import { FloatingNavigation } from '@/components/floating-navigation';
+import { useBuddyScreen } from '@/hooks/use-journey-buddy';
+import { useBuddyProtectedBounds } from '@/hooks/use-buddy-geometry';
 import { Stack, useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AppState, Keyboard, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
@@ -19,7 +21,7 @@ import { invalidatePublicJourneys, loadDiscoveryEntries, loadPublicJourney } fro
 
 export default function DiscoverScreen() {
   const router = useRouter();
-  // Home companion is temporarily unmounted; components, assets, flag and saved preference are preserved.
+  const headerProtection = useBuddyProtectedBounds(), bannerProtection = useBuddyProtectedBounds();
   const insets = useSafeAreaInsets();
   // The public load never waits for authentication; only the viewer filter does.
   const state = useLoad(loadDiscoveryEntries);
@@ -79,10 +81,11 @@ export default function DiscoverScreen() {
     : !selection.data ? 'This journey is no longer public.'
     : !points.features.length ? 'No mapped stops for this journey. Open its story to explore.'
     : Platform.OS === 'web' ? 'Mapped stops are available in the mobile app. Open the story to explore.' : 'Tap a stop to open ' + selection.data.title) : 'Journeys from our global community');
+  useBuddyScreen({ floating: true, suppressed: initialLoading, interacting: sheetInteracting, geometryMoving: sheetInteracting });
   return <SafeAreaView edges={['left', 'right']} style={s.safe}>
     <View style={s.page}>
       <Stack.Screen options={{ statusBarStyle: initialLoading ? 'dark' : 'light' }} />
-      <View style={[s.header, { top: headerTop }]} onLayout={event => setHeaderHeight(event.nativeEvent.layout.height)}>
+      <View {...headerProtection} style={[s.header, { top: headerTop }]} onLayout={event => { headerProtection.onLayout(); setHeaderHeight(event.nativeEvent.layout.height); }}>
         <View style={s.search}><PlacePicker label="Search places" homeSearch compact embeddedSuggestions autoSuggest disabled={false}
           dismissVersion={dismissVersion} proximity={userProximity || mapProximity} onSelect={selectPlace} /></View>
         <View accessible accessibilityRole="image" accessibilityLabel="Notifications, coming soon" style={s.iconButton}>
@@ -99,8 +102,8 @@ export default function DiscoverScreen() {
           loading={state.loading || (viewer.pending && !state.error)} emptyText={onlyOwn ? onlyViewerJourneysCopy : undefined} refreshing={state.refreshing} error={state.error} onRefresh={refreshPublic}
           onInteraction={setSheetInteracting} onHeight={setRailHeight} availableHeight={layout.height} availableWidth={layout.width} bottomClearance={navClearance + bannerHeight + 12} topClearance={headerClearance} />
       </View>
-      <Pressable accessibilityRole="button" accessibilityLabel="Create Journey from Home" onPress={() => router.push('/create')}
-        onLayout={event => setBannerHeight(event.nativeEvent.layout.height)} style={[s.banner, { bottom: navClearance }]}>
+      <Pressable {...bannerProtection} accessibilityRole="button" accessibilityLabel="Create Journey from Home" onPress={() => router.push('/create')}
+        onLayout={event => { bannerProtection.onLayout(); setBannerHeight(event.nativeEvent.layout.height); }} style={[s.banner, { bottom: navClearance }]}>
         <View style={s.bannerCopy}><Text style={s.bannerTitle}>Start your own journey</Text><Text style={s.bannerSubtitle}>Make memories into stories</Text></View>
         <View style={s.bannerAction}><Text style={s.bannerActionText}>Create Journey ↗</Text></View>
       </Pressable>

@@ -4,10 +4,12 @@ import type { PublicJourney } from '@/types/journey';
 import { journeyFacts, travelerLabel } from '@/lib/discovery/model';
 import { ThumbnailPhoto } from './thumbnail-photo';
 import { colors } from './ui';
+import { useBuddyProtectedBounds } from '@/hooks/use-buddy-geometry';
 
 export function JourneyCard({ journey }: { journey: PublicJourney }) {
   const router = useRouter();
-  return <Pressable accessibilityRole="button" accessibilityLabel={'Open journey: ' + journey.title + ', ' + journey.destination}
+  const protection = useBuddyProtectedBounds();
+  return <Pressable {...protection} accessibilityRole="button" accessibilityLabel={'Open journey: ' + journey.title + ', ' + journey.destination}
     onPress={() => router.push({ pathname: '/journey/[id]', params: { id: journey.id } })}
     style={({ pressed }) => [styles.card, pressed && { opacity: 0.85 }]}>
     <View style={styles.cover}>

@@ -1,3 +1,4 @@
+import { buddyGeometryStub } from './helpers/buddy-geometry-stub.mjs';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
@@ -16,7 +17,9 @@ function hooks(){let slots=[],cursor=0,effects=[];return {
     useCallback:fn=>fn,useEffect:(fn,deps)=>{let i=cursor++;if(!slots[i]||deps.some((v,j)=>v!==slots[i][j])){slots[i]=deps;effects.push(fn);}}},
   render(fn){cursor=0;effects=[];const tree=fn();effects.forEach(f=>f());return tree;},
 };}
-function load(path,modules={},react=hooks().react){const exports={};const code=ts.transpileModule(readFileSync(path,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX}}).outputText;
+function load(path,modules={},react=hooks().react){
+  modules={'@/hooks/use-buddy-geometry':buddyGeometryStub,...modules};const exports={};const code=ts.transpileModule(readFileSync(path,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX}}).outputText;
+  modules={'@/hooks/use-journey-buddy':{useBuddyScreen(){},useBuddyPreference:()=>({loaded:true,enabled:false,error:null,setEnabled(){}})},...modules};
   new Function('require','exports',code)(name=>name==='@/theme/mobile-theme'?mobileTheme:name==='@/components/discovery/thumbnail-photo'?{ThumbnailPhoto:'JourneyPhoto'}:name==='./profile-styles'?load('src/components/profile/profile-styles.ts',{'@/components/discovery/ui':ui}):name==='react'?react:name==='@/components/delete-draft-action'?{DeleteDraftAction:'DeleteDraftAction'}:name==='@/lib/remix/model'?{draftRemixCredit:source=>source===undefined?'Remix of another journey':source===null?'Remixed from an original journey that is currently unavailable.':'Remix of '+source.title+' · by '+source.creatorName}:name==='@/components/branded-loading'?{BrandedLoading:'BrandedLoading'}:name==='react/jsx-runtime'?{jsx,jsxs:jsx,Fragment:'Fragment'}:name==='react-native'?native:name.endsWith('.png')?1:name in modules?modules[name]:(()=>{throw Error(name);})(),exports);return exports;}
 function all(tree,type){if(!tree||typeof tree!=='object')return [];return [...(tree.type===type?[tree]:[]),...[tree.props?.children].flat(Infinity).flatMap(t=>all(t,type))];}
 const uid='22222222-2222-4222-8222-222222222222';const journey={id:'real',title:'Hill journey',destination:'Ponmudi',cover:'https://test/cover.jpg',durationDays:1,stops:[{},{}]};

@@ -1,3 +1,4 @@
+import { buddyGeometryStub } from './helpers/buddy-geometry-stub.mjs';
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { readFileSync } from 'node:fs';
@@ -31,6 +32,7 @@ function harness() {
   for (const name of ['View', 'Pressable', 'Text', 'FlatList', 'ActivityIndicator']) rn[name] = name;
   const jsx = (type, props, key) => ({ type, props, key });
   function load(path, dependencies = {}) {
+  dependencies={'@/hooks/use-buddy-geometry':buddyGeometryStub,...dependencies};
     const exports = {};
     const compiled = ts.transpileModule(readFileSync(path, 'utf8'), { compilerOptions: { jsx: ts.JsxEmit.ReactJSX, module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
     new Function('require', 'exports', compiled)(name => {

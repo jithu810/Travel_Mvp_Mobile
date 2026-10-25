@@ -81,3 +81,14 @@ export function staticMapHasInlineCredit(width: number) { return Number.isFinite
 export function canDrawStaticMap(points: readonly MapPoint[] | null | undefined, token?: string | null) {
   return staticMapUrl(token === undefined ? { points, width: 1, height: 1 } : { points, width: 1, height: 1, token }) !== null;
 }
+// Journey Buddy keeps clear of these window-space rects on a branded (wide) map:
+// the app-drawn top-left text credit and Mapbox's bottom-left logo.
+export const staticMapCreditBand = { width: 170, height: 22 };
+export const staticMapLogoBand = { width: 100, height: 36 };
+export function staticMapBrandingRects(rect: { x: number; y: number; width: number; height: number }, creditTop = 0) {
+  if (!(rect.width > 0 && rect.height > 0)) return [];
+  const credit = { x: rect.x, y: rect.y + creditTop, width: Math.min(rect.width, staticMapCreditBand.width), height: Math.min(staticMapCreditBand.height, Math.max(0, rect.height - creditTop)) };
+  const logoHeight = Math.min(rect.height, staticMapLogoBand.height);
+  const logo = { x: rect.x, y: rect.y + rect.height - logoHeight, width: Math.min(rect.width, staticMapLogoBand.width), height: logoHeight };
+  return [credit, logo].filter(item => item.width > 0 && item.height > 0);
+}

@@ -109,6 +109,9 @@ test('the token defaults to the trimmed public environment value and is injectab
   }
 });
 
+// Records the Journey Buddy projection each map layer registers (latest wins).
+const buddyProjections = [];
+const buddyGeometry = { useBuddyProtectedBounds: project => { buddyProjections.push(project); return { ref() {}, collapsable: false, onLayout() {} }; } };
 // Component harness: minimal hooks, JSX as plain objects; hook-free function
 // components (StaticMapLayer/StaticMapCredit) are expanded in place.
 const jsx = (type, props) => ({ type, props });
@@ -118,12 +121,13 @@ function hooks() {
   const slots = []; let cursor = 0, computations = 0;
   const react = {
     useState: initial => { const i = cursor++; if (!(i in slots)) slots[i] = typeof initial === 'function' ? initial() : initial; return [slots[i], value => { slots[i] = typeof value === 'function' ? value(slots[i]) : value; }]; },
+    useCallback: fn => fn,
     useMemo: (fn, deps) => { const i = cursor++; if (!slots[i] || deps.some((value, j) => value !== slots[i].deps[j])) { computations++; slots[i] = { value: fn(), deps }; } return slots[i].value; },
   };
   return { react, render: fn => { cursor = 0; return fn(); }, computations: () => computations };
 }
 function components(h) {
-  const base = { react: h.react, 'react/jsx-runtime': { jsx, jsxs: jsx, Fragment: 'Fragment' }, 'react-native': native, '@/lib/media/static-map': map };
+  const base = { react: h.react, 'react/jsx-runtime': { jsx, jsxs: jsx, Fragment: 'Fragment' }, 'react-native': native, '@/lib/media/static-map': map, '@/hooks/use-buddy-geometry': buddyGeometry, '@/lib/buddy/model': {} };
   const staticMapPhoto = load('src/components/discovery/static-map-photo.tsx', base);
   const placeholder = load('src/components/discovery/travel-photo-placeholder.tsx', { ...base, './static-map-photo': staticMapPhoto, '../../../assets/images/journey-photo-fallback.png': 17 });
   const photo = load('src/components/discovery/journey-photo.tsx', { ...base, './static-map-photo': staticMapPhoto, './ui': { colors: {} } });
@@ -201,13 +205,32 @@ test('StaticMapCredit renders one line only when a small map can actually draw',
     delete process.env.EXPO_PUBLIC_MAPBOX_TOKEN;
     assert.equal(StaticMapCredit({ points: [kochi] }), null);
     withToken(() => {
-      const credit = StaticMapCredit({ points: [{ latitude: null, longitude: null }, kochi] });
+      const wrapper = StaticMapCredit({ points: [{ latitude: null, longitude: null }, kochi] });
+      assert.equal(wrapper.props.collapsable, false, 'The credit line registers with Journey Buddy geometry');
+      const credit = wrapper.props.children;
       assert.equal(credit.props.children, 'Maps © Mapbox © OpenStreetMap'); assert.equal(credit.props.testID, 'static-map-credit');
       assert.equal(StaticMapCredit({ points: [{ latitude: null, longitude: null }] }), null);
       assert.equal(StaticMapCredit({ points: [] }), null);
     });
   } finally { if (previous !== undefined) process.env.EXPO_PUBLIC_MAPBOX_TOKEN = previous; }
 });
+
+test('branded maps keep Journey Buddy off the top-left credit and bottom-left Mapbox logo', () => withToken(() => {
+  const rect = { x: 20, y: 300, width: 320, height: 180 };
+  assert.deepEqual(map.staticMapBrandingRects(rect, 0), [{ x: 20, y: 300, width: 170, height: 22 }, { x: 20, y: 444, width: 100, height: 36 }]);
+  assert.deepEqual(map.staticMapBrandingRects(rect, 50)[0], { x: 20, y: 350, width: 170, height: 22 }, 'Credit band follows creditTop');
+  assert.deepEqual(map.staticMapBrandingRects({ x: 0, y: 0, width: 0, height: 10 }), []);
+  const h = hooks(), { TravelPhotoPlaceholder } = components(h);
+  const render = () => h.render(() => TravelPhotoPlaceholder({ variant: 'stop', map: { points: [kochi] } }));
+  let layer = nodes(render()).find(n => n.props?.testID === 'static-map-photo');
+  assert.equal(layer.props.collapsable, false, 'The map layer attaches to buddy geometry');
+  assert.deepEqual(buddyProjections.at(-1)(rect), [], 'Nothing is protected before a map image shows');
+  layer.props.onLayout(layout(320, 145));
+  layer = nodes(render()).find(n => n.props?.testID === 'static-map-photo');
+  assert.equal(buddyProjections.at(-1)(rect).length, 2, 'Credit and logo corners are protected while a wide map shows');
+  layer.props.onLayout(layout(120, 80)); nodes(render());
+  assert.deepEqual(buddyProjections.at(-1)(rect), [], 'Small unbranded thumbnails protect nothing');
+}));
 
 test('JourneyPhoto keeps photos first, then map, then its existing fallback', () => withToken(() => {
   const h = hooks(), { JourneyPhoto } = components(h);

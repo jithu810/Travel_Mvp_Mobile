@@ -5,6 +5,7 @@ import { discoveryCardWidth } from '@/lib/discovery/presentation';
 import { useDiscoverySheet } from '@/hooks/use-discovery-sheet';
 import { HomeJourneyCard } from './home-journey-card';
 import { colors } from './ui';
+import { useBuddyProtectedBounds, useBuddyScroll } from '@/hooks/use-buddy-geometry';
 
 export function DiscoveryPanel({ journeys, selectedId, onLocate, onOpen, notice, onClear, onRetrySelection,
   loading, refreshing, error, emptyText, onRefresh, onHeight, onInteraction, availableHeight, availableWidth, bottomClearance = 0, topClearance = 0 }: {
@@ -24,10 +25,11 @@ export function DiscoveryPanel({ journeys, selectedId, onLocate, onOpen, notice,
   const collapsed = Math.min(space, chromeHeight + cardHeight + 14);
   const sheet = useDiscoverySheet(space, publishHeight, onInteraction, { peek: Math.min(44, space), collapsed, expanded: Math.max(collapsed, space - 96) });
   const { expanded } = sheet;
+  const protection = useBuddyProtectedBounds(), scroll = useBuddyScroll();
   // Touch/search updates rerender Home; retain the same animation graph.
   const panelHeight = useMemo(() => Animated.add(sheet.height, clearance), [sheet.height, clearance]);
   const [visible, setVisible] = useState(24);
-  return <Animated.View style={[s.sheet, { height: panelHeight }]}
+  return <Animated.View {...protection} style={[s.sheet, { height: panelHeight }]}
     onTouchStart={sheet.touchStart} onTouchEnd={sheet.touchEnd} onTouchCancel={sheet.touchEnd}>
     <View onLayout={event => {
       // Expanded descriptions/notices must never redefine the compact snap.
@@ -61,9 +63,9 @@ export function DiscoveryPanel({ journeys, selectedId, onLocate, onOpen, notice,
     </View>
     <View style={[s.list, !expanded && { marginBottom: clearance }]} {...sheet.responders.content}>
     {[false, true].map(listExpanded => <View key={String(listExpanded)} style={[s.list, { display: expanded === listExpanded ? 'flex' : 'none' }]}>
-    <FlatList horizontal={!listExpanded}
+    <FlatList {...scroll} horizontal={!listExpanded}
       initialNumToRender={listExpanded ? 3 : 2} maxToRenderPerBatch={2} windowSize={3} updateCellsBatchingPeriod={50}
-      onScroll={event => { if (listExpanded) sheet.offset.current = event.nativeEvent.contentOffset.y; }} scrollEventThrottle={16}
+      onScroll={event => { scroll.onScroll(); if (listExpanded) sheet.offset.current = event.nativeEvent.contentOffset.y; }} scrollEventThrottle={16}
       data={expanded === listExpanded ? journeys.slice(0, visible) : []} keyExtractor={item => item.id} style={s.list}
       showsHorizontalScrollIndicator={false} showsVerticalScrollIndicator={listExpanded}
       contentContainerStyle={[s.items, listExpanded && s.expandedItems, listExpanded && { paddingBottom: clearance + 10 }]}

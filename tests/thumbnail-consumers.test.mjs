@@ -1,10 +1,12 @@
+import { buddyGeometryStub } from './helpers/buddy-geometry-stub.mjs';
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
 import {readFileSync} from 'node:fs';
 import ts from 'typescript';
 const jsx=(type,props)=>({type,props});const runtime={jsx,jsxs:jsx,Fragment:'Fragment'};
 const native={View:'View',Text:'Text',Image:'Image',Pressable:'Pressable',StyleSheet:{create:x=>x}};
-function load(path,modules){const exports={};new Function('require','exports',ts.transpileModule(readFileSync(path,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX}}).outputText)(id=>{assert.ok(id in modules,id);return modules[id];},exports);return exports;}
+function load(path,modules){
+  modules={'@/hooks/use-buddy-geometry':buddyGeometryStub,...modules};const exports={};new Function('require','exports',ts.transpileModule(readFileSync(path,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX}}).outputText)(id=>{assert.ok(id in modules,id);return modules[id];},exports);return exports;}
 function harness(){let cursor=0,effects=[];const slots=[];return {react:{memo:fn=>fn,useMemo:fn=>fn(),useState:initial=>{const i=cursor++;if(!(i in slots))slots[i]=initial;return [slots[i],v=>{slots[i]=typeof v==='function'?v(slots[i]):v;}];},useRef:initial=>{const i=cursor++;return slots[i]??={current:initial};},useEffect:(fn,deps)=>{const i=cursor++;if(!slots[i]||deps.some((v,j)=>v!==slots[i].deps[j])){slots[i]={deps};effects.push(fn);}}},render(fn){cursor=0;effects=[];const tree=fn();effects.forEach(fn=>fn());return tree;}};}
 const nodes=tree=>!tree||typeof tree!=='object'?[]:[tree,...[tree.props?.children].flat(Infinity).flatMap(nodes)];
 function thumbnail(h){const hook=load('src/hooks/use-thumbnail-source.ts',{react:{...h.react,useLayoutEffect:h.react.useEffect}});return load('src/components/discovery/thumbnail-photo.tsx',{'react/jsx-runtime':runtime,'react-native':native,'@/hooks/use-thumbnail-source':hook,'./journey-photo':{JourneyPhoto:'JourneyPhoto'},'./travel-photo-placeholder':{TravelPhotoPlaceholder:'DefaultPhoto'}}).ThumbnailPhoto;}

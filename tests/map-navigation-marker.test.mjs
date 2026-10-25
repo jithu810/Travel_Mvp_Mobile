@@ -3,6 +3,7 @@ import { Buffer } from 'node:buffer';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import ts from 'typescript';
+import { buddyGeometryStub, buddyMapPinsStub } from './helpers/buddy-geometry-stub.mjs';
 
 // Executes the native component with inert native adapters; no device rendering is claimed.
 function fixture() {
@@ -12,6 +13,9 @@ function fixture() {
   mapbox.StyleURL = {};
   const frame = { camera: {}, projection: 'mercator', route: { type: 'Feature', properties: {}, geometry: { type: 'MultiLineString', coordinates: [[[0, 0], [0.01, 0]]] } }, fitsViewport: true };
   const mocks = {
+    '@/hooks/use-buddy-geometry': buddyGeometryStub,
+    '@/hooks/use-buddy-map-pins': buddyMapPinsStub,
+    '@/lib/buddy/map-controls': { journeyBuddyControls: () => [] },
     '@/components/journey/journey-action-icon': { JourneyActionIcon: 'JourneyActionIcon' },
     '@/lib/journey/nearby': { nearbyFocus: () => null }, '../nearby-locations': { NearbyLocations: 'NearbyLocations' },
     'expo-router': { useFocusEffect() {} }, '@/components/discovery/globe/journey-overlays': { JourneyOverlays: 'JourneyOverlays' },

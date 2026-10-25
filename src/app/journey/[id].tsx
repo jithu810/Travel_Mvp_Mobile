@@ -1,4 +1,6 @@
 import { SwipeJourneyStart } from '@/components/journey/swipe-journey-start';
+import { useBuddyScreen } from '@/hooks/use-journey-buddy';
+import { useBuddyProtectedBounds, useBuddyScroll } from '@/hooks/use-buddy-geometry';
 import { JourneyActionIcon } from '@/components/journey/journey-action-icon';
 import { StatusBar } from 'expo-status-bar';
 import { BrandedLoading } from '@/components/branded-loading';
@@ -43,6 +45,7 @@ export default function JourneyStoryScreen() {
 
 export function JourneyStoryContent({ journey, refresh, refreshing, error, saveFirst = false }: { journey: PublicJourney; saveFirst?: boolean; refresh: () => void; refreshing: boolean; error: string | null }) {
   const router = useRouter();
+  const footerProtection = useBuddyProtectedBounds(), expandProtection = useBuddyProtectedBounds(), scroll = useBuddyScroll();
   const insets = useSafeAreaInsets();
   const [panel, setPanel] = useState<'map' | 'about' | 'stop' | null>(null);
   const [focused, setFocused] = useState(true);
@@ -66,17 +69,18 @@ export function JourneyStoryContent({ journey, refresh, refreshing, error, saveF
   const showStop = useCallback((id: string) => { select(id); setPanel('stop'); }, [select, setPanel]);
   const memoryPhotos = useMemo(() => Object.fromEntries(journey.stops.map(stop => [stop.id, stop.photo])), [journey.stops]);
   const missing = buildMapData(journey.stops).missing;
+  useBuddyScreen({ floating: true, suppressed: !focused || panel !== null });
   return <View style={styles.screen}>
     {focused && panel === null && <StatusBar style="light" />}
-    <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" nestedScrollEnabled>
+    <ScrollView {...scroll} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" nestedScrollEnabled>
       <View style={[styles.preview, { height: Math.max(150, Math.min(280, window.height * 0.30)) }]}>
         {focused && panel === null && <JourneyMap stops={journey.stops} memoryPhotos={memoryPhotos} playRouteWithSelection={requestedId === null} animateMemoryRoute={requestedId === null} selectedId={selectedId} onSelect={select} presentation="expanded" controlTopInset={insets.top} onExpand={openMap} />}
-        <Pressable accessibilityRole="button" accessibilityLabel="Expand journey map" onPress={openMap} style={[styles.expand, { top: insets.top + 4 }]}><JourneyActionIcon name="expand" /></Pressable>
+        <Pressable {...expandProtection} accessibilityRole="button" accessibilityLabel="Expand journey map" onPress={openMap} style={[styles.expand, { top: insets.top + 4 }]}><JourneyActionIcon name="expand" /></Pressable>
       </View>
       <StopTimeline horizontal stacked creator={<StoryCreator journey={journey} />} active={focused && panel === null} stops={journey.stops} selectedId={selectedId} onSelect={select} onDetails={showStop} photoActions={<SocialActions selectedMemoryId={selectedId} key={'social-' + journey.id} journey={journey} layout="rail" saveFirst={saveFirst} />} optionsActions={<JourneyOptions key={journey.id} id={journey.id} onUse={openTravel} presentation="rail" onAbout={() => setPanel('about')} />} />
       {journey.sourceId && <SourceAttribution key={'source-' + journey.sourceId} id={journey.sourceId} variant="published" />}
     </ScrollView>
-    {canOpenTravelMode(journey) && <View style={styles.swipeFooter}><SwipeJourneyStart active={focused && panel === null} onStart={openTravel} /></View>}
+    {canOpenTravelMode(journey) && <View {...footerProtection} style={styles.swipeFooter}><SwipeJourneyStart active={focused && panel === null} onStart={openTravel} /></View>}
     <View pointerEvents="none" testID="journey-status-shade" style={[styles.statusShade, { height: insets.top + 20 }]} />
     {panel === 'stop' && <StopStoryViewer journey={journey} selectedId={selectedId} onSelect={select} onClose={() => setPanel(null)} onMap={openMap} />}
     <StorySheet visible={panel === 'map' || panel === 'about'} title={panel === 'map' ? journey.title : 'About this journey'} subtitle={panel === 'map' ? journey.stops.length + (journey.stops.length === 1 ? ' stop' : ' stops') + ' · Journey map' : undefined} onClose={() => setPanel(null)} scrollable={panel !== 'map'}>

@@ -3,6 +3,7 @@ import { AccessibilityInfo, Animated, AppState, PanResponder, Pressable, StyleSh
 import type { GestureResponderHandlers } from 'react-native';
 import type { StopInput } from '@/lib/create/model';
 import { theme } from '@/theme/mobile-theme';
+import { useBuddyProtectedBounds } from '@/hooks/use-buddy-geometry';
 
 export type MemorySwipe = { handlers: GestureResponderHandlers; canInteract: () => boolean };
 // Browsing changes selection only; MemoryRow owns the separate edit/reorder/remove controls.
@@ -12,6 +13,7 @@ export function MemoryDeck({ stops, selectedId, onSelect, renderMemory, actions,
   /** Optional one-line credit under the title, such as a remix's original journey. */ credit?: ReactNode;
 }) {
   const [width, setWidth] = useState(320);
+  const protection = useBuddyProtectedBounds();
   const [reduced, setReduced] = useState(true);
   const [x] = useState(() => new Animated.Value(0));
   const selected = Math.max(0, stops.findIndex(stop => stop.id === selectedId));
@@ -64,7 +66,7 @@ export function MemoryDeck({ stops, selectedId, onSelect, renderMemory, actions,
   // Renderer forwards canInteract into MemoryRow event handlers without calling it.
   // eslint-disable-next-line react-hooks/refs
   const card = memory ? renderMemory(memory, selected, width, { handlers: swipe.panHandlers, canInteract }) : null;
-  return <View testID="draft-memory-deck" onLayout={event => setWidth(event.nativeEvent.layout.width)}>
+  return <View {...protection} testID="draft-memory-deck" onLayout={event => { protection.onLayout(); setWidth(event.nativeEvent.layout.width); }}>
     <View style={s.header}>{leading}<View style={s.heading}>{title && <Text accessibilityRole="header" numberOfLines={1} style={s.headingTitle}>{title}</Text>}{credit}<Text numberOfLines={1} style={s.progress} accessibilityLiveRegion="polite">{stops.length ? 'Memory ' + (selected + 1) + ' of ' + stops.length : 'Memories · 0/50'}{status ? ' · ' + status : ''}</Text></View>
       {stops.length > 0 && <View style={s.controls}><Pressable accessibilityRole="button" accessibilityLabel="Previous memory card" disabled={!active || selected === 0} accessibilityState={{ disabled: !active || selected === 0 }} onPress={() => browse(-1)} style={s.arrow}><Text style={s.arrowText}>←</Text></Pressable><Pressable accessibilityRole="button" accessibilityLabel="Next memory card" disabled={!active || selected >= stops.length - 1} accessibilityState={{ disabled: !active || selected >= stops.length - 1 }} onPress={() => browse(1)} style={s.arrow}><Text style={s.arrowText}>→</Text></Pressable></View>}
     </View>

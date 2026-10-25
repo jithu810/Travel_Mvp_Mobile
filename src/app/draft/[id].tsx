@@ -1,4 +1,6 @@
 import { BrandedLoading } from '@/components/branded-loading';
+import { useBuddyScreen } from '@/hooks/use-journey-buddy';
+import { useBuddyScroll } from '@/hooks/use-buddy-geometry';
 import { useCallback } from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ActivityIndicator, ScrollView, Text, View } from 'react-native';
@@ -19,8 +21,10 @@ export default function PrivateDraftScreen() {
   const userId = auth.session?.user.id;
   const loader = useCallback((signal: AbortSignal) => userId ? loadPrivateDraft(id, userId, signal) : Promise.resolve(null), [id, userId]);
   const state = useLoad(loader);
+  const scroll = useBuddyScroll();
+  useBuddyScreen({ floating: true, suppressed: auth.loading || !auth.session || state.loading || !state.data });
   return <SafeAreaView style={ui.safe}><View style={ui.page}><ScreenHeader title="Private draft" back />
-    <ScrollView contentContainerStyle={[ui.list, { gap: 24 }]}>
+    <ScrollView {...scroll} contentContainerStyle={[ui.list, { gap: 24 }]}>
       {auth.loading ? <ActivityIndicator /> : !auth.session ? <Message title="Sign in to open your draft" body="Private copies are available only to their owner." action="Sign in" retry={() => router.push('/auth')} />
         : state.loading ? <BrandedLoading message="Opening your private journey…" /> : !state.data ? <Message title="Draft unavailable" body={state.error || 'This draft may belong to another account or no longer be available.'} retry={state.retry} />
           : <><Text style={ui.eyebrow}>PRIVATE · UNPUBLISHED</Text><Text style={ui.heading}>{state.data.title}</Text>

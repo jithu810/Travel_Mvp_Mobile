@@ -1,3 +1,4 @@
+import { buddyGeometryStub, buddyMapPinsStub } from './helpers/buddy-geometry-stub.mjs';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
@@ -37,11 +38,17 @@ function harness(runEffects = true) {
   };
 }
 function load(path, modules, hooks = harness(false).hooks, timers = globalThis) {
+  modules={'@/hooks/use-buddy-geometry':buddyGeometryStub,...modules};
   const source = ts.transpileModule(readFileSync(path, 'utf8'), {
     compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true },
   }).outputText;
   const module = { exports: {} };
   const require = name => {
+    if(name==='@/hooks/use-journey-buddy')return modules[name] || {useBuddyScreen(){},useBuddySuppression(){}};
+    if(name==='@/hooks/use-buddy-map-pins')return buddyMapPinsStub;
+    if(name==='@/lib/buddy/map-controls')return load('src/lib/buddy/map-controls.ts',{});
+    if(name==='@/lib/buddy/model')return load('src/lib/buddy/model.ts',{});
+    if(name==='@/components/buddy/buddy-space')return {BuddySpace:'BuddySpace'};
     if (name === '@/theme/mobile-theme') return mobileTheme;
     if(name==='@/lib/journey/nearby')return load('src/lib/journey/nearby.ts',{}); if(name.endsWith('/nearby-locations'))return {NearbyLocations:'NearbyLocations'}; if (name === 'react/jsx-runtime') return { jsx, jsxs: jsx };
     if (name === '@/components/journey/swipe-journey-start') return { SwipeJourneyStart: 'SwipeJourneyStart' };
@@ -1552,6 +1559,7 @@ test('popup JourneyOptions preserves Use, sign-in Remix, private copy reuse and 
 });
 test('editor photo overlays use actual ordered markers; idle playback yields to touches, selection, background and reduced motion',async()=>{
   const listeners=new Set();let preference;
+  const idleEvent={properties:{center:[76,8],zoom:7,heading:0,pitch:0}};
   const app={currentState:'active',addEventListener:(_name,fn)=>{listeners.add(fn);return {remove:()=>listeners.delete(fn)};}};
   const h=nativeMapHarness([mappedStop('second',2,77,9),mappedStop('first',1,76,8)],{
     AppState:app,AccessibilityInfo:{isReduceMotionEnabled:async()=>false,addEventListener:(_name,fn)=>{preference=fn;return {remove(){}};}}
@@ -1559,16 +1567,16 @@ test('editor photo overlays use actual ordered markers; idle playback yields to 
   Object.assign(h.props,{selectedId:null,memoryPhotos:{first:'https://signed.test/first',second:null},animateMemoryRoute:true});
   let tree=h.measure();find(tree,'MapView').props.onDidFinishLoadingMap();await new Promise(resolve=>setImmediate(resolve));tree=h.render();
   const flights=[];find(tree,'Camera').props.ref.current={setCamera:value=>flights.push(value)};
-  find(tree,'MapView').props.onMapIdle();tree=h.render();let overlay=find(tree,'JourneyOverlays');
+  find(tree,'MapView').props.onMapIdle(idleEvent);tree=h.render();let overlay=find(tree,'JourneyOverlays');
   assert.deepEqual(overlay.props.points.features.map(p=>[p.id,p.properties.photo]),[['first','https://signed.test/first'],['second',null]]);
   assert.equal(overlay.props.playing,true);assert.equal(overlay.props.durationScale,3);assert.equal(overlay.props.drawRoute,false);
   find(tree,'MapView').props.onTouchStart();tree=h.render();assert.equal(find(tree,'JourneyOverlays').props.playing,false);
-  find(tree,'MapView').props.onMapIdle();tree=h.render();assert.equal(find(tree,'JourneyOverlays').props.playing,false,'Native idle during a held gesture cannot restart playback');
-  find(tree,'MapView').props.onTouchEnd();find(tree,'MapView').props.onMapIdle();tree=h.render();assert.equal(find(tree,'JourneyOverlays').props.playing,true);
+  find(tree,'MapView').props.onMapIdle(idleEvent);tree=h.render();assert.equal(find(tree,'JourneyOverlays').props.playing,false,'Native idle during a held gesture cannot restart playback');
+  find(tree,'MapView').props.onTouchEnd();find(tree,'MapView').props.onMapIdle(idleEvent);tree=h.render();assert.equal(find(tree,'JourneyOverlays').props.playing,true);
   h.props.selectedId='second';tree=h.render();assert.equal(find(tree,'JourneyOverlays').props.playing,false);assert.deepEqual(flights.at(-1).centerCoordinate,[77,9]);assert.equal(flights.at(-1).animationDuration,450);
   h.props.selectedId=null;h.props.animateMemoryRoute=false;tree=h.render();assert.equal(find(tree,'JourneyOverlays').props.playing,false,'Open editor sheet suppresses playback');
   h.props.animateMemoryRoute=true;app.currentState='background';listeners.forEach(fn=>fn('background'));tree=h.render();assert.equal(find(tree,'JourneyOverlays').props.playing,false);
-  app.currentState='active';listeners.forEach(fn=>fn('active'));preference(true);tree=h.render();find(tree,'MapView').props.onMapIdle();tree=h.render();assert.equal(find(tree,'JourneyOverlays').props.playing,false);
+  app.currentState='active';listeners.forEach(fn=>fn('active'));preference(true);tree=h.render();find(tree,'MapView').props.onMapIdle(idleEvent);tree=h.render();assert.equal(find(tree,'JourneyOverlays').props.playing,false);
   h.props.selectedId='first';h.render();assert.equal(flights.at(-1).animationDuration,0);
   h.dispose();assert.equal(listeners.size,0);
 });

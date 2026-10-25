@@ -1,4 +1,6 @@
 import { DraftRouteIllustration } from '@/components/create/draft-route-illustration';
+import { useBuddyScreen } from '@/hooks/use-journey-buddy';
+import { useBuddyProtectedBounds, useBuddyScroll } from '@/hooks/use-buddy-geometry';
 import { StatusBar } from 'expo-status-bar';
 import { SwipeAction } from '@/components/journey/swipe-journey-start';
 import { MemoryDeck } from '@/components/create/memory-deck';
@@ -43,6 +45,7 @@ const DraftMap = memo(function DraftMap({ geometry, photos, thumbnails, selected
 });
 export function NewJourneyEditor({ ownerId, initial, onReload, onDestinationFocus, dismissSearchVersion = 0, keyboardOpen = false }: { ownerId: string; initial?: CreateForm; onReload?: () => void; onDestinationFocus?: (place: Place | null) => void; dismissSearchVersion?: number; keyboardOpen?: boolean }) {
   const router = useRouter(), navigation = useNavigation();
+  const scroll = useBuddyScroll(), footerProtection = useBuddyProtectedBounds();
   const insets = useSafeAreaInsets(), window = useWindowDimensions();
   const [editorFocused, setEditorFocused] = useState(true);
   const allowExit = useRef(false);
@@ -86,6 +89,8 @@ export function NewJourneyEditor({ ownerId, initial, onReload, onDestinationFocu
   const memoryPhotos = JSON.stringify(Object.fromEntries(form.stops.map(stop => [stop.id, localPhotos.candidates[stop.id]?.uri || (stop.photoPath ? stop.photoPath.startsWith('journey-media/') ? photos.data?.[stop.photoPath] || null : safePhoto(stop.photoPath) : null)])));
   const memoryThumbnails = JSON.stringify(Object.fromEntries(form.stops.map(stop => [stop.id, !localPhotos.candidates[stop.id] && stop.photoPath ? photos.data?.[thumbnailStoragePath(stop.photoPath) || ''] || null : null])));
   const latest = useRef({ form, memoryEdit, candidates: localPhotos.candidates, disabled, settingsOpen, coverOpen });
+  useBuddyScreen({ floating: true, suppressed: !editorFocused || disabled || settingsOpen || coverOpen || !!memoryEdit || keyboardOpen,
+    canAddMemory: !!form.updatedAt && !publishedId && !disabled && form.stops.length < 50 }, { addMemory });
   useEffect(() => { latest.current = { form, memoryEdit, candidates: localPhotos.candidates, disabled, settingsOpen, coverOpen }; }, [form, memoryEdit, localPhotos.candidates, disabled, settingsOpen, coverOpen]);
   usePreventRemove(dirty || memoryChanged(memoryEdit) || busy || hasLocalPhotos || photoBusy, ({ data }) => {
     if (allowExit.current) { navigation.dispatch(data.action); return; }
@@ -205,7 +210,7 @@ export function NewJourneyEditor({ ownerId, initial, onReload, onDestinationFocu
     </View>
   </View>;
   return <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-    <ScrollView style={{ flex: 1 }} contentContainerStyle={[ui.list, { gap: 10, paddingTop: 0, paddingHorizontal: 16 }]} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
+    <ScrollView {...scroll} style={{ flex: 1 }} contentContainerStyle={[ui.list, { gap: 10, paddingTop: 0, paddingHorizontal: 16 }]} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
     {editorFocused && <StatusBar style={settingsOpen || coverOpen || memoryEdit ? 'dark' : 'light'} />}
     <DraftMap geometry={geometry} photos={memoryPhotos} thumbnails={memoryThumbnails} selectedId={selectedId} onSelect={setSelectedMemoryId} active={editorFocused && !settingsOpen && !coverOpen && !memoryEdit && !busy && !photoBusy} height={Math.max(180, Math.min(270, window.height * 0.29))} topInset={insets.top} />
     <View pointerEvents="none" style={[createStyles.statusShade, { height: insets.top + 20 }]} />
@@ -222,7 +227,7 @@ export function NewJourneyEditor({ ownerId, initial, onReload, onDestinationFocu
         {attemptedStatus === 'published' && <Action label="Check public journey" onPress={() => router.push({ pathname: '/journey/[id]', params: { id: form.id } })} />}
         <Text style={ui.body}>The form is preserved. Check the save result before trying again.</Text></>}
     </ScrollView>
-    <View style={createStyles.editorFooter}>
+    <View {...footerProtection} style={createStyles.editorFooter}>
       {form.stops.length === 0 ? <Text style={createStyles.emptyGuidance}>Add a stop to start building your journey.</Text> : <>
       <Text accessibilityLiveRegion="polite" style={createStyles.publishReason}>{readiness || (uncertain ? 'Check the save result before retrying.' : busy ? savePhase : 'Ready to publish your journey')}</Text>
       <SwipeAction active={editorFocused && !settingsOpen && !coverOpen && !memoryEdit && !disabled && !readiness} onComplete={publish} label="Swipe to publish journey" accessibilityLabel="Publish Journey" hint="Make this journey public" accessibilityHint="Swipe right or double tap to publish this journey and its photos publicly." openingLabel="Preparing to publish…" resetKey={JSON.stringify([ownerId, form, localPhotos.candidates, uncertain])} /></>}
@@ -259,6 +264,7 @@ export function NewJourneyEditor({ ownerId, initial, onReload, onDestinationFocu
 }
 
 export function DraftShortcuts({ ownerId, keyboardHidden = false }: { ownerId: string; keyboardHidden?: boolean }) {
+  const protection = useBuddyProtectedBounds(), scroll = useBuddyScroll();
   const router = useRouter();
   const loader = useCallback((signal: AbortSignal) => loadPrivateDrafts(ownerId, signal), [ownerId]);
   const drafts = useLoad(loader);
@@ -266,14 +272,14 @@ export function DraftShortcuts({ ownerId, keyboardHidden = false }: { ownerId: s
   useFocusEffect(useCallback(() => { refresh(); }, [refresh]));
   const [historyWidth, setHistoryWidth] = useState(0);
   const cardWidth = Math.max(0, Math.min(320, (historyWidth || 280) - 24));
-  return <View style={keyboardHidden ? [createStyles.history, { display: 'none' }] : createStyles.history} accessibilityElementsHidden={keyboardHidden} onLayout={event => setHistoryWidth(event.nativeEvent.layout.width)}>
+  return <View {...protection} style={keyboardHidden ? [createStyles.history, { display: 'none' }] : createStyles.history} accessibilityElementsHidden={keyboardHidden} onLayout={event => { protection.onLayout(); setHistoryWidth(event.nativeEvent.layout.width); }}>
     <View style={createStyles.historyHeader}>
       <View accessible={false} style={createStyles.historyBalance} />
       <Text accessibilityRole="header" style={createStyles.historyHeading}>Your drafts</Text>
       <Pressable accessibilityRole="button" accessibilityLabel="All private drafts" onPress={() => router.push('/account')} style={createStyles.allDrafts}><Text style={createStyles.allDraftsText}>View all →</Text></Pressable>
     </View>
     {drafts.loading ? <ActivityIndicator accessibilityLabel="Loading private drafts" /> : drafts.error ? <Message title="Drafts unavailable" body={drafts.error} retry={drafts.retry} />
-      : drafts.data?.length ? <ScrollView horizontal accessibilityLabel="Private draft history" accessibilityHint="Swipe left or right to browse your drafts"
+      : drafts.data?.length ? <ScrollView {...scroll} horizontal accessibilityLabel="Private draft history" accessibilityHint="Swipe left or right to browse your drafts"
         style={createStyles.historyScroll} contentContainerStyle={createStyles.historyItems} showsHorizontalScrollIndicator={false} directionalLockEnabled keyboardShouldPersistTaps="handled">
         {drafts.data.map(draft => <Pressable key={draft.id} accessibilityRole="button" accessibilityLabel={'Continue: ' + draft.title}
           onPress={() => router.push({ pathname: '/create', params: { draft: draft.id } })} style={({ pressed }) => [createStyles.draftCard, { width: cardWidth }, pressed && { opacity: 0.75 }]}>
@@ -288,6 +294,7 @@ function DraftEditorEntry({ id, ownerId }: { id: string; ownerId: string }) {
   const [revision, setRevision] = useState(0);
   const loader = useCallback((signal: AbortSignal) => { void revision; return loadEditableDraft(id, ownerId, signal); }, [id, ownerId, revision]);
   const draft = useLoad(loader);
+  useBuddyScreen({ suppressed: draft.loading || !draft.data });
   if (!draft.loading && draft.data) return <NewJourneyEditor key={id + ':' + revision} ownerId={ownerId} initial={draft.data} onReload={() => setRevision(value => value + 1)} />;
   return <SafeAreaView edges={['top']} style={{ flex: 1 }}><ScreenHeader title="Your journey" back compact /><View style={ui.list}>
     {draft.loading ? <BrandedLoading message="Opening your private journey…" /> : <Message title="Draft unavailable" body={draft.error || 'This draft is not available for editing.'} retry={draft.retry} />}
@@ -298,6 +305,7 @@ export default function CreateScreen() {
   const [focus, setFocus] = useState<{ ownerId: string | undefined; place: Place | null; version: number } | null>(null);
   const [dismissSearchVersion, setDismissSearchVersion] = useState(0), [keyboardOpen, setKeyboardOpen] = useState(false);
   const userId = auth.session?.user.id;
+  useBuddyScreen({ floating: true, suppressed: auth.loading || !auth.session || keyboardOpen });
   const focusDestination = useCallback((place: Place | null) => setFocus(current => ({ ownerId: userId, place, version: (current?.version || 0) + 1 })), [userId]);
   useEffect(() => {
     const show = Keyboard.addListener('keyboardDidShow', () => setKeyboardOpen(true)), hide = Keyboard.addListener('keyboardDidHide', () => setKeyboardOpen(false));

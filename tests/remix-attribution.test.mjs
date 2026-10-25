@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { createRequire } from 'node:module';
 import ts from 'typescript';
+import { buddyGeometryStub } from './helpers/buddy-geometry-stub.mjs';
 
 // Synthetic IDs and fixtures only; no network or hosted data.
 const output = mkdtempSync(join(tmpdir(), 'journey-remix-attribution-'));
@@ -343,7 +344,7 @@ test('Account draft card shows the direct-source credit only for remixes', () =>
     'expo-router': { useFocusEffect() {}, useRouter: () => ({ push() {} }) }, '@/lib/remix/model': remix,
     '@/components/discovery/journey-photo': { JourneyPhoto: 'JourneyPhoto' }, '@/components/discovery/thumbnail-photo': { ThumbnailPhoto: 'ThumbnailPhoto' },
     '@/lib/discovery/model': { journeyFacts: () => '' }, './profile-styles': { profileUIStyles: {} },
-    '@/components/delete-draft-action': { DeleteDraftAction: 'DeleteDraftAction' },
+    '@/components/delete-draft-action': { DeleteDraftAction: 'DeleteDraftAction' }, '@/hooks/use-buddy-geometry': buddyGeometryStub,
   });
   const credit = card => nodes(card).find(n => n.props?.testID === 'draft-remix-credit')?.props.children;
   const named = ProfileDraftCard({ draft: { id: draftId, title: 'Remix', sourceId, source }, onDeleted() {} });
