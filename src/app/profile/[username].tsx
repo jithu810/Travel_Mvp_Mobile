@@ -1,4 +1,6 @@
 import { BrandedLoading } from '@/components/branded-loading';
+import { useBuddyScreen } from '@/hooks/use-journey-buddy';
+import { useBuddyScroll } from '@/hooks/use-buddy-geometry';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback } from 'react';
 import { FlatList, RefreshControl, Text, View } from 'react-native';
@@ -15,6 +17,8 @@ export default function CreatorProfileScreen() {
   const router = useRouter(), auth = useSessionState();
   const loader = useCallback((signal: AbortSignal) => loadPublicProfile(handle, signal), [handle]);
   const state = useLoad(loader), value = state.data;
+  const scroll = useBuddyScroll();
+  useBuddyScreen({ floating: true, suppressed: state.loading || !value });
   const refresh = state.refresh;
   useFocusEffect(useCallback(() => { refresh(); }, [refresh]));
   const owner = Boolean(value && auth.session?.user.id === value.profile.id);
@@ -22,7 +26,7 @@ export default function CreatorProfileScreen() {
     <ProfileHeader onSettings={() => router.push('/account')} />
     {state.loading ? <BrandedLoading message="Opening this travel journal…" /> : !value
       ? <View style={s.content}><Message title={state.error ? 'A small detour' : 'Creator unavailable'} body={state.error || 'This public creator profile could not be found.'} retry={state.retry} /></View>
-      : <FlatList data={value.journeys} keyExtractor={journey => journey.id} contentContainerStyle={s.content} showsVerticalScrollIndicator={false}
+      : <FlatList {...scroll} data={value.journeys} keyExtractor={journey => journey.id} contentContainerStyle={s.content} showsVerticalScrollIndicator={false}
         renderItem={({ item }) => <JourneyCard journey={item} />}
         refreshControl={<RefreshControl refreshing={state.refreshing} onRefresh={state.refresh} tintColor={colors.ink} />}
         ListHeaderComponent={<View>

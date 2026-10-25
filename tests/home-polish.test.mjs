@@ -1,3 +1,4 @@
+import { buddyGeometryStub, buddyMapPinsStub } from './helpers/buddy-geometry-stub.mjs';
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { readFileSync } from 'node:fs';
@@ -8,6 +9,7 @@ new Function('exports', ts.transpileModule(readFileSync('src/theme/mobile-theme.
 
 
 function load(file, dependencies, state = null, hookOverrides = {}) {
+  dependencies={'@/hooks/use-buddy-geometry':buddyGeometryStub,...dependencies};
   const exports = {};
   const jsx = (type, props) => ({ type, props });
   const react = { useRef:()=>({current:null}),useEffect:()=>{}, memo: fn => fn, useState: initial => typeof state === 'function' ? state(initial) : [state ?? initial, () => {}], useMemo: fn => fn(), useCallback: fn => fn, ...hookOverrides };
@@ -15,6 +17,11 @@ function load(file, dependencies, state = null, hookOverrides = {}) {
   for (const name of ['View', 'Text', 'Pressable', 'Image', 'TextInput']) rn[name] = name;
   const source = ts.transpileModule(readFileSync(file, 'utf8'), { compilerOptions: { jsx: ts.JsxEmit.ReactJSX, module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
   new Function('require', 'exports', source)(name => { if (name === '@/theme/mobile-theme') return mobileTheme;
+    if(name==='@/hooks/use-journey-buddy')return {useBuddyScreen(){}};
+    if(name==='@/hooks/use-buddy-map-pins')return buddyMapPinsStub;
+    if(name==='@/lib/buddy/map-controls')return load('src/lib/buddy/map-controls.ts',{});
+    if(name==='@/lib/buddy/model')return load('src/lib/buddy/model.ts',{});
+    if(name==='@/components/buddy/buddy-space')return {BuddyDock:()=>null,BuddySpace:()=>null};
     if(name==='@/lib/discovery/queries')return {invalidatePublicJourneys(){},...dependencies[name]};
     if(name==='@/components/discovery/compact-search-input')return load('src/components/discovery/compact-search-input.tsx',{},null,{useRef:()=>({current:null})});
     if(name==='@/lib/social/saved-queries')return {loadSavedJourneys:async()=>[]};
@@ -379,7 +386,7 @@ test('Home retains navigation and its live globe through loading, refreshing and
     '@/lib/discovery/presentation':{spaceColor:'#080F1E'},'@/lib/discovery/queries':{loadPublicJourney:()=>{},loadDiscoveryEntries:()=>{}},
   });
   const tree = home.default(), all = nodes(tree), children = tree.props.children.props.children;
-  assert.equal(children.filter(Boolean).length, 6);
+  assert.equal(children.filter(Boolean).length, 6, 'Buddy floating overlay adds no Home layout node');
   assert.equal(children[2].type, 'View');
   assert.equal(children[5].type, 'Navigation');
   assert.equal(all.find(n => n.type === 'Navigation').props.active, 'explore');

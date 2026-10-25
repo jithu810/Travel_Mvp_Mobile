@@ -1,3 +1,4 @@
+import { buddyGeometryStub } from './helpers/buddy-geometry-stub.mjs';
 import assert from 'node:assert/strict';
 import { test, after } from 'node:test';
 import { mkdtempSync, readFileSync, readdirSync, rmSync, statSync } from 'node:fs';
@@ -162,6 +163,9 @@ native.StyleSheet = { create: x => x }; native.Platform = { OS: 'android' }; nat
 native.AppState = { addEventListener: () => ({ remove() {} }) };
 const all = tree => !tree || typeof tree !== 'object' ? [] : [tree, ...[tree.props?.children].flat(Infinity).flatMap(all)];
 function load(path, modules, timers = globalThis) {
+  modules={'@/hooks/use-buddy-geometry':buddyGeometryStub,...modules};
+  modules = {'@/hooks/use-journey-buddy':{useBuddyScreen(){}},'@/components/buddy/buddy-space':{BuddySpace:'BuddySpace'},...modules};
+  if(path!=='src/lib/buddy/model.ts' && !('@/lib/buddy/model' in modules))modules['@/lib/buddy/model']=load('src/lib/buddy/model.ts',{});
   const exports = {};
   new Function('require', 'exports', 'setTimeout', 'clearTimeout', ts.transpileModule(readFileSync(path, 'utf8'), { compilerOptions: { jsx: ts.JsxEmit.ReactJSX, module: ts.ModuleKind.CommonJS } }).outputText)(id => { assert.ok(id in modules, id); return modules[id]; }, exports, timers.setTimeout, timers.clearTimeout);
   return exports;

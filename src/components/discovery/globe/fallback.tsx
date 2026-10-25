@@ -2,13 +2,15 @@ import { BrandedLoading } from '@/components/branded-loading';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { spaceColor } from '@/lib/discovery/presentation';
 import { colors } from '../ui';
+import { useBuddyProtectedBounds, useBuddyScroll } from '@/hooks/use-buddy-geometry';
 export function GlobeFallback({ message, retry, bottomInset = 0, compact = false }: { message: string; retry?: () => void; bottomInset?: number; compact?: boolean }) {
+  const protection = useBuddyProtectedBounds(), scroll = useBuddyScroll();
   return <View style={styles.fallback}>
-    <ScrollView showsVerticalScrollIndicator={false} style={[styles.viewport, { bottom: bottomInset }]} contentContainerStyle={[styles.content, compact && { padding: 8, gap: 4 }]}>
+    <ScrollView {...scroll} showsVerticalScrollIndicator={false} style={[styles.viewport, { bottom: bottomInset }]} contentContainerStyle={[styles.content, compact && { padding: 8, gap: 4 }]}>
       {!compact && <Text style={styles.kicker}>A WORLD OF POSSIBILITIES</Text>}
       {!compact && <Text style={styles.title}>Your next chapter starts here.</Text>}
       <Text style={styles.body}>{compact ? 'World preview unavailable' : message}</Text>
-      {retry && <Pressable accessibilityRole="button" onPress={retry} style={styles.retry}><Text style={styles.label}>Retry map</Text></Pressable>}
+      {retry && <Pressable {...protection} accessibilityRole="button" onPress={retry} style={styles.retry}><Text style={styles.label}>Retry map</Text></Pressable>}
     </ScrollView>
   </View>;
 }

@@ -1,4 +1,5 @@
 import { theme } from '@/theme/mobile-theme';
+import { useBuddyProtectedBounds, useBuddyScroll } from '@/hooks/use-buddy-geometry';
 import type { ReactNode } from 'react';
 import { ScrollView, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Action, colors } from '../discovery/ui';
@@ -9,12 +10,13 @@ export function QuickJourneySetup({ form, disabled, editing = false, saving = fa
   onChange: (patch: Partial<CreateForm>) => void; onStart: () => void;
 }) {
   const days = Number(form.days);
+  const protection = useBuddyProtectedBounds(), scroll = useBuddyScroll();
   const accents = { solo: theme.lavender, couple: theme.lavender, friends: '#E5F0FC', family: theme.lavender };
   const symbols = { solo: '●', couple: '♥', friends: '♣', family: '⌂' };
   const fewerDisabled = disabled || !Number.isInteger(days) || days <= 1;
   const moreDisabled = disabled || !Number.isInteger(days) || days >= 365 || days < 1;
-  return <View style={editing ? [s.setup, s.editSetup] : s.setup}>
-    <ScrollView accessibilityLabel="Journey setup controls" style={s.controls} contentContainerStyle={s.controlContent} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
+  return <View {...protection} style={editing ? [s.setup, s.editSetup] : s.setup}>
+    <ScrollView {...scroll} accessibilityLabel="Journey setup controls" style={s.controls} contentContainerStyle={s.controlContent} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
     <View style={editing ? [s.destinationCard, s.editSurface] : s.destinationCard}>
     <PlacePicker label="Destination" compact premium memorySheet={editing} embeddedSuggestions dismissVersion={dismissSearchVersion} destinationOnly autoSuggest disabled={disabled} onSelect={onDestination} />
     {form.destination && <View accessibilityLiveRegion="polite" style={s.selectedPlace}><Text style={s.placeName} numberOfLines={1} accessibilityLabel={form.destination.label}>{form.destination.label}</Text></View>}

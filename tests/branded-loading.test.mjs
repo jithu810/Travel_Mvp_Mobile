@@ -26,6 +26,7 @@ function load(file,h,modules={}) {
   const exports={};const jsx=(type,props)=>({type,props});
   const code=ts.transpileModule(readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX,target:ts.ScriptTarget.ES2022}}).outputText;
   new Function('require','exports','setTimeout','clearTimeout',code)(name=>{ if (name === '@/theme/mobile-theme') return mobileTheme;
+    if(name==='@/hooks/use-journey-buddy')return {useBuddySuppression(){}};
     if(name==='react')return h.react;if(name==='react/jsx-runtime')return {jsx,jsxs:jsx};if(name.endsWith('.png'))return name;
     if(name in modules)return modules[name];throw Error(name);
   },exports,h.setTimeout,h.clearTimeout);return exports;

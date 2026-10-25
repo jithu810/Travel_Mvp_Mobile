@@ -1,7 +1,9 @@
 import { BrandedLoading } from '@/components/branded-loading';
 import { useCallback, useRef, useState } from 'react';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { ActivityIndicator, FlatList, Modal, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
+import { ActivityIndicator, FlatList, Modal, Pressable, RefreshControl, ScrollView, Switch, Text, View } from 'react-native';
+import { useBuddyPreference, useBuddyScreen } from '@/hooks/use-journey-buddy';
+import { useBuddyProtectedBounds, useBuddyScroll } from '@/hooks/use-buddy-geometry';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Action, colors, Message, ui } from '@/components/discovery/ui';
 import { ProfileCollections, ProfileDraftCard, ProfileHeader, ProfileIdentity, ProfileJourneyCard, profileStyles as s } from '@/components/profile/profile-ui';
@@ -35,6 +37,9 @@ export default function AccountScreen() {
   const signOutLock = useRef(false);
   const [deleteMessage, setDeleteMessage] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const buddy = useBuddyPreference();
+  const scroll = useBuddyScroll(), footerProtection = useBuddyProtectedBounds();
+  useBuddyScreen({ floating: true, suppressed: settings || busy || auth.loading });
   const refreshDrafts = drafts.refresh, refreshPublished = published.refresh;
   useFocusEffect(useCallback(() => { refreshDrafts(); refreshPublished(); }, [refreshDrafts, refreshPublished]));
   async function signOut() {
@@ -57,7 +62,7 @@ export default function AccountScreen() {
   return <SafeAreaView edges={['left', 'right', 'bottom']} style={ui.safe}><View style={ui.page}>
     <ProfileHeader onSettings={() => setSettings(true)} />
     {auth.loading ? <ActivityIndicator accessibilityLabel="Loading account" /> : !auth.session ? <View style={s.content}><Message title="Your next chapter" body="Sign in to Like, Save, and create private journey copies." retry={() => router.push('/auth')} action="Sign in or register" />{auth.error && <Text accessibilityRole="alert" style={ui.body}>{auth.error}</Text>}</View>
-      : <FlatList data={rows} keyExtractor={row => row.kind + ':' + (row.kind === 'draft' ? row.draft.id : row.journey.id)} contentContainerStyle={s.content} showsVerticalScrollIndicator={false}
+      : <FlatList {...scroll} data={rows} keyExtractor={row => row.kind + ':' + (row.kind === 'draft' ? row.draft.id : row.journey.id)} contentContainerStyle={s.content} showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={tab === 'drafts' ? drafts.refreshing : published.refreshing} onRefresh={refresh} tintColor={colors.ink} />}
         renderItem={({ item }) => item.kind === 'draft' ? <ProfileDraftCard draft={item.draft} onDeleted={() => { setDeleteMessage('Draft deleted.'); refreshDrafts(); }} /> : <ProfileJourneyCard journey={item.journey} />}
         ListHeaderComponent={<View>
@@ -70,10 +75,13 @@ export default function AccountScreen() {
         </View>}
         ListEmptyComponent={loading ? <ActivityIndicator accessibilityLabel={tab === 'drafts' ? 'Loading private drafts' : 'Loading published journeys'} /> : collectionError ? <Message title={tab === 'drafts' ? 'Couldn’t load drafts' : 'Couldn’t load journeys'} body={collectionError} retry={retry} />
           : <Message title={tab === 'drafts' ? 'No private drafts yet' : 'No public journeys yet'} body={tab === 'drafts' ? 'Remix a public journey or start your own story.' : 'Your published journeys will appear here.'} retry={() => router.push('/create')} action="Create Journey" />}
-        ListFooterComponent={<Pressable accessibilityRole="button" accessibilityLabel={tab === 'drafts' ? 'Refresh drafts' : 'Refresh published journeys'} onPress={refresh} style={s.close}><Text style={ui.body}>↻ Refresh {tab === 'drafts' ? 'drafts' : 'journeys'}</Text></Pressable>} />}
+        ListFooterComponent={<Pressable {...footerProtection} accessibilityRole="button" accessibilityLabel={tab === 'drafts' ? 'Refresh drafts' : 'Refresh published journeys'} onPress={refresh} style={s.close}><Text style={ui.body}>↻ Refresh {tab === 'drafts' ? 'drafts' : 'journeys'}</Text></Pressable>} />}
     <Modal visible={settings} transparent animationType="none" onRequestClose={() => { if (!busy) setSettings(false); }}>
       <View style={s.shade}><SafeAreaView edges={['bottom', 'left', 'right']} style={s.sheet}><ScrollView keyboardShouldPersistTaps="handled">
         <View style={s.settingsRow}><Text accessibilityRole="header" style={s.heading}>Account settings</Text><Pressable accessibilityRole="button" accessibilityLabel="Close account settings" disabled={busy} onPress={() => setSettings(false)} style={s.close}><Text style={s.heading}>×</Text></Pressable></View>
+        <View style={[s.settingsRow, { gap: 12, marginBottom: 12 }]}><View style={{ flex: 1 }}><Text style={s.heading}>Journey Buddy</Text><Text style={ui.body}>A tiny explorer for your adventures. Saved on this device.</Text></View>
+          <Switch accessibilityLabel="Journey Buddy" accessibilityHint="Show or hide your little journey helper" disabled={!buddy.loaded} value={buddy.enabled} onValueChange={buddy.setEnabled} /></View>
+        {buddy.error && <Text accessibilityRole="alert" style={ui.body}>{buddy.error}</Text>}
         {auth.session ? <View style={{ gap: 12 }}><Text selectable style={ui.body}>{auth.session.user.email}</Text>
           <Action label="Create Journey" onPress={() => { setSettings(false); router.push('/create'); }} />
           <Action label="Refresh drafts" secondary onPress={() => { refreshDrafts(); setTab('drafts'); setSettings(false); }} />

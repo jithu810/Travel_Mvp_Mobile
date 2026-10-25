@@ -2,12 +2,14 @@ import { theme, primaryControl } from '@/theme/mobile-theme';
 import type { ReactNode } from 'react';
 import { useRouter } from 'expo-router';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useBuddyProtectedBounds } from '@/hooks/use-buddy-geometry';
 
 export const colors = { paper: theme.background, ink: theme.text, muted: theme.muted, green: theme.accent, line: theme.border, white: theme.white, pale: theme.lavender };
 
 export function ScreenHeader({ title, back = false, right, compact = false }: { title: string; back?: boolean; right?: ReactNode; compact?: boolean }) {
   const router = useRouter();
-  return <View style={[ui.header, compact && ui.compactHeader]}>
+  const protection = useBuddyProtectedBounds();
+  return <View {...protection} style={[ui.header, compact && ui.compactHeader]}>
     {back ? <Pressable accessibilityRole="button" accessibilityLabel="Go back"
       onPress={() => router.canGoBack() ? router.back() : router.replace('/discover')} style={[ui.back, compact && ui.compactBack]}>
       <Text style={ui.backText}>‹</Text>
@@ -16,7 +18,8 @@ export function ScreenHeader({ title, back = false, right, compact = false }: { 
   </View>;
 }
 export function Action({ label, onPress, disabled = false, accessibilityLabel, secondary = false, compact = false, vibrant = false, memorySheet = false }: { label: string; onPress: () => void; disabled?: boolean; accessibilityLabel?: string; secondary?: boolean; compact?: boolean; vibrant?: boolean; memorySheet?: boolean }) {
-  return <Pressable accessibilityRole="button" accessibilityLabel={accessibilityLabel ?? label} disabled={disabled} accessibilityState={{ disabled }} onPress={onPress} style={({ pressed }) => [ui.action, vibrant && ui.vibrantAction, memorySheet && ui.memoryAction, secondary && { backgroundColor: colors.pale, experimental_backgroundImage: 'none', borderColor: colors.line, boxShadow: 'none' }, (pressed || disabled) && { opacity: 0.75 }, compact && { minHeight: 44, paddingHorizontal: 14 }]}>
+  const protection = useBuddyProtectedBounds();
+  return <Pressable {...protection} accessibilityRole="button" accessibilityLabel={accessibilityLabel ?? label} disabled={disabled} accessibilityState={{ disabled }} onPress={onPress} style={({ pressed }) => [ui.action, vibrant && ui.vibrantAction, memorySheet && ui.memoryAction, secondary && { backgroundColor: colors.pale, experimental_backgroundImage: 'none', borderColor: colors.line, boxShadow: 'none' }, (pressed || disabled) && { opacity: 0.75 }, compact && { minHeight: 44, paddingHorizontal: 14 }]}>
     <Text style={[ui.actionLabel, vibrant && ui.vibrantLabel, memorySheet && ui.memoryLabel, secondary && { color: colors.ink }]}>{label}</Text>
   </Pressable>;
 }

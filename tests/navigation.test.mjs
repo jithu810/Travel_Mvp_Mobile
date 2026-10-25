@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { readFileSync } from 'node:fs';
 import ts from 'typescript';
+import { buddyGeometryStub, buddyMapPinsStub } from './helpers/buddy-geometry-stub.mjs';
 const module = { exports: {} };
 const guidanceModule = { exports: {} };
 new Function('module', 'exports', ts.transpileModule(readFileSync('src/lib/journey/turn-guidance.ts', 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText)(guidanceModule, guidanceModule.exports);
@@ -146,6 +147,9 @@ test('native map renders a separate blue route source only when supplied and for
     '@/components/discovery/ui': { colors: {} }, '@/lib/discovery/presentation': {}, '@/lib/discovery/globe-style': {},
     '@/lib/journey/map-camera': { frameJourneyMap: () => frame }, './map-frame': {},
     '@/hooks/use-travel-camera': { useTravelCamera: () => ({ explore() {}, canMove: () => true }) },
+    '@/hooks/use-buddy-geometry': buddyGeometryStub,
+    '@/hooks/use-buddy-map-pins': buddyMapPinsStub,
+    '@/lib/buddy/map-controls': { journeyBuddyControls: () => [] },
   };
   new Function('require','module','exports',ts.transpileModule(readFileSync('src/components/journey/map/native-map.tsx', 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX } }).outputText)(id => { assert.ok(id in mocks, id); return mocks[id]; }, native, native.exports);
   const nodes = node => !node || typeof node !== 'object' ? [] : [node, ...[node.props?.children].flat(Infinity).flatMap(nodes)];

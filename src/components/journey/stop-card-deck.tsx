@@ -3,6 +3,7 @@ import { AccessibilityInfo, Animated, AppState, Image, PanResponder, Pressable, 
 import type { JourneyStop } from '@/types/journey';
 import { TravelPhotoPlaceholder } from '@/components/discovery/travel-photo-placeholder';
 import { theme } from '@/theme/mobile-theme';
+import { useBuddyProtectedBounds } from '@/hooks/use-buddy-geometry';
 
 function StopPhoto({ stop }: { stop: JourneyStop }) {
   const [failed, setFailed] = useState<string | null>(null);
@@ -14,6 +15,7 @@ function StopPhoto({ stop }: { stop: JourneyStop }) {
 export function StopCardDeck({ stops, selectedId, onSelect, onDetails, active = true, photoActions, optionsActions, creator }: { stops: JourneyStop[]; selectedId: string | null; onSelect: (id: string) => void; onDetails: (id: string) => void; active?: boolean; photoActions?: ReactNode; optionsActions?: ReactNode; creator?: ReactNode }) {
   const [reduceMotion, setReduceMotion] = useState(true);
   const [width, setWidth] = useState(320);
+  const protection = useBuddyProtectedBounds();
   const [x] = useState(() => new Animated.Value(0));
   const index = Math.max(0, stops.findIndex(stop => stop.id === selectedId));
   const current = useRef({ stops, index, onSelect, width, reduceMotion });
@@ -58,9 +60,9 @@ export function StopCardDeck({ stops, selectedId, onSelect, onDetails, active = 
     onPanResponderTerminate: reset,
   }), [move, reset, shouldSwipe, x]);
   const stop = stops[index];
-  if (!stop) return <View style={s.empty}><Text style={s.name}>Places still to come</Text><Text style={s.note}>The creator hasn’t added stops yet.</Text>{photoActions && <View style={s.emptyActions}>{photoActions}</View>}{optionsActions && <View style={s.emptyActions}>{optionsActions}</View>}</View>;
+  if (!stop) return <View {...protection} style={s.empty}><Text style={s.name}>Places still to come</Text><Text style={s.note}>The creator hasn’t added stops yet.</Text>{photoActions && <View style={s.emptyActions}>{photoActions}</View>}{optionsActions && <View style={s.emptyActions}>{optionsActions}</View>}</View>;
   const behind = stops.slice(index + 1, index + 3).reverse();
-  return <View style={s.section} testID="journey-stop-deck" onLayout={event => setWidth(event.nativeEvent.layout.width)}>
+  return <View {...protection} style={s.section} testID="journey-stop-deck" onLayout={event => { protection.onLayout(); setWidth(event.nativeEvent.layout.width); }}>
     <View style={s.progress} accessibilityLiveRegion="polite"><Text style={s.note}>Stop {index + 1} of {stops.length}</Text><View style={s.controls}>
       <Pressable accessibilityRole="button" accessibilityLabel="Previous memory" disabled={index === 0} accessibilityState={{ disabled: index === 0 }} onPress={() => move(-1)} style={[s.control, index === 0 && s.disabled]}><Text style={s.link}>←</Text></Pressable>
       <Pressable accessibilityRole="button" accessibilityLabel="Next memory" disabled={index >= stops.length - 1} accessibilityState={{ disabled: index >= stops.length - 1 }} onPress={() => move(1)} style={[s.control, index >= stops.length - 1 && s.disabled]}><Text style={s.link}>→</Text></Pressable>

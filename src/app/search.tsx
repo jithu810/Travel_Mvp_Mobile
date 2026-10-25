@@ -1,4 +1,6 @@
 import { CompactSearchInput } from '@/components/discovery/compact-search-input';
+import { useBuddyScreen } from '@/hooks/use-journey-buddy';
+import { useBuddyProtectedBounds, useBuddyScroll } from '@/hooks/use-buddy-geometry';
 import { JourneyActionIcon } from '@/components/journey/journey-action-icon';
 import { useSessionState } from '@/hooks/session-context';
 import { useDiscoveryViewer } from '@/hooks/use-discovery-viewer';
@@ -17,6 +19,8 @@ import { invalidatePublicJourneys, loadDiscoveryEntries } from '@/lib/discovery/
 
 export default function SearchScreen() {
   const state = useLoad(loadDiscoveryEntries);
+  const controlsProtection = useBuddyProtectedBounds(), resultsProtection = useBuddyProtectedBounds(), scroll = useBuddyScroll();
+  useBuddyScreen({ floating: true, suppressed: state.loading && !state.data });
   const refreshPublic = () => { invalidatePublicJourneys(); state.refresh(); };
   const { view } = useLocalSearchParams<{ view?: string }>();
   // Story opens the existing public collection without inheriting a Search filter.
@@ -59,7 +63,7 @@ export default function SearchScreen() {
   return <SafeAreaView style={ui.safe}>
     <KeyboardAvoidingView style={ui.page} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       {!explore && <ScreenHeader title="Find your next journey" back />}
-      <View style={[styles.controls, explore && styles.exploreControls]}>
+      <View {...controlsProtection} style={[styles.controls, explore && styles.exploreControls]}>
         {explore ? <View style={styles.compactRow}>
           <View style={styles.compactField}><CompactSearchInput inputRef={input} focusLabel="Focus journey search" accessibilityLabel="Search journeys, places, stops or creators"
             accessibilityHint={showSaved ? 'Filters your saved public journeys' : 'Searches the latest 100 public journeys'} placeholder="Search journeys & places..."
@@ -77,12 +81,12 @@ export default function SearchScreen() {
         </View>}
         {!explore && <Text style={styles.hint}>Search titles, destinations, stops and creators in the latest 100 public journeys.</Text>}
       </View>
-      <FlatList key={explore ? 'explore' : 'stories'} numColumns={explore ? 3 : 1} data={results} keyExtractor={item => item.id} renderItem={({ item }) => explore ? <ExploreTile journey={item} /> : <JourneyCard journey={item} />}
+      <FlatList key={explore ? 'explore' : 'stories'} {...scroll} numColumns={explore ? 3 : 1} data={results} keyExtractor={item => item.id} renderItem={({ item }) => explore ? <ExploreTile journey={item} /> : <JourneyCard journey={item} />}
         // FlatList counts rows when numColumns is set: four rows = twelve tiles.
         initialNumToRender={explore ? 4 : undefined} maxToRenderPerBatch={explore ? 2 : undefined} windowSize={explore ? 3 : undefined} updateCellsBatchingPeriod={explore ? 50 : undefined}
         contentContainerStyle={explore ? styles.grid : ui.list} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag" showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={collection.refreshing} onRefresh={showSaved ? saved.refresh : refreshPublic} tintColor={colors.ink} />}
-        ListHeaderComponent={<View style={[styles.resultsHeader, explore && styles.exploreResults]}>
+        ListHeaderComponent={<View {...resultsProtection} style={[styles.resultsHeader, explore && styles.exploreResults]}>
           {!explore && !query.trim() && places.length > 0 && <View style={styles.places}>{places.map(place => <Pressable key={place} accessibilityRole="button" accessibilityLabel={'Search ' + place} onPress={() => changeQuery(place)} style={styles.chip}><Text style={styles.chipText}>{place}</Text></Pressable>)}</View>}
           {!collection.loading && !holding && (!explore || Boolean(query.trim()) || showSaved) && <Text accessibilityLiveRegion="polite" style={ui.body}>{query.trim() ? results.length + (results.length === 1 ? ' journey found' : ' journeys found') : showSaved ? 'Saved journeys' : 'Explore recent journeys'}</Text>}
           {collection.error && results.length > 0 && <Message title="Couldn’t refresh results" body={collection.error} retry={showSaved ? saved.refresh : refreshPublic} />}

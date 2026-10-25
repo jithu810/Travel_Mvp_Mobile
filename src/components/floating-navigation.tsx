@@ -8,6 +8,7 @@ import { useSessionState } from '@/hooks/session-context';
 import { useLoad } from '@/hooks/use-load';
 import { loadOwnProfile } from '@/lib/profile/edit-queries';
 import { safePhoto } from '@/lib/discovery/model';
+import { useBuddyProtectedBounds } from '@/hooks/use-buddy-geometry';
 
 type Destination = 'explore' | 'search' | 'create' | 'story' | 'account' | null;
 function AccountAvatar() {
@@ -31,6 +32,7 @@ function NavigationIcon({ name }: { name: Exclude<Destination, null> }) {
   return <View style={styles.globe}><View style={styles.meridian} /><View style={styles.equator} /></View>;
 }
 export function FloatingNavigation({ active, onHeight }: { active: Destination; onHeight?: (height: number) => void }) {
+  const protection = useBuddyProtectedBounds();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const items = [
@@ -40,8 +42,8 @@ export function FloatingNavigation({ active, onHeight }: { active: Destination; 
     { key: 'story', label: 'Story', accessible: 'Browse public stories', route: '/search?view=stories' },
     { key: 'account', label: 'Account', accessible: 'Open account', route: '/account' },
   ] as const;
-  return <View style={[styles.bar, { bottom: Math.max(0, insets.bottom) + 8, left: Math.max(16, insets.left + 8), right: Math.max(16, insets.right + 8) }]}
-    onLayout={event => onHeight?.(event.nativeEvent.layout.height)} onStartShouldSetResponder={() => true} onResponderTerminationRequest={() => false}>
+  return <View {...protection} style={[styles.bar, { bottom: Math.max(0, insets.bottom) + 8, left: Math.max(16, insets.left + 8), right: Math.max(16, insets.right + 8) }]}
+    onLayout={event => { protection.onLayout(); onHeight?.(event.nativeEvent.layout.height); }} onStartShouldSetResponder={() => true} onResponderTerminationRequest={() => false}>
     {items.map(item => <Pressable key={item.key} accessibilityRole="button" accessibilityLabel={item.accessible}
       accessibilityState={{ selected: active === item.key }} onPress={() => { if (active !== item.key) router.navigate(item.route); }}
       style={({ pressed }) => [styles.item, active === item.key && styles.selected, pressed && styles.pressed]}>

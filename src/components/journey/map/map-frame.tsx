@@ -4,6 +4,7 @@ import type { ReactNode } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { colors, ui } from '@/components/discovery/ui';
 import type { JourneyMapData } from '@/lib/journey/map-data';
+import { useBuddyProtectedBounds } from '@/hooks/use-buddy-geometry';
 
 export type MapPresentation = 'story' | 'preview' | 'expanded';
 export type MapDisplayProps = { controlTopInset?: number; memoryPhotos?: Readonly<Record<string, string | null>>; animateMemoryRoute?: boolean; playRouteWithSelection?: boolean; travelCamera?: TravelCameraSource; navigationMode?: boolean; navigationPadding?: { top: number; bottom: number }; destinationId?: string | null; presentation?: MapPresentation; onExpand?: () => void; navigationRoute?: RoadGeometry | null; currentPosition?: { latitude: number; longitude: number; direction?: number | null } | null };
@@ -20,8 +21,9 @@ export function MapFrame({ data, children, presentation = 'story' }: { data: Jou
   </View>;
 }
 export function MapFallback({ message = 'Map unavailable for this journey.', retry, compact = false, onExpand, controlTopInset = 0 }: { controlTopInset?: number; message?: string; retry?: () => void; compact?: boolean; onExpand?: () => void }) {
-  if (compact) return <Pressable accessibilityRole="button" accessibilityLabel="Expand journey map" onPress={onExpand} style={styles.compactFallback}><Text style={styles.fallbackTitle}>Journey map</Text><Text style={styles.note}>Expand for map details ↗</Text></Pressable>;
-  return <View style={[styles.fallback, { paddingTop: 20 + Math.max(0, controlTopInset) } ]}>
+  const protection = useBuddyProtectedBounds();
+  if (compact) return <Pressable {...protection} accessibilityRole="button" accessibilityLabel="Expand journey map" onPress={onExpand} style={styles.compactFallback}><Text style={styles.fallbackTitle}>Journey map</Text><Text style={styles.note}>Expand for map details ↗</Text></Pressable>;
+  return <View {...protection} style={[styles.fallback, { paddingTop: 20 + Math.max(0, controlTopInset) } ]}>
     <Text style={styles.fallbackTitle}>Map unavailable for this journey.</Text>
     {message !== 'Map unavailable for this journey.' && <Text style={styles.note}>{message}</Text>}
     {retry && <Pressable accessibilityRole="button" onPress={retry} style={styles.retry}><Text style={styles.retryLabel}>Try map again</Text></Pressable>}

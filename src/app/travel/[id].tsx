@@ -1,4 +1,6 @@
 import { primaryControl } from '@/theme/mobile-theme';
+import { useBuddyScreen } from '@/hooks/use-journey-buddy';
+import { useBuddyProtectedBounds } from '@/hooks/use-buddy-geometry';
 import { BrandedLoading } from '@/components/branded-loading';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useMemo, useRef, useState } from 'react';
@@ -35,6 +37,7 @@ export default function TravelModeScreen() {
   const session = useTripSnapshot(id);
   const available = session.journey ?? state.data;
   const [leaving, setLeaving] = useState(false);
+  useBuddyScreen({ suppressed: leaving || !canOpenTravelMode(available) });
   const exit = useCallback(() => {
     if (router.canGoBack()) router.back();
     else if (isJourneyId(id)) router.replace({ pathname: '/journey/[id]', params: { id } });
@@ -64,6 +67,7 @@ function Exit({ onExit }: { onExit: () => void }) {
 }
 
 export function TravelModeContent({ journey, onExit, refreshNotice }: { journey: PublicJourney; onExit: () => void; refreshNotice?: string }) {
+  const topProtection = useBuddyProtectedBounds();
   const window = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const [viewportHeight, setViewportHeight] = useState(window.height);
@@ -107,6 +111,10 @@ export function TravelModeContent({ journey, onExit, refreshNotice }: { journey:
     : terminal ? session.completedStopIds.length + ' of ' + stops.length + ' stops completed'
     : 'Stop ' + (destinationIndex + 1) + ' of ' + stops.length;
   const missing = buildMapData(journey.stops).missing;
+  useBuddyScreen({ floating: true, suppressed: !!confirmation,
+    travel: { journeyId: journey.id, status: session.status, nextStop: navigation.destination?.name ?? null,
+      gpsAvailable: location.status === 'tracking' && navigationFix(location.position), guidance: navigation.guidance?.message ?? null,
+      arrival: !!arrival.prompt, completed: session.completedStopIds.length } });
   const select = useCallback((id: string) => {
     if (journey.stops.some(stop => stop.id === id)) setRequestedId(id);
   }, [journey.stops]);
@@ -117,7 +125,7 @@ export function TravelModeContent({ journey, onExit, refreshNotice }: { journey:
         currentPosition={navigationFix(location.position) ? location.position : null} navigationRoute={navigation.remainingGeometry} />
     </View>
     <View pointerEvents="box-none" style={[styles.overlays, { paddingTop: insets.top + 8, paddingBottom: Math.max(insets.bottom, 8) }]}>
-      <View style={styles.topStack} onLayout={event => setTopOverlayHeight(event.nativeEvent.layout.height)}>
+      <View {...topProtection} style={styles.topStack} onLayout={event => { topProtection.onLayout(); setTopOverlayHeight(event.nativeEvent.layout.height); }}>
         <View style={styles.header}><View style={styles.heading}><Text style={styles.eyebrow}>TRAVEL MODE</Text><Text accessibilityRole="header" numberOfLines={1} style={styles.title}>{journey.title}</Text></View><Exit onExit={onExit} /></View>
         {!terminal && session.status !== 'ready' && (arrival.prompt ? <ArrivalPrompt prompt={arrival.prompt} onConfirm={() => arrival.confirm(arrival.prompt!)} onDismiss={() => arrival.dismiss(arrival.prompt!)} /> : <ManeuverPanel guidance={navigation.guidance} message={navigation.message} />)}
       </View>

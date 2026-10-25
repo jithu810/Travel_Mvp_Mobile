@@ -1,3 +1,4 @@
+import { buddyGeometryStub } from './helpers/buddy-geometry-stub.mjs';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
@@ -10,6 +11,7 @@ new Function('exports', ts.transpileModule(readFileSync('src/theme/mobile-theme.
 const jsx = (type, props) => ({ type, props });
 const compile = path => ts.transpileModule(readFileSync(path, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true } }).outputText;
 function load(path, modules) {
+  modules={'@/hooks/use-buddy-geometry':buddyGeometryStub,...modules};
   const module = { exports: {} };
   new Function('require', 'module', 'exports', compile(path))(name => { if (name === '@/theme/mobile-theme') return mobileTheme; if (name === '@/components/auth/legacy-ui') return load('src/components/auth/legacy-ui.ts', { 'react-native': native });
     if (name.endsWith('.png')) return name;
