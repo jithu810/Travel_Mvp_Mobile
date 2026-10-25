@@ -710,7 +710,8 @@ test('Home selection wires coordinates and repeat flight versions without naviga
     'react-native-safe-area-context':{SafeAreaView:'SafeAreaView',useSafeAreaInsets:()=>({bottom:24})},
     '@/components/discovery/globe/discovery-globe':{DiscoveryGlobe:'Globe'},'@/components/discovery/discovery-panel':{DiscoveryPanel:'Panel'},
     '@/hooks/use-load':{useLoad:()=>({data:[],refresh(){}})},'@/lib/discovery/map':{discoveryPoints:()=>({features:[]}),worldCamera:{centerCoordinate:[35,18]}},
-    '@/lib/discovery/travel':{discoveryRoute:()=>[]},'@/lib/discovery/presentation':{},'@/lib/discovery/queries':{},
+    '@/lib/discovery/travel':{discoveryRoute:()=>[]},'@/lib/discovery/presentation':{},'@/lib/discovery/queries':{loadDiscoveryEntries(){},loadPublicJourney(){}},
+    '@/hooks/use-discovery-viewer':{useDiscoveryViewer:()=>({pending:false,id:null})},'@/lib/discovery/model':{hideViewerJourneys:rows=>rows.map(r=>r.journey),discoveryJourneys:rows=>rows.map(r=>r.journey)},
   },h.hooks);
   let tree=h.render(Home,{});let picker=all(tree,'PlacePicker')[0];assert.equal(picker.props.proximity.longitude,35);
   all(tree,'Globe')[0].props.onCenterChange([76,9]);tree=h.render(Home,{});picker=all(tree,'PlacePicker')[0];assert.equal(picker.props.proximity.latitude,9);
@@ -733,7 +734,8 @@ test('Home proximity uses only already-granted recent location; denied, missing 
       'react-native-safe-area-context':{SafeAreaView:'SafeAreaView',useSafeAreaInsets:()=>({bottom:0})},
       '@/components/discovery/globe/discovery-globe':{DiscoveryGlobe:'Globe'},'@/components/discovery/discovery-panel':{DiscoveryPanel:'Panel'},
       '@/hooks/use-load':{useLoad:()=>({data:[],refresh(){}})},'@/lib/discovery/map':{discoveryPoints:()=>({features:[]}),worldCamera:{centerCoordinate:[35,18]}},
-      '@/lib/discovery/travel':{discoveryRoute:()=>[]},'@/lib/discovery/presentation':{},'@/lib/discovery/queries':{},
+      '@/lib/discovery/travel':{discoveryRoute:()=>[]},'@/lib/discovery/presentation':{},'@/lib/discovery/queries':{loadDiscoveryEntries(){},loadPublicJourney(){}},
+    '@/hooks/use-discovery-viewer':{useDiscoveryViewer:()=>({pending:false,id:null})},'@/lib/discovery/model':{hideViewerJourneys:rows=>rows.map(r=>r.journey),discoveryJourneys:rows=>rows.map(r=>r.journey)},
     },h.hooks);
     h.render(Home,{});await tick();const tree=h.render(Home,{}),picker=all(tree,'PlacePicker')[0];
     assert.equal(permissionRequests,0);assert.equal(positionReads,mode==='denied'||mode==='error'?0:1);

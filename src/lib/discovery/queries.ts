@@ -1,10 +1,11 @@
 import { publicSupabase } from '../supabase/public';
 import type { PublicJourney } from '../../types/journey';
-import { discoveryLimit, isJourneyId, normalizePublicDetail, normalizePublicJourney } from './model';
+import { discoveryLimit, isJourneyId, normalizeDiscoveryEntry, normalizePublicDetail, normalizePublicJourney, type DiscoveryEntry } from './model';
 import { createRequestCache } from './request-cache';
 import { storedThumbnailsEnabled, thumbnailStoragePath } from '../media/image-variants';
 
-const collections = createRequestCache<PublicJourney[]>(1, 45000);
+// Viewer-independent: anonymous results only, filtered per viewer at render time.
+const collections = createRequestCache<DiscoveryEntry[]>(1, 45000);
 const signed = createRequestCache<string>(512, 3300000);
 type Signing = { path: string; signal: AbortSignal; resolve: (url: string) => void; reject: (error: Error) => void };
 const signingQueue: Signing[] = [];
@@ -75,17 +76,25 @@ export async function resolvePhotos(journeys: PublicJourney[], signal: AbortSign
   return journeys.map(j => ({ ...j, cover: photo(j.cover), ...(thumbnailPath(j.cover) ? { coverThumbnail: photo(thumbnailPath(j.cover)) } : {}), stops: j.stops.map(s => ({ ...s, photo: photo(s.photo), ...(thumbnailPath(s.photo) ? { photoThumbnail: photo(thumbnailPath(s.photo)) } : {}) })) }));
 }
 
-export async function loadPublicJourneys(signal: AbortSignal): Promise<PublicJourney[]> {
-  const journeys = await collections.get('public', signal, async upstream => {
+export async function loadDiscoveryEntries(signal: AbortSignal): Promise<DiscoveryEntry[]> {
+  const entries = await collections.get('public', signal, async upstream => {
     const { data, error } = await client().rpc('get_public_journeys', {}).abortSignal(upstream);
     if (error) throw new Error('We couldn’t load journeys. Check your connection and try again.');
     if (!Array.isArray(data)) throw new Error('Journey browsing is temporarily unavailable.');
     return data.slice(0, discoveryLimit).flatMap(value => {
-      const journey = normalizePublicJourney(value);
-      return journey ? [journey] : [];
+      const entry = normalizeDiscoveryEntry(value);
+      return entry ? [entry] : [];
     });
   });
-  return resolvePhotos(journeys.map(journey => ({ ...journey, stops: journey.stops.map(stop => ({ ...stop })) })), signal);
+  const journeys = await resolvePhotos(entries.map(({ journey }) => ({ ...journey, stops: journey.stops.map(stop => ({ ...stop })) })), signal);
+  // Re-attach owners by journey id, never by position, so a photo step that
+  // reorders or drops cards cannot attribute one journey to another creator.
+  const creators = new Map(entries.map(entry => [entry.journey.id, entry.creatorId]));
+  return journeys.map(journey => ({ journey, creatorId: creators.get(journey.id) ?? null }));
+}
+
+export async function loadPublicJourneys(signal: AbortSignal): Promise<PublicJourney[]> {
+  return (await loadDiscoveryEntries(signal)).map(entry => entry.journey);
 }
 
 export async function loadPublicJourney(id: string, signal: AbortSignal): Promise<PublicJourney | null> {

@@ -33,7 +33,8 @@ function load(file, dependencies, state = null, hookOverrides = {}) {
     if(name==='@/hooks/session-context' && !(name in dependencies))return {useSessionState:()=>({session:null,loading:false})};
     if(name==='@/hooks/use-load' && !(name in dependencies))return {useLoad:()=>({data:null,refresh:()=>{}})};
     if(name==='@/lib/profile/edit-queries')return {loadOwnProfile:()=>Promise.resolve(null)};
-    if(name==='@/lib/discovery/model' && !(name in dependencies))return {safePhoto:()=>null};
+    if(name==='@/lib/discovery/model' && !(name in dependencies))return {safePhoto:()=>null,hideViewerJourneys:rows=>rows.map(r=>r.journey),discoveryJourneys:rows=>rows.map(r=>r.journey)};
+    if(name==='@/hooks/use-discovery-viewer' && !(name in dependencies))return {useDiscoveryViewer:()=>({pending:false,id:null})};
     if(name==='expo-router')return {Stack:{Screen:'StackScreen'},useFocusEffect:()=>{},useGlobalSearchParams:()=>({}),...dependencies[name]};
     if (name in dependencies) return name==='@/lib/discovery/map'?{worldCamera:{centerCoordinate:[35,18]},...dependencies[name]}:dependencies[name];
     if(name==='@/components/branded-loading')return {BrandedLoading:'BrandedLoading'};throw Error(name);
@@ -57,7 +58,7 @@ test('shared Search route highlights only its selected entry point and Story det
 });
 test('Search and Story share one public list while preserving independent query state', () => {
   let view = 'search', cursor = 0;
-  let collection = { data: [{ id: 'a', destination: 'Coast' }, { id: 'b', destination: 'Hills' }], loading: false };
+  let collection = { data: [{ id: 'a', destination: 'Coast' }, { id: 'b', destination: 'Hills' }].map(journey => ({ journey, creatorId: null })), loading: false };
   const state = [];
   const component = load('src/app/search.tsx', {
     'expo-router': { useLocalSearchParams: () => ({ view }), useRouter:()=>({}), useFocusEffect(){} },
@@ -67,8 +68,8 @@ test('Search and Story share one public list while preserving independent query 
     '@/components/discovery/journey-card': { JourneyCard: 'JourneyCard' },
     '@/components/discovery/ui': { colors, ui: {}, ScreenHeader: 'ScreenHeader', Message: 'Message', LoadingCards: 'LoadingCards' },
     '@/hooks/use-load': { useLoad: () => collection },
-    '@/lib/discovery/model': { searchJourneys: (rows, query) => rows.filter(row => row.destination.includes(query)) },
-    '@/lib/discovery/queries': { loadPublicJourneys: () => {} },
+    '@/lib/discovery/model': { hideViewerJourneys:rows=>rows.map(r=>r.journey),discoveryJourneys:rows=>rows.map(r=>r.journey), searchJourneys: (rows, query) => rows.filter(row => row.destination.includes(query)) },
+    '@/lib/discovery/queries': { loadDiscoveryEntries: () => {} },
   }, initial => { const slot = cursor++; if (!(slot in state)) state[slot] = initial; return [state[slot], value => { state[slot] = value; }]; });
   function render() { cursor = 0; return nodes(component.default()); }
   let all = render();
@@ -119,7 +120,7 @@ test('Home embeds place search; Account and navigation retain existing routes an
     '@/lib/discovery/map': { discoveryPoints: () => ({ features: [] }) },
     '@/lib/discovery/travel': { discoveryRoute: () => null },
     '@/lib/discovery/presentation': { spaceColor: '#080F1E' },
-    '@/lib/discovery/queries': { invalidatePublicJourneys:()=>refreshOrder.push('invalidate'), loadPublicJourney: () => {}, loadPublicJourneys: () => {} },
+    '@/lib/discovery/queries': { invalidatePublicJourneys:()=>refreshOrder.push('invalidate'), loadPublicJourney: () => {}, loadDiscoveryEntries: () => {} },
   });
   const tree = home.default();
   const all = nodes(tree);
@@ -409,7 +410,7 @@ test('Home omits companion switch and scene even when saved preference is enable
     '@/components/discovery/discovery-panel':{DiscoveryPanel:'Panel'},
     '@/hooks/use-load':{useLoad:()=>({refresh(){},...collection})},
     '@/lib/discovery/map':{discoveryPoints:()=>({features:[]})},'@/lib/discovery/travel':{discoveryRoute:()=>null},
-    '@/lib/discovery/presentation':{spaceColor:'#080F1E'},'@/lib/discovery/queries':{loadPublicJourney:()=>{},loadPublicJourneys:()=>{}},
+    '@/lib/discovery/presentation':{spaceColor:'#080F1E'},'@/lib/discovery/queries':{loadPublicJourney:()=>{},loadDiscoveryEntries:()=>{}},
   });
   for (const enabled of [false, true]) {
     choice.enabled = enabled;
@@ -441,7 +442,7 @@ test('Home assigns native-screen dark loading icons then light globe icons witho
   'react-native':{Platform:{OS:'android'},Keyboard:{dismiss(){}}},
   'react-native-safe-area-context':{SafeAreaView:'SafeAreaView',useSafeAreaInsets:()=>({top:30,bottom:20})},
   '@/components/floating-navigation':{FloatingNavigation:'Navigation'},'@/components/discovery/globe/discovery-globe':{DiscoveryGlobe:'Globe'},'@/components/discovery/discovery-panel':{DiscoveryPanel:'Panel'},
-  '@/hooks/use-load':{useLoad:()=>({refresh(){},...collection})},'@/lib/discovery/map':{worldCamera:{centerCoordinate:[35,18]},discoveryPoints:()=>({features:[]})},'@/lib/discovery/travel':{discoveryRoute:()=>null},'@/lib/discovery/presentation':{spaceColor:'#080F1E'},'@/lib/discovery/queries':{loadPublicJourneys(){},loadPublicJourney(){}},
+  '@/hooks/use-load':{useLoad:()=>({refresh(){},...collection})},'@/lib/discovery/map':{worldCamera:{centerCoordinate:[35,18]},discoveryPoints:()=>({features:[]})},'@/lib/discovery/travel':{discoveryRoute:()=>null},'@/lib/discovery/presentation':{spaceColor:'#080F1E'},'@/lib/discovery/queries':{loadDiscoveryEntries(){},loadPublicJourney(){}},
  },null,hooks).default;
  const render=()=>{cursor=0;return Home();};
  let tree=render();assert.ok(nodes(tree).some(n=>n.type==='BrandedLoading'));assert.equal(nodes(tree).find(n=>n.type==='StackScreen').props.options.statusBarStyle,'dark');

@@ -7,10 +7,10 @@ import { HomeJourneyCard } from './home-journey-card';
 import { colors } from './ui';
 
 export function DiscoveryPanel({ journeys, selectedId, onLocate, onOpen, notice, onClear, onRetrySelection,
-  loading, refreshing, error, onRefresh, onHeight, onInteraction, availableHeight, availableWidth, bottomClearance = 0, topClearance = 0 }: {
+  loading, refreshing, error, emptyText, onRefresh, onHeight, onInteraction, availableHeight, availableWidth, bottomClearance = 0, topClearance = 0 }: {
   journeys: PublicJourney[]; selectedId: string | null; onLocate: (id: string) => void; onOpen: (id: string) => void;
   notice: string; onClear: () => void; onRetrySelection?: () => void; loading: boolean; refreshing: boolean;
-  error: string | null; onRefresh: () => void; onHeight: (height: number) => void; onInteraction: (active: boolean) => void; availableHeight: number; availableWidth: number; bottomClearance?: number; topClearance?: number;
+  error: string | null; emptyText?: string; onRefresh: () => void; onHeight: (height: number) => void; onInteraction: (active: boolean) => void; availableHeight: number; availableWidth: number; bottomClearance?: number; topClearance?: number;
 }) {
   // Keep the peek handle and compact cards above the fixed pill. Expanded content
   // scrolls underneath it, with enough trailing space to expose the final actions.
@@ -71,7 +71,7 @@ export function DiscoveryPanel({ journeys, selectedId, onLocate, onOpen, notice,
         selected={selectedId === item.id} onOpen={onOpen} onLocate={onLocate} onHeight={listExpanded ? undefined : measureCard} />}
       ListEmptyComponent={expanded !== listExpanded ? null : <View style={s.empty}>
         {loading ? <><ActivityIndicator color={colors.ink} /><Text style={s.hint}>Finding your next journey…</Text></>
-          : <Text style={s.emptyText}>{error ? 'A small detour. Tap Refresh to try again.' : 'The next story is still to come. No public journeys yet.'}</Text>}
+          : <Text style={s.emptyText}>{error ? 'A small detour. Tap Refresh to try again.' : emptyText || 'The next story is still to come. No public journeys yet.'}</Text>}
       </View>}
       ListFooterComponent={expanded !== listExpanded ? null : visible < journeys.length
         ? <Pressable accessibilityRole="button" accessibilityLabel="More journeys" onPress={() => setVisible(count => count + 24)} style={s.more}><Text style={s.refreshText}>More journeys →</Text></Pressable>
