@@ -27,8 +27,6 @@ function load(file, dependencies, state = null, hookOverrides = {}) {
     if (name === 'react') return react;
     if (name === 'react/jsx-runtime') return { jsx, jsxs: jsx, Fragment: 'Fragment' };
     if (name === 'react-native') return { ...rn, ...dependencies[name] };
-    if(name==='@/hooks/use-companion-preference'&&!(name in dependencies))return {useCompanionPreference:()=>({enabled:false,available:true,status:'ready',setEnabled:()=>{},registerDisable:()=>{}})};
-    if(name==='@/components/companion/companion-toggle'&&!(name in dependencies))return {CompanionToggle:()=>null};
     if(name==='@/components/create/place-picker')return {PlacePicker:'PlacePicker'};
     if(name==='@/hooks/session-context' && !(name in dependencies))return {useSessionState:()=>({session:null,loading:false})};
     if(name==='@/hooks/use-load' && !(name in dependencies))return {useLoad:()=>({data:null,refresh:()=>{}})};
@@ -109,7 +107,6 @@ test('Home embeds place search; Account and navigation retain existing routes an
     'react-native-safe-area-context': { useSafeAreaInsets: () => ({ bottom: bottomInset, left: 0, right: 0 }) },
   });
   const home = load('src/app/discover.tsx', {
-    '@/components/companion/travel-companion': { TravelCompanion: () => null },
     '@/components/floating-navigation': navigation,
     '../../assets/journey-creator-logo.png': 'supplied-logo',
     'expo-router': { useRouter: () => ({ push: route => pushed.push(route) }), useFocusEffect: () => {} },
@@ -368,40 +365,9 @@ test('shared navigation selects each destination and frame includes only standar
     if (expected) assert.equal(tree.props.children[0].props.style[1].paddingBottom, 72);
   }
 });
-test('temporary companion guide decorates only the actual Create Journey button without changing layout or tap behavior', () => {
-  const routes=[];
-  const nav=load('src/components/floating-navigation.tsx',{
-    'expo-router':{useRouter:()=>({navigate:route=>routes.push(route)})},
-    'react-native-safe-area-context':{useSafeAreaInsets:()=>({bottom:24,left:0,right:0})},
-    'react-native':{StyleSheet:{create:x=>x,absoluteFillObject:{position:'absolute',left:0,right:0,top:0,bottom:0}}},
-  });
-  const baseline=nav.FloatingNavigation({active:'explore'});
-  const guided=nav.FloatingNavigation({active:'explore',companionGuide:true});
-  assert.deepEqual(guided.props.style,baseline.props.style);
-  const baseButtons=nodes(baseline).filter(n=>n.type==='Pressable');
-  const buttons=nodes(guided).filter(n=>n.type==='Pressable');
-  for(let i=0;i<buttons.length;i++){
-    assert.deepEqual(buttons[i].props.style({pressed:false}),baseButtons[i].props.style({pressed:false}));
-    const guides=nodes(buttons[i]).filter(n=>n.props?.style?.borderColor==='#D3A94B');
-    assert.equal(guides.length,i===2?1:0);
-    if(i===2){
-      assert.equal(buttons[i].props.accessibilityLabel,'Create Journey');
-      assert.equal(guides[0].props.pointerEvents,'none');
-      assert.equal(guides[0].props.accessible,false);
-      assert.equal(guides[0].props.style.position,'absolute');
-      buttons[i].props.onPress();assert.equal(routes.at(-1),'/create');
-    }
-  }
-  assert.ok(!nodes(baseline).some(n=>n.props?.style?.borderColor==='#D3A94B'));
-});
-
-test('Home omits companion switch and scene even when saved preference is enabled; assets and preference implementation remain',()=>{
+test('Home retains navigation and its live globe through loading, refreshing and errors',()=>{
   let collection={data:[],loading:false};
-  const choice={enabled:false,available:true,status:'ready',registerDisable:()=>{},setEnabled:value=>{choice.enabled=value;}};
   const home=load('src/app/discover.tsx',{
-    '@/hooks/use-companion-preference':{useCompanionPreference:()=>choice},
-    '@/components/companion/companion-toggle':{CompanionToggle:'CompanionToggle'},
-    '@/components/companion/travel-companion':{TravelCompanion:'TravelCompanion'},
     '@/components/floating-navigation':{FloatingNavigation:'Navigation'},
     '../../assets/journey-creator-logo.png':'logo',
     'expo-router':{useRouter:()=>({}),useFocusEffect:()=>{}},
@@ -412,19 +378,12 @@ test('Home omits companion switch and scene even when saved preference is enable
     '@/lib/discovery/map':{discoveryPoints:()=>({features:[]})},'@/lib/discovery/travel':{discoveryRoute:()=>null},
     '@/lib/discovery/presentation':{spaceColor:'#080F1E'},'@/lib/discovery/queries':{loadPublicJourney:()=>{},loadDiscoveryEntries:()=>{}},
   });
-  for (const enabled of [false, true]) {
-    choice.enabled = enabled;
-    const tree = home.default(), all = nodes(tree), children = tree.props.children.props.children;
-    assert.equal(children.filter(Boolean).length, 6);
-    assert.equal(children[2].type, 'View');
-    assert.equal(children[5].type, 'Navigation');
-    assert.ok(!all.some(n => n.type === 'CompanionToggle' || n.type === 'TravelCompanion'));
-    assert.equal(all.find(n => n.type === 'Navigation').props.active, 'explore');
-    assert.equal(all.find(n => n.type === 'Navigation').props.companionGuide, undefined);
-    assert.ok(readFileSync('src/components/companion/travel-companion.tsx', 'utf8'));
-    assert.ok(readFileSync('src/components/companion/companion-toggle.tsx', 'utf8'));
-    assert.ok(readFileSync('src/hooks/use-companion-preference.ts', 'utf8'));
-  }
+  const tree = home.default(), all = nodes(tree), children = tree.props.children.props.children;
+  assert.equal(children.filter(Boolean).length, 6);
+  assert.equal(children[2].type, 'View');
+  assert.equal(children[5].type, 'Navigation');
+  assert.equal(all.find(n => n.type === 'Navigation').props.active, 'explore');
+  assert.ok(all.some(n => n.type === 'Globe'));
   collection={data:null,loading:true};let loadingTree=home.default();
   assert.ok(nodes(loadingTree).some(n=>n.type==='BrandedLoading'));
   assert.ok(nodes(loadingTree).some(n=>n.type==='Globe'),'Live map stays mounted under the overlay');

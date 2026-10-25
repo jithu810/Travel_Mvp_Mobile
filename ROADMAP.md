@@ -1,3 +1,11 @@
+## Complete 3D Travel Companion removal - 2026-10-25
+- [x] Remove character assets, renderer, animation/preference/lifecycle code, preparation script and dedicated tests; remove unused Create guide while retaining Home globe/maps/navigation and loading coverage.
+- [x] Remove direct Fiber/Three/types/ExpoGL/Asset dependencies and companion Metro overrides; retain Expo's transitive Asset dependency and unrelated locked versions. Backend preflight completed with no backend changes.
+- [x] Focused Home tests 15/15, residual-reference scan and whitespace check passed; QA static inspection and independent review found no actionable issues.
+- [x] Architect restored missing locked vector-icons dependency; post-restoration typecheck and zero-warning lint excluding pre-existing ignored .local-tests snapshots passed. Full lint remains affected by stale companion imports in those preserved historical snapshots.
+- [x] QA full suite covered all 628 tests across the initial run (627 pass) and successful isolated PostgreSQL retry (1 pass); offline Expo compatibility and Android export passed. Source/asset maps exclude character/3D runtime and retain Home globe/Mapbox. See docs/qa/companion-removal.md.
+- [ ] Physical-device verification: no phone connected. Local/unpublished; no EAS build or hosted changes.
+
 ## Hide own journeys from discovery - 2026-10-25
 - IMPLEMENTED LOCALLY and unit/harness-tested: signed-in Home and Search/Explore browsing hide the viewer's own published journeys; typed search still finds them. QA/review fix round applied (id-based owner re-attach, non-blocking Search hold, 4 s fail-open, only-own empty copy). Pending: physical-device check (sign-in/out on Home and Search), final review and publication approval.
 
