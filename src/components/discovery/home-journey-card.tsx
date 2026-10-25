@@ -32,8 +32,8 @@ export const HomeJourneyCard = memo(function HomeJourneyCard({ journey, expanded
     <View style={s.actions}>
       <Pressable accessibilityRole="button" accessibilityLabel={'Locate journey: ' + journey.title} accessibilityState={{ selected }}
         onPress={() => onLocate(journey.id)} style={[s.locate, selected && s.selectedAction]}><HomeControlIcon name="locate" selected={selected} size={28} /><Text style={[s.actionLabel, selected && s.selectedLabel]}>Locate</Text></Pressable>
-      <Pressable accessibilityRole="button" accessibilityLabel={'Read story: ' + journey.title}
-        onPress={() => onOpen(journey.id)} style={s.locate}><HomeControlIcon name="story" size={28} /><Text style={s.actionLabel}>Read story</Text></Pressable>
+      <Pressable accessibilityRole="button" accessibilityLabel={'Explore journey: ' + journey.title} accessibilityHint="Opens Journey Story"
+        onPress={() => onOpen(journey.id)} style={s.locate}><HomeControlIcon name="explore" size={28} /><Text style={s.actionLabel}>Explore journey</Text></Pressable>
     </View>
   </View>;
 });
@@ -53,7 +53,7 @@ const s = StyleSheet.create({
   facts: { color: colors.muted, fontSize: 10, lineHeight: 14 },
   actions: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 10, paddingBottom: 4, gap: 8 },
   locate: { minWidth: 76, minHeight: 56, flexShrink: 1, paddingHorizontal: 10, paddingVertical: 6, gap: 4, justifyContent: 'center', alignItems: 'center', borderRadius: 16 },
-  actionLabel: { color: '#243E68', fontSize: 11, lineHeight: 14, fontWeight: '600', textAlign: 'center', flexShrink: 1 },
+  actionLabel: { color: '#2C63AF', fontSize: 11, lineHeight: 14, fontWeight: '600', textAlign: 'center', flexShrink: 1 },
   selectedLabel: { color: '#6555CF' },
   selectedAction: { backgroundColor: '#E6E0FF' },
 });

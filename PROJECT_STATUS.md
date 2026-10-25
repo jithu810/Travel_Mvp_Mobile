@@ -1,3 +1,6 @@
+## Home card Explore journey action - 2026-10-25
+- IMPLEMENTED LOCALLY on feat/home-card-explore-journey: Home card second action reads Explore journey (MaterialCommunityIcons book-outline, opens Journey Story); Locate uses Ionicons locate-outline; soft blue labels/icons. Added @expo/vector-icons plus already-installed expo-font as a direct dependency; World globe icon, Read story elsewhere, queries and backend unchanged. Local/unpublished; device check pending.
+
 ## Turn confirmation display - 2026-10-24
 - IMPLEMENTED LOCALLY in isolated codex/turn-confirmation-display worktree: outgoing-turn confirmation shows Confirming turn and hides stale maneuver distance; existing fresh-fix/1-second/3-metre progress gates, accepted route trim and navigation arrow unchanged.
 - Verified: full 646/646 tests (zero skips), TypeScript, full zero-warning lint, offline Expo compatibility (offline reliability caveat), Android export 1633 modules/4.5 MB. Independent QA 19/19 and independent review found no actionable application issues; documented phone-path typo corrected. Physical-device GPS/TalkBack/iOS acceptance pending.

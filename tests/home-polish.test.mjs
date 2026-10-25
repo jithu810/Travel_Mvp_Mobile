@@ -22,6 +22,7 @@ function load(file, dependencies, state = null, hookOverrides = {}) {
     if (name === '../../../assets/images/journey-photo-fallback.png') return 17;
     if (name === './travel-photo-placeholder') return load('src/components/discovery/travel-photo-placeholder.tsx', {});
     if (name === './home-control-icon') return load('src/components/discovery/home-control-icon.tsx', {});
+    if (name === '@expo/vector-icons') return { Ionicons: 'Ionicons', MaterialCommunityIcons: 'MaterialCommunityIcons' };
     if (name === 'expo-status-bar') return {StatusBar:'StatusBar'};
     if (name === 'react') return react;
     if (name === 'react/jsx-runtime') return { jsx, jsxs: jsx, Fragment: 'Fragment' };
@@ -214,11 +215,11 @@ test('Home fills photo frames without blurred side panels and uses 16:9 expanded
     if (expanded) assert.equal(frameStyle.aspectRatio, 16 / 9);
   }
 });
-test('Home retains title, author, count, Locate and both Story entry points', () => {
+test('Home retains title, author, count, Locate and both Story entry points (card and Explore journey)', () => {
   const { all, calls } = card();
   const texts = all.filter(n => n.type === 'Text').map(n => [n.props.children].flat().join(''));
   for (const text of [journey.title, 'By Traveler', '1 stops']) assert.ok(texts.includes(text));
-  for (const label of ['Locate journey: Coastal weekend', 'Read story: Coastal weekend', 'Open journey: Coastal weekend, Coast']) all.find(n => n.props?.accessibilityLabel === label).props.onPress();
+  for (const label of ['Locate journey: Coastal weekend', 'Explore journey: Coastal weekend', 'Open journey: Coastal weekend, Coast']) all.find(n => n.props?.accessibilityLabel === label).props.onPress();
   assert.deepEqual(calls, [['locate', journey.id], ['open', journey.id], ['open', journey.id]]);
 });
 test('missing/failed photos retain fallback and a changed URI recovers', () => {
@@ -239,17 +240,28 @@ test('Home image failure falls back, a new URI recovers and card measurement rem
   tree.props.onLayout({ nativeEvent: { layout: { height: 310 } } });
   assert.equal(measured, 310);
   assert.equal(nodes(tree).find(n => n.props?.accessibilityLabel === 'Locate journey: Coastal weekend').props.accessibilityState.selected, true);
-  for (const label of ['Locate journey: Coastal weekend', 'Read story: Coastal weekend']) {
+  for (const label of ['Locate journey: Coastal weekend', 'Explore journey: Coastal weekend']) {
     const action = nodes(tree).find(n => n.props?.accessibilityLabel === label);
     const style = Object.assign({}, ...[action.props.style].flat().filter(Boolean));
     assert.ok(style.minWidth >= 44 && style.minHeight >= 56);
     assert.equal(style.height, undefined, 'Action can grow with larger text');
     const text = nodes(action).find(n => n.type === 'Text');
-    assert.equal(text.props.children, label.startsWith('Locate') ? 'Locate' : 'Read story');
+    assert.equal(text.props.children, label.startsWith('Locate') ? 'Locate' : 'Explore journey');
     assert.equal(text.props.numberOfLines, undefined, 'Visible title can wrap at large font sizes');
     const icon = nodes(action).find(n => n.props?.accessibilityElementsHidden);
-    assert.equal(icon.props.style[1].transform[0].scale, 28 / 24);
+    assert.equal(icon.props.pointerEvents, 'none');
+    assert.equal(icon.props.accessible, false);
+    assert.equal(icon.props.importantForAccessibility, 'no-hide-descendants');
+    const glyph = nodes(icon).find(n => n.type === (label.startsWith('Locate') ? 'Ionicons' : 'MaterialCommunityIcons'));
+    assert.equal(glyph.props.name, label.startsWith('Locate') ? 'locate-outline' : 'book-outline');
+    assert.equal(glyph.props.size, 28);
+    assert.equal(glyph.props.color, label.startsWith('Locate') ? '#6555CF' : '#3873CE');
+    const box = Object.assign({}, ...[icon.props.style].flat().filter(Boolean));
+    assert.equal(box.width, 28); assert.equal(box.height, 28, 'Glyph space is reserved before the icon font loads');
+    if (!label.startsWith('Locate')) assert.equal(action.props.accessibilityHint, 'Opens Journey Story');
   }
+  const unselectedLocate = nodes(component.HomeJourneyCard({ ...props, selected: false })).find(n => n.props?.accessibilityLabel === 'Locate journey: Coastal weekend');
+  assert.equal(nodes(unselectedLocate).find(n => n.type === 'Ionicons').props.color, '#3873CE');
   nodes(tree).find(n => n.type === 'Image').props.onError();
   assert.equal(failedUri, journey.cover);
   assert.ok(nodes(component.HomeJourneyCard(props)).some(n => n.props?.accessibilityLabel === 'Default travel photo. No journey cover photo available. Coast. Explore journey'));
