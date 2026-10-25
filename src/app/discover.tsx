@@ -19,7 +19,6 @@ import { invalidatePublicJourneys, loadDiscoveryEntries, loadPublicJourney } fro
 
 export default function DiscoverScreen() {
   const router = useRouter();
-  // Home companion is temporarily unmounted; components, assets, flag and saved preference are preserved.
   const insets = useSafeAreaInsets();
   // The public load never waits for authentication; only the viewer filter does.
   const state = useLoad(loadDiscoveryEntries);

@@ -30,7 +30,7 @@ function NavigationIcon({ name }: { name: Exclude<Destination, null> }) {
   if (name === 'story') return <View style={styles.book}><View style={styles.bookPage} /><View style={styles.bookPage} /></View>;
   return <View style={styles.globe}><View style={styles.meridian} /><View style={styles.equator} /></View>;
 }
-export function FloatingNavigation({ active, onHeight, companionGuide = false }: { active: Destination; onHeight?: (height: number) => void; companionGuide?: boolean }) {
+export function FloatingNavigation({ active, onHeight }: { active: Destination; onHeight?: (height: number) => void }) {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const items = [
@@ -45,7 +45,6 @@ export function FloatingNavigation({ active, onHeight, companionGuide = false }:
     {items.map(item => <Pressable key={item.key} accessibilityRole="button" accessibilityLabel={item.accessible}
       accessibilityState={{ selected: active === item.key }} onPress={() => { if (active !== item.key) router.navigate(item.route); }}
       style={({ pressed }) => [styles.item, active === item.key && styles.selected, pressed && styles.pressed]}>
-      {item.key === 'create' && companionGuide && <View pointerEvents="none" accessible={false} importantForAccessibility="no-hide-descendants" style={styles.companionGuide} />}
       <View accessible={false} importantForAccessibility="no-hide-descendants" style={styles.iconSlot}><NavigationIcon name={item.key} /></View>
       <Text style={[styles.label, active === item.key && styles.active]}>{item.label}</Text>
     </Pressable>)}
@@ -74,7 +73,6 @@ const styles = StyleSheet.create({
     shadowColor: '#14251F', shadowOpacity: 0.12, shadowRadius: 8, shadowOffset: { width: 0, height: 3 } },
   item: { flex: 1, minWidth: 0, minHeight: 46, borderRadius: 26, paddingHorizontal: 4, paddingVertical: 4,
     alignItems: 'center', justifyContent: 'center', gap: 0 },
-  companionGuide: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, borderRadius: 26, borderWidth: 2, borderColor: '#D3A94B', backgroundColor: 'rgba(241, 210, 128, 0.12)' },
   selected: { backgroundColor: '#C9DFFF' }, pressed: { opacity: 0.65 },
   iconSlot: { height: 26, width: 28, alignItems: 'center', justifyContent: 'center' },
   avatar: { width: 24, height: 24, borderRadius: 12 },
