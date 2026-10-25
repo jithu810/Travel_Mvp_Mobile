@@ -4,7 +4,7 @@ Local presentation update, following the completed no-backend-change preflight i
 
 - Home World reset is a native globe icon in a 34dp white disc within a 44dp button, positioned 16dp above the measured discovery panel. Mapbox legal branding stays in its existing top position. Other globe previews retain their previous control placement.
 - Search uses a 34dp minimum painted surface in its existing 44dp focus target. Notification uses a 34dp painted disc and 18dp bell inside its existing 44dp presentation area; it remains a coming-soon image.
-- Card Locate and Read story actions use native crosshair and open-book geometry in 44dp targets. Labels, callbacks and selected accessibility state remain; Locate has a purple selected background/icon.
+- Card Locate (Ionicons locate-outline) and Explore journey (MaterialCommunityIcons closed book-outline) actions use 28dp size-reserved @expo/vector-icons glyphs in 44dp targets. Labels, callbacks and selected accessibility state remain; Locate has a purple selected background/icon.
 - No dependencies, native configuration, data contracts, permissions, GPS watches or lifecycle logic changed. Existing Journey/map routing and search behavior are retained. React quality checklist applied to stable hooks, direct imports, decorative accessibility hiding and semantic controls.
 
 ## Verification
