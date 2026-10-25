@@ -15,6 +15,9 @@ import { HomeControlIcon } from '../home-control-icon';
 import { globeAtmosphere, spaceColor } from '@/lib/discovery/presentation';
 import { GlobeFallback, GlobeLoading } from './fallback';
 import { JourneyOverlays } from './journey-overlays';
+import { useBuddyProtectedBounds } from '@/hooks/use-buddy-geometry';
+import { globeBuddyControls } from '@/lib/buddy/map-controls';
+import { useBuddyMapPins } from '@/hooks/use-buddy-map-pins';
 
 const previewCamera = { ...worldCamera, zoomLevel: 0 };
 let configured: string | null = null;
@@ -26,6 +29,8 @@ export const NativeGlobe = memo(function NativeGlobe({ points, route, onOpen, re
   viewport: Viewport; selectionId: string | null; locateVersion: number; sheetInteracting: boolean; preview?: boolean; homeSearch?: boolean; onCenterChange?: (center: [number, number]) => void; destinationMode?: boolean; destination?: DestinationFocus | null; destinationVersion?: number;
 }) {
   const overview = preview ? previewCamera : worldCamera;
+  const projectWorld = useCallback((rect: { x: number; y: number; width: number; height: number }) => [{ x: rect.x - 4, y: rect.y - 4, width: rect.width + 8, height: rect.height + 8 }], []);
+  const worldProtection = useBuddyProtectedBounds(projectWorld);
   const camera = useRef<Camera>(null);
   const [nearby, setNearby] = useState<NearbyPoint[]>([]);
   const zoom = useRef(0);
@@ -37,6 +42,11 @@ export const NativeGlobe = memo(function NativeGlobe({ points, route, onOpen, re
   const [ready, setReady] = useState(false);
   const [style, setStyle] = useState<GlobeStyle>('satellite');
   const failed = style === 'failed';
+  const pinCoordinates = useMemo(() => points.features.map(point => point.geometry.coordinates), [points]);
+  const pins = useBuddyMapPins(pinCoordinates, ready && !failed);
+  const { setFrame: setPinFrame } = pins;
+  const projectControls = useCallback((rect: { x: number; y: number; width: number; height: number }) => { setPinFrame(rect); return globeBuddyControls(rect, headerInset, !preview || destinationMode); }, [setPinFrame, headerInset, preview, destinationMode]);
+  const controlsProtection = useBuddyProtectedBounds(projectControls);
   const [focused, setFocused] = useState(false);
   const [appActive, setAppActive] = useState(AppState.currentState === 'active');
   const requestKey = selectionId ? JSON.stringify([selectionId, locateVersion]) : null;
@@ -162,16 +172,16 @@ export const NativeGlobe = memo(function NativeGlobe({ points, route, onOpen, re
     camera.current?.setCamera({ ...overview, padding, animationMode: 'easeTo', animationDuration: locateDuration });
   };
   if (failed) return <GlobeFallback message="The map couldn’t load. Search and journeys are still available below." retry={retry} bottomInset={bottomInset} compact={preview} />;
-  return <View style={s.frame}>
-    <Mapbox.MapView style={s.map} projection="globe" styleURL={style === 'satellite' ? Mapbox.StyleURL.SatelliteStreet : Mapbox.StyleURL.Outdoors}
+  return <View {...controlsProtection} style={s.frame}>
+    <Mapbox.MapView ref={pins.mapRef} style={s.map} projection="globe" styleURL={style === 'satellite' ? Mapbox.StyleURL.SatelliteStreet : Mapbox.StyleURL.Outdoors}
       scrollEnabled={!preview || destinationMode} zoomEnabled={!preview || destinationMode} rotateEnabled={!preview || destinationMode} pitchEnabled={false} surfaceView={false}
       requestDisallowInterceptTouchEvent compassEnabled={!preview || destinationMode} compassFadeWhenNorth scaleBarEnabled={false} logoEnabled attributionEnabled
       compassPosition={{ top: headerInset + 12, right: 12 }}
       logoPosition={{ ...globeLogoPosition, top: globeLogoPosition.top + headerInset }} attributionPosition={{ ...globeAttributionPosition, top: globeAttributionPosition.top + headerInset }}
       onTouchStart={() => { if (destinationMode) Keyboard.dismiss(); mapTouch.current = true; setTravel(null); transition.cancel(); motion.touch(true); }}
       onTouchEnd={event => { mapTouch.current = event.nativeEvent.touches.length > 0; motion.touch(mapTouch.current); }}
-      onTouchCancel={() => { mapTouch.current = false; motion.touch(false); }} onCameraChanged={state => observe(state)}
-      onMapIdle={state => { observe(state, true); motion.idle(); }}
+      onTouchCancel={() => { mapTouch.current = false; motion.touch(false); }} onCameraChanged={state => { pins.cameraChanged(state.properties); observe(state); }}
+      onMapIdle={state => { pins.idle(state.properties); observe(state, true); motion.idle(); }}
       onDidFinishLoadingMap={() => setReady(true)} onMapLoadingError={mapError}>
       <Mapbox.Atmosphere style={globeAtmosphere} />
       {ready && style === 'satellite' && <Mapbox.SymbolLayer {...worldCountryLabels} belowLayerID="country-label"
@@ -205,7 +215,7 @@ export const NativeGlobe = memo(function NativeGlobe({ points, route, onOpen, re
     </Mapbox.MapView>
     <NearbyLocations points={nearby} onClose={() => setNearby([])} onSelect={id => { setNearby([]); const point = points.features.find(p => String(p.id) === id); if (point) onOpen(point.properties.journeyId); }} />
     {!ready && <View style={[StyleSheet.absoluteFill, s.noTouches]}><GlobeLoading bottomInset={bottomInset} /></View>}
-    {(!preview || (destinationMode && viewport.height - headerInset >= 112)) && <Pressable accessibilityRole="button" accessibilityLabel="Reset globe to world view" disabled={!ready}
+    {(!preview || (destinationMode && viewport.height - headerInset >= 112)) && <Pressable {...worldProtection} accessibilityRole="button" accessibilityLabel="Reset globe to world view" disabled={!ready}
       accessibilityState={{ disabled: !ready }} onPress={reset} hitSlop={homeSearch ? { top: 4, bottom: 4, left: 4, right: 4 } : undefined} style={[s.reset, (homeSearch || (preview && destinationMode)) && s.compactReset, { bottom: homeSearch ? bottomInset + 16 : preview && destinationMode ? 8 : headerInset > 0 ? undefined : destinationMode ? 8 : bottomInset + 40, top: !homeSearch && !preview && headerInset > 0 ? headerInset + 40 : undefined }]}>
       {homeSearch || (preview && destinationMode) ? <View style={s.worldSurface}><HomeControlIcon name="world" /></View> : <Text style={s.resetText}>↗ World</Text>}
     </Pressable>}

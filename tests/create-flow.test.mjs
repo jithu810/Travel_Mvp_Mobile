@@ -1,3 +1,4 @@
+import { buddyGeometryStub, buddyMapPinsStub } from './helpers/buddy-geometry-stub.mjs';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
@@ -21,9 +22,15 @@ native.useWindowDimensions=()=>({width:390,height:844,fontScale:1});
 native.AppState={addEventListener(){return {remove(){}};}};native.Animated={View:'AnimatedView'};native.Keyboard={dismiss(){},addListener(){return {remove(){}};}};native.StyleSheet={create:value=>value};native.Platform={OS:'android'};
 const ui = { colors: {}, ui: {}, Action:'Action', Message:'Message', ScreenHeader:'ScreenHeader' };
 function load(file, modules, hooks=harness().hooks, timers=globalThis) {
+  modules={'@/hooks/use-buddy-geometry':buddyGeometryStub,...modules};
   const exports={}; const jsx=(type,props)=>({type,props});
   const code=ts.transpileModule(readFileSync(file,'utf8'), {compilerOptions:{module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX,target:ts.ScriptTarget.ES2022}}).outputText;
   new Function('require','exports','setTimeout','clearTimeout',code)(name=>{ if (name === '@/theme/mobile-theme') return mobileTheme;
+    if(name==='@/hooks/use-journey-buddy')return modules[name] || {useBuddyScreen(){}};
+    if(name==='@/hooks/use-buddy-map-pins')return buddyMapPinsStub;
+    if(name==='@/lib/buddy/map-controls')return load('src/lib/buddy/map-controls.ts',{});
+    if(name==='@/lib/buddy/model')return load('src/lib/buddy/model.ts',{});
+    if(name==='@/components/buddy/buddy-space')return {BuddySpace:'BuddySpace'};
     if(name==='@/components/create/draft-route-illustration')return {DraftRouteIllustration:'DraftRouteIllustration'};
     if(name==='@/components/journey/swipe-journey-start')return {SwipeAction:'SwipeAction'};
     if(name==='@/components/create/memory-deck')return {MemoryDeck:'MemoryDeck'};
@@ -47,11 +54,12 @@ const photoSave=load('src/lib/create/photo-save.ts', {'./model':model,'../discov
 const memory=load('src/lib/create/memory.ts', {'./model':model});
 const editor=load('src/lib/create/editor-model.ts', {'../discovery/model':{},'./model':model});
 const place={name:'Varkala',label:'Varkala, Kerala',latitude:8.7,longitude:76.7,mapboxId:'place'};
-function screenHarness(initial, photoState = {}) {
+function screenHarness(initial, photoState = {}, buddyEvents = []) {
   photoState.candidates ??= {}; photoState.errors ??= {};
   photoState.candidates=Object.fromEntries(Object.entries(photoState.candidates).map(([key,p])=>[key,{width:800,height:600,size:1000,mime:'image/png',...p}]));
   const h=harness(), writes=[],routes=[],alerts=[],uploads=[];let fail=false, uncertain=true, pending=null, prevented=null, canGoBack=true, focusCleanup=null; const dispatches=[];
   const modules={
+    '@/hooks/use-journey-buddy':{useBuddyScreen:(state,actions)=>buddyEvents.push({state,actions})},
     '@/lib/create/photo-save':photoSave,
     '@/lib/create/photo-queries':{checkPhotoDraft:async()=>({ownerId:uid,stopIds:(writes.at(-1)?.stops||initial?.stops||[]).map(s=>s.id)}),uploadJourneyPhoto:async(name,photo)=>{uploads.push({name,photo});if(photoState.uploadFailure)throw new model.SaveFailure(photoState.uploadFailure);}},
     '@/hooks/use-editor-photos':{useEditorPhotos:()=>({data:{'journey-media/raw/stop.png':'https://signed.test/stop',...photoState.previews},error:null,refreshPreview(){}})},
@@ -569,7 +577,8 @@ test('static horizontal history keeps a centered heading, every draft, and no sh
     assert.equal(title.props.style.flex,1);assert.equal(balance.props.style.width,viewAll.props.style.width,'Equal side slots center the heading across the whole section');
     assert.equal(header.props.onMoveShouldSetPanResponderCapture,undefined);assert.equal(header.props.style.minHeight,44);
     const list=all(tree,'ScrollView')[0];assert.equal(list.props.horizontal,true);assert.equal(list.props.directionalLockEnabled,true);
-    assert.equal(list.props.onScroll,undefined,'Swiping drafts cannot update form/sheet height');
+    assert.equal(typeof list.props.onScroll,'function','Scroll only updates Buddy protection measurements');
+    list.props.onScroll();assert.equal(h.render(DraftShortcuts,{ownerId:uid}).props.style.height,undefined,'Swiping history still cannot set form/sheet height');
     assert.equal(all(tree,'DeleteDraftAction').length,0);assert.equal(all(tree,'Modal').length,0);
     assert.ok(list.props.children.every(n=>n.type==='Pressable'),'History has only original cards, without extra action rows');
     assert.equal(list.props.style.flexShrink,0);assert.equal(list.props.style.height,undefined,'Text can grow without fixed-height cropping');
@@ -850,4 +859,15 @@ test('empty onboarding guards preparation and ambiguous-save state while seconda
  const photos={busyKey:'cover'};const h=screenHarness(privateForm(),photos);let tree=h.render();let cta=all(tree,'Pressable').find(n=>n.props.accessibilityLabel==='Add your first stop');assert.equal(cta.props.disabled,true);cta.props.onPress();tree=h.render();assert.equal(all(tree,'MemoryEditorSheet').length,0);
  photos.busyKey=null;tree=h.render();cta=all(tree,'Pressable').find(n=>n.props.accessibilityLabel==='Add your first stop');assert.equal(cta.props.disabled,false);
  h.setFailure(true,true);all(tree,'Pressable').find(n=>n.props.accessibilityLabel==='Save Draft').props.onPress();await tick();tree=h.render();assert.equal(all(tree,'Pressable').find(n=>n.props.accessibilityLabel==='Add your first stop').props.disabled,true);cta.props.onPress();tree=h.render();assert.equal(all(tree,'MemoryEditorSheet').length,0);assert.equal(h.writes.length,1);assert.equal(h.uploads.length,0);
+});
+
+test('Journey Buddy uses the actual guarded memory buffer, never writes on opening and advertises only loaded editable drafts',()=>{
+ const registrations=[];const h=screenHarness(privateForm(),{},registrations);let tree=h.render();
+ assert.equal(registrations.at(-1).state.canAddMemory,true);const open=registrations.at(-1).actions.addMemory;
+ open();open();tree=h.render();assert.equal(all(tree,'MemoryEditorSheet').length,1);assert.equal(h.writes.length,0);assert.equal(h.uploads.length,0);
+ assert.equal(registrations.at(-1).state.suppressed,true);all(tree,'MemoryEditorSheet')[0].props.onClose();tree=h.render();
+ h.blur();open();tree=h.render();assert.equal(all(tree,'MemoryEditorSheet').length,0);assert.equal(h.writes.length,0);
+ const setup=[];screenHarness(undefined,{},setup).render();assert.equal(setup.at(-1).state.canAddMemory,false,'Quick Start must save a draft explicitly first');
+ const photos={busyKey:'cover'},busy=[];const pending=screenHarness(privateForm(),photos,busy);pending.render();
+ assert.equal(busy.at(-1).state.suppressed,true);busy.at(-1).actions.addMemory();assert.equal(all(pending.render(),'MemoryEditorSheet').length,0);
 });

@@ -1,3 +1,4 @@
+import { buddyGeometryStub } from './helpers/buddy-geometry-stub.mjs';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
@@ -37,6 +38,7 @@ function harness(runEffects = true) {
   };
 }
 function load(path, modules, hooks = harness(false).hooks, timers = globalThis) {
+  modules={'@/hooks/use-buddy-geometry':buddyGeometryStub,...modules};
   const source = ts.transpileModule(readFileSync(path, 'utf8'), {
     compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true },
   }).outputText;

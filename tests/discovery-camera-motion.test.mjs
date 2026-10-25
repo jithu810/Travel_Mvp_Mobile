@@ -150,7 +150,19 @@ test('native Home disables only the scale bar and retains gestures, branding and
   const source = readFileSync('src/components/discovery/globe/native-globe.tsx', 'utf8');
   assert.ok(source.includes('scaleBarEnabled={false}'));
   assert.ok(source.includes('logoEnabled attributionEnabled'));
-  assert.ok(source.includes('onTouchStart=') && source.includes('onCameraChanged={state => observe(state)}'));
+  assert.ok(source.includes('onTouchStart='));
+  const syntax = ts.createSourceFile('native-globe.tsx', source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+  const handlers = [];
+  const visit = node => {
+    if (ts.isJsxAttribute(node) && node.name.getText(syntax) === 'onCameraChanged' && node.initializer && ts.isJsxExpression(node.initializer)) handlers.push(node.initializer.expression);
+    ts.forEachChild(node, visit);
+  };
+  visit(syntax); assert.equal(handlers.length, 1);
+  const calls = [], state = { properties: { zoom: 2 } };
+  const cameraChanged = new Function('pins', 'observe', 'return (' + handlers[0].getText(syntax) + ');')(
+    { cameraChanged: value => calls.push(['invalidate pins', value]) }, value => calls.push(value));
+  cameraChanged(state);
+  assert.deepEqual(calls, [['invalidate pins', state.properties], state], 'Forward the real camera pose to pin protection and the original camera event exactly once');
   assert.ok(source.includes('framed.current.layout === layoutKey'));
   assert.ok(!source.includes('zoomLevel: 5'));
 });

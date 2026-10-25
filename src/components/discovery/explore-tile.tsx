@@ -3,15 +3,17 @@ import { useState } from 'react';
 import { Image, Pressable, StyleSheet } from 'react-native';
 import type { PublicJourney } from '@/types/journey';
 import { JourneyPhoto } from './journey-photo';
+import { useBuddyProtectedBounds } from '@/hooks/use-buddy-geometry';
 
 export function ExploreTile({ journey }: { journey: PublicJourney }) {
   const router = useRouter();
+  const protection = useBuddyProtectedBounds();
   const [failedUri, setFailedUri] = useState<string | null>(null);
   const [failedThumbnail, setFailedThumbnail] = useState<string | null>(null);
   const thumbnail = journey.coverThumbnail && journey.coverThumbnail !== failedThumbnail ? journey.coverThumbnail : null;
   const cover = thumbnail || journey.cover;
   const available = cover && cover !== failedUri;
-  return <Pressable accessibilityRole="button" accessibilityLabel={'Open journey: ' + journey.title + ', ' + journey.destination + ', by ' + journey.creatorName}
+  return <Pressable {...protection} accessibilityRole="button" accessibilityLabel={'Open journey: ' + journey.title + ', ' + journey.destination + ', by ' + journey.creatorName}
     accessibilityHint="Opens the journey story and save action"
     onPress={() => router.push({ pathname: '/journey/[id]', params: { id: journey.id, source: 'search' } })}
     style={({ pressed }) => [styles.tile, pressed && styles.pressed]}>
