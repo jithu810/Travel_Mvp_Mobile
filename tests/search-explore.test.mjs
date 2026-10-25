@@ -15,7 +15,7 @@ const all = tree => !tree || typeof tree !== 'object' ? [] : [tree, ...[tree.pro
 function screen() {
   let view, cursor = 0;
   const slots = [];
-  const rows = Array.from({length:19}, (_,i) => ({id:String(i),destination:i%2 ? 'Coast':'Hill'}));
+  const rows = Array.from({length:19}, (_,i) => ({journey:{id:String(i),destination:i%2 ? 'Coast':'Hill'},creatorId:null}));
   let state = {data:rows, loading:false, refreshing:false, refresh(){},retry(){}};
   const component = load('src/app/search.tsx', {
     react: {useCallback:fn=>fn,useEffect(){},useRef:()=>({current:null}),useMemo:fn=>fn(),useState:initial=>{const i=cursor++;if(!(i in slots))slots[i]=initial;return [slots[i],x=>{slots[i]=x;}];}},
@@ -24,8 +24,8 @@ function screen() {
     'expo-router':{useLocalSearchParams:()=>({view}),useRouter:()=>({}),useFocusEffect(){}},'@/components/branded-loading':{BrandedLoading:'BrandedLoading'},
     '@/components/discovery/explore-tile':{ExploreTile:'ExploreTile'},'@/components/discovery/journey-card':{JourneyCard:'JourneyCard'},
     '@/components/discovery/ui':{colors:{},ui:{},ScreenHeader:'ScreenHeader',Message:'Message',LoadingCards:'LoadingCards'},
-    '@/hooks/use-load':{useLoad:()=>state},'@/lib/discovery/queries':{invalidatePublicJourneys(){},loadPublicJourneys(){}},
-    '@/lib/discovery/model':{searchJourneys:(rows,q)=>rows.filter(x=>x.destination.includes(q))},
+    '@/hooks/use-load':{useLoad:()=>state},'@/lib/discovery/queries':{invalidatePublicJourneys(){},loadDiscoveryEntries(){}},'@/hooks/use-discovery-viewer':{useDiscoveryViewer:()=>({pending:false,id:null})},
+    '@/lib/discovery/model':{hideViewerJourneys:rows=>rows.map(r=>r.journey),discoveryJourneys:rows=>rows.map(r=>r.journey),searchJourneys:(rows,q)=>rows.filter(x=>x.destination.includes(q))},
   }).default;
   return {render(){cursor=0;return all(component());},view(v){view=v;},state(s){state={...state,...s};}};
 }
@@ -84,14 +84,14 @@ function stateHarness() {
 const tick=()=>new Promise(setImmediate);
 test('Saved mode isolates identities and public failures, keeps query, refreshes on focus/foreground, aborts stale reads and prompts guests',async()=>{
  const h=stateHarness(), requests=[],routes=[];let invalidations=0;let auth={session:null,loading:false,error:null},view,focus,foreground;
- let publicFailure=true;const publicLoader=async()=>{if(publicFailure)throw Error('Public offline');return [{id:'public',destination:'Coast'}];};
+ let publicFailure=true;const publicLoader=async()=>{if(publicFailure)throw Error('Public offline');return [{journey:{id:'public',destination:'Coast'},creatorId:null}];};
  const useLoad=load('src/hooks/use-load.ts',{react:h.hooks}).useLoad;
  const component=load('src/app/search.tsx',{
   react:h.hooks,'react/jsx-runtime':runtime,'react-native':{...native,AppState:{addEventListener:(_name,fn)=>{foreground=fn;return {remove(){foreground=null;}};}}},
   'react-native-safe-area-context':{SafeAreaView:'SafeAreaView'},'expo-router':{useRouter:()=>({push:x=>routes.push(x)}),useLocalSearchParams:()=>({view}),useFocusEffect:fn=>{focus=fn;}},
   '@/hooks/session-context':{useSessionState:()=>auth},'@/hooks/use-load':{useLoad},'@/lib/social/saved-queries':{loadSavedJourneys:(id,signal)=>new Promise(resolve=>requests.push({id,signal,resolve}))},
   '@/components/discovery/compact-search-input':{CompactSearchInput:'TextInput'},'@/components/journey/journey-action-icon':{JourneyActionIcon:'Icon'},'@/components/branded-loading':{BrandedLoading:'BrandedLoading'},'@/components/discovery/explore-tile':{ExploreTile:'ExploreTile'},'@/components/discovery/journey-card':{JourneyCard:'JourneyCard'},
-  '@/components/discovery/ui':{colors:{},ui:{},ScreenHeader:'Header',Message:'Message',LoadingCards:'LoadingCards'},'@/lib/discovery/queries':{invalidatePublicJourneys(){invalidations++;},loadPublicJourneys:publicLoader},'@/lib/discovery/model':{searchJourneys:(rows,q)=>rows.filter(x=>x.destination.includes(q))},
+  '@/components/discovery/ui':{colors:{},ui:{},ScreenHeader:'Header',Message:'Message',LoadingCards:'LoadingCards'},'@/lib/discovery/queries':{invalidatePublicJourneys(){invalidations++;},loadDiscoveryEntries:publicLoader},'@/hooks/use-discovery-viewer':{useDiscoveryViewer:()=>({pending:false,id:null})},'@/lib/discovery/model':{hideViewerJourneys:rows=>rows.map(r=>r.journey),discoveryJourneys:rows=>rows.map(r=>r.journey),searchJourneys:(rows,q)=>rows.filter(x=>x.destination.includes(q))},
  }).default;
  const render=()=>h.render(component),list=t=>t.find(n=>n.type==='FlatList'),toggle=t=>t.find(n=>n.props.accessibilityLabel==='Show saved journeys');
  try {

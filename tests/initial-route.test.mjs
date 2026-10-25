@@ -22,6 +22,8 @@ test('root stack retains public Home and every existing feature route', () => {
     assert.ok(layout.includes('name="' + route + '"'), route + ' remains registered');
   }
   const discovery = readFileSync('src/app/discover.tsx', 'utf8');
-  assert.ok(discovery.includes('loadPublicJourneys'));
-  assert.ok(!discovery.includes('useSessionState'), 'Public Home does not wait for authentication');
+  assert.ok(discovery.includes('useLoad(loadDiscoveryEntries)'));
+  // Home reads the session only to hide the viewer's own journeys; the public load never waits for it.
+  assert.ok(discovery.includes('useDiscoveryViewer()'));
+  assert.ok(!/useLoad\([^)]*session/i.test(discovery), 'Public Home load does not wait for authentication');
 });

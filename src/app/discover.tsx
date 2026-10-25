@@ -9,17 +9,21 @@ import { AppState, Keyboard, Platform, Pressable, StyleSheet, Text, View } from 
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { DiscoveryGlobe } from '@/components/discovery/globe/discovery-globe';
 import { DiscoveryPanel } from '@/components/discovery/discovery-panel';
+import { useDiscoveryViewer } from '@/hooks/use-discovery-viewer';
 import { useLoad } from '@/hooks/use-load';
 import { discoveryPoints, worldCamera } from '@/lib/discovery/map';
+import { hideViewerJourneys, onlyViewerJourneysCopy } from '@/lib/discovery/model';
 import { discoveryRoute } from '@/lib/discovery/travel';
 import { spaceColor } from '@/lib/discovery/presentation';
-import { invalidatePublicJourneys, loadPublicJourney, loadPublicJourneys } from '@/lib/discovery/queries';
+import { invalidatePublicJourneys, loadDiscoveryEntries, loadPublicJourney } from '@/lib/discovery/queries';
 
 export default function DiscoverScreen() {
   const router = useRouter();
   // Home companion is temporarily unmounted; components, assets, flag and saved preference are preserved.
   const insets = useSafeAreaInsets();
-  const state = useLoad(loadPublicJourneys);
+  // The public load never waits for authentication; only the viewer filter does.
+  const state = useLoad(loadDiscoveryEntries);
+  const viewer = useDiscoveryViewer();
   const reloadPublic = state.refresh;
   const refreshPublic = () => { invalidatePublicJourneys(); state.refresh(); };
   useFocusEffect(useCallback(() => { reloadPublic(); }, [reloadPublic]));
@@ -65,7 +69,12 @@ export default function DiscoverScreen() {
   const points = useMemo(() => discoveryPoints(selection.data), [selection.data]);
   const route = useMemo(() => discoveryRoute(selection.data), [selection.data]);
   const open = useCallback((id: string) => router.push({ pathname: '/journey/[id]', params: { id } }), [router]);
-  const journeys = state.data || [];
+  // Hide the signed-in viewer's own journeys; hold the list while the session restores.
+  const journeys = useMemo(() => viewer.pending ? [] : hideViewerJourneys(state.data || [], viewer.id), [state.data, viewer.pending, viewer.id]);
+  // Signing in can hide a selected journey; drop it so the globe never keeps showing it.
+  if (selectedId && !viewer.pending && !journeys.some(j => j.id === selectedId) && state.data?.some(entry => entry.journey.id === selectedId)) setSelectedId(null);
+  // Every loaded journey is the viewer's own: point to search instead of "no journeys".
+  const onlyOwn = !viewer.pending && !journeys.length && Boolean(state.data?.length);
   const notice = state.error || (selectedId ? selection.error || (selection.loading ? 'Finding this journey on the map…'
     : !selection.data ? 'This journey is no longer public.'
     : !points.features.length ? 'No mapped stops for this journey. Open its story to explore.'
@@ -87,7 +96,7 @@ export default function DiscoverScreen() {
         <View style={s.map}><DiscoveryGlobe points={points} route={route} onOpen={open} bottomInset={railHeight} headerInset={headerClearance} viewport={layout} selectionId={selectedId} locateVersion={locateVersion} sheetInteracting={sheetInteracting} homeSearch destinationMode={!!place} destination={place} destinationVersion={placeVersion} onCenterChange={mapCenter} /></View>
         <DiscoveryPanel journeys={journeys} selectedId={selectedId} onLocate={locate} onOpen={open}
           notice={notice} onClear={() => setSelectedId(null)} onRetrySelection={selection.error ? selection.retry : undefined}
-          loading={state.loading} refreshing={state.refreshing} error={state.error} onRefresh={refreshPublic}
+          loading={state.loading || (viewer.pending && !state.error)} emptyText={onlyOwn ? onlyViewerJourneysCopy : undefined} refreshing={state.refreshing} error={state.error} onRefresh={refreshPublic}
           onInteraction={setSheetInteracting} onHeight={setRailHeight} availableHeight={layout.height} availableWidth={layout.width} bottomClearance={navClearance + bannerHeight + 12} topClearance={headerClearance} />
       </View>
       <Pressable accessibilityRole="button" accessibilityLabel="Create Journey from Home" onPress={() => router.push('/create')}

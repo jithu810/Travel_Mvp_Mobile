@@ -1,3 +1,6 @@
+## Hide own journeys from discovery - 2026-10-25
+- IMPLEMENTED LOCALLY and unit/harness-tested: signed-in Home and Search/Explore browsing hide the viewer's own published journeys; typed search still finds them. QA/review fix round applied (id-based owner re-attach, non-blocking Search hold, 4 s fail-open, only-own empty copy). Pending: physical-device check (sign-in/out on Home and Search), final review and publication approval.
+
 ## Turn confirmation display - 2026-10-24
 - IMPLEMENTED LOCALLY in isolated codex/turn-confirmation-display worktree: outgoing-turn confirmation shows Confirming turn and hides stale maneuver distance; existing fresh-fix/1-second/3-metre progress gates, accepted route trim and navigation arrow unchanged.
 - Verified: full 646/646 tests (zero skips), TypeScript, full zero-warning lint, offline Expo compatibility (offline reliability caveat), Android export 1633 modules/4.5 MB. Independent QA 19/19 and independent review found no actionable application issues; documented phone-path typo corrected. Physical-device GPS/TalkBack/iOS acceptance pending.
