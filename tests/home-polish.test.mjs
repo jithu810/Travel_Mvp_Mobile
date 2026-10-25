@@ -21,6 +21,8 @@ function load(file, dependencies, state = null, hookOverrides = {}) {
     if(name==='@/components/journey/journey-action-icon')return {JourneyActionIcon:'JourneyActionIcon'};
     if (name === '../../../assets/images/journey-photo-fallback.png') return 17;
     if (name === './travel-photo-placeholder') return load('src/components/discovery/travel-photo-placeholder.tsx', {});
+    if (name === './static-map-photo') return load('src/components/discovery/static-map-photo.tsx', {});
+    if (name === '@/lib/media/static-map') return load('src/lib/media/static-map.ts', {});
     if (name === './home-control-icon') return load('src/components/discovery/home-control-icon.tsx', {});
     if (name === '@expo/vector-icons') return { Ionicons: 'Ionicons', MaterialCommunityIcons: 'MaterialCommunityIcons' };
     if (name === 'expo-status-bar') return {StatusBar:'StatusBar'};

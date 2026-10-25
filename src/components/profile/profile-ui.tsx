@@ -8,6 +8,7 @@ import { ThumbnailPhoto } from '@/components/discovery/thumbnail-photo';
 import { journeyFacts } from '@/lib/discovery/model';
 import { profileUIStyles as s } from './profile-styles';
 import type { PublicJourney } from '@/types/journey';
+import { draftRemixCredit, type RemixSource } from '@/lib/remix/model';
 export { profileStyles } from './profile-styles';
 
 export function ProfileHeader({ onSettings }: { onSettings: () => void }) {
@@ -109,13 +110,13 @@ export function ProfileJourneyCard({ journey }: { journey: PublicJourney }) {
   </Pressable>;
 }
 
-export function ProfileDraftCard({ draft, onDeleted }: { draft: { id: string; title: string }; onDeleted: () => void }) {
+export function ProfileDraftCard({ draft, onDeleted }: { draft: { id: string; title: string; sourceId?: string; source?: RemixSource | null }; onDeleted: () => void }) {
   const router = useRouter();
   return <View style={s.card}>
-    <Pressable accessibilityRole="button" accessibilityLabel={'Continue: ' + draft.title} onPress={() => router.push({ pathname: '/create', params: { draft: draft.id } })}
+    <Pressable accessibilityRole="button" accessibilityLabel={'Continue: ' + draft.title + (draft.sourceId ? ', ' + draftRemixCredit(draft.source) : '')} onPress={() => router.push({ pathname: '/create', params: { draft: draft.id } })}
       style={({ pressed }) => [s.draftMain, pressed && s.pressed]}>
       <View accessible={false} style={s.draftPlaceholder}><Text style={s.draftSymbol}>↗</Text></View>
-      <View style={s.cardCopy}><Text numberOfLines={2} style={s.cardTitle}>{draft.title}</Text><Text style={s.continueText}>Continue editing →</Text></View>
+      <View style={s.cardCopy}><Text numberOfLines={2} style={s.cardTitle}>{draft.title}</Text>{draft.sourceId && <Text testID="draft-remix-credit" numberOfLines={1} style={s.remixCredit}>{draftRemixCredit(draft.source)}</Text>}<Text style={s.continueText}>Continue editing →</Text></View>
     </Pressable>
     <View style={s.draftFooter}><Text style={s.privateLabel}>Private draft</Text><DeleteDraftAction draft={draft} onDeleted={onDeleted} /></View>
   </View>;

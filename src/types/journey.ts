@@ -27,4 +27,6 @@ export type PublicJourney = {
   cover: string | null;
   coverThumbnail?: string | null;
   stops: JourneyStop[];
+  /** Direct remix parent (journeys.copied_from_journey_id); present only on detail. */
+  sourceId?: string;
 };

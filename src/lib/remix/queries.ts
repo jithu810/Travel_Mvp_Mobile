@@ -1,7 +1,7 @@
 import { supabase } from '../supabase/client';
 import { isJourneyId, object } from '../discovery/model';
-import { loadPublicJourney } from '../discovery/queries';
-import { normalizeDraft, RemixFailure, type PrivateDraft } from './model';
+import { loadPublicJourney, loadPublicJourneyCard } from '../discovery/queries';
+import { mapLimited, normalizeDraft, RemixFailure, type PrivateDraft, type RemixSource } from './model';
 function api() { if (!supabase) throw new Error('Accounts are not configured yet.'); return supabase; }
 async function owner(userId: string, signal: AbortSignal) {
   const { data, error } = await api().auth.getUser();
@@ -26,15 +26,66 @@ export async function loadPrivateDraft(id: string, userId: string, signal: Abort
   const photo = (path: string | null) => path?.startsWith('journey-media/') ? resolved.get(path) ?? null : path;
   return { ...draft, cover: photo(draft.cover), stops: draft.stops.map(stop => ({ ...stop, photo: photo(stop.photo) })) };
 }
-export async function loadPrivateDrafts(userId: string, signal: AbortSignal) {
+export type PrivateDraftSummary = { id: string; title: string; sourceId?: string; source?: RemixSource | null };
+// Bounds the Account list's parent lookups: distinct ids only, a small cap,
+// limited concurrency and a short per-lookup deadline.
+export const draftSourceLookupLimit = 12;
+const draftSourceConcurrency = 3, draftSourceTimeout = 6000;
+// get_account_journeys omits lineage, so one owner-scoped journeys read (RLS: own rows)
+// adds copied_from_journey_id for every draft at once. It is optional: a failed
+// lineage read keeps the list and only omits the Remix credit.
+async function draftSources(userId: string, signal: AbortSignal): Promise<Map<string, string>> {
+  const sources = new Map<string, string>();
+  try {
+    const { data, error } = await api().from('journeys').select('id,copied_from_journey_id')
+      .eq('user_id', userId).eq('status', 'draft').abortSignal(signal);
+    if (error || !Array.isArray(data)) return sources;
+    for (const value of data) {
+      const row = object(value);
+      if (row && typeof row.id === 'string' && typeof row.copied_from_journey_id === 'string' && isJourneyId(row.copied_from_journey_id) && row.copied_from_journey_id !== row.id) sources.set(row.id, row.copied_from_journey_id);
+    }
+  } catch { /* Lineage is display-only. */ }
+  return sources;
+}
+// Direct parent only (never walks further up the lineage). undefined = not looked
+// up or failed; null = no longer public.
+// Loaded after the list is shown (Account fills credits in progressively).
+export async function loadDraftSourceCards(ids: readonly string[], signal: AbortSignal): Promise<Map<string, RemixSource | null>> {
+  const cards = new Map<string, RemixSource | null>();
+  const distinct = [...new Set(ids.filter(isJourneyId))];
+  await mapLimited(distinct.slice(0, draftSourceLookupLimit), draftSourceConcurrency, async id => {
+    const controller = new AbortController(), abort = () => controller.abort();
+    if (signal.aborted) controller.abort();
+    else signal.addEventListener('abort', abort, { once: true });
+    const timer = setTimeout(abort, draftSourceTimeout);
+    try {
+      const card = await loadPublicJourneyCard(id, controller.signal);
+      cards.set(id, card ? { title: card.title, creatorName: card.creatorName } : null);
+    } catch { /* Falls back to the generic Remix credit. */ }
+    finally { clearTimeout(timer); signal.removeEventListener('abort', abort); }
+  }, signal);
+  return cards;
+}
+// Lineage (sourceId) is opt-in (Account); the Create shortcuts list stays a single RPC.
+// Parent titles/authors are not awaited here: see loadDraftSourceCards.
+export async function loadPrivateDrafts(userId: string, signal: AbortSignal, options: { lineage?: boolean } = {}): Promise<PrivateDraftSummary[]> {
   await owner(userId, signal);
-  const { data, error } = await api().rpc('get_account_journeys', { owner_id: userId, collection: 'drafts' }).abortSignal(signal);
+  const [{ data, error }, sources] = await Promise.all([
+    api().rpc('get_account_journeys', { owner_id: userId, collection: 'drafts' }).abortSignal(signal),
+    options.lineage ? draftSources(userId, signal) : Promise.resolve(new Map<string, string>()),
+  ]);
   if (error || !Array.isArray(data)) throw new Error('Couldn’t load your private drafts. Please retry.');
-  return data.flatMap(value => {
+  const drafts: PrivateDraftSummary[] = data.flatMap(value => {
     const row = object(value);
-    return row && row.creator_id === userId && row.status === 'draft' && row.is_demo === false && typeof row.id === 'string' && isJourneyId(row.id) && typeof row.title === 'string'
-      ? [{ id: row.id, title: row.title }] : [];
+    if (!(row && row.creator_id === userId && row.status === 'draft' && row.is_demo === false && typeof row.id === 'string' && isJourneyId(row.id) && typeof row.title === 'string')) return [];
+    const sourceId = sources.get(row.id);
+    return [sourceId ? { id: row.id, title: row.title, sourceId } : { id: row.id, title: row.title }];
   });
+  return drafts;
+}
+// Attaches looked-up parents; drafts without a result keep the generic credit.
+export function withDraftSources(drafts: readonly PrivateDraftSummary[], cards: ReadonlyMap<string, RemixSource | null>): PrivateDraftSummary[] {
+  return drafts.map(draft => draft.sourceId && cards.has(draft.sourceId) ? { ...draft, source: cards.get(draft.sourceId) } : draft);
 }
 export async function remixJourney(sourceId: string, userId: string): Promise<string> {
   const controller = new AbortController();

@@ -9,7 +9,7 @@ export function MemoryRow({ stop, index, total, photo, photoThumbnail, cardWidth
 }) {
   return <View style={[s.card, { width: cardWidth }, selected && !deck && { borderColor: '#326A8C', borderWidth: 2 }, deck && { borderColor: '#FFFFFF' }]}>
     <View {...swipeHandlers} testID="draft-memory-swipe"><Pressable accessibilityRole="button" accessibilityLabel={'Edit memory ' + (index + 1) + ': ' + (stop.name || 'Unnamed')} accessibilityState={{ selected, disabled }} disabled={disabled} onPress={() => { if (!canInteract || canInteract()) onEdit(); }} style={deck ? [s.main, s.deckMain] : s.main}>
-      <View style={[s.thumb, deck && s.deckThumb]}><ThumbnailPhoto uri={photo} thumbnailUri={localPhoto ? null : photoThumbnail} label={stop.name + ' photo'} ratio={deck ? 16 / 9 : 1.6} variant="stop" onOriginalError={onPhotoError} />{deck && <View pointerEvents="none" style={s.deckShade} />}</View>
+      <View style={[s.thumb, deck && s.deckThumb]}><ThumbnailPhoto uri={photo} thumbnailUri={localPhoto ? null : photoThumbnail} label={stop.name + ' photo'} ratio={deck ? 16 / 9 : 1.6} variant="stop" onOriginalError={onPhotoError} map={{ points: [stop] }} mapLabel={'Map of ' + (stop.name || 'this memory') + '. No photo yet.'} />{deck && <View pointerEvents="none" style={s.deckShade} />}</View>
       <View style={[s.text, deck && s.deckText]}><Text numberOfLines={2} style={s.name}>{index + 1}. {stop.name || 'Name this memory'}</Text>
         {(stop.day || stop.rating) && <Text style={s.meta}>{[stop.day && ('Day ' + stop.day), stop.rating && (stop.rating + '/5 ★')].filter(Boolean).join(' · ')}</Text>}
         {localPhoto && <Text style={s.note}>Photo - Not saved</Text>}

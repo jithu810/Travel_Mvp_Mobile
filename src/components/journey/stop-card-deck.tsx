@@ -8,7 +8,7 @@ function StopPhoto({ stop }: { stop: JourneyStop }) {
   const [failed, setFailed] = useState<string | null>(null);
   return <View style={s.photo}>{stop.photo && failed !== stop.photo
     ? <Image key={stop.photo} source={{ uri: stop.photo }} accessibilityLabel={stop.name + ' photo'} resizeMode="cover" style={s.image} onError={() => setFailed(stop.photo)} />
-    : <TravelPhotoPlaceholder variant="stop" label={'Default travel photo. No stop photo available. ' + stop.name + '. See this stop'} />}<View pointerEvents="none" style={s.photoShade} /></View>;
+    : <TravelPhotoPlaceholder variant="stop" label={'Default travel photo. No stop photo available. ' + stop.name + '. See this stop'} map={{ points: [stop] }} mapLabel={'Map of ' + stop.name + '. No stop photo yet. See this stop'} />}<View pointerEvents="none" style={s.photoShade} /></View>;
 }
 
 export function StopCardDeck({ stops, selectedId, onSelect, onDetails, active = true, photoActions, optionsActions, creator }: { stops: JourneyStop[]; selectedId: string | null; onSelect: (id: string) => void; onDetails: (id: string) => void; active?: boolean; photoActions?: ReactNode; optionsActions?: ReactNode; creator?: ReactNode }) {

@@ -1,3 +1,7 @@
+## Remix without inherited photos (Mobile) - 2026-10-25
+- IMPLEMENTED LOCALLY and unit-tested: static map placeholders for photo-less places, stops and draft covers, direct-source remix credits (editor, draft screen, Account drafts, published journey) and an optional add-photos hint. Pending: device check, final review, publication approval.
+- FOLLOW-UP (deferred): journey cards on Home/Explore/Search/Profile keep the stock photo until the list RPCs return stop or destination coordinates.
+
 ## Hide own journeys from discovery - 2026-10-25
 - IMPLEMENTED LOCALLY and unit/harness-tested: signed-in Home and Search/Explore browsing hide the viewer's own published journeys; typed search still finds them. QA/review fix round applied (id-based owner re-attach, non-blocking Search hold, 4 s fail-open, only-own empty copy). Pending: physical-device check (sign-in/out on Home and Search), final review and publication approval.
 

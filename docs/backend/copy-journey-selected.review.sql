@@ -1,3 +1,6 @@
+-- SUPERSEDED, DO NOT APPLY. The live standalone copy_journey_selected omits inherited
+-- media (verified read-only 2026-10-25); this draft still copies media via
+-- private.copy_media_path. Kept for history only.
 -- REVIEW ARTIFACT ONLY. Not a registered/applied migration.
 -- Integrate with the backend's migration history after independent review.
 begin;

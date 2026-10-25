@@ -27,6 +27,8 @@ function load(file, modules, hooks=harness().hooks, timers=globalThis) {
     if(name==='@/components/create/draft-route-illustration')return {DraftRouteIllustration:'DraftRouteIllustration'};
     if(name==='@/components/journey/swipe-journey-start')return {SwipeAction:'SwipeAction'};
     if(name==='@/components/create/memory-deck')return {MemoryDeck:'MemoryDeck'};
+    if(name==='@/components/remix/source-attribution')return {SourceAttribution:'SourceAttribution'};
+    if(name==='@/lib/remix/model')return load('src/lib/remix/model.ts',{'../discovery/model':load('src/lib/discovery/model.ts',{'../../types/journey':load('src/types/journey.ts',{})})});
     if(name==='@/components/create/editor-action-icon')return {EditorActionIcon:'EditorActionIcon'};
     if(name==='react-native-safe-area-context')return {useSafeAreaInsets:()=>({top:24,bottom:24,left:0,right:0}),...modules[name]};
     if(name==='@/lib/media/image-variants')return load('src/lib/media/image-variants.ts',{});

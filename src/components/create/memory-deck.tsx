@@ -6,9 +6,10 @@ import { theme } from '@/theme/mobile-theme';
 
 export type MemorySwipe = { handlers: GestureResponderHandlers; canInteract: () => boolean };
 // Browsing changes selection only; MemoryRow owns the separate edit/reorder/remove controls.
-export function MemoryDeck({ stops, selectedId, onSelect, renderMemory, actions, active = true, title, status, leading, emptyContent }: {
+export function MemoryDeck({ stops, selectedId, onSelect, renderMemory, actions, active = true, title, status, leading, emptyContent, credit }: {
   stops: StopInput[]; selectedId: string | null; onSelect: (id: string) => void;
   renderMemory: (stop: StopInput, index: number, width: number, swipe?: MemorySwipe) => ReactNode; actions: ReactNode; active?: boolean; title?: string; status?: string; leading?: ReactNode; emptyContent?: ReactNode;
+  /** Optional one-line credit under the title, such as a remix's original journey. */ credit?: ReactNode;
 }) {
   const [width, setWidth] = useState(320);
   const [reduced, setReduced] = useState(true);
@@ -64,7 +65,7 @@ export function MemoryDeck({ stops, selectedId, onSelect, renderMemory, actions,
   // eslint-disable-next-line react-hooks/refs
   const card = memory ? renderMemory(memory, selected, width, { handlers: swipe.panHandlers, canInteract }) : null;
   return <View testID="draft-memory-deck" onLayout={event => setWidth(event.nativeEvent.layout.width)}>
-    <View style={s.header}>{leading}<View style={s.heading}>{title && <Text accessibilityRole="header" numberOfLines={1} style={s.headingTitle}>{title}</Text>}<Text numberOfLines={1} style={s.progress} accessibilityLiveRegion="polite">{stops.length ? 'Memory ' + (selected + 1) + ' of ' + stops.length : 'Memories · 0/50'}{status ? ' · ' + status : ''}</Text></View>
+    <View style={s.header}>{leading}<View style={s.heading}>{title && <Text accessibilityRole="header" numberOfLines={1} style={s.headingTitle}>{title}</Text>}{credit}<Text numberOfLines={1} style={s.progress} accessibilityLiveRegion="polite">{stops.length ? 'Memory ' + (selected + 1) + ' of ' + stops.length : 'Memories · 0/50'}{status ? ' · ' + status : ''}</Text></View>
       {stops.length > 0 && <View style={s.controls}><Pressable accessibilityRole="button" accessibilityLabel="Previous memory card" disabled={!active || selected === 0} accessibilityState={{ disabled: !active || selected === 0 }} onPress={() => browse(-1)} style={s.arrow}><Text style={s.arrowText}>←</Text></Pressable><Pressable accessibilityRole="button" accessibilityLabel="Next memory card" disabled={!active || selected >= stops.length - 1} accessibilityState={{ disabled: !active || selected >= stops.length - 1 }} onPress={() => browse(1)} style={s.arrow}><Text style={s.arrowText}>→</Text></Pressable></View>}
     </View>
     {memory ? <View style={s.stack}>

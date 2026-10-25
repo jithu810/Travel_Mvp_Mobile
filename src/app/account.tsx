@@ -8,21 +8,24 @@ import { ProfileCollections, ProfileDraftCard, ProfileHeader, ProfileIdentity, P
 import { useSessionState } from '@/hooks/session-context';
 import { useActionIntent } from '@/hooks/action-intent';
 import { useLoad } from '@/hooks/use-load';
-import { loadPrivateDrafts } from '@/lib/remix/queries';
+import { loadPrivateDrafts, withDraftSources, type PrivateDraftSummary } from '@/lib/remix/queries';
+import { useDraftCredits } from '@/hooks/use-draft-credits';
 import { loadPublishedProfileJourneys } from '@/lib/profile/queries';
 import { loadOwnProfile } from '@/lib/profile/edit-queries';
 import { safePhoto } from '@/lib/discovery/model';
 import { signOutAccount } from '@/lib/auth/queries';
 import type { PublicJourney } from '@/types/journey';
 
-type Row = { kind: 'draft'; draft: { id: string; title: string } } | { kind: 'published'; journey: PublicJourney };
+type Row = { kind: 'draft'; draft: PrivateDraftSummary } | { kind: 'published'; journey: PublicJourney };
 export default function AccountScreen() {
   const router = useRouter(), auth = useSessionState(), intent = useActionIntent();
   const userId = auth.session?.user.id;
   const metadata = auth.session?.user.user_metadata;
 
-  const loader = useCallback((signal: AbortSignal) => userId ? loadPrivateDrafts(userId, signal) : Promise.resolve([]), [userId]);
+  const loader = useCallback((signal: AbortSignal) => userId ? loadPrivateDrafts(userId, signal, { lineage: true }) : Promise.resolve([]), [userId]);
   const drafts = useLoad(loader);
+  // The list shows at once; parent titles/authors fill in as they resolve.
+  const credits = useDraftCredits(drafts.data);
   const publicLoader = useCallback(async (signal: AbortSignal) => {
     if (!userId) return { profile: null, journeys: [] as PublicJourney[] };
     const [own, journeys] = await Promise.all([loadOwnProfile(userId, signal), loadPublishedProfileJourneys(userId, signal)]);
@@ -48,7 +51,7 @@ export default function AccountScreen() {
   const metadataAvatar = safePhoto(metadata?.avatar_url);
   const avatar = profile?.avatar || (metadataAvatar?.startsWith('https:') ? metadataAvatar : null);
   const bio = profile?.bio || (typeof metadata?.bio === 'string' ? metadata.bio : null);
-  const rows: Row[] = tab === 'drafts' ? (drafts.data || []).map(draft => ({ kind: 'draft', draft })) : (published.data?.journeys || []).map(journey => ({ kind: 'published', journey }));
+  const rows: Row[] = tab === 'drafts' ? withDraftSources(drafts.data || [], credits).map(draft => ({ kind: 'draft', draft })) : (published.data?.journeys || []).map(journey => ({ kind: 'published', journey }));
   const loading = tab === 'drafts' ? drafts.loading : published.loading;
   const collectionError = tab === 'drafts' ? drafts.error : published.error;
   const refresh = tab === 'drafts' ? drafts.refresh : published.refresh;

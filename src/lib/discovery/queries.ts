@@ -109,3 +109,13 @@ export async function loadPublicJourney(id: string, signal: AbortSignal): Promis
   const detail = normalizePublicDetail(data, card);
   return detail ? (await resolvePhotos([detail], signal))[0] : null;
 }
+
+// Lightweight public card for attribution: one get_public_journeys row, normalized
+// only. No detail call and no photo signing. null when not public (or not found).
+export async function loadPublicJourneyCard(id: string, signal: AbortSignal): Promise<PublicJourney | null> {
+  if (!isJourneyId(id)) return null;
+  const { data, error } = await client().rpc('get_public_journeys', { journey_filter: id }).abortSignal(signal);
+  if (error) throw new Error('We couldn’t check the original journey. Please try again.');
+  if (signal.aborted) throw new Error('Request cancelled.');
+  return (Array.isArray(data) ? data.map(normalizePublicJourney).find(journey => journey?.id === id) : null) ?? null;
+}

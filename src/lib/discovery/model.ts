@@ -92,8 +92,10 @@ export function normalizePublicDetail(value: unknown, card: PublicJourney): Publ
   // Anonymous transport AND a public-card gate protect detail. Fail closed on
   // drafts, missing status, different IDs and entries withdrawn during loading.
   if (!row || row.id !== card.id || row.status !== 'published' || row.is_demo !== false) return null;
+  const source = text(row.copied_from_journey_id);
   return {
     ...card,
+    ...(isJourneyId(source) && source.toLowerCase() !== card.id.toLowerCase() ? { sourceId: source } : {}),
     description: typeof row.description === 'string' ? row.description.trim() : card.description,
     cover: safePhoto(row.cover_image_path),
     stops: normalizeStops(row.stops, true),

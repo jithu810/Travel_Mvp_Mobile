@@ -12,6 +12,7 @@ import { SocialActions } from '@/components/journey/social-actions';
 import { StoryCreator } from '@/components/journey/story-header';
 import { StopTimeline } from '@/components/journey/stop-timeline';
 import { StorySnapshot } from '@/components/journey/story-extras';
+import { SourceAttribution } from '@/components/remix/source-attribution';
 import { StorySheet } from '@/components/journey/story-sheet';
 import { JourneyOptions } from '@/components/journey/journey-options';
 import { JourneyMap } from '@/components/journey/map/journey-map';
@@ -73,6 +74,7 @@ export function JourneyStoryContent({ journey, refresh, refreshing, error, saveF
         <Pressable accessibilityRole="button" accessibilityLabel="Expand journey map" onPress={openMap} style={[styles.expand, { top: insets.top + 4 }]}><JourneyActionIcon name="expand" /></Pressable>
       </View>
       <StopTimeline horizontal stacked creator={<StoryCreator journey={journey} />} active={focused && panel === null} stops={journey.stops} selectedId={selectedId} onSelect={select} onDetails={showStop} photoActions={<SocialActions selectedMemoryId={selectedId} key={'social-' + journey.id} journey={journey} layout="rail" saveFirst={saveFirst} />} optionsActions={<JourneyOptions key={journey.id} id={journey.id} onUse={openTravel} presentation="rail" onAbout={() => setPanel('about')} />} />
+      {journey.sourceId && <SourceAttribution key={'source-' + journey.sourceId} id={journey.sourceId} variant="published" />}
     </ScrollView>
     {canOpenTravelMode(journey) && <View style={styles.swipeFooter}><SwipeJourneyStart active={focused && panel === null} onStart={openTravel} /></View>}
     <View pointerEvents="none" testID="journey-status-shade" style={[styles.statusShade, { height: insets.top + 20 }]} />

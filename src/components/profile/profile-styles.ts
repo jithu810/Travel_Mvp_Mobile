@@ -68,4 +68,5 @@ export const profileUIStyles = StyleSheet.create({
   draftSymbol: { color: colors.ink, fontSize: 25 }, continueText: { color: theme.accent, fontSize: 12, lineHeight: 18 },
   draftFooter: { borderTopWidth: 1, borderColor: theme.border, paddingLeft: 16, paddingRight: 6, paddingVertical: 2, flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 4 },
   privateLabel: { color: colors.muted, fontSize: 11, lineHeight: 17 },
+  remixCredit: { color: colors.muted, fontSize: 11, lineHeight: 16, fontWeight: '600' },
 });

@@ -38,7 +38,7 @@ export async function loadEditableDraft(id: string, ownerId: string, signal: Abo
   const { data: viewer, error: authError } = await supabase.auth.getUser();
   if (signal.aborted || authError || viewer.user?.id !== ownerId) throw new Error('Sign in again to edit your private draft.');
   const { data: journey, error } = await supabase.from('journeys')
-    .select('id,user_id,title,description,destination_slug,destination_name,destination_latitude,destination_longitude,traveler_type,duration_days,cover_image_path,status,is_demo,updated_at')
+    .select('id,user_id,title,description,destination_slug,destination_name,destination_latitude,destination_longitude,traveler_type,duration_days,cover_image_path,status,is_demo,updated_at,copied_from_journey_id')
     .eq('id', id).eq('user_id', ownerId).eq('status', 'draft').abortSignal(signal).maybeSingle();
   if (error || !journey) throw new Error('Private draft unavailable. It may have been published, deleted or belong to another account.');
   const { data: stops, error: stopError } = await supabase.from('journey_stops')

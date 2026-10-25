@@ -1,0 +1,289 @@
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { test } from 'node:test';
+import ts from 'typescript';
+
+// Transpile real sources with explicit module stubs (synthetic tokens only).
+function load(path, modules = {}) {
+  const exports = {};
+  const code = ts.transpileModule(readFileSync(path, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX } }).outputText;
+  new Function('require', 'exports', code)(name => { assert.ok(name in modules, 'Unexpected dependency: ' + name); return modules[name]; }, exports);
+  return exports;
+}
+const map = load('src/lib/media/static-map.ts');
+const token = 'pk.synthetic-test+token/=';
+const kochi = { latitude: 9.9312, longitude: 76.2673 };
+const fort = { latitude: 9.9658, longitude: 76.2421 };
+
+test('single point builds an Outdoors pin with a fixed ~13 zoom and @2x', () => {
+  const url = map.staticMapUrl({ points: [kochi], width: 320, height: 180, token });
+  const parsed = new URL(url);
+  assert.equal(parsed.origin, 'https://api.mapbox.com');
+  assert.equal(parsed.pathname, '/styles/v1/mapbox/outdoors-v12/static/pin-s+6555cf(76.2673,9.9312)/76.2673,9.9312,13,0/320x180@2x');
+  assert.equal(parsed.searchParams.get('padding'), null, 'A fixed camera takes no padding');
+  assert.equal(map.staticMapSingleZoom, 13);
+});
+
+test('slots from 160 px request the Mapbox logo without in-image text; smaller thumbnails are unbranded', () => {
+  const params = width => new URL(map.staticMapUrl({ points: [kochi], width, height: 100, token })).searchParams;
+  for (const width of [160, 320, 1280]) { assert.equal(params(width).get('logo'), 'true', String(width)); assert.equal(params(width).get('attribution'), 'false', String(width)); }
+  for (const width of [54, 120, 159]) { assert.equal(params(width).get('logo'), 'false', String(width)); assert.equal(params(width).get('attribution'), 'false', String(width)); }
+  assert.equal(map.staticMapHasInlineCredit(160), true); assert.equal(map.staticMapHasInlineCredit(159), false); assert.equal(map.staticMapHasInlineCredit(NaN), false);
+  assert.equal(map.staticMapInlineCreditText, '© Mapbox © OpenStreetMap');
+  assert.equal(map.staticMapCreditText, 'Maps © Mapbox © OpenStreetMap');
+});
+
+test('only public pk. tokens are used; the token is URL-encoded and decodes back exactly', () => {
+  const url = map.staticMapUrl({ points: [kochi], width: 100, height: 100, token: '  ' + token + '  ' });
+  assert.ok(url.includes('access_token=' + encodeURIComponent(token)));
+  assert.ok(!url.includes(token), 'Reserved characters never appear raw');
+  assert.equal(new URL(url).searchParams.get('access_token'), token);
+  for (const rejected of ['sk.secret-synthetic', 'tk.temporary-synthetic', 'pk', 'PK.upper', 'xpk.synthetic', 'synthetic'])
+    assert.equal(map.staticMapUrl({ points: [kochi], width: 100, height: 100, token: rejected }), null, rejected);
+});
+
+test('several points use numbered pins, auto camera and padding below half the smaller side', () => {
+  const url = map.staticMapUrl({ points: [kochi, fort], width: 400, height: 120, token });
+  const parsed = new URL(url);
+  assert.equal(parsed.pathname, '/styles/v1/mapbox/outdoors-v12/static/pin-s-1+6555cf(76.2673,9.9312),pin-s-2+6555cf(76.2421,9.9658)/auto/400x120@2x');
+  const padding = Number(parsed.searchParams.get('padding'));
+  assert.ok(padding > 0 && padding < 60, 'padding ' + padding);
+  assert.equal(new URL(map.staticMapUrl({ points: [kochi, fort], width: 2, height: 2, token })).searchParams.get('padding'), '0');
+});
+
+test('pins are capped, rounded and de-duplicated so the URL stays short', () => {
+  const many = Array.from({ length: 80 }, (_, index) => ({ latitude: 10 + index * 0.0123456789, longitude: 76 + index * 0.0123456789 }));
+  const url = map.staticMapUrl({ points: many, width: 1280, height: 1280, token });
+  assert.equal((url.match(/pin-s-/g) || []).length, map.staticMapMaxPins);
+  assert.ok(url.length < 8192, 'length ' + url.length);
+  assert.ok(url.includes('(76.01235,10.01235)'), 'Coordinates round to five decimals');
+  const same = map.staticMapUrl({ points: [kochi, { ...kochi }, { latitude: 9.931200001, longitude: 76.267300001 }], width: 100, height: 100, token });
+  assert.ok(same.includes('/76.2673,9.9312,13,0/'), 'Duplicates collapse to the single-point camera');
+});
+
+test('invalid coordinates are skipped; with none left there is no URL', () => {
+  const invalid = [null, {}, { latitude: null, longitude: null }, { latitude: NaN, longitude: 1 }, { latitude: 1, longitude: Infinity },
+    { latitude: 91, longitude: 0 }, { latitude: 86, longitude: 0 }, { latitude: 0, longitude: 181 }, { latitude: '9', longitude: '76' }];
+  assert.equal(map.staticMapUrl({ points: invalid, width: 100, height: 100, token }), null);
+  const mixed = map.staticMapUrl({ points: [...invalid, kochi], width: 100, height: 100, token });
+  assert.ok(mixed.includes('/76.2673,9.9312,13,0/'));
+  assert.equal(map.validMapPoint({ latitude: 0, longitude: -180 }), true);
+});
+
+test('null cases: no token, blank token, no points, missing points and unusable sizes', () => {
+  for (const missing of [null, '', '   ']) assert.equal(map.staticMapUrl({ points: [kochi], width: 100, height: 100, token: missing }), null);
+  assert.equal(map.staticMapUrl({ points: [], width: 100, height: 100, token }), null);
+  assert.equal(map.staticMapUrl({ points: undefined, width: 100, height: 100, token }), null);
+  for (const size of [NaN, Infinity, -Infinity]) assert.equal(map.staticMapUrl({ points: [kochi], width: size, height: 100, token }), null);
+  assert.equal(map.canDrawStaticMap([kochi], token), true);
+  assert.equal(map.canDrawStaticMap([kochi], null), false);
+  assert.equal(map.canDrawStaticMap([kochi], 'sk.secret-synthetic'), false);
+  assert.equal(map.canDrawStaticMap([{ latitude: null, longitude: null }], token), false);
+});
+
+test('sizes keep the slot aspect ratio when scaled into the 1..1280 API range', () => {
+  const size = (width, height) => /\/(\d+)x(\d+)@2x\?/.exec(map.staticMapUrl({ points: [kochi], width, height, token })).slice(1).map(Number);
+  assert.deepEqual(size(5000, 2000), [1280, 512]);
+  assert.deepEqual(size(2560, 1280), [1280, 640]);
+  assert.deepEqual(size(900, 3000), [384, 1280]);
+  assert.deepEqual(size(100000, 10), [1280, 1], 'The short side never drops below 1');
+  assert.deepEqual(map.staticMapSize(1280, 720), [1280, 720]);
+  assert.deepEqual(map.staticMapSize(NaN, 10), [0, 0]);
+  assert.deepEqual(size(0, -4), [1, 1]);
+  assert.deepEqual(size(320.6, 179.4), [321, 179]);
+});
+
+test('the token defaults to the trimmed public environment value and is injectable', () => {
+  const previous = process.env.EXPO_PUBLIC_MAPBOX_TOKEN;
+  try {
+    delete process.env.EXPO_PUBLIC_MAPBOX_TOKEN;
+    assert.equal(map.staticMapUrl({ points: [kochi], width: 10, height: 10 }), null);
+    process.env.EXPO_PUBLIC_MAPBOX_TOKEN = '  pk.env-synthetic  ';
+    assert.equal(new URL(map.staticMapUrl({ points: [kochi], width: 10, height: 10 })).searchParams.get('access_token'), 'pk.env-synthetic');
+    assert.equal(map.staticMapUrl({ points: [kochi], width: 10, height: 10, token: null }), null, 'An explicit null disables the environment token');
+    assert.equal(map.canDrawStaticMap([kochi]), true);
+    process.env.EXPO_PUBLIC_MAPBOX_TOKEN = 'sk.env-secret-synthetic';
+    assert.equal(map.canDrawStaticMap([kochi]), false, 'A secret token in the environment is never used');
+  } finally {
+    if (previous === undefined) delete process.env.EXPO_PUBLIC_MAPBOX_TOKEN; else process.env.EXPO_PUBLIC_MAPBOX_TOKEN = previous;
+  }
+});
+
+// Component harness: minimal hooks, JSX as plain objects; hook-free function
+// components (StaticMapLayer/StaticMapCredit) are expanded in place.
+const jsx = (type, props) => ({ type, props });
+const nodes = tree => !tree || typeof tree !== 'object' ? [] : typeof tree.type === 'function' ? nodes(tree.type(tree.props)) : [tree, ...[tree.props?.children].flat(Infinity).flatMap(nodes)];
+const native = { StyleSheet: { create: value => value }, View: 'View', Text: 'Text', Image: 'Image', ActivityIndicator: 'ActivityIndicator' };
+function hooks() {
+  const slots = []; let cursor = 0, computations = 0;
+  const react = {
+    useState: initial => { const i = cursor++; if (!(i in slots)) slots[i] = typeof initial === 'function' ? initial() : initial; return [slots[i], value => { slots[i] = typeof value === 'function' ? value(slots[i]) : value; }]; },
+    useMemo: (fn, deps) => { const i = cursor++; if (!slots[i] || deps.some((value, j) => value !== slots[i].deps[j])) { computations++; slots[i] = { value: fn(), deps }; } return slots[i].value; },
+  };
+  return { react, render: fn => { cursor = 0; return fn(); }, computations: () => computations };
+}
+function components(h) {
+  const base = { react: h.react, 'react/jsx-runtime': { jsx, jsxs: jsx, Fragment: 'Fragment' }, 'react-native': native, '@/lib/media/static-map': map };
+  const staticMapPhoto = load('src/components/discovery/static-map-photo.tsx', base);
+  const placeholder = load('src/components/discovery/travel-photo-placeholder.tsx', { ...base, './static-map-photo': staticMapPhoto, '../../../assets/images/journey-photo-fallback.png': 17 });
+  const photo = load('src/components/discovery/journey-photo.tsx', { ...base, './static-map-photo': staticMapPhoto, './ui': { colors: {} } });
+  return { ...staticMapPhoto, ...placeholder, ...photo };
+}
+const layout = (width, height) => ({ nativeEvent: { layout: { width, height } } });
+function withToken(fn) {
+  const previous = process.env.EXPO_PUBLIC_MAPBOX_TOKEN;
+  process.env.EXPO_PUBLIC_MAPBOX_TOKEN = 'pk.component-synthetic';
+  try { fn(); } finally { if (previous === undefined) delete process.env.EXPO_PUBLIC_MAPBOX_TOKEN; else process.env.EXPO_PUBLIC_MAPBOX_TOKEN = previous; }
+}
+
+test('stop-deck placeholder: wide map ends above the caption bar so the logo shows, keeps a top-left credit, then falls back on failure', () => withToken(() => {
+  const h = hooks(), { TravelPhotoPlaceholder } = components(h);
+  const render = () => h.render(() => TravelPhotoPlaceholder({ variant: 'stop', label: 'Default travel photo. Stop', map: { points: [kochi] }, mapLabel: 'Map of Kochi. No photo yet.' }));
+  let tree = render();
+  assert.equal(tree.props.accessibilityLabel, 'Map of Kochi. No photo yet.');
+  let layer = nodes(tree).find(n => n.props?.testID === 'static-map-photo');
+  assert.equal(nodes(layer).filter(n => n.type === 'Image').length, 0, 'Nothing is requested before the slot is measured');
+  assert.equal(Object.assign({}, ...[layer.props.style].flat()).bottom, 35, 'Estimated caption height before measurement');
+  nodes(tree).find(n => n.props?.testID === 'travel-photo-caption').props.onLayout(layout(300, 41.2));
+  tree = render(); layer = nodes(tree).find(n => n.props?.testID === 'static-map-photo');
+  assert.equal(Object.assign({}, ...[layer.props.style].flat()).bottom, 41, 'The map ends exactly above the measured caption bar');
+  layer.props.onLayout(layout(300.4, 128.6));
+  tree = render(); layer = nodes(tree).find(n => n.props?.testID === 'static-map-photo');
+  const image = nodes(layer).find(n => n.type === 'Image');
+  const url = new URL(image.props.source.uri);
+  assert.ok(url.pathname.endsWith('/300x129@2x'), 'Image covers only the visible map area, so its bottom-left logo is not covered or cropped');
+  assert.equal(url.searchParams.get('access_token'), 'pk.component-synthetic');
+  assert.equal(url.searchParams.get('logo'), 'true'); assert.equal(url.searchParams.get('attribution'), 'false');
+  const credit = nodes(layer).find(n => n.props?.testID === 'static-map-inline-credit');
+  assert.equal(credit.props.children, '© Mapbox © OpenStreetMap');
+  const style = Object.assign({}, ...[credit.props.style].flat());
+  assert.equal(style.top, 4); assert.equal(style.left, 4); assert.equal(style.bottom, undefined, 'Credit sits in the top corner, never under the caption bar');
+  assert.ok(nodes(tree).some(n => n.type === 'Text' && n.props.children === 'See this stop'), 'Caption is kept');
+  assert.equal(nodes(layer).some(n => n.props?.children === 'See this stop'), false, 'Caption bar stays outside the map layer');
+  image.props.onError();
+  tree = render();
+  assert.equal(tree.props.accessibilityLabel, 'Default travel photo. Stop');
+  assert.equal(nodes(tree).find(n => n.type === 'Image').props.source, 17);
+}));
+
+test('map points and URL are memoized across renders with fresh but equal arrays', () => withToken(() => {
+  const h = hooks(), { TravelPhotoPlaceholder } = components(h);
+  const render = point => h.render(() => TravelPhotoPlaceholder({ map: { points: [{ ...point }] } }));
+  nodes(render(kochi)).find(n => n.props?.testID === 'static-map-photo').props.onLayout(layout(120, 80));
+  const before = h.computations();
+  const first = nodes(render(kochi)).find(n => n.type === 'Image').props.source.uri;
+  const second = nodes(render(kochi)).find(n => n.type === 'Image').props.source.uri;
+  assert.equal(first, second); assert.equal(h.computations(), before + 1, 'Only the first render after layout builds the URL');
+  assert.equal(nodes(render(kochi)).some(n => n.props?.testID === 'static-map-inline-credit'), false, 'Narrow thumbnails rely on the list credit');
+  assert.notEqual(nodes(render(fort)).find(n => n.type === 'Image').props.source.uri, first, 'Changed coordinates rebuild the URL');
+}));
+
+test('placeholder without coordinates or without a usable token keeps the default photo unchanged', () => {
+  const previous = process.env.EXPO_PUBLIC_MAPBOX_TOKEN;
+  try {
+    for (const value of [undefined, 'sk.secret-synthetic']) {
+      if (value === undefined) delete process.env.EXPO_PUBLIC_MAPBOX_TOKEN; else process.env.EXPO_PUBLIC_MAPBOX_TOKEN = value;
+      const h = hooks(); const tree = h.render(() => components(h).TravelPhotoPlaceholder({ label: 'Default', map: { points: [kochi] } }));
+      assert.equal(tree.props.accessibilityLabel, 'Default'); assert.equal(nodes(tree).find(n => n.type === 'Image').props.source, 17);
+    }
+    withToken(() => {
+      for (const props of [{ label: 'Default', map: { points: [{ latitude: null, longitude: null }] } }, { label: 'Default' }]) {
+        const h = hooks(); assert.equal(h.render(() => components(h).TravelPhotoPlaceholder(props)).props.accessibilityLabel, 'Default');
+      }
+    });
+  } finally { if (previous === undefined) delete process.env.EXPO_PUBLIC_MAPBOX_TOKEN; else process.env.EXPO_PUBLIC_MAPBOX_TOKEN = previous; }
+});
+
+test('StaticMapCredit renders one line only when a small map can actually draw', () => {
+  const h = hooks(), { StaticMapCredit } = components(h);
+  const previous = process.env.EXPO_PUBLIC_MAPBOX_TOKEN;
+  try {
+    delete process.env.EXPO_PUBLIC_MAPBOX_TOKEN;
+    assert.equal(StaticMapCredit({ points: [kochi] }), null);
+    withToken(() => {
+      const credit = StaticMapCredit({ points: [{ latitude: null, longitude: null }, kochi] });
+      assert.equal(credit.props.children, 'Maps © Mapbox © OpenStreetMap'); assert.equal(credit.props.testID, 'static-map-credit');
+      assert.equal(StaticMapCredit({ points: [{ latitude: null, longitude: null }] }), null);
+      assert.equal(StaticMapCredit({ points: [] }), null);
+    });
+  } finally { if (previous !== undefined) process.env.EXPO_PUBLIC_MAPBOX_TOKEN = previous; }
+});
+
+test('JourneyPhoto keeps photos first, then map, then its existing fallback', () => withToken(() => {
+  const h = hooks(), { JourneyPhoto } = components(h);
+  const uri = 'https://example.test/photo.jpg';
+  const render = () => h.render(() => JourneyPhoto({ uri, label: 'Stop photo', map: { points: [kochi, fort] }, mapLabel: 'Map of Stop' }));
+  let tree = render();
+  const photo = nodes(tree).find(n => n.type === 'Image');
+  assert.equal(photo.props.source.uri, uri);
+  photo.props.onError();
+  tree = render();
+  const mapNode = nodes(tree).find(n => n.props?.accessibilityLabel === 'Map of Stop');
+  assert.ok(mapNode, 'A failed photo shows the map');
+  nodes(mapNode).find(n => n.props?.testID === 'static-map-photo').props.onLayout(layout(120, 120));
+  tree = render();
+  const mapImage = nodes(tree).find(n => n.type === 'Image');
+  assert.match(mapImage.props.source.uri, /\/auto\/120x120@2x\?/);
+  mapImage.props.onError();
+  tree = render();
+  assert.ok(nodes(tree).some(n => n.props?.accessibilityLabel === 'No journey photo available'));
+  const plainHooks = hooks(); const plain = plainHooks.render(() => components(plainHooks).JourneyPhoto({ uri: null, label: 'Stop photo' }));
+  assert.ok(nodes(plain).some(n => n.props?.accessibilityLabel === 'No journey photo available'), 'No map prop keeps the original fallback');
+}));
+
+test('map fallbacks are wired only where coordinates are loaded; small timeline thumbnails carry one credit line', () => {
+  const read = path => readFileSync(path, 'utf8');
+  assert.match(read('src/components/create/memory-row.tsx'), /map=\{\{ points: \[stop\] \}\}/);
+  assert.match(read('src/components/journey/stop-card-deck.tsx'), /TravelPhotoPlaceholder[^\n]*map=\{\{ points: \[stop\] \}\}/);
+  assert.match(read('src/components/journey/customize-stops.tsx'), /JourneyPhoto uri=\{stop\.photo\}[^\n]*map=\{\{ points: \[stop\] \}\}/);
+  assert.match(read('src/app/draft/[id].tsx'), /JourneyPhoto uri=\{state\.data\.cover\}[^\n]*map=\{\{ points: state\.data\.stops \}\}/);
+  const timeline = read('src/components/journey/stop-timeline.tsx');
+  assert.equal((timeline.match(/map=\{\{ points: \[(stop|item)\] \}\}/g) || []).length, 2, 'Plain map props: vertical map-only slot and small thumbnails; the vertical photo branch has none and the carousel adds bottomInset');
+  const viewer = read('src/components/journey/stop-story-viewer.tsx');
+  assert.match(viewer, /map=\{\{ points: \[stop\], creditTop: insets\.top \+ headerHeight, bottomInset: insets\.bottom \+ captionHeight \}\}/, 'Story viewer map sits between header and caption sheet');
+  assert.match(viewer, /<View style=\{styles\.caption\} onLayout=\{event => \{[^}]*setCaptionHeight/, 'Caption sheet height is measured');
+  assert.match(timeline, /map=\{\{ points: \[item\], bottomInset: stacked \? 0 : textHeights\[item\.id\] \?\? 72 \}\}/, 'Carousel map ends above the card text overlay');
+  assert.match(timeline, /pointerEvents="none" onLayout=\{event => \{[^}]*setTextHeights/, 'Card text heights are measured');
+  assert.match(timeline, /verticalTimelineMapLimit = 6/);
+  // Card maps are deferred: list RPCs carry no coordinates, so cards keep the stock photo.
+  for (const file of ['src/components/discovery/home-journey-card.tsx', 'src/components/discovery/journey-card.tsx', 'src/components/discovery/explore-tile.tsx', 'src/components/profile/profile-ui.tsx'])
+    assert.doesNotMatch(read(file), /map=\{\{/, file);
+});
+
+test('horizontal thumbnails show the list credit once a small map can appear, including after a photo fails', () => withToken(() => {
+  const slots = []; let cursor = 0;
+  const react = { useState: initial => { const i = cursor++; if (!(i in slots)) slots[i] = initial; return [slots[i], value => { slots[i] = typeof value === 'function' ? value(slots[i]) : value; }]; },
+    useRef: initial => { const i = cursor++; return slots[i] ??= { current: initial }; }, useEffect() {} };
+  const { StopTimeline } = load('src/components/journey/stop-timeline.tsx', {
+    'react/jsx-runtime': { jsx, jsxs: jsx, Fragment: 'Fragment' }, react, 'react-native': { ...native, AccessibilityInfo: {}, FlatList: 'FlatList', Pressable: 'Pressable' },
+    './stop-card-deck': { StopCardDeck: 'StopCardDeck' }, '@/theme/mobile-theme': { theme: {} }, '@/components/discovery/journey-photo': { JourneyPhoto: 'JourneyPhoto' },
+    '@/components/discovery/ui': { colors: {}, ui: {} }, '@/lib/journey/story-layout': { stopIndexAtOffset: () => 0 }, '@/lib/media/static-map': map,
+    '@/components/discovery/static-map-photo': { StaticMapCredit: 'StaticMapCredit' },
+  });
+  const stop = { id: 'a', name: 'Fort', description: '', sequence: 1, dayNumber: null, photo: 'https://example.test/fort.jpg', rating: null, ...fort };
+  const render = () => { cursor = 0; const element = StopTimeline({ stops: [stop], horizontal: true, selectedId: 'a', onSelect() {}, onDetails() {} }); return element.type(element.props); };
+  let tree = render();
+  let credit = tree.props.children.flat(Infinity).find(n => n?.type === 'StaticMapCredit');
+  assert.deepEqual(credit.props.points, [], 'All photos present: no map can show yet');
+  const thumbnails = tree.props.children.flat(Infinity).find(n => n?.type === 'FlatList' && n.props.testID === 'journey-stop-thumbnails');
+  nodes(thumbnails.props.renderItem({ item: stop, index: 0 })).find(n => n.type === 'JourneyPhoto').props.onError();
+  tree = render();
+  credit = tree.props.children.flat(Infinity).find(n => n?.type === 'StaticMapCredit');
+  assert.deepEqual(credit.props.points.map(item => item.id), ['a'], 'A failed photo now shows a small map, so the credit covers it');
+}));
+
+test('vertical timeline requests maps for at most the first six photo-less located stops', () => withToken(() => {
+  const stops = Array.from({ length: 9 }, (_, index) => ({ id: 's' + index, name: 'Stop ' + index, description: '', sequence: index + 1, dayNumber: null, photo: index === 1 ? 'https://example.test/p.jpg' : null, rating: null, latitude: 9 + index / 100, longitude: 76 }));
+  stops.push({ ...stops[0], id: 'unlocated', latitude: null, longitude: null });
+  const { StopTimeline } = load('src/components/journey/stop-timeline.tsx', {
+    'react/jsx-runtime': { jsx, jsxs: jsx, Fragment: 'Fragment' }, react: {}, 'react-native': { ...native, AccessibilityInfo: {}, FlatList: 'FlatList', Pressable: 'Pressable' },
+    './stop-card-deck': { StopCardDeck: 'StopCardDeck' }, '@/theme/mobile-theme': { theme: {} }, '@/components/discovery/journey-photo': { JourneyPhoto: 'JourneyPhoto' },
+    '@/components/discovery/ui': { colors: {}, ui: {} }, '@/lib/journey/story-layout': { stopIndexAtOffset: () => 0 }, '@/lib/media/static-map': map,
+    '@/components/discovery/static-map-photo': { StaticMapCredit: 'StaticMapCredit' },
+  });
+  const tree = nodes(StopTimeline({ stops }));
+  const photos = tree.filter(n => n.type === 'JourneyPhoto');
+  assert.equal(photos.filter(n => n.props.uri === null).length, 6, 'Map-only slots are capped');
+  assert.equal(photos.filter(n => n.props.uri).length, 1, 'Photos are never capped');
+  assert.deepEqual(photos.filter(n => n.props.uri === null).map(n => n.props.label), ['Stop 0', 'Stop 2', 'Stop 3', 'Stop 4', 'Stop 5', 'Stop 6'].map(name => name + ' photo'));
+}));
