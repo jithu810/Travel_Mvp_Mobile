@@ -102,12 +102,13 @@ export async function loadPublicJourney(id: string, signal: AbortSignal): Promis
   const api = client();
   const { data: cards, error: cardError } = await api.rpc('get_public_journeys', { journey_filter: id }).abortSignal(signal);
   if (cardError) throw new Error('We couldn’t load this journey. Please try again.');
-  const card = Array.isArray(cards) ? cards.map(normalizePublicJourney).find(j => j?.id === id) : null;
+  const entry = Array.isArray(cards) ? cards.map(normalizeDiscoveryEntry).find(e => e?.journey.id === id) : null;
+  const card = entry?.journey;
   if (!card) return null;
   const { data, error } = await api.rpc('get_journey_detail', { target_id: id }).abortSignal(signal);
   if (error) throw new Error('We couldn’t load this journey. Please try again.');
   const detail = normalizePublicDetail(data, card);
-  return detail ? (await resolvePhotos([detail], signal))[0] : null;
+  return detail ? (await resolvePhotos([{ ...detail, ...(entry?.creatorId ? { creatorId: entry.creatorId } : {}) }], signal))[0] : null;
 }
 
 // Lightweight public card for attribution: one get_public_journeys row, normalized

@@ -1,5 +1,6 @@
 import { SwipeJourneyStart } from '@/components/journey/swipe-journey-start';
 import { useBuddyScreen } from '@/hooks/use-journey-buddy';
+import { useSessionState } from '@/hooks/session-context';
 import { useBuddyProtectedBounds, useBuddyScroll } from '@/hooks/use-buddy-geometry';
 import { JourneyActionIcon } from '@/components/journey/journey-action-icon';
 import { StatusBar } from 'expo-status-bar';
@@ -44,6 +45,7 @@ export default function JourneyStoryScreen() {
 }
 
 export function JourneyStoryContent({ journey, refresh, refreshing, error, saveFirst = false }: { journey: PublicJourney; saveFirst?: boolean; refresh: () => void; refreshing: boolean; error: string | null }) {
+  const auth = useSessionState();
   const router = useRouter();
   const footerProtection = useBuddyProtectedBounds(), expandProtection = useBuddyProtectedBounds(), scroll = useBuddyScroll();
   const insets = useSafeAreaInsets();
@@ -69,7 +71,8 @@ export function JourneyStoryContent({ journey, refresh, refreshing, error, saveF
   const showStop = useCallback((id: string) => { select(id); setPanel('stop'); }, [select, setPanel]);
   const memoryPhotos = useMemo(() => Object.fromEntries(journey.stops.map(stop => [stop.id, stop.photo])), [journey.stops]);
   const missing = buildMapData(journey.stops).missing;
-  useBuddyScreen({ floating: true, suppressed: !focused || panel !== null });
+  useBuddyScreen({ floating: true, suppressed: !focused || panel !== null,
+    ownStory: !auth.loading && !auth.error && !!auth.session && !!journey.creatorId && auth.session.user.id.toLowerCase() === journey.creatorId.toLowerCase() ? { id: journey.id, title: journey.title } : undefined });
   return <View style={styles.screen}>
     {focused && panel === null && <StatusBar style="light" />}
     <ScrollView {...scroll} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" nestedScrollEnabled>

@@ -19,6 +19,27 @@ const { createBuddyPositionCapture } = load('src/lib/buddy/position.ts');
 const { createBuddyPreference, BUDDY_PREFERENCE_KEY } = load('src/lib/buddy/preference.ts');
 const animations = load('src/lib/buddy/animations.ts');
 const tick = () => new Promise(setImmediate);
+test('bubble placement stays clear, flips below near the top, and relocates beside protected controls', () => {
+  const g = geometry.createBuddyGeometry({ x: 0, y: 0, width: 360, height: 800 }, { top: 24, bottom: 24, left: 0, right: 0 }, []);
+  const top = geometry.placeBuddyBubble({ x: 150, y: 30 }, g, 252, 240);
+  assert.equal(top.above, false); assert.deepEqual(top.buddy, { x: 150, y: 30 });
+  const bottom = geometry.placeBuddyBubble({ x: 280, y: 700 }, g, 252, 240);
+  assert.equal(bottom.above, true); assert.equal(geometry.buddyOverlayClear(bottom.rect, g), true);
+  assert.ok(bottom.tailX >= 18 && bottom.tailX <= 234);
+  const blocked = geometry.createBuddyGeometry({ x: 0, y: 0, width: 360, height: 800 }, { top: 0, bottom: 0, left: 0, right: 0 }, [{ x: 100, y: 350, width: 200, height: 200 }]);
+  const moved = geometry.placeBuddyBubble({ x: 280, y: 700 }, blocked, 252, 240);
+  assert.ok(moved); assert.equal(geometry.buddyOverlayClear(moved.rect, blocked), true); assert.equal(geometry.buddyPositionClear(moved.buddy, blocked), true);
+  assert.equal(geometry.placeBuddyBubble({ x: 0, y: 0 }, g, 999, 240), null);
+});
+test('store reaction cooldown spans actor remounts and route visits; tour survives navigation until exit', () => {
+  const store = createBuddyStore(); store.environment('/discover', true);
+  assert.equal(store.reactOnce('story:a', 0), true); assert.equal(store.reactOnce('story:a', 31000), false);
+  assert.equal(store.reactOnce('travel:a', 29000), false); assert.equal(store.reactOnce('travel:a', 30000), true);
+  store.environment('/discover', false); store.environment('/discover', true); assert.equal(store.reactOnce('story:a', 61000), false);
+  store.setTour(1); store.environment('/create', true); assert.equal(store.getTour(), 1);
+  assert.equal(store.reactOnce('story:a', 31000), false); assert.equal(store.reactOnce('story:a', 61000), true);
+  store.setTour(null); assert.equal(store.getTour(), null);
+});
 function deferred() { let resolve, reject; const promise = new Promise((yes, no) => { resolve = yes; reject = no; }); return { promise, resolve, reject }; }
 
 test('Buddy preference starts hidden, ignores old key/invalid data, and survives remount', async () => {
@@ -129,10 +150,10 @@ test('parent/child registration order preserves travel semantics and editor capa
 test('travel reactions are once per event, cooldown limited, quiet for maneuver/arrival and do not replay after resume', () => {
   let now = 0; const reactions = model.createBuddyReactions(() => now);
   const travel = { journeyId: 'trip', status: 'active', nextStop: 'Beach', gpsAvailable: true, guidance: null, arrival: false, completed: 0 };
-  reactions.reset(travel); now = 16000;
+  reactions.reset(travel); now = 31000;
   assert.equal(reactions.read(travel), null);
   assert.ok(reactions.read({ ...travel, completed: 1 })); assert.equal(reactions.read({ ...travel, completed: 1 }), null);
-  now += 16000; assert.equal(reactions.read({ ...travel, arrival: true, completed: 1 }), null);
+  now += 31000; assert.equal(reactions.read({ ...travel, arrival: true, completed: 1 }), null);
   assert.equal(reactions.read({ ...travel, nextStop: 'Hill', guidance: 'Turn left', completed: 1 }), null);
   assert.ok(reactions.read({ ...travel, status: 'completed', nextStop: null, completed: 2 }));
   reactions.reset(travel); now += 16000; assert.equal(reactions.read(travel), null);
@@ -187,19 +208,22 @@ test('future non-looping sprites stop their frame clock at the final frame', () 
   const props = { animation: 'wave', animate: true }; h.render(BuddySprite, props); timers.fire(); timers.fire();
   const tree = h.render(BuddySprite, props); assert.equal(timers.jobs.size, 0); assert.equal(all(tree, 'Image')[0].props.style.left, -128); h.dispose();
 });
-test('actual helper exposes guidance and existing navigation callbacks without automatic saves', () => {
+test('actual anchored helper offers two contextual actions and never saves automatically', () => {
   const h = hooks(); let creates = 0, drafts = 0, adds = 0;
-  const { BuddyHelpSheet } = load('src/components/buddy/buddy-help-sheet.tsx', { react: h.react, 'react/jsx-runtime': runtime, 'react-native': { Modal: 'Modal', Pressable: 'Pressable', ScrollView: 'ScrollView', Text: 'Text', View: 'View', StyleSheet: { create: v => v } }, 'react-native-safe-area-context': { SafeAreaView: 'SafeAreaView' }, '@/lib/buddy/model': model });
+  const { BuddyHelpSheet } = load('src/components/buddy/buddy-help-sheet.tsx', { react: h.react, 'react/jsx-runtime': runtime, 'react-native': { BackHandler: { addEventListener: () => ({ remove() {} }) }, Pressable: 'Pressable', ScrollView: 'ScrollView', Text: 'Text', View: 'View', StyleSheet: { create: v => v } }, '@/lib/buddy/model': model });
   const props = { canAddMemory: false, onAddMemory: () => adds++, onCreate: () => creates++, onDrafts: () => drafts++, onClose() {} };
   let tree = h.render(BuddyHelpSheet, props); assert.equal(creates + drafts + adds, 0);
   // Components remain function-valued in this small JSX harness.
   const findAction = label => { const visit = node => !node || typeof node !== 'object' ? null : typeof node.type === 'function' && node.props.label === label ? node : [node.props?.children].flat(Infinity).map(visit).find(Boolean); return visit(tree); };
-  findAction('Add a stop or memory').props.onPress(); tree = h.render(BuddyHelpSheet, props); assert.equal(adds, 0); assert.ok(all(tree, 'Text').some(n => String(n.props.children).includes('private drafts')));
-  findAction('Create a journey').props.onPress(); findAction('Open my drafts').props.onPress(); assert.equal(creates, 1); assert.equal(drafts, 1);
-  tree = h.render(BuddyHelpSheet, { ...props, canAddMemory: true }); findAction('Add a stop or memory').props.onPress(); assert.equal(adds, 1);
+  findAction('Open my drafts').props.onPress(); assert.equal(drafts, 1); assert.equal(adds, 0);
+  assert.equal(all(tree, 'Modal').length, 0); assert.equal(tree.props.testID, 'buddy-speech-bubble');
+  assert.equal(all(all(tree, 'ScrollView')[0], 'Pressable').length, 0, 'Actions never scroll away with the message');
+  assert.equal(all(tree, 'View').find(n => n.props.testID === 'buddy-bubble-actions').props.style.flexShrink, 0, 'Both actions keep their space in a124dp bubble');
+  tree = h.render(BuddyHelpSheet, { ...props, canAddMemory: true }); findAction('Capture a moment').props.onPress(); assert.equal(adds, 1);
+  assert.equal(creates, 0); assert.ok(findAction('Show me around')); h.dispose();
 });
 
-async function hostHarness() {
+async function hostHarness(openSpace = false) {
   const hostHooks = hooks(); let actorHooks = hooks(); const timers = clock(); let currentHooks = hostHooks;
   const react = Object.fromEntries(Object.keys(hostHooks.react).map(name => [name, (...args) => currentHooks.react[name](...args)]));
   react.useSyncExternalStore = (_, get) => get();
@@ -208,7 +232,7 @@ async function hostHarness() {
   let path = '/create'; api.store.environment(path, true);
   const owner = {}, region = {}; let adds = 0;
   api.store.screen(owner, { path, state: { floating: true, canAddMemory: true }, act: () => adds++ });
-  api.store.protect(region, path, [{ x: 0, y: 0, width: 360, height: 592 }, { x: 0, y: 680, width: 360, height: 120 }]);
+  api.store.protect(region, path, openSpace ? [] : [{ x: 0, y: 0, width: 360, height: 592 }, { x: 0, y: 680, width: 360, height: 120 }]);
   api.store.onMeasure(() => api.store.protect(region, path, api.store.current().protectedRects));
   const native = {
     delayCaptures: false, pendingCaptures: [], nativePoint: null,
@@ -387,4 +411,47 @@ test('Travel Walk is a bounded stationary progress reaction, never an active-sta
   h.api.store.screen(h.owner, { path: '/create', state: { floating: true, travel: { ...progress, completed: 3, nextStop: 'Lake' } }, act() {} }); h.renderHost(); tree = h.renderActor(); assert.equal(all(tree, 'BuddySprite')[0].props.animation, 'walk');
   h.native.motion(true); tree = h.renderActor(); assert.equal(h.timers.jobs.size, 0); assert.equal(all(tree, 'BuddySprite')[0].props.animate, false);
   h.actorHooks.dispose(); h.hostHooks.dispose();
+});
+
+test('actual bubble tour visits screens, survives actor remount, exits and guards stale callbacks', async () => {
+  const h = await hostHarness(true); h.renderHost(); let tree = h.renderActor(); await tick(); tree = h.renderActor();
+  all(tree, 'View').find(n => n.props.accessibilityLabel === 'Journey Buddy').props.onAccessibilityTap(); tree = h.renderActor();
+  let bubble = all(tree, 'BuddyHelpSheet')[0]; bubble.props.onMeasure(240); tree = h.renderActor(); bubble = all(tree, 'BuddyHelpSheet')[0];
+  assert.ok(bubble.props.placement); assert.equal(all(tree, 'BuddySprite')[0].props.animate, false);
+  bubble.props.onTour(); tree = h.renderActor(); bubble = all(tree, 'BuddyHelpSheet')[0]; assert.equal(bubble.props.tour, 0); assert.ok(bubble.props.placement, 'Starting tour retains measured placement without another native onLayout');
+  bubble.props.onNext(); tree = h.renderActor(); bubble = all(tree, 'BuddyHelpSheet')[0]; assert.equal(bubble.props.tour, 1); assert.ok(bubble.props.placement, 'Same-height Next remains visible without another onMeasure');
+  h.api.store.setTour(0); tree = h.renderActor(); bubble = all(tree, 'BuddyHelpSheet')[0];
+  bubble.props.onTour(); assert.deepEqual(h.routes, ['/discover']);
+  h.path('/discover'); h.api.store.screen(h.owner, { path: '/discover', state: { floating: true }, act() {} }); h.api.store.protect(h.region, '/discover', []); h.renderHost(); tree = h.remountActor();
+  bubble = all(tree, 'BuddyHelpSheet')[0]; assert.equal(bubble.props.tour, 0); bubble.props.onNext(); tree = h.renderActor(); bubble = all(tree, 'BuddyHelpSheet')[0]; assert.equal(bubble.props.tour, 1);
+  bubble.props.onTour(); assert.deepEqual(h.routes, ['/discover', '/create']);
+  const stale = bubble.props.onNext; await h.api.preference.setEnabled(false); stale(); assert.equal(h.api.store.getTour(), 1);
+  await h.api.preference.setEnabled(true); bubble.props.onClose(); assert.equal(h.api.store.getTour(), null);
+  h.actorHooks.dispose(); h.hostHooks.dispose();
+});
+
+test('actual own-story reaction appears once and never replays after geometry remount', async () => {
+  const h = await hostHarness(true); const state = { floating: true, ownStory: { id: 'mine', title: 'A little adventure' } };
+  h.api.store.screen(h.owner, { path: '/create', state, act() {} }); h.renderHost(); h.renderActor(); let tree = h.renderActor();
+  let bubble = all(tree, 'BuddyHelpSheet')[0]; assert.ok(bubble.props.reaction.includes('applause'));
+  bubble.props.onMeasure(130); tree = h.renderActor(); assert.ok(all(tree, 'BuddyHelpSheet')[0].props.placement);
+  tree = h.remountActor(); assert.equal(all(tree, 'BuddyHelpSheet').length, 0);
+  h.actorHooks.dispose(); h.hostHooks.dispose();
+});
+
+test('a measured no-fit bubble releases gestures and allows drag and later retry', async () => {
+  const h = await hostHarness(true); h.renderHost(); const stripes = [116,240,364,488,612,736].map(y => ({ x: 0, y, width: 390, height: 28 }));
+  const cramped = geometry.createBuddyGeometry({ x:0,y:0,width:390,height:844 }, { top:0,bottom:0,left:0,right:0 }, stripes);
+  assert.ok(cramped.areas.length); assert.equal(geometry.placeBuddyBubble({x:300,y:40},cramped,252,124),null);
+  let tree = h.renderActor({ geometry: cramped }); await tick(); tree = h.renderActor({ geometry: cramped });
+  all(tree,'View').find(n=>n.props.accessibilityLabel==='Journey Buddy').props.onAccessibilityTap(); tree = h.renderActor({ geometry: cramped });
+  all(tree,'BuddyHelpSheet')[0].props.onMeasure(124); h.renderActor({ geometry: cramped }); tree = h.renderActor({ geometry: cramped });
+  assert.equal(all(tree,'BuddyHelpSheet').length,0);
+  let buddy = all(tree,'View').find(n=>n.props.accessibilityLabel==='Journey Buddy');
+  assert.equal(buddy.props.onStartShouldSetPanResponder(),true); assert.ok(buddy.props.accessibilityHint.includes('retry'));
+  buddy.props.onPanResponderGrant(); buddy.props.onPanResponderMove(null,{dx:-50,dy:0}); buddy.props.onPanResponderRelease(null,{dx:-50,dy:0});
+  tree = h.renderActor(); buddy = all(tree,'View').find(n=>n.props.accessibilityLabel==='Journey Buddy'); buddy.props.onAccessibilityTap(); tree = h.renderActor();
+  all(tree,'BuddyHelpSheet')[0].props.onMeasure(200); tree = h.renderActor(); assert.ok(all(tree,'BuddyHelpSheet')[0].props.placement);
+  all(tree,'BuddyHelpSheet')[0].props.onClose(); tree=h.renderActor(); assert.equal(all(tree,'BuddyHelpSheet').length,0);
+  h.actorHooks.dispose();h.hostHooks.dispose();
 });

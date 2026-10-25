@@ -14,6 +14,8 @@ export type JourneyStop = {
   longitude: number | null;
 };
 export type PublicJourney = {
+  /** Already-public creator UUID, attached only to a gated detail response. */
+  creatorId?: string;
   id: string;
   title: string;
   description: string;

@@ -6,6 +6,26 @@ export function buddyOverlayClear(rect: BuddyRect, geometry: BuddyGeometry) {
   const { bounds } = geometry;
   return rect.x >= bounds.x && rect.y >= bounds.y && rect.x + rect.width <= bounds.x + bounds.width && rect.y + rect.height <= bounds.y + bounds.height && !geometry.obstacles.some(obstacle => overlaps(rect, obstacle));
 }
+export function placeBuddyBubble(point: BuddyPoint, geometry: BuddyGeometry, width: number, height: number) {
+  const bounds = geometry.bounds;
+  if (![width, height].every(Number.isFinite) || width <= 0 || height <= 0 || width > bounds.width) return null;
+  const seeds = [point, ...geometry.areas.flatMap(a => [
+    { x: a.x, y: a.y }, { x: a.x + a.width - BUDDY_SIZE, y: a.y + a.height - BUDDY_SIZE },
+    { x: a.x, y: a.y + a.height - BUDDY_SIZE }, { x: a.x + a.width - BUDDY_SIZE, y: a.y },
+    { x: a.x + (a.width - BUDDY_SIZE) / 2, y: a.y + (a.height - BUDDY_SIZE) / 2 },
+  ])].sort((a, b) => Math.hypot(a.x - point.x, a.y - point.y) - Math.hypot(b.x - point.x, b.y - point.y));
+  for (const buddy of seeds) {
+    if (!buddyPositionClear(buddy, geometry)) continue;
+    const x = Math.max(bounds.x, Math.min(bounds.x + bounds.width - width, buddy.x + BUDDY_SIZE / 2 - width / 2));
+    for (const above of [true, false]) {
+      const rect = { x, y: above ? buddy.y - height - 10 : buddy.y + BUDDY_SIZE + 10, width, height };
+      // Include the tail in collision checks, leaving a clear link to Buddy.
+      const withTail = { ...rect, y: above ? rect.y : rect.y - 10, height: rect.height + 10 };
+      if (buddyOverlayClear(withTail, geometry)) return { rect, buddy, above, tailX: Math.max(18, Math.min(width - 18, buddy.x + BUDDY_SIZE / 2 - x)) };
+    }
+  }
+  return null;
+}
 export function buddyPositionClear(point: BuddyPoint, geometry: BuddyGeometry) {
   const { bounds, obstacles } = geometry;
   return Number.isFinite(point.x) && Number.isFinite(point.y) && point.x >= bounds.x && point.y >= bounds.y

@@ -8,6 +8,8 @@ export function createBuddyStore() {
   const protections = new Map<object, Protection>(), moving = new Map<object, string>(), measurements = new Set<() => void>();
   let pose: BuddyPose | null = null;
   let poseOwner: object | null = null;
+  let tour: number | null = null, lastReaction = -Infinity;
+  const reacted = new Set<string>();
   let snapshot = { revision: 0, path: '', foreground: false, interacting: false, measurement: 0 };
   const publish = () => { snapshot = { ...snapshot, revision: snapshot.revision + 1 }; listeners.forEach(fn => fn()); };
   let deferredMeasurement = false;
@@ -30,11 +32,18 @@ export function createBuddyStore() {
     subscribe(fn: () => void) { listeners.add(fn); return () => { listeners.delete(fn); }; },
     environment(path: string, foreground: boolean) {
       if (snapshot.path === path && snapshot.foreground === foreground) return;
-      if (snapshot.path !== path) { pose = null; poseOwner = null; deferredMeasurement = false; }
+      if (snapshot.path !== path) { pose = null; poseOwner = null; deferredMeasurement = false; reacted.clear(); }
       snapshot = { ...snapshot, path, foreground, interacting: false }; publish();
       if (foreground) measurements.forEach(fn => fn());
     },
     getPose(path: string) { return path === snapshot.path ? pose : null; },
+    getTour() { return tour; },
+    setTour(step: number | null) { const next = step !== null && step >= 0 && step < 3 ? step : null; if (tour !== next) { tour = next; publish(); } },
+    // Retained across actor remounts, reset only on an actual route visit.
+    reactOnce(key: string, now = Date.now()) {
+      if (reacted.has(key) || now - lastReaction < 30000) return false;
+      reacted.add(key); lastReaction = now; return true;
+    },
     claimPose(path: string, owner: object) { if (path === snapshot.path) poseOwner = owner; },
     releasePose(path: string, owner: object) { if (path === snapshot.path && poseOwner === owner) poseOwner = null; },
     savePose(path: string, value: BuddyPose, owner?: object) { if (path === snapshot.path && (!owner || poseOwner === owner)) pose = { point: { ...value.point }, parked: value.parked }; },

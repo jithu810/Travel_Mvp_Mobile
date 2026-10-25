@@ -1,0 +1,48 @@
+# Buddy speech bubbles: backend preflight
+
+Backend Developer, 2026-10-25. **Decision: no backend change required; ready for Architect gate release.**
+
+## Scope and baseline
+
+Replace Buddy's help sheet with contextual speech bubbles and at most two actions, add a voluntary Explore/Create/Account tour, show a reaction to the viewer's own published journey, and offer a shortcut into existing draft memory capture. No new persistence, AI connection, API request, permission, dependency or automatic save is required. Travel Mode remains an in-memory foreground session and does not become a draft editor or save travel history.
+
+- Mobile `main`, revision `e527e105b7d1b0a45e04d85fa83d771c6cee8380`. Starting dirty files: `PROJECT_STATUS.md`, `ROADMAP.md`, `src/lib/buddy/map-controls.ts`, `src/lib/discovery/globe-style.ts`, and tests `create-flow`, `discovery-panel`, `home-polish`, `journey-buddy-floating`, `story-interaction`; untracked existing home-attribution preflight/QA reports. Preserve all.
+- Web `main`, revision `aa36fe8639a8b7b50fc6df4298f214a0db092186`. Three existing untracked customize-stops directories contain only nested `.temp/cli-latest` metadata, no SQL, as verified by a fresh recursive inventory. Preserve all.
+- Confirmed shared hosted target `gwybjhqgnrpouwcdvusi`: connector project listing reports ACTIVE_HEALTHY, ap-northeast-2, PostgreSQL 17.11. This is a live target, not an isolated write-test database. No environment files or credentials read.
+
+## Fresh read-only evidence
+
+Connector `list_projects`, `list_migrations`, and three SELECT-only catalog queries succeeded. First catalog timestamp **2026-10-25 16:36:10.756928 UTC** (22:06:10.756928 IST); function/constraint/index check at **16:36:25.551891 UTC**. No application rows, Storage object records or auth user records were read. Inspected actual function definitions, ACLs, relation owners/RLS, column types/nullability, constraints, indexes, policy expressions, table grants, roles and bucket configuration.
+
+- Existing `public.get_journey_detail(uuid)` is an invoker wrapper with empty search path into stable definer `private.journey_detail(uuid)`. Its actual definition projects `creator_id = j.user_id`, `status`, title and stops, and permits only published journeys or the authenticated owner. Anon/authenticated execution is present. `private.public_journeys` retains its published-only filter and discovery fields; no new RPC or field is needed.
+- Mobile public loading first gates through published discovery cards, then gets detail. The UI may expose optional `creatorId` from that existing response and compare with current session UUID for an own-published reaction. Treat missing owner identity as unknown; never infer ownership from display names. This is a client model addition, not an API/schema change or new query.
+- Existing `loadEditableDraft` verifies authenticated identity and filters by journey ID, owner UUID and draft status, with a consistent-version recheck. Existing `saveNewJourney` verifies authenticated identity and invokes `save_journey`; its timeout/unconfirmed-write behavior remains necessary. Buddy's action store uses route, current owner token, foreground state and suppression guards rather than stale editor callbacks. Opening a bubble or editor must never save.
+- Actual `save_journey(jsonb)` remains security invoker, empty search path, authenticated execution, explicit auth UID and owner filters, optimistic `updated_at` comparison, input validation, owned media checks and atomic stop replacement. Its contract already supports named memory notes/photos through the existing editor; no conversational saving is added now.
+- Public journeys/stops/profiles/social/travel tables have RLS enabled. Journey/stop SELECT is published-or-owner; authenticated INSERT/UPDATE/DELETE is owner guarded, including UPDATE USING and WITH CHECK. Anon has SELECT on journeys/stops; authenticated has guarded CRUD. `customize_stops_rpc` has neither LOGIN nor BYPASSRLS; `journey_rpc` is absent.
+- Journey/stop UUID ownership, status/publication, title, coordinate, parent FK, sequence uniqueness, duration, rating and day constraints and existing owner/discovery/sequence indexes support unchanged reads/editor saves. No table, column, index, grant or policy addition is necessary.
+- `journey-media` and `profile-avatars` remain private buckets with 15,728,640-byte JPEG/PNG/WebP limits. Actual journey-media read policy permits owned media or exact published/owned cover/stop references; insert requires user path and owned journey. The thumbnail read policy remains present. Buddy uses packaged sprites and existing media/editor flow, so no Storage change is needed.
+
+## Migration comparison and existing drift
+
+Read the eight default Web SQL migrations: core `20261001000000`, discovery `20261001010000`, detail `20261001020000`, creation `20261002000000`, media limit `20261002010000`, social `20261002020000`, travel tracks `20261003000000`, destinations `20261004000000`. Inspected live core/detail/discovery/save/media/owner contracts agree with the corresponding migrated feature contracts, including renamed stop sequence, creator UUID/status projection, world destination validation and private-draft save ownership.
+
+Hosted migration history contains only `20261024041322 journey_media_thumbnail_v1_read` and `20261025153306 remix_without_media`; the default migration versions are not registered. Additional live standalone-copy policies/private receipt relation and avatar bucket are existing structural/deployment-provenance drift. Full database equivalence is not asserted. These differences do not require any change for Buddy presentation and existing editor shortcuts. Do not replay, reconcile or modify migrations for this task.
+
+## Safe tests and handoff
+
+Database/RPC/API/RLS/permissions/Storage change requirements: **none**. The proposed addition consumes existing loaded journey/session context and invokes existing navigation or guarded editor actions; it introduces no new backend capability.
+
+- Local deterministic tests: own UUID versus other/absent UUID, published detail model propagation, no additional load/request; current-route/owner token checks, suppressed/blurred/background/editor action rejection; no write on bubble opening, tour navigation, reaction or editor opening; retain existing draft save ambiguity and stale-version behavior.
+- UI/native checks: bubble positioning/large text, tap versus drag, navigation/arrival suppression, tour exit and route transitions, capture shortcut availability with/without editable draft. Native inspection may navigate and open an editor, but must not save, upload, create, publish, delete or otherwise write live data without the user's explicit action/target approval.
+- No database fixtures or live writes are necessary. If scope expands to conversational persistence, new queries, AI or changed save contracts, pause for refreshed preflight and a verified disposable database test plan before implementation. Recover by reverting only this task's local changes, preserving the starting dirty baseline.
+
+Missing feature-specific schema evidence: none. Backend gate recommendation: release for the stated UI-only scope after Architect records acceptance. Next owner: Architect, Mobile implementation, QA and independent review. Live Supabase changes: **not authorized; none performed**. Publication: local/unpublished. Changed file: this report only.
+
+## Cosmetic bubble refinement refresh — 2026-10-25
+
+**Decision: no backend change required; ready for Architect gate release.** User-authorized refinement is restricted to BuddyHelpSheet visual styles and concise message copy after native screenshot feedback. Existing bubble actions, save behavior, navigation, ownership fields and data contracts remain unchanged.
+
+- Starting state is the accumulated local Buddy feature on Mobile revision `e527e105b7d1b0a45e04d85fa83d771c6cee8380`, plus the previously listed Home attribution changes. Fresh Git status records Buddy host/help, journey screen, geometry/model/store, discovery queries, journey type and Buddy tests as modified; preflight/QA documents remain untracked. Preserve these existing changes. Web status still shows only the three original untracked metadata directories; the eight default migration filenames are unchanged, with no tracked migration edits.
+- Fresh connector migration-history read and SELECT-only catalog refresh on the same confirmed target succeeded at **2026-10-25 17:02:20.393156 UTC** (22:32:20.393156 IST). History remains the same two hosted migrations. Current function catalog retains the invoker detail wrapper, creator UUID projection in the definer detail implementation, authenticated owner gating in save, and the same execute ACLs. Refreshed function-definition MD5s: detail wrapper `ae705a7a5558415684ba40591702bf89`; private detail `39613298a4c55a41ada066697a2e7d78`; save `5b0fc2023c7f6cfa0e1125d939975b0e`.
+- Journey/stops RLS remains enabled, published-or-owner SELECT and owner-only UPDATE USING/WITH CHECK expressions remain present, and both media buckets remain private with the same size limit. No database, RPC/API, grant, RLS or Storage modification is needed for style/copy changes. Existing migration provenance drift above remains outside scope.
+- Safe validation: local UI/component checks for short copy, action semantics, accessible text and unchanged callbacks, plus native screenshot review at supported text sizes. No data fixtures or live save/upload tests are needed. No application rows or secrets were read; no live writes performed. The Architect records release before coding. This refresh edits only this report.

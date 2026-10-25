@@ -7,7 +7,8 @@ function load(file, modules = {}, timers = globalThis) {
   new Function('require', 'exports', 'setTimeout', 'clearTimeout', source)(id => { assert.ok(id in modules, id); return modules[id]; }, exports, timers.setTimeout, timers.clearTimeout); return exports;
 }
 const model = load('src/lib/buddy/model.ts'), geometry = load('src/lib/buddy/geometry.ts', { './model': model });
-const maps = load('src/lib/buddy/map-controls.ts');
+const globeStyle = load('src/lib/discovery/globe-style.ts');
+const maps = load('src/lib/buddy/map-controls.ts', { '../discovery/globe-style': globeStyle });
 const { createBuddyStore } = load('src/lib/buddy/store.ts', { './model': model });
 const { createBuddyPreference } = load('src/lib/buddy/preference.ts');
 const viewport = { x: 0, y: 0, width: 390, height: 844 }, insets = { top: 24, bottom: 34, left: 0, right: 0 };
@@ -53,6 +54,22 @@ test('SDK control rectangles leave clear map space and use actual measured map o
   const state = geometry.createBuddyGeometry(viewport, insets, controls); assert.equal(geometry.buddyPositionClear({ x: 160, y: 150 }, state), true);
   assert.equal(geometry.buddyPositionClear({ x: 300, y: 290 }, state), false);
 });
+test('Home attribution follows the logo while Buddy can use space released beside the compass', () => {
+  const frame = { x: 12, y: 36, width: 500, height: 600 };
+  for (const header of [0, 80]) for (const compass of [false, true]) {
+    const controls = maps.globeBuddyControls(frame, header, compass);
+    const state = geometry.createBuddyGeometry({ ...viewport, width: 600 }, insets, controls);
+    assert.deepEqual(controls[1], { x: 128, y: 48 + header, width: 40, height: 40 });
+    const released = { x: 360, y: 48 + header };
+    const previous = geometry.createBuddyGeometry({ ...viewport, width: 600 }, insets,
+      [controls[0], maps.anchoredMapControl(frame, { top: header + 12, right: 56 }, 40, 40), ...controls.slice(2)]);
+    assert.equal(geometry.buddyPositionClear(released, previous), false);
+    assert.equal(geometry.buddyPositionClear(released, state), true);
+    assert.deepEqual(geometry.nearestBuddyPosition(released, state), released);
+    for (const control of controls) assert.equal(geometry.buddyPositionClear({ x: control.x, y: control.y }, state), false);
+  }
+});
+
 test('ordinary interaction pauses walking without marking geometry stale, while scroll ownership remains path-specific', () => {
   const store = createBuddyStore(), owner = {}; store.environment('/journey/id', true); store.screen({}, { path: '/journey/id', state: { floating: true }, act() {} });
   store.interaction(true); assert.equal(store.current().geometryPending, false); assert.equal(store.current().interacting, true);

@@ -1,4 +1,5 @@
 import type { BuddyRect } from './model';
+import { globeAttributionPosition, globeLogoPosition } from '../discovery/globe-style';
 type Anchor = { top?: number; bottom?: number; left?: number; right?: number };
 // SDK controls are native descendants, not RN refs. Project each bounded footprint from the measured map view.
 export function anchoredMapControl(frame: BuddyRect, anchor: Anchor, width = 48, height = 48): BuddyRect {
@@ -6,8 +7,8 @@ export function anchoredMapControl(frame: BuddyRect, anchor: Anchor, width = 48,
     y: frame.y + (anchor.top ?? frame.height - (anchor.bottom ?? 0) - height), width, height };
 }
 export function globeBuddyControls(frame: BuddyRect, header: number, compass: boolean) {
-  return [anchoredMapControl(frame, { top: header + 12, left: 12 }, 96, 32),
-    anchoredMapControl(frame, { top: header + 12, right: 56 }, 40, 40),
+  return [anchoredMapControl(frame, { ...globeLogoPosition, top: header + globeLogoPosition.top }, 96, 32),
+    anchoredMapControl(frame, { ...globeAttributionPosition, top: header + globeAttributionPosition.top }, 40, 40),
     ...(compass ? [anchoredMapControl(frame, { top: header + 12, right: 12 })] : [])];
 }
 export function journeyBuddyControls(frame: BuddyRect, navigation: boolean, bottom: number, top: number, compass: boolean) {
