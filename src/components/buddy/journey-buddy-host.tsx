@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
-import { AccessibilityInfo, Animated, AppState, PanResponder, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { AccessibilityInfo, Animated, AppState, PanResponder, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { usePathname, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useBuddyApi } from '@/hooks/use-journey-buddy';
@@ -55,7 +55,6 @@ function BuddyActor({ api, path, geometry, screen, interacting }: { api: Api; pa
   const [help, setHelp] = useState<{ owner: object | null } | null>(() => api.store.getTour() !== null ? { owner: api.store.actionOwner() } : null);
   const [reaction, setReaction] = useState<{ text: string; key: string } | null>(null);
   const [bubbleHeight, setBubbleHeight] = useState(0), [anchor, setAnchor] = useState(initialPoint);
-  const [spaceBlocked, setSpaceBlocked] = useState(false);
   const storyId = screen?.ownStory?.id;
   const [travelWalking, setTravelWalking] = useState(false), burstTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const stopTravelBurst = useCallback(() => { clearTimeout(burstTimer.current); burstTimer.current = undefined; setTravelWalking(false); }, []);
@@ -86,11 +85,8 @@ function BuddyActor({ api, path, geometry, screen, interacting }: { api: Api; pa
       if (!alive.current) return;
       point.current = project(value); position.setValue(point.current); setWalking(false);
       setDragging(false);
-      if (latest.current.help && !placeBuddyBubble(point.current, geometry, Math.min(252, geometry.bounds.width), minimumBubbleHeight)) {
-        setSpaceBlocked(true); setHelp(null); setReaction(null); api.store.setTour(null);
-      }
     });
-  }, [geometry, position, capture, project, api, minimumBubbleHeight]);
+  }, [geometry, position, capture, project]);
   useEffect(() => {
     if (!canAnimate || parked || screen?.travel) return;
     const gesture = gestureState.current;
@@ -155,7 +151,6 @@ function BuddyActor({ api, path, geometry, screen, interacting }: { api: Api; pa
     if (api.store.current().state?.travel?.guidance || api.store.current().state?.travel?.arrival) return;
     capture.read(value => { if (alive.current) { point.current = nearestBuddyPosition(value, latest.current.geometry) ?? point.current; position.setValue(point.current); setAnchor(point.current); } });
     stopTravelBurst(); setWalking(false); setReaction(null);
-    setSpaceBlocked(false);
     setBubbleHeight(0); setHelp({ owner: api.store.actionOwner() });
   };
   const open = useRef<() => void>(() => {});
@@ -213,8 +208,20 @@ function BuddyActor({ api, path, geometry, screen, interacting }: { api: Api; pa
   const canAct = () => alive.current && api.preference.get().enabled && path === api.store.get().path && AppState.currentState === 'active' && !api.store.current().suppressed && !api.store.current().state?.travel?.guidance && !api.store.current().state?.travel?.arrival;
   const reactionVisible = reaction && !quiet && (reaction.key.startsWith('story:') ? reaction.key === 'story:' + screen?.ownStory?.id : !!screen?.travel && travelEvent(screen.travel) === reaction.key);
   const bubbleWidth = Math.min(252, corridor.width);
-  const bubbleMaxHeight = [Math.max(320, minimumBubbleHeight), 280, 240, 200, 160, minimumBubbleHeight].filter(height => height >= minimumBubbleHeight).find(height => placeBuddyBubble(anchor, geometry, bubbleWidth, height)) ?? minimumBubbleHeight;
-  const placement = useMemo(() => bubbleHeight ? placeBuddyBubble(anchor, geometry, bubbleWidth, Math.min(bubbleHeight, bubbleMaxHeight)) : null, [anchor, geometry, bubbleWidth, bubbleHeight, bubbleMaxHeight]);
+  const bubbleActive = !!(help || reactionVisible) && !quiet;
+  const manualHelp = !!help;
+  const bubbleFit = useMemo(() => {
+    if (!bubbleActive) return { maxHeight: minimumBubbleHeight, fits: false, aboveOnly: false };
+    const heights = [...new Set([Math.max(320, minimumBubbleHeight), 280, 240, 200, 160, minimumBubbleHeight])].filter(height => height >= minimumBubbleHeight);
+    if (manualHelp) {
+      const height = heights.find(height => placeBuddyBubble(anchor, geometry, bubbleWidth, height, 'above'));
+      return { maxHeight: height ?? minimumBubbleHeight, fits: height !== undefined, aboveOnly: true };
+    }
+    const height = heights.find(height => placeBuddyBubble(anchor, geometry, bubbleWidth, height));
+    return { maxHeight: height ?? minimumBubbleHeight, fits: height !== undefined, aboveOnly: false };
+  }, [bubbleActive, manualHelp, anchor, geometry, bubbleWidth, minimumBubbleHeight]);
+  const bubbleMaxHeight = bubbleFit.maxHeight;
+  const placement = useMemo(() => bubbleActive && bubbleFit.fits && bubbleHeight ? placeBuddyBubble(anchor, geometry, bubbleWidth, Math.min(bubbleHeight, bubbleMaxHeight), bubbleFit.aboveOnly ? 'above' : undefined) : null, [bubbleActive, bubbleFit.fits, bubbleFit.aboveOnly, anchor, geometry, bubbleWidth, bubbleHeight, bubbleMaxHeight]);
   useEffect(() => {
     if (!help && !reactionVisible) return;
     if (!bubbleHeight) return;
@@ -226,18 +233,19 @@ function BuddyActor({ api, path, geometry, screen, interacting }: { api: Api; pa
   return <>
     <Animated.View pointerEvents="box-none" style={[s.character, { transform: position.getTranslateTransform() }]}>
       <View {...gesture.panHandlers} collapsable={false} pointerEvents="box-only" accessible focusable
-        accessibilityRole="button" accessibilityLabel="Journey Buddy" accessibilityHint={spaceBlocked ? 'I need a little more room. Drag me to a clearer spot, then double tap to retry.' : 'Double tap for journey help. Drag to park Buddy.'}
+        accessibilityRole="button" accessibilityLabel="Journey Buddy" accessibilityHint="Double tap for journey help. Drag to park Buddy."
         accessibilityActions={[{ name: 'activate', label: 'Open journey help' }]} onAccessibilityTap={openHelp}
         onAccessibilityAction={event => { if (event.nativeEvent.actionName === 'activate') openHelp(); }}
         onTouchStart={event => event.stopPropagation()} style={s.touch}>
         <BuddySprite animation={(walking || travelWalking) && canAnimate ? 'walk' : 'idle'} animate={canAnimate} facing={facing} />
-        {spaceBlocked && <Text pointerEvents="none" accessibilityElementsHidden style={s.spaceHint}>…</Text>}
       </View>
     </Animated.View>
     {(help || reactionVisible) && !quiet && <BuddyHelpSheet canAddMemory={!!screen?.canAddMemory} travel={screen?.travel}
-      width={bubbleWidth} maxHeight={bubbleMaxHeight} onMeasure={height => {
-        if (!placeBuddyBubble(anchor, geometry, bubbleWidth, minimumBubbleHeight)) {
-          setSpaceBlocked(true); setHelp(null); setReaction(null); api.store.setTour(null); return;
+      fallback={!!help && !bubbleFit.fits} width={help && !bubbleFit.fits ? Math.min(320, corridor.width - 32) : bubbleWidth}
+      maxHeight={help && !bubbleFit.fits ? Math.max(124, corridor.height - 48) : bubbleMaxHeight} onMeasure={height => {
+        if (!bubbleFit.fits) {
+          if (!help) setReaction(null);
+          return;
         }
         setBubbleHeight(old => old === height ? old : height);
       }}
@@ -253,5 +261,4 @@ const s = StyleSheet.create({
   // Raise the global host above native screen/map layers; startup remains above at z100/elevation30.
   host: { zIndex: 30, elevation: 20 },
   character: { position: 'absolute', left: 0, top: 0, width: 64, height: 64, zIndex: 25 }, touch: { width: 64, height: 64 },
-  spaceHint: { position: 'absolute', top: 0, right: 0, width: 24, height: 22, textAlign: 'center', color: '#314F5D', backgroundColor: '#F5FBFF', borderRadius: 10, fontSize: 17 },
 });

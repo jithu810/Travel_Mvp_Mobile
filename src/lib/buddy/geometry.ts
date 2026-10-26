@@ -6,7 +6,7 @@ export function buddyOverlayClear(rect: BuddyRect, geometry: BuddyGeometry) {
   const { bounds } = geometry;
   return rect.x >= bounds.x && rect.y >= bounds.y && rect.x + rect.width <= bounds.x + bounds.width && rect.y + rect.height <= bounds.y + bounds.height && !geometry.obstacles.some(obstacle => overlaps(rect, obstacle));
 }
-export function placeBuddyBubble(point: BuddyPoint, geometry: BuddyGeometry, width: number, height: number) {
+export function placeBuddyBubble(point: BuddyPoint, geometry: BuddyGeometry, width: number, height: number, preference?: 'above') {
   const bounds = geometry.bounds;
   if (![width, height].every(Number.isFinite) || width <= 0 || height <= 0 || width > bounds.width) return null;
   const seeds = [point, ...geometry.areas.flatMap(a => [
@@ -14,14 +14,42 @@ export function placeBuddyBubble(point: BuddyPoint, geometry: BuddyGeometry, wid
     { x: a.x, y: a.y + a.height - BUDDY_SIZE }, { x: a.x + a.width - BUDDY_SIZE, y: a.y },
     { x: a.x + (a.width - BUDDY_SIZE) / 2, y: a.y + (a.height - BUDDY_SIZE) / 2 },
   ])].sort((a, b) => Math.hypot(a.x - point.x, a.y - point.y) - Math.hypot(b.x - point.x, b.y - point.y));
-  for (const buddy of seeds) {
-    if (!buddyPositionClear(buddy, geometry)) continue;
+  const sides = preference === 'above' ? [true] : [true, false];
+  const place = (buddy: BuddyPoint, directions: readonly boolean[] = sides) => {
+    if (!buddyPositionClear(buddy, geometry)) return null;
     const x = Math.max(bounds.x, Math.min(bounds.x + bounds.width - width, buddy.x + BUDDY_SIZE / 2 - width / 2));
-    for (const above of [true, false]) {
+    for (const above of directions) {
       const rect = { x, y: above ? buddy.y - height - 10 : buddy.y + BUDDY_SIZE + 10, width, height };
       // Include the tail in collision checks, leaving a clear link to Buddy.
       const withTail = { ...rect, y: above ? rect.y : rect.y - 10, height: rect.height + 10 };
       if (buddyOverlayClear(withTail, geometry)) return { rect, buddy, above, tailX: Math.max(18, Math.min(width - 18, buddy.x + BUDDY_SIZE / 2 - x)) };
+    }
+    return null;
+  };
+  for (const buddy of seeds) {
+    const placement = place(buddy);
+    if (placement) return placement;
+  }
+  // Generic Buddy-area samples can miss a bubble-sized gap between pins. In
+  // Buddy coordinates, every collision boundary lies on one of these edges.
+  // Include the bubble's centering/clamping transitions as well as Buddy edges.
+  const right = bounds.x + bounds.width, bottom = bounds.y + bounds.height;
+  const ordered = (values: number[], min: number, max: number, preferred: number) => [...new Set(values)]
+    .filter(value => Number.isFinite(value) && value >= min && value <= max)
+    .sort((a, b) => Math.abs(a - preferred) - Math.abs(b - preferred));
+  const xs = ordered([point.x, bounds.x, right - BUDDY_SIZE,
+    bounds.x + width / 2 - BUDDY_SIZE / 2, right - width / 2 - BUDDY_SIZE / 2,
+    ...geometry.obstacles.flatMap(o => [o.x - BUDDY_SIZE, o.x + o.width,
+      o.x - width / 2 - BUDDY_SIZE / 2, o.x + o.width + width / 2 - BUDDY_SIZE / 2])], bounds.x, right - BUDDY_SIZE, point.x);
+  for (const above of sides) {
+    const minY = above ? bounds.y + height + 10 : bounds.y;
+    const maxY = above ? bottom - BUDDY_SIZE : bottom - BUDDY_SIZE - height - 10;
+    const ys = ordered([point.y, minY, maxY, ...geometry.obstacles.flatMap(o => [o.y - BUDDY_SIZE, o.y + o.height,
+      above ? o.y : o.y - BUDDY_SIZE - height - 10,
+      above ? o.y + o.height + height + 10 : o.y + o.height - BUDDY_SIZE])], minY, maxY, point.y);
+    for (const y of ys) for (const x of xs) {
+      const placement = place({ x, y }, [above]);
+      if (placement) return placement;
     }
   }
   return null;

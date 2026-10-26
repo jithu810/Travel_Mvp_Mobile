@@ -1,5 +1,6 @@
-import { BackHandler, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { BackHandler, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useEffect } from 'react';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { buddyTravelCopy, type BuddyTravel } from '@/lib/buddy/model';
 
 export const buddyTour = [
@@ -10,10 +11,11 @@ export const buddyTour = [
 
 // Historical module name; this is an anchored bubble, not a modal or bottom sheet.
 export function BuddyHelpSheet({ canAddMemory, travel, onAddMemory, onCreate, onDrafts, onClose, onTour, onNext,
-  tour = null, reaction, placement, width = 252, maxHeight = 320, onMeasure }: {
+  tour = null, reaction, placement, fallback = false, width = 252, maxHeight = 320, onMeasure }: {
   canAddMemory: boolean; travel?: BuddyTravel; onAddMemory: () => void; onCreate: () => void; onDrafts: () => void; onClose: () => void;
   onTour?: () => void; onNext?: () => void; tour?: number | null; reaction?: string;
   placement?: { x: number; y: number; above: boolean; tailX: number }; width?: number; maxHeight?: number; onMeasure?: (height: number) => void;
+  fallback?: boolean;
 }) {
   useEffect(() => {
     const back = BackHandler.addEventListener('hardwareBackPress', () => { onClose(); return true; });
@@ -23,9 +25,10 @@ export function BuddyHelpSheet({ canAddMemory, travel, onAddMemory, onCreate, on
   const text = reaction ?? step?.text ?? (travel
     ? (travel.status === 'ready' ? 'Adventure time! Tiny backpack reporting for duty.' : buddyTravelCopy(travel)) + (canAddMemory ? '' : ' Capture moments in a private draft. Leaving Travel Mode stops GPS.')
     : canAddMemory ? 'A moment worth keeping? Let’s tuck it into your story.' : 'Tiny backpack, big adventures! Shall we explore?');
-  return <View testID="buddy-speech-bubble" pointerEvents={placement ? 'auto' : 'none'} accessibilityElementsHidden={!placement} importantForAccessibility={placement ? 'auto' : 'no-hide-descendants'} onTouchStart={event => event.stopPropagation()}
-    onLayout={event => onMeasure?.(event.nativeEvent.layout.height)}
-    style={[s.bubble, { width, maxHeight, left: placement?.x ?? 0, top: placement?.y ?? 0, opacity: placement ? 1 : 0 }]}>
+  const shown = fallback || !!placement;
+  const content = <View testID="buddy-speech-bubble" accessibilityViewIsModal={fallback} pointerEvents={shown ? 'auto' : 'none'} accessibilityElementsHidden={!shown} importantForAccessibility={shown ? 'auto' : 'no-hide-descendants'} onTouchStart={event => event.stopPropagation()}
+    onLayout={fallback ? undefined : event => onMeasure?.(event.nativeEvent.layout.height)}
+    style={[s.bubble, { width, maxHeight, left: fallback ? undefined : placement?.x ?? 0, top: fallback ? undefined : placement?.y ?? 0, opacity: shown ? 1 : 0 }, fallback && s.dialog]}>
     <View style={s.messageRow}>
       <ScrollView style={s.scroll} keyboardShouldPersistTaps="handled">
         <Text accessibilityLiveRegion="polite" style={s.body}>{step && <Text style={s.step}>{((tour ?? 0) + 1) + '/3  '}</Text>}{text}</Text>
@@ -41,8 +44,11 @@ export function BuddyHelpSheet({ canAddMemory, travel, onAddMemory, onCreate, on
         <HelpAction secondary label="Show me around" onPress={onTour ?? onCreate} />
       </>}
     </View>}
-    {placement && <View pointerEvents="none" style={[s.tail, { left: placement.tailX - 7 }, placement.above ? s.tailBelow : s.tailAbove]} />}
+    {!fallback && placement && <View pointerEvents="none" style={[s.tail, { left: placement.tailX - 7 }, placement.above ? s.tailBelow : s.tailAbove]} />}
   </View>;
+  return fallback ? <Modal transparent visible animationType="none" onRequestClose={onClose}>
+    <SafeAreaView style={s.scrim}><Pressable style={StyleSheet.absoluteFill} accessibilityRole="button" accessibilityLabel="Close Journey Buddy help" onPress={onClose} />{content}</SafeAreaView>
+  </Modal> : content;
 }
 function HelpAction({ label, onPress, secondary = false }: { label: string; onPress: () => void; secondary?: boolean }) {
   return <Pressable accessibilityRole="button" onPress={onPress} style={({ pressed }) => [s.action, pressed && s.pressed]}>
@@ -50,6 +56,8 @@ function HelpAction({ label, onPress, secondary = false }: { label: string; onPr
   </Pressable>;
 }
 const s = StyleSheet.create({
+  scrim: { flex: 1, padding: 24, alignItems: 'center', justifyContent: 'center', backgroundColor: '#10231F66' },
+  dialog: { position: 'relative', left: undefined, top: undefined, maxWidth: '100%' },
   bubble: { position: 'absolute', borderRadius: 20, backgroundColor: '#FFFCF3', borderWidth: 1, borderColor: '#A9C9BB', padding: 8, gap: 6, zIndex: 40, elevation: 24,
     shadowColor: '#244A3D', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.13, shadowRadius: 8 },
   messageRow: { flexDirection: 'row', alignItems: 'flex-start', minHeight: 44, flexShrink: 1 },

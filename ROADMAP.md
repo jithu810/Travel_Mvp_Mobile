@@ -1,3 +1,9 @@
+## Buddy opening investigation - 2026-10-26
+- [x] Correct sparse-placement false no-fit, repeated search cost, above-only manual help and safe dialog fallback. Final focused QA128/128 and independent review64/64 pass. Publication authorized; draft PR prepared.
+- [x] Rebind phone8081 tunnel to this laptop, start fresh Metro from D:/JBuild, confirm runtime attachment and full bubble opening on unconfigured Home. No rebuild performed or required by these JS changes.
+- [x] Restore environment using owner-approved Expo automatic loading; verify configured-Home opening and tour step1/3.
+- [ ] Complete final above-only/dialog native QA on unlocked phone, including Back/close/tour and larger text. Final files synced to active Metro; no rebuild needed. See docs/qa/buddy-bubble-opening-2026-10-26.md.
+
 ## Buddy speech-bubble companion experiment - 2026-10-25
 - LATEST HANDOFF: 722 cases verified across broad/isolated retry, types/current-source lint pass, independent publication review clear. Latest Outdoor build copy prepared at D:/JBuild for user-operated Gradle with D:/GHome cache; no build/install started. New PR publication authorized; no merge authorized.
 - COSMETIC REFINEMENT: ivory/teal bubble, compact pill/text actions, small accessible close and shorter tour copy. Native default-size appearance verified; Buddy 30/30, TypeScript and lint pass; independent review has no actionable findings. Local/unpublished; larger-text device check pending.
