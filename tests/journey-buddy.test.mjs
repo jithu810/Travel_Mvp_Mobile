@@ -19,6 +19,14 @@ const { createBuddyPositionCapture } = load('src/lib/buddy/position.ts');
 const { createBuddyPreference, BUDDY_PREFERENCE_KEY } = load('src/lib/buddy/preference.ts');
 const animations = load('src/lib/buddy/animations.ts');
 const tick = () => new Promise(setImmediate);
+function zoomedBuddyGeometry() {
+  const obstacles = [[-8,327.3333435058594,376,461.9999694824219],[8,691.3333129882812,344,74],[-8,36,376,72],
+    [8,625.3333129882812,344,70],[4,263.3333435058594,68,68],[152.44546313737123,257.68098804925785,80,80],
+    [163.25604684830878,205.21882964243912,80,80],[181.55453686264147,98.31901434198744,80,80],
+    [4,112,112,48],[108,112,56,56],[292,112,64,64]];
+  return geometry.createBuddyGeometry({ x: 0, y: 0, width: 360, height: 781.3333129882812 },
+    { top: 40, bottom: 16, left: 0, right: 0 }, obstacles.map(([x,y,width,height]) => ({ x: x + 8, y: y + 8, width: width - 16, height: height - 16 })));
+}
 test('bubble placement stays clear, flips below near the top, and relocates beside protected controls', () => {
   const g = geometry.createBuddyGeometry({ x: 0, y: 0, width: 360, height: 800 }, { top: 24, bottom: 24, left: 0, right: 0 }, []);
   const top = geometry.placeBuddyBubble({ x: 150, y: 30 }, g, 252, 240);
@@ -30,7 +38,36 @@ test('bubble placement stays clear, flips below near the top, and relocates besi
   const moved = geometry.placeBuddyBubble({ x: 280, y: 700 }, blocked, 252, 240);
   assert.ok(moved); assert.equal(geometry.buddyOverlayClear(moved.rect, blocked), true); assert.equal(geometry.buddyPositionClear(moved.buddy, blocked), true);
   assert.equal(geometry.placeBuddyBubble({ x: 0, y: 0 }, g, 999, 240), null);
+  const preferred = geometry.placeBuddyBubble({ x: 150, y: 30 }, g, 252, 240, 'above');
+  assert.ok(preferred); assert.equal(preferred.above, true, 'Above preference relocates Buddy before falling below him');
 });
+test('Home bubble finds clear space between branding, map pins and the discovery rail', () => {
+  const controls = [
+    { x: 0, y: 40, width: 360, height: 60 }, { x: 0, y: 380, width: 360, height: 420 },
+    { x: 12, y: 112, width: 96, height: 32 }, { x: 116, y: 112, width: 40, height: 40 },
+    { x: 300, y: 112, width: 48, height: 48 },
+    { x: 289, y: 181, width: 64, height: 64 }, { x: 113, y: 312, width: 64, height: 64 },
+    { x: 273, y: 303, width: 64, height: 64 },
+  ];
+  const g = geometry.createBuddyGeometry({ x: 0, y: 0, width: 360, height: 800 }, { top: 24, bottom: 24, left: 0, right: 0 }, controls);
+  // There is room, but none of the five generic samples in each Buddy area finds it.
+  assert.equal(geometry.buddyPositionClear({ x: 4, y: 294 }, g), true);
+  assert.equal(geometry.buddyOverlayClear({ x: 4, y: 160, width: 252, height: 134 }, g), true);
+  const parked = geometry.nearestBuddyPosition({ x: 300, y: 600 }, g);
+  const placement = geometry.placeBuddyBubble(parked, g, 252, 124);
+  assert.ok(placement, 'A tap must find the available bubble and tail space');
+  assert.equal(geometry.buddyPositionClear(placement.buddy, g), true);
+  assert.equal(geometry.buddyOverlayClear({ ...placement.rect, y: placement.above ? placement.rect.y : placement.rect.y - 10, height: placement.rect.height + 10 }, g), true);
+  for (const offset of [1 / 3, 0.5]) {
+    const fractional = geometry.createBuddyGeometry({ x: 0, y: 0, width: 360, height: 781 + 1 / 3 },
+      { top: 24, bottom: 24, left: 0, right: 0 }, controls.map(rect => ({ ...rect, y: rect.y + offset })));
+    const result = geometry.placeBuddyBubble(geometry.nearestBuddyPosition({ x: 300, y: 600 }, fractional), fractional, 252, 124);
+    assert.ok(result, 'Fractional Android measurements retain the available placement');
+    assert.equal(geometry.buddyPositionClear(result.buddy, fractional), true);
+    assert.equal(geometry.buddyOverlayClear({ ...result.rect, y: result.above ? result.rect.y : result.rect.y - 10, height: result.rect.height + 10 }, fractional), true);
+  }
+});
+
 test('store reaction cooldown spans actor remounts and route visits; tour survives navigation until exit', () => {
   const store = createBuddyStore(); store.environment('/discover', true);
   assert.equal(store.reactOnce('story:a', 0), true); assert.equal(store.reactOnce('story:a', 31000), false);
@@ -190,7 +227,7 @@ function clock() {
 }
 const jsx = (type, props) => ({ type, props });
 const runtime = { jsx, jsxs: jsx, Fragment: 'Fragment' };
-function all(tree, type) { if (!tree || typeof tree !== 'object') return []; return [...(tree.type === type ? [tree] : []), ...[tree.props?.children].flat(Infinity).flatMap(n => all(n, type))]; }
+function all(tree, type) { if (!tree || typeof tree !== 'object') return []; return [...(type === undefined || tree.type === type ? [tree] : []), ...[tree.props?.children].flat(Infinity).flatMap(n => all(n, type))]; }
 test('actual isolated sprite clock crops Walk, freezes for reduced/paused motion, falls back on image errors and cleans unmount', () => {
   const h = hooks(), timers = clock();
   const { BuddySprite } = load('src/components/buddy/buddy-sprite.tsx', { react: h.react, 'react/jsx-runtime': runtime, 'react-native': { Image: 'Image', View: 'View' }, '@/lib/buddy/animations': animations }, timers);
@@ -210,7 +247,7 @@ test('future non-looping sprites stop their frame clock at the final frame', () 
 });
 test('actual anchored helper offers two contextual actions and never saves automatically', () => {
   const h = hooks(); let creates = 0, drafts = 0, adds = 0;
-  const { BuddyHelpSheet } = load('src/components/buddy/buddy-help-sheet.tsx', { react: h.react, 'react/jsx-runtime': runtime, 'react-native': { BackHandler: { addEventListener: () => ({ remove() {} }) }, Pressable: 'Pressable', ScrollView: 'ScrollView', Text: 'Text', View: 'View', StyleSheet: { create: v => v } }, '@/lib/buddy/model': model });
+  const { BuddyHelpSheet } = load('src/components/buddy/buddy-help-sheet.tsx', { react: h.react, 'react/jsx-runtime': runtime, 'react-native': { BackHandler: { addEventListener: () => ({ remove() {} }) }, Modal: 'Modal', Pressable: 'Pressable', ScrollView: 'ScrollView', Text: 'Text', View: 'View', StyleSheet: { create: v => v } }, 'react-native-safe-area-context': { SafeAreaView: 'SafeAreaView' }, '@/lib/buddy/model': model });
   const props = { canAddMemory: false, onAddMemory: () => adds++, onCreate: () => creates++, onDrafts: () => drafts++, onClose() {} };
   let tree = h.render(BuddyHelpSheet, props); assert.equal(creates + drafts + adds, 0);
   // Components remain function-valued in this small JSX harness.
@@ -221,6 +258,28 @@ test('actual anchored helper offers two contextual actions and never saves autom
   assert.equal(all(tree, 'View').find(n => n.props.testID === 'buddy-bubble-actions').props.style.flexShrink, 0, 'Both actions keep their space in a124dp bubble');
   tree = h.render(BuddyHelpSheet, { ...props, canAddMemory: true }); findAction('Capture a moment').props.onPress(); assert.equal(adds, 1);
   assert.equal(creates, 0); assert.ok(findAction('Show me around')); h.dispose();
+});
+
+test('manual help dialog is visible without measurement, retains actions and dismisses via close or Android Back', () => {
+  const h = hooks(); let closes = 0, drafts = 0, back;
+  const { BuddyHelpSheet } = load('src/components/buddy/buddy-help-sheet.tsx', {
+    react: h.react, 'react/jsx-runtime': runtime, 'react-native-safe-area-context': { SafeAreaView: 'SafeAreaView' },
+    'react-native': { BackHandler: { addEventListener: (_, callback) => { back = callback; return { remove() {} }; } },
+      Modal: 'Modal', Pressable: 'Pressable', ScrollView: 'ScrollView', Text: 'Text', View: 'View', StyleSheet: { create: value => value, absoluteFill: {} } },
+    '@/lib/buddy/model': model,
+  });
+  const tree = h.render(BuddyHelpSheet, { fallback: true, canAddMemory: false, onClose: () => closes++, onDrafts: () => drafts++, onCreate() {}, onAddMemory() {} });
+  assert.equal(tree.type, 'Modal'); assert.equal(tree.props.visible, true);
+  const surface = all(tree, 'View').find(n => n.props.testID === 'buddy-speech-bubble');
+  assert.equal(surface.props.pointerEvents, 'auto'); assert.equal(surface.props.accessibilityViewIsModal, true);
+  assert.equal(surface.props.accessibilityElementsHidden, false); assert.equal(surface.props.onLayout, undefined);
+  assert.equal(surface.props.style[1].opacity, 1);
+  const draftAction = all(tree, undefined).find(n => n.props?.label === 'Open my drafts');
+  draftAction.props.onPress(); assert.equal(drafts, 1);
+  tree.props.onRequestClose(); assert.equal(closes, 1);
+  assert.equal(back(), true); assert.equal(closes, 2);
+  all(tree, 'Pressable').find(n => n.props.accessibilityLabel === 'Close Journey Buddy help').props.onPress(); assert.equal(closes, 3);
+  h.dispose();
 });
 
 async function hostHarness(openSpace = false) {
@@ -247,13 +306,14 @@ async function hostHarness(openSpace = false) {
       getTranslateTransform() { return [{ translateX: this.value.x }, { translateY: this.value.y }]; }
     }, timing: (value, config) => ({ start(fn) { native.animation = { value, config, finish: () => { value.setValue(config.toValue); fn({ finished: true }); } }; } }) },
   };
-  const routes = [];
+  const routes = []; let placementCalls = 0;
   const module = load('src/components/buddy/journey-buddy-host.tsx', {
     react, 'react/jsx-runtime': runtime, 'react-native': native,
     'expo-router': { usePathname: () => path, useRouter: () => ({ navigate: route => routes.push(route) }) },
     'react-native-safe-area-context': { useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 4, right: 4 }) },
     '@/hooks/use-journey-buddy': { useBuddyApi: () => api }, '@/lib/buddy/model': model,
-    '@/lib/buddy/position': { createBuddyPositionCapture }, '@/lib/buddy/geometry': geometry,
+    '@/lib/buddy/position': { createBuddyPositionCapture }, '@/lib/buddy/geometry': { ...geometry,
+      placeBuddyBubble(...args) { placementCalls++; return geometry.placeBuddyBubble(...args); } },
     './buddy-sprite': { BuddySprite: 'BuddySprite' }, './buddy-help-sheet': { BuddyHelpSheet: 'BuddyHelpSheet' },
   }, timers);
   const hostElement = module.JourneyBuddyHost(); let actorElement;
@@ -268,7 +328,7 @@ async function hostHarness(openSpace = false) {
     currentHooks = actorHooks;
     return actorHooks.render(actorElement.type, { ...actorElement.props, ...overrides });
   };
-  return { api, native, timers, routes, owner, region, renderHost, renderActor, get actorHooks() { return actorHooks; }, hostHooks, adds: () => adds,
+  return { api, native, timers, routes, owner, region, renderHost, renderActor, get placementCalls() { return placementCalls; }, get actorHooks() { return actorHooks; }, hostHooks, adds: () => adds,
     remountActor() { actorHooks.dispose(); actorHooks = hooks(); return renderActor(); },
     path: value => { path = value; api.store.environment(value, true); } };
 }
@@ -439,16 +499,83 @@ test('actual own-story reaction appears once and never replays after geometry re
   h.actorHooks.dispose(); h.hostHooks.dispose();
 });
 
-test('a measured no-fit bubble releases gestures and allows drag and later retry', async () => {
+test('bubble placement searches stay idle while closed and reuse a measured no-fit result', async () => {
+  const h = await hostHarness(true); h.renderHost(); let tree = h.renderActor(); await tick();
+  for (let i = 0; i < 20; i++) tree = h.renderActor();
+  assert.equal(h.placementCalls, 0, 'Closed Buddy must not scan for bubble space on ordinary renders');
+  const stripes = [116, 240, 364, 488, 612, 736].map(y => ({ x: 0, y, width: 390, height: 28 }));
+  const cramped = geometry.createBuddyGeometry({ x: 0, y: 0, width: 390, height: 844 }, { top: 0, bottom: 0, left: 0, right: 0 }, stripes);
+  tree = h.renderActor({ geometry: cramped });
+  all(tree, 'View').find(n => n.props.accessibilityLabel === 'Journey Buddy').props.onAccessibilityTap();
+  tree = h.renderActor({ geometry: cramped });
+  const searched = h.placementCalls; assert.ok(searched > 0);
+  for (let i = 0; i < 20; i++) tree = h.renderActor({ geometry: cramped });
+  assert.equal(h.placementCalls, searched, 'Unchanged open geometry reuses the height search');
+  all(tree, 'BuddyHelpSheet')[0].props.onMeasure(124);
+  tree = h.renderActor({ geometry: cramped });
+  assert.equal(h.placementCalls, searched, 'Measurement reuses the known no-fit result');
+  assert.equal(all(tree, 'BuddyHelpSheet')[0].props.fallback, true);
+  all(tree, 'BuddyHelpSheet')[0].props.onClose(); tree = h.renderActor({ geometry: cramped });
+  assert.equal(all(tree, 'View').find(n => n.props.accessibilityLabel === 'Journey Buddy').props.onStartShouldSetPanResponder(), true);
+  h.actorHooks.dispose(); h.hostHooks.dispose();
+});
+
+test('manual help uses the dialog when only a below-Buddy bubble would fit', async () => {
+  const h = await hostHarness(true); h.renderHost();
+  const belowOnly = geometry.createBuddyGeometry({ x: 0, y: 0, width: 360, height: 300 },
+    { top: 0, bottom: 0, left: 0, right: 0 }, [{ x: 0, y: 0, width: 180, height: 100 }]);
+  assert.equal(geometry.placeBuddyBubble({ x: 292, y: 40 }, belowOnly, 252, 124).above, false);
+  assert.equal(geometry.placeBuddyBubble({ x: 292, y: 40 }, belowOnly, 252, 124, 'above'), null);
+  let tree = h.renderActor({ geometry: belowOnly }); await tick(); tree = h.renderActor({ geometry: belowOnly });
+  all(tree, 'View').find(n => n.props.accessibilityLabel === 'Journey Buddy').props.onAccessibilityTap();
+  tree = h.renderActor({ geometry: belowOnly });
+  assert.equal(all(tree, 'BuddyHelpSheet')[0].props.fallback, true);
+  assert.equal(all(tree, 'BuddyHelpSheet')[0].props.placement, undefined);
+  h.actorHooks.dispose(); h.hostHooks.dispose();
+});
+
+test('exact zoomed-map geometry opens manual help, retains tour and guards stale actions', async () => {
+  const h = await hostHarness(true); h.renderHost(); const zoom = zoomedBuddyGeometry();
+  assert.equal(geometry.placeBuddyBubble({ x: 292, y: 250 }, zoom, 252, 124), null);
+  let tree = h.renderActor({ geometry: zoom }); await tick(); tree = h.renderActor({ geometry: zoom });
+  all(tree, 'View').find(n => n.props.accessibilityLabel === 'Journey Buddy').props.onAccessibilityTap();
+  tree = h.renderActor({ geometry: zoom }); let dialog = all(tree, 'BuddyHelpSheet')[0];
+  assert.equal(dialog.props.fallback, true); assert.ok(dialog.props.width >= 252); assert.ok(dialog.props.maxHeight > 124);
+  assert.equal(all(tree, 'BuddySprite')[0].props.animate, false);
+  dialog.props.onTour(); tree = h.renderActor({ geometry: zoom }); dialog = all(tree, 'BuddyHelpSheet')[0];
+  assert.equal(dialog.props.tour, 0); assert.equal(dialog.props.fallback, true);
+  dialog.props.onNext(); tree = h.renderActor({ geometry: zoom }); dialog = all(tree, 'BuddyHelpSheet')[0]; assert.equal(dialog.props.tour, 1);
+  const staleAdd = dialog.props.onAddMemory, staleDrafts = dialog.props.onDrafts;
+  await h.api.preference.setEnabled(false); staleAdd(); staleDrafts(); assert.equal(h.adds(), 0); assert.deepEqual(h.routes, []);
+  await h.api.preference.setEnabled(true); dialog.props.onClose(); tree = h.renderActor({ geometry: zoom });
+  assert.equal(all(tree, 'BuddyHelpSheet').length, 0); assert.equal(h.api.store.getTour(), null);
+  h.actorHooks.dispose(); h.hostHooks.dispose();
+});
+
+test('automatic own-story reactions never open a dialog when map space disappears', async () => {
+  const h = await hostHarness(true);
+  h.api.store.screen(h.owner, { path: '/create', state: { floating: true, ownStory: { id: 'mine' } }, act() {} });
+  h.renderHost(); let tree = h.renderActor(); tree = h.renderActor();
+  assert.ok(all(tree, 'BuddyHelpSheet')[0].props.reaction);
+  tree = h.renderActor({ geometry: zoomedBuddyGeometry() }); const reaction = all(tree, 'BuddyHelpSheet')[0];
+  assert.equal(reaction.props.fallback, false); assert.equal(reaction.props.placement, undefined);
+  reaction.props.onMeasure(124); tree = h.renderActor({ geometry: zoomedBuddyGeometry() });
+  assert.equal(all(tree, 'BuddyHelpSheet').length, 0);
+  h.actorHooks.dispose(); h.hostHooks.dispose();
+});
+
+test('a measured no-fit bubble stays usable in a manual dialog and closes before dragging', async () => {
   const h = await hostHarness(true); h.renderHost(); const stripes = [116,240,364,488,612,736].map(y => ({ x: 0, y, width: 390, height: 28 }));
   const cramped = geometry.createBuddyGeometry({ x:0,y:0,width:390,height:844 }, { top:0,bottom:0,left:0,right:0 }, stripes);
   assert.ok(cramped.areas.length); assert.equal(geometry.placeBuddyBubble({x:300,y:40},cramped,252,124),null);
   let tree = h.renderActor({ geometry: cramped }); await tick(); tree = h.renderActor({ geometry: cramped });
   all(tree,'View').find(n=>n.props.accessibilityLabel==='Journey Buddy').props.onAccessibilityTap(); tree = h.renderActor({ geometry: cramped });
   all(tree,'BuddyHelpSheet')[0].props.onMeasure(124); h.renderActor({ geometry: cramped }); tree = h.renderActor({ geometry: cramped });
-  assert.equal(all(tree,'BuddyHelpSheet').length,0);
+  assert.equal(all(tree,'BuddyHelpSheet')[0].props.fallback,true);
+  assert.equal(all(tree,'BuddySprite')[0].props.animate,false);
+  all(tree,'BuddyHelpSheet')[0].props.onClose(); tree=h.renderActor({geometry:cramped});
   let buddy = all(tree,'View').find(n=>n.props.accessibilityLabel==='Journey Buddy');
-  assert.equal(buddy.props.onStartShouldSetPanResponder(),true); assert.ok(buddy.props.accessibilityHint.includes('retry'));
+  assert.equal(buddy.props.onStartShouldSetPanResponder(),true);
   buddy.props.onPanResponderGrant(); buddy.props.onPanResponderMove(null,{dx:-50,dy:0}); buddy.props.onPanResponderRelease(null,{dx:-50,dy:0});
   tree = h.renderActor(); buddy = all(tree,'View').find(n=>n.props.accessibilityLabel==='Journey Buddy'); buddy.props.onAccessibilityTap(); tree = h.renderActor();
   all(tree,'BuddyHelpSheet')[0].props.onMeasure(200); tree = h.renderActor(); assert.ok(all(tree,'BuddyHelpSheet')[0].props.placement);
