@@ -28,7 +28,7 @@ function load(file, modules, hooks=harness().hooks, timers=globalThis) {
   new Function('require','exports','setTimeout','clearTimeout',code)(name=>{ if (name === '@/theme/mobile-theme') return mobileTheme;
     if(name==='@/hooks/use-journey-buddy')return modules[name] || {useBuddyScreen(){}};
     if(name==='@/hooks/use-buddy-map-pins')return buddyMapPinsStub;
-    if(name==='@/lib/buddy/map-controls')return load('src/lib/buddy/map-controls.ts',{});
+    if(name==='@/lib/buddy/map-controls')return load('src/lib/buddy/map-controls.ts',{'../discovery/globe-style':load('src/lib/discovery/globe-style.ts',{})});
     if(name==='@/lib/buddy/model')return load('src/lib/buddy/model.ts',{});
     if(name==='@/components/buddy/buddy-space')return {BuddySpace:'BuddySpace'};
     if(name==='@/components/create/draft-route-illustration')return {DraftRouteIllustration:'DraftRouteIllustration'};
@@ -454,7 +454,7 @@ test('globe preview keeps native attribution while Home retains its original con
     '@/lib/discovery/map':{worldCamera,selectedJourneyId:()=>null},
     '@/lib/discovery/camera':{discoveryPadding:()=>({paddingTop:12}),locateCamera:()=>null,maxDiscoveryZoom:16},
     '@/lib/discovery/locate-transition':{createLocateTransition:()=>({})},'@/lib/discovery/idle-motion':{createIdleMotion:()=>({})},
-    '@/lib/discovery/globe-style':{globeLogoPosition:{top:12,left:12},globeAttributionPosition:{top:12,right:56}},'../home-control-icon':{HomeControlIcon:'HomeControlIcon'},'../ui':ui,'@/lib/discovery/presentation':{},'./fallback':{GlobeLoading:'GlobeLoading'},'./journey-overlays':{JourneyOverlays:'JourneyOverlays'},
+    '@/lib/discovery/globe-style':load('src/lib/discovery/globe-style.ts',{}),'../home-control-icon':{HomeControlIcon:'HomeControlIcon'},'../ui':ui,'@/lib/discovery/presentation':{},'./fallback':{GlobeLoading:'GlobeLoading'},'./journey-overlays':{JourneyOverlays:'JourneyOverlays'},
   });
   const props={points:{features:[]},route:[],onOpen(){},retry(){},bottomInset:0,viewport:{width:360,height:120},selectionId:null,locateVersion:0,sheetInteracting:true};
   let tree=NativeGlobe({...props,preview:true});let map=all(tree,'MapView')[0].props;
@@ -620,7 +620,7 @@ test('Create native globe flies to real destinations, replaces repeated flights,
     '@rnmapbox/maps':{__esModule:true,default:mapbox},'expo-router':{useFocusEffect:fn=>h.hooks.useEffect(fn,[fn])},
     'react-native':{AppState:{currentState:'active',addEventListener:(name,fn)=>{appChange=fn;return {remove(){}};}},AccessibilityInfo:{isReduceMotionEnabled:async()=>false,addEventListener:(name,fn)=>{motionChange=fn;return {remove(){}};}}},
     '@/lib/discovery/map':{worldCamera:{centerCoordinate:[35,18],zoomLevel:0.8},selectedJourneyId:()=>null},'@/lib/discovery/camera':{discoveryPadding:()=>({}),locateCamera:()=>null,maxDiscoveryZoom:16,locateDuration:900},
-    '@/lib/discovery/locate-transition':{createLocateTransition:()=>({select(){},cancel(){}})},'@/lib/discovery/idle-motion':{createIdleMotion:()=>motion},'@/lib/discovery/globe-style':{globeLogoPosition:{top:12,left:12},globeAttributionPosition:{top:12,right:56}},'../ui':ui,'@/lib/discovery/presentation':{},'./fallback':{GlobeLoading:'GlobeLoading'},'./journey-overlays':{JourneyOverlays:'JourneyOverlays'},
+    '@/lib/discovery/locate-transition':{createLocateTransition:()=>({select(){},cancel(){}})},'@/lib/discovery/idle-motion':{createIdleMotion:()=>motion},'@/lib/discovery/globe-style':load('src/lib/discovery/globe-style.ts',{}),'../ui':ui,'@/lib/discovery/presentation':{},'./fallback':{GlobeLoading:'GlobeLoading'},'./journey-overlays':{JourneyOverlays:'JourneyOverlays'},
   },h.hooks);
   let props={preview:true,destinationMode:true,destination:null,destinationVersion:0,points:{features:[]},route:[],onOpen(){},retry(){},bottomInset:0,viewport:{width:344,height:192},selectionId:null,locateVersion:0,sheetInteracting:true};
   let tree=h.render(NativeGlobe,props);all(tree,'Camera')[0].props.ref.current={setCamera:command=>commands.push(command)};await tick();all(tree,'MapView')[0].props.onDidFinishLoadingMap();tree=h.render(NativeGlobe,props);
@@ -690,7 +690,7 @@ test('Home native globe flies to real destinations, replaces repeated flights, m
     '@rnmapbox/maps':{__esModule:true,default:mapbox},'expo-router':{useFocusEffect:fn=>h.hooks.useEffect(fn,[fn])},
     'react-native':{AppState:{currentState:'active',addEventListener:(name,fn)=>{appChange=fn;return {remove(){}};}},AccessibilityInfo:{isReduceMotionEnabled:async()=>false,addEventListener:(name,fn)=>{motionChange=fn;return {remove(){}};}}},
     '@/lib/discovery/map':{worldCamera:{centerCoordinate:[35,18],zoomLevel:0.8},selectedJourneyId:()=>null},'@/lib/discovery/camera':{discoveryPadding:()=>({paddingBottom:260,paddingTop:12}),locateCamera:()=>null,maxDiscoveryZoom:16,locateDuration:900},
-    '@/lib/discovery/locate-transition':{createLocateTransition:()=>({select(){},cancel(){}})},'@/lib/discovery/idle-motion':{createIdleMotion:()=>motion},'@/lib/discovery/globe-style':{globeLogoPosition:{top:12,left:12},globeAttributionPosition:{top:12,right:56}},'../ui':ui,'@/lib/discovery/presentation':{},'./fallback':{GlobeLoading:'GlobeLoading'},'./journey-overlays':{JourneyOverlays:'JourneyOverlays'},
+    '@/lib/discovery/locate-transition':{createLocateTransition:()=>({select(){},cancel(){}})},'@/lib/discovery/idle-motion':{createIdleMotion:()=>motion},'@/lib/discovery/globe-style':load('src/lib/discovery/globe-style.ts',{}),'../ui':ui,'@/lib/discovery/presentation':{},'./fallback':{GlobeLoading:'GlobeLoading'},'./journey-overlays':{JourneyOverlays:'JourneyOverlays'},
   },h.hooks);
   let props={headerInset:100,preview:false,homeSearch:true,destinationMode:true,destination:null,destinationVersion:0,points:{features:[]},route:[],onOpen(){},retry(){},bottomInset:260,viewport:{width:344,height:640},selectionId:null,locateVersion:0,sheetInteracting:true};
   let tree=h.render(NativeGlobe,props);all(tree,'Camera')[0].props.ref.current={setCamera:command=>commands.push(command)};await tick();all(tree,'MapView')[0].props.onDidFinishLoadingMap();tree=h.render(NativeGlobe,props);

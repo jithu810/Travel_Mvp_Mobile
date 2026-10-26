@@ -1,39 +1,68 @@
-import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { useState } from 'react';
+import { BackHandler, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useEffect } from 'react';
 import { buddyTravelCopy, type BuddyTravel } from '@/lib/buddy/model';
 
-export function BuddyHelpSheet({ canAddMemory, travel, onAddMemory, onCreate, onDrafts, onClose }: {
+export const buddyTour = [
+  { route: '/discover', label: 'Visit Explore', text: 'Find a journey. Discover somewhere new.' },
+  { route: '/create', label: 'Visit Create', text: 'A place, a photo, a little story. Start yours.' },
+  { route: '/account', label: 'Visit Account', text: 'Your drafts live here. Pick up where you left off.' },
+] as const;
+
+// Historical module name; this is an anchored bubble, not a modal or bottom sheet.
+export function BuddyHelpSheet({ canAddMemory, travel, onAddMemory, onCreate, onDrafts, onClose, onTour, onNext,
+  tour = null, reaction, placement, width = 252, maxHeight = 320, onMeasure }: {
   canAddMemory: boolean; travel?: BuddyTravel; onAddMemory: () => void; onCreate: () => void; onDrafts: () => void; onClose: () => void;
+  onTour?: () => void; onNext?: () => void; tour?: number | null; reaction?: string;
+  placement?: { x: number; y: number; above: boolean; tailX: number }; width?: number; maxHeight?: number; onMeasure?: (height: number) => void;
 }) {
-  const [tip, setTip] = useState<string | null>(null);
-  return <Modal visible transparent animationType="none" onRequestClose={onClose}>
-    <View style={s.shade}><SafeAreaView edges={['left', 'right', 'bottom']} style={s.sheet} accessibilityViewIsModal>
-      <View style={s.header}><Text accessibilityRole="header" style={s.title}>Your little Journey Buddy</Text><Pressable accessibilityRole="button" accessibilityLabel="Close Journey Buddy help" onPress={onClose} style={s.close}><Text style={s.closeText}>×</Text></Pressable></View>
-      <ScrollView contentContainerStyle={s.content} keyboardShouldPersistTaps="handled">
-        <Text style={s.body}>{travel ? buddyTravelCopy(travel) : 'Tiny backpack, big adventures! What shall we do together?'}</Text>
-        {canAddMemory ? <HelpAction label="Add a stop or memory" onPress={onAddMemory} /> : <HelpAction label="Add a stop or memory" onPress={() => setTip('Open one of your private drafts, then choose Add memory. A stop and a memory use the same little editor.')} />}
-        <HelpAction label="Create a journey" onPress={onCreate} />
-        <HelpAction label="Open my drafts" onPress={onDrafts} />
-        <HelpAction label="How do I save a memory?" onPress={() => setTip('In your draft, choose Add memory. Pick a place or name your moment, add a photo or note, then tap Save memory. This also saves your current journey changes privately. Nothing is saved just by opening Buddy.')} />
-        <HelpAction label="Show me around" onPress={() => setTip('Explore discovers journeys. Search finds places and stories; its bookmark shows your saved journeys. Create starts your own story. Account keeps your private drafts. Journey Buddy can be switched off in Account settings.')} />
-        {travel && <HelpAction label="Help with Travel Mode" onPress={() => setTip('Begin Trip starts foreground GPS. Follow the map’s maneuver panel and check arrival prompts yourself. Pause or leave Travel Mode to stop GPS; stop completion always needs your confirmation. I never track you separately.')} />}
-        {tip && <Text accessibilityLiveRegion="polite" style={s.tip}>{tip}</Text>}
-        <Text style={s.note}>Drag me to park in my little space. I’ll stay there until you change screens.</Text>
+  useEffect(() => {
+    const back = BackHandler.addEventListener('hardwareBackPress', () => { onClose(); return true; });
+    return () => back.remove();
+  }, [onClose]);
+  const step = tour !== null ? buddyTour[tour] : undefined;
+  const text = reaction ?? step?.text ?? (travel
+    ? (travel.status === 'ready' ? 'Adventure time! Tiny backpack reporting for duty.' : buddyTravelCopy(travel)) + (canAddMemory ? '' : ' Capture moments in a private draft. Leaving Travel Mode stops GPS.')
+    : canAddMemory ? 'A moment worth keeping? Let’s tuck it into your story.' : 'Tiny backpack, big adventures! Shall we explore?');
+  return <View testID="buddy-speech-bubble" pointerEvents={placement ? 'auto' : 'none'} accessibilityElementsHidden={!placement} importantForAccessibility={placement ? 'auto' : 'no-hide-descendants'} onTouchStart={event => event.stopPropagation()}
+    onLayout={event => onMeasure?.(event.nativeEvent.layout.height)}
+    style={[s.bubble, { width, maxHeight, left: placement?.x ?? 0, top: placement?.y ?? 0, opacity: placement ? 1 : 0 }]}>
+    <View style={s.messageRow}>
+      <ScrollView style={s.scroll} keyboardShouldPersistTaps="handled">
+        <Text accessibilityLiveRegion="polite" style={s.body}>{step && <Text style={s.step}>{((tour ?? 0) + 1) + '/3  '}</Text>}{text}</Text>
       </ScrollView>
-    </SafeAreaView></View>
-  </Modal>;
+      <Pressable accessibilityRole="button" accessibilityLabel={step ? 'Exit Buddy tour' : 'Close Journey Buddy help'} onPress={onClose} style={({ pressed }) => [s.close, pressed && s.pressed]}><View style={s.closeCircle}><Text style={s.closeText}>×</Text></View></Pressable>
+    </View>
+    {!reaction && <View testID="buddy-bubble-actions" style={s.actions}>
+      {step ? <>
+        <HelpAction label={step.label} onPress={onTour ?? onCreate} />
+        <HelpAction secondary label={tour === 2 ? 'Finish tour' : 'Next'} onPress={onNext ?? onClose} />
+      </> : <>
+        <HelpAction label={canAddMemory ? 'Capture a moment' : 'Open my drafts'} onPress={canAddMemory ? onAddMemory : onDrafts} />
+        <HelpAction secondary label="Show me around" onPress={onTour ?? onCreate} />
+      </>}
+    </View>}
+    {placement && <View pointerEvents="none" style={[s.tail, { left: placement.tailX - 7 }, placement.above ? s.tailBelow : s.tailAbove]} />}
+  </View>;
 }
-function HelpAction({ label, onPress }: { label: string; onPress: () => void }) {
-  return <Pressable accessibilityRole="button" onPress={onPress} style={s.action}><Text style={s.actionText}>{label}</Text></Pressable>;
+function HelpAction({ label, onPress, secondary = false }: { label: string; onPress: () => void; secondary?: boolean }) {
+  return <Pressable accessibilityRole="button" onPress={onPress} style={({ pressed }) => [s.action, pressed && s.pressed]}>
+    <View style={[s.pill, secondary && s.ghost]}><Text style={[s.actionText, secondary && s.secondaryText]}>{label}</Text></View>
+  </Pressable>;
 }
 const s = StyleSheet.create({
-  shade: { flex: 1, backgroundColor: 'rgba(12,24,42,0.4)', justifyContent: 'flex-end' },
-  sheet: { backgroundColor: '#F5F8FF', borderTopLeftRadius: 28, borderTopRightRadius: 28, maxHeight: '85%', padding: 18 },
-  header: { flexDirection: 'row', alignItems: 'center', gap: 8 }, title: { flex: 1, fontSize: 20, fontWeight: '700', color: '#203750' },
-  close: { minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' }, closeText: { fontSize: 28, color: '#203750' },
-  content: { gap: 10, paddingBottom: 12 }, body: { color: '#40516A', fontSize: 15, lineHeight: 22 },
-  action: { minHeight: 48, justifyContent: 'center', padding: 12, borderRadius: 16, backgroundColor: '#E4EEFF' },
-  actionText: { fontSize: 15, color: '#244979', fontWeight: '600' }, tip: { color: '#284E4B', backgroundColor: '#E1F3EA', padding: 14, borderRadius: 16, fontSize: 15, lineHeight: 23 },
-  note: { color: '#657289', fontSize: 12, lineHeight: 18 },
+  bubble: { position: 'absolute', borderRadius: 20, backgroundColor: '#FFFCF3', borderWidth: 1, borderColor: '#A9C9BB', padding: 8, gap: 6, zIndex: 40, elevation: 24,
+    shadowColor: '#244A3D', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.13, shadowRadius: 8 },
+  messageRow: { flexDirection: 'row', alignItems: 'flex-start', minHeight: 44, flexShrink: 1 },
+  close: { minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'flex-start', paddingTop: 2 },
+  closeCircle: { width: 22, height: 22, borderRadius: 11, alignItems: 'center', justifyContent: 'center', backgroundColor: '#EEEFE5' },
+  closeText: { fontSize: 18, lineHeight: 21, color: '#61776C' },
+  scroll: { flex: 1, flexShrink: 1 }, body: { color: '#253F35', fontSize: 14, lineHeight: 19 }, step: { color: '#71877C', fontSize: 11 },
+  actions: { flexDirection: 'row', gap: 4, flexShrink: 0, alignItems: 'center' },
+  action: { flex: 1, minHeight: 44, justifyContent: 'center', alignItems: 'flex-start' },
+  pill: { borderRadius: 18, paddingHorizontal: 10, paddingVertical: 7, backgroundColor: '#2F6C59', maxWidth: '100%' },
+  ghost: { backgroundColor: 'transparent', paddingHorizontal: 4 },
+  actionText: { fontSize: 12, lineHeight: 16, color: '#FFFFFF', fontWeight: '600' }, secondaryText: { color: '#386958' },
+  pressed: { opacity: 0.62 },
+  tail: { position: 'absolute', width: 14, height: 14, backgroundColor: '#FFFCF3', borderColor: '#A9C9BB', transform: [{ rotate: '45deg' }] },
+  tailBelow: { bottom: -8, borderRightWidth: 1, borderBottomWidth: 1 }, tailAbove: { top: -8, borderLeftWidth: 1, borderTopWidth: 1 },
 });

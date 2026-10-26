@@ -11,7 +11,7 @@ export type BuddyTravel = Readonly<{
   arrival: boolean;
   completed: number;
 }>;
-export type BuddyScreen = Readonly<{ floating?: boolean; geometryMoving?: boolean; suppressed?: boolean; interacting?: boolean; canAddMemory?: boolean; travel?: BuddyTravel }>;
+export type BuddyScreen = Readonly<{ floating?: boolean; geometryMoving?: boolean; suppressed?: boolean; interacting?: boolean; canAddMemory?: boolean; travel?: BuddyTravel; ownStory?: { id: string; title: string } }>;
 export type BuddyAction = 'addMemory';
 export const isBuddyRoute = (path: string) => ['/', '/index', '/discover', '/search', '/create', '/account'].includes(path)
   || /^\/(journey|travel|draft)\/[^/]+$/.test(path) || /^\/profile\/[^/]+$/.test(path) && path !== '/profile/edit';
@@ -59,7 +59,7 @@ export function createBuddyReactions(now = Date.now) {
       if (next === event) return null;
       event = next;
       // Existing maneuver/arrival UI has priority. Buddy is quiet during active guidance.
-      if (travel.arrival || travel.guidance || now() - last < 15000) return null;
+      if (travel.arrival || travel.guidance || now() - last < 30000) return null;
       last = now(); return buddyTravelCopy(travel);
     },
   };

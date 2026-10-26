@@ -107,7 +107,8 @@ test('satellite failure falls back once to Outdoors, then graceful failure; bran
   assert.equal(nextGlobeStyle('failed'), 'failed');
   assert.ok(globeLogoPosition.top >= 0 && globeLogoPosition.top < 96);
   assert.ok(globeAttributionPosition.top >= 0 && globeAttributionPosition.top < 96);
-  assert.ok(globeAttributionPosition.right > 12);
+  assert.deepEqual(globeAttributionPosition, { top: globeLogoPosition.top, left: 116 });
+  assert.ok(globeAttributionPosition.left >= globeLogoPosition.left + 96 + 8);
 });
 
 // Exercise the actual hook with deterministic RN animation/responder doubles.

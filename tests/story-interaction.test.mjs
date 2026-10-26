@@ -46,7 +46,7 @@ function load(path, modules, hooks = harness(false).hooks, timers = globalThis) 
   const require = name => {
     if(name==='@/hooks/use-journey-buddy')return modules[name] || {useBuddyScreen(){},useBuddySuppression(){}};
     if(name==='@/hooks/use-buddy-map-pins')return buddyMapPinsStub;
-    if(name==='@/lib/buddy/map-controls')return load('src/lib/buddy/map-controls.ts',{});
+    if(name==='@/lib/buddy/map-controls')return load('src/lib/buddy/map-controls.ts',{'../discovery/globe-style':load('src/lib/discovery/globe-style.ts',{})});
     if(name==='@/lib/buddy/model')return load('src/lib/buddy/model.ts',{});
     if(name==='@/components/buddy/buddy-space')return {BuddySpace:'BuddySpace'};
     if (name === '@/theme/mobile-theme') return mobileTheme;
@@ -147,8 +147,11 @@ test('measured short/tall layouts leave space for stop browsing after reserving 
 test('Story preserves map browsing while Use opens Travel directly and Remix remains separate', () => {
   const h = harness();
   const journey = { id: journeyId, title: 'Public journey', stops: [{ ...stop('first'), sequence: 0 }, { ...stop('second'), sequence: 1 }], description: '' };
-  const routes = []; let focus;
+  const routes = []; let focus, buddyState;
+  let buddyAuth = { loading: false, session: null, error: null };
   const { JourneyStoryContent: Screen } = load('src/app/journey/[id].tsx', {
+    '@/hooks/session-context': { useSessionState: () => buddyAuth },
+    '@/hooks/use-journey-buddy': { useBuddyScreen: value => { buddyState = value; } },
     'expo-router': { useRouter: () => ({ push: route => routes.push(route) }), useFocusEffect: callback => { focus = callback; } }, 'react-native': native,
     'react-native-safe-area-context': { SafeAreaView: 'SafeAreaView' }, '@/components/discovery/ui': ui,
     '@/components/journey/stop-story-viewer': { StopStoryViewer: 'StopStoryViewer' },
@@ -167,6 +170,15 @@ test('Story preserves map browsing while Use opens Travel directly and Remix rem
   }, h.hooks);
   const props = { journey, refresh: () => {}, refreshing: false, error: null };
   let tree = h.render(Screen, props);
+  assert.equal(buddyState.ownStory, undefined, 'Anonymous viewer never owns an unidentified story');
+  buddyAuth = { loading: false, session: { user: { id: journeyId } }, error: null };
+  h.render(Screen, { ...props, journey: { ...journey, creatorId: journeyId } });
+  assert.equal(buddyState.ownStory.id, journeyId);
+  h.render(Screen, { ...props, journey: { ...journey, creatorId: 'other-owner' } });
+  assert.equal(buddyState.ownStory, undefined);
+  buddyAuth = { ...buddyAuth, loading: true }; h.render(Screen, { ...props, journey: { ...journey, creatorId: journeyId } });
+  assert.equal(buddyState.ownStory, undefined, 'Auth restoration does not guess ownership');
+  buddyAuth = { loading: false, session: null, error: null }; tree = h.render(Screen, props);
   assert.ok(find(tree, 'ScrollView'), 'Map and cards retain an accessible short-screen scroll fallback');
   assert.equal(find(find(tree, 'ScrollView'), 'SwipeJourneyStart'), null, 'Swipe stays below the card scroll area');
   assert.ok(find(tree, 'SwipeJourneyStart'));

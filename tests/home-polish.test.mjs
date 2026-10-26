@@ -19,7 +19,7 @@ function load(file, dependencies, state = null, hookOverrides = {}) {
   new Function('require', 'exports', source)(name => { if (name === '@/theme/mobile-theme') return mobileTheme;
     if(name==='@/hooks/use-journey-buddy')return {useBuddyScreen(){}};
     if(name==='@/hooks/use-buddy-map-pins')return buddyMapPinsStub;
-    if(name==='@/lib/buddy/map-controls')return load('src/lib/buddy/map-controls.ts',{});
+    if(name==='@/lib/buddy/map-controls')return load('src/lib/buddy/map-controls.ts',{'../discovery/globe-style':load('src/lib/discovery/globe-style.ts',{})});
     if(name==='@/lib/buddy/model')return load('src/lib/buddy/model.ts',{});
     if(name==='@/components/buddy/buddy-space')return {BuddyDock:()=>null,BuddySpace:()=>null};
     if(name==='@/lib/discovery/queries')return {invalidatePublicJourneys(){},...dependencies[name]};
