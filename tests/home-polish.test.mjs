@@ -229,6 +229,43 @@ test('Home retains title, author, count, Locate and both Story entry points (car
   for (const label of ['Locate journey: Coastal weekend', 'Explore journey: Coastal weekend', 'Open journey: Coastal weekend, Coast']) all.find(n => n.props?.accessibilityLabel === label).props.onPress();
   assert.deepEqual(calls, [['locate', journey.id], ['open', journey.id], ['open', journey.id]]);
 });
+test('Home cards show a display-only like count, including 0, in compact and expanded layouts', () => {
+  for (const expanded of [false, true]) {
+    for (const [likes, label] of [[0, '0 likes'], [1, '1 like'], [12, '12 likes']]) {
+      const component = load('src/components/discovery/home-journey-card.tsx', {
+        '@/lib/discovery/model': { journeyFacts: j => j.stops.length + ' stops' }, './ui': { colors },
+      });
+      const calls = [];
+      const all = nodes(component.HomeJourneyCard({ journey: { ...journey, likes }, expanded, width: 300, selected: false, onOpen: id => calls.push(['open', id]), onLocate: id => calls.push(['locate', id]) }));
+      const count = all.filter(n => n.type === 'Text' && n.props.accessibilityLabel === label);
+      assert.equal(count.length, 1, label);
+      assert.equal([count[0].props.children].flat().join(''), '♡ ' + likes);
+      assert.equal(count[0].props.onPress, undefined, 'Like count is display-only');
+      assert.equal(count[0].props.numberOfLines, 1);
+      const row = all.find(n => [n.props?.children].flat().includes(count[0]));
+      assert.equal(row.props.style.flexDirection, 'row', 'Count shares the facts line so card height is unchanged');
+      const facts = [row.props.children].flat().find(n => n?.props?.children === '1 stops');
+      assert.ok(facts);
+      assert.equal(facts.props.numberOfLines, 1, 'Facts truncate to one line');
+      assert.equal(facts.props.style.flexShrink, 1, 'Facts shrink before the count');
+      assert.equal(count[0].props.style.flexShrink, 0, 'Count is never pushed off the card');
+      const open = all.find(n => n.props?.accessibilityLabel === 'Open journey: Coastal weekend, Coast, ' + label);
+      assert.equal(open.props.accessibilityHint, 'Opens Journey Story');
+      open.props.onPress();
+      for (const action of ['Locate journey: Coastal weekend', 'Explore journey: Coastal weekend']) all.find(n => n.props?.accessibilityLabel === action).props.onPress();
+      assert.deepEqual(calls, [['open', journey.id], ['locate', journey.id], ['open', journey.id]]);
+      assert.ok(!all.some(n => /like/i.test(String(n.props?.accessibilityLabel ?? '')) && n.type === 'Pressable' && !String(n.props.accessibilityLabel).startsWith('Open journey')), 'No like toggle on Home');
+    }
+    for (const likes of [null, undefined, NaN, -1, 1.5]) {
+      const component = load('src/components/discovery/home-journey-card.tsx', {
+        '@/lib/discovery/model': { journeyFacts: j => j.stops.length + ' stops' }, './ui': { colors },
+      });
+      const all = nodes(component.HomeJourneyCard({ journey: { ...journey, likes }, expanded, width: 300, selected: false, onOpen() {}, onLocate() {} }));
+      assert.ok(!all.some(n => n.type === 'Text' && [n.props.children].flat().join('').includes('♡')), 'Unknown count shows nothing');
+      assert.ok(all.some(n => n.props?.accessibilityLabel === 'Open journey: Coastal weekend, Coast'));
+    }
+  }
+});
 test('missing/failed photos retain fallback and a changed URI recovers', () => {
   for (const [uri, failed] of [[null, null], [journey.cover, journey.cover]]) {
     assert.ok(card(uri, failed).all.some(n => n.props?.accessibilityLabel === 'Default travel photo. No journey cover photo available. Coast. Explore journey'));
