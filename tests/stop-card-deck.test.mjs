@@ -74,6 +74,7 @@ function all(tree, type) {
   return [...(tree.type === type ? [tree] : []), ...[tree.props?.children, tree.props?.footer].flat(Infinity).flatMap(child => all(child, type))];
 }
 
+const artModules={'@/components/art/journey-art':{StopArt:'StopArt',JourneyArt:'JourneyArt'},'@/lib/art/journey-art':{artSeed:(id,stops)=>'seed:'+id+':'+stops.map(s=>s.id).join(',')}};
 function setup() {
   const h = harness(), calls = [], pending = []; let background, preference;
   class Value { constructor(v) { this.value=v; } setValue(v) { this.value=v; } stopAnimation() {} interpolate() { return '0deg'; } }
@@ -83,7 +84,7 @@ function setup() {
     AccessibilityInfo:{isReduceMotionEnabled:async()=>false,addEventListener:(_,fn)=>{preference=fn;return {remove(){}};}},
     AppState:{addEventListener:(_,fn)=>{background=fn;return {remove(){}};}},
   };
-  const {StopCardDeck}=load('src/components/journey/stop-card-deck.tsx',{'react-native':native,'@/components/discovery/travel-photo-placeholder':{TravelPhotoPlaceholder:'Placeholder'}},h.hooks);
+  const {StopCardDeck}=load('src/components/journey/stop-card-deck.tsx',{'react-native':native,...artModules},h.hooks);
   const stops=['a','b','c'].map(id=>({id,name:id,photo:null,description:'Story',rating:null}));
   const props={stops,selectedId:'a',onSelect:id=>calls.push(id),onDetails:id=>calls.push('read:'+id)};
   return {h,props,calls,pending,render:()=>h.render(StopCardDeck,props),background:()=>background('background'),reduce:()=>preference(true)};
@@ -130,5 +131,40 @@ test('deck never emits raw text as a native View child',()=>{
  for(const node of [...all(tree,'View'),...all(tree,'AnimatedView')]){
   assert.equal([node.props.children].flat(Infinity).some(child=>typeof child==='string'||typeof child==='number'),false);
  }
+ t.h.dispose();
+});
+
+test('photo-less deck cards show stop art for their own index on the shared route; photos still win and no map image is requested',()=>{
+ const t=setup();t.props.stops=t.props.stops.map((stop,i)=>({...stop,photo:i===1?'https://example.test/b.jpg':null,latitude:9+i/10,longitude:76}));t.props.selectedId='a';
+ const tree=t.render();
+ const photos=[...all(tree,'Pressable'),...all(tree,'View')].flatMap(n=>[n.props.children].flat(Infinity)).filter(n=>n?.type?.name==='StopPhoto');
+ assert.ok(photos.length>=3,'Active card and the two rear cards');
+ const rendered=photos.map(node=>({props:node.props,out:node.type(node.props)}));
+ for(const {props,out} of rendered){
+  const art=all(out,'StopArt')[0];const image=all(out,'Image')[0];
+  if(props.stop.photo){assert.equal(art,undefined);assert.equal(image.props.source.uri,props.stop.photo);continue;}
+  assert.equal(image,undefined,'No stock photo and no static map image');
+  assert.equal(art.props.index,props.stops.indexOf(props.stop),'Highlights this stop');
+  assert.equal(art.props.stops,t.props.stops,'Draws the whole journey route');
+  assert.equal(art.props.seed,'seed:null:a,b,c','One palette for the whole journey');
+  assert.equal(art.props.name,props.stop.name);
+  assert.ok(art.props.inset.right>=44,'Keeps the photo action rail clear');
+  assert.equal(art.props.accessibilityLabel,undefined,'Decorative: the card Pressable carries the label');
+ }
+ assert.deepEqual(rendered.filter(r=>!r.props.stop.photo).map(r=>r.props.index).sort(),[0,2]);
+ t.h.dispose();
+});
+
+test('deck photo button says View stop without a usable photo, including after the photo fails',()=>{
+ const t=setup();t.props.stops=t.props.stops.map((stop,i)=>({...stop,photo:i===1?'https://example.test/b.jpg':null}));t.props.selectedId='a';
+ let tree=t.render();
+ assert.ok(button(tree,'View stop 1: a'));assert.equal(button(tree,'View stop 1: a').props.accessibilityHint,'Opens the full stop story');
+ t.props.selectedId='b';tree=t.render();
+ const label='View photo for stop 2: b';assert.equal(button(tree,label).props.accessibilityHint,'Opens the full stop story and photo');
+ const active=[button(tree,label).props.children].flat().find(n=>n?.type?.name==='StopPhoto');
+ const image=all(active.type(active.props),'Image')[0];image.props.onError();tree=t.render();
+ assert.ok(button(tree,'View stop 2: b'),'A failed photo is no longer announced as a photo');
+ const failed=[button(tree,'View stop 2: b').props.children].flat().find(n=>n?.type?.name==='StopPhoto');
+ assert.equal(failed.props.failed,true);assert.equal(all(failed.type(failed.props),'StopArt').length,1);
  t.h.dispose();
 });

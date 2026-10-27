@@ -5,6 +5,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Image, Platform, Pressable, StatusBar, Text, useWindowDimensions, View } from 'react-native';
 import { JourneyPhoto } from '@/components/discovery/journey-photo';
 import { ThumbnailPhoto } from '@/components/discovery/thumbnail-photo';
+import { JourneyArt } from '@/components/art/journey-art';
+import { artSeed } from '@/lib/art/journey-art';
 import { journeyFacts } from '@/lib/discovery/model';
 import { profileUIStyles as s } from './profile-styles';
 import type { PublicJourney } from '@/types/journey';
@@ -106,7 +108,8 @@ export function ProfileJourneyCard({ journey }: { journey: PublicJourney }) {
   const protection = useBuddyProtectedBounds();
   return <Pressable {...protection} accessibilityRole="button" accessibilityLabel={'Open journey: ' + journey.title + ', ' + journey.destination}
     onPress={() => router.push({ pathname: '/journey/[id]', params: { id: journey.id } })} style={({ pressed }) => [s.card, s.journeyCard, pressed && s.pressed]}>
-    <View style={s.thumbnail}><ThumbnailPhoto uri={journey.cover} thumbnailUri={journey.coverThumbnail} ratio={0.9} label={journey.title + ' cover photo'} /></View>
+    <View style={s.thumbnail}><ThumbnailPhoto uri={journey.cover} thumbnailUri={journey.coverThumbnail} ratio={0.9} label={journey.title + ' cover photo'}
+      fallback={<JourneyArt seed={artSeed(journey.id, journey.stops)} stops={journey.stops} compact />} /></View>
     <View style={s.cardCopy}>
       {journey.destination !== 'Destination not specified' && <Text numberOfLines={1} style={s.destination}>⌖ {journey.destination}</Text>}
       <Text numberOfLines={2} style={s.cardTitle}>{journey.title}</Text>

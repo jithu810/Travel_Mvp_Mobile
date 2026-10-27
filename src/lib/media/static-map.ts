@@ -77,6 +77,15 @@ export function staticMapUrl(options: StaticMapOptions): string | null {
   return 'https://api.mapbox.com/styles/v1/' + staticMapStyle + '/static/' + pins + '/' + camera + '/' + width + 'x' + height + '@2x?' + query.join('&');
 }
 export function staticMapHasInlineCredit(width: number) { return Number.isFinite(width) && width >= staticMapInlineCreditMinWidth; }
+// The optional small circular map on opened stop surfaces uses ONE fixed size, so each
+// stop has exactly one cacheable URL whatever the device or slot. It is below the inline
+// credit width (no logo is requested), so its screen must show StaticMapCredit.
+export const staticMapCircleSize = 88;
+export function staticMapCircleUrl(point: MapPoint | null | undefined, token?: string | null): string | null {
+  if (!validMapPoint(point)) return null;
+  const options = { points: [point], width: staticMapCircleSize, height: staticMapCircleSize };
+  return staticMapUrl(token === undefined ? options : { ...options, token });
+}
 // True when a map could be drawn for these points (valid coordinates and a token).
 export function canDrawStaticMap(points: readonly MapPoint[] | null | undefined, token?: string | null) {
   return staticMapUrl(token === undefined ? { points, width: 1, height: 1 } : { points, width: 1, height: 1, token }) !== null;

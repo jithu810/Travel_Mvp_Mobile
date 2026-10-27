@@ -4,7 +4,8 @@ import type { PublicJourney } from '@/types/journey';
 import { journeyFacts } from '@/lib/discovery/model';
 import { colors } from './ui';
 import { HomeControlIcon } from './home-control-icon';
-import { TravelPhotoPlaceholder } from './travel-photo-placeholder';
+import { JourneyArt } from '@/components/art/journey-art';
+import { artSeed } from '@/lib/art/journey-art';
 
 export const HomeJourneyCard = memo(function HomeJourneyCard({ journey, expanded, width, selected, onOpen, onLocate, onHeight }: {
   journey: PublicJourney; expanded: boolean; width: number; selected: boolean;
@@ -22,7 +23,7 @@ export const HomeJourneyCard = memo(function HomeJourneyCard({ journey, expanded
       <View style={[s.cover, expanded && s.expandedCover, expanded && { height: Math.round(width * 9 / 16) }]}>
         {cover && failedUri !== cover
           ? <Image key={cover} source={{ uri: cover }} accessibilityLabel={journey.title + ' cover photo'} style={s.image} resizeMode="cover" onError={() => { if (thumbnail) setFailedThumbnail(thumbnail); else setFailedUri(cover); }} />
-          : <TravelPhotoPlaceholder compact={!expanded} label={'Default travel photo. No journey cover photo available. ' + journey.destination + '. Explore journey'} />}
+          : <JourneyArt seed={artSeed(journey.id, journey.stops)} stops={journey.stops} compact={!expanded} />}
       </View>
       <View style={[s.content, expanded && s.expandedContent]}>
         <Text numberOfLines={1} style={s.destination}>{journey.destination}</Text>
