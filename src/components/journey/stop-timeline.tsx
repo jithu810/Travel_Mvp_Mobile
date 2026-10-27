@@ -7,12 +7,11 @@ import type { JourneyStop } from '@/types/journey';
 import { JourneyPhoto } from '@/components/discovery/journey-photo';
 import { colors, ui } from '@/components/discovery/ui';
 import { stopIndexAtOffset } from '@/lib/journey/story-layout';
-import { canDrawStaticMap } from '@/lib/media/static-map';
-import { StaticMapCredit } from '@/components/discovery/static-map-photo';
+import { StopArt } from '@/components/art/journey-art';
+import { artSeed, validGeoPoint } from '@/lib/art/journey-art';
 
-// The vertical list lives inside a non-virtualized ScrollView, so photo-less stops
-// get a static map only for the first few; later ones keep the text-only card.
-export const verticalTimelineMapLimit = 6;
+// Photo-less (or failed-photo) stops show generated stop art instead of map images:
+// no network requests, and each stop looks distinct (its own highlight and tint).
 
 type CarouselProps = { stops: JourneyStop[]; horizontal: true; selectedId: string | null; onSelect: (id: string) => void; onDetails: (id: string) => void; stacked?: boolean; compact?: boolean; active?: boolean; photoActions?: ReactNode; optionsActions?: ReactNode; creator?: ReactNode };
 export function StopTimeline(props: CarouselProps | { stops: JourneyStop[]; horizontal?: false }) {
@@ -20,15 +19,15 @@ export function StopTimeline(props: CarouselProps | { stops: JourneyStop[]; hori
 }
 // The private draft screen continues using its existing read-only vertical presentation.
 function VerticalStopTimeline({ stops }: { stops: JourneyStop[] }) {
-  // Ids of the first photo-less, mappable stops that may request a static map.
-  const mapped = new Set(stops.filter(stop => !stop.photo && canDrawStaticMap([stop])).slice(0, verticalTimelineMapLimit).map(stop => stop.id));
+  const seed = artSeed(null, stops);
+  const art = (stop: JourneyStop, index: number) => <StopArt seed={seed} stops={stops} index={index} name={stop.name} accessibilityLabel={'Stop art. ' + (stop.photo ? 'Photo unavailable. ' : 'No photo yet. ') + stop.name} />;
   if (!stops.length) return <View style={vertical.empty}><Text style={ui.sectionTitle}>The itinerary is still unwritten</Text><Text style={vertical.description}>The creator hasn’t added stops yet. Enjoy the story and check back for more places.</Text></View>;
   return <View><View style={vertical.heading}><View style={vertical.rule} /><Text style={ui.eyebrow}>THE PLACES IN BETWEEN</Text></View><Text accessibilityRole="header" style={vertical.title}>Along the way</Text>{stops.map((stop, index) => <View key={stop.id} style={vertical.row}>
     <View style={vertical.rail}><View style={vertical.number}><Text style={vertical.numberText}>{index + 1}</Text></View>{index < stops.length - 1 && <View style={vertical.line} />}</View>
     <View style={vertical.stop}>
 <View style={vertical.stopHeader}>{stop.dayNumber !== null && <Text style={vertical.day}>DAY {stop.dayNumber}</Text>}<Text accessibilityRole="header" style={vertical.name}>{stop.name}</Text></View>
-      {stop.photo ? <View style={vertical.photo}><JourneyPhoto uri={stop.photo} label={stop.name + ' photo'} ratio={1.3} /></View>
-        : mapped.has(stop.id) && <View style={vertical.photo}><JourneyPhoto uri={null} label={stop.name + ' photo'} ratio={2} map={{ points: [stop] }} mapLabel={'Map of ' + stop.name + '. No photo yet.'} /></View>}
+      {stop.photo ? <View style={vertical.photo}><JourneyPhoto uri={stop.photo} label={stop.name + ' photo'} ratio={1.3} fallback={art(stop, index)} /></View>
+        : validGeoPoint(stop) && <View testID="vertical-stop-art" style={[vertical.photo, vertical.art]}>{art(stop, index)}</View>}
       {!!stop.description.trim() && <Text style={vertical.description}>{stop.description}</Text>}
       {stop.rating !== null && <Text accessibilityLabel={'Creator rating: ' + stop.rating + ' out of 5'} style={vertical.rating}>★ {stop.rating}/5 <Text style={vertical.ratingLabel}> · Creator’s rating</Text></Text>}
     </View>
@@ -44,18 +43,18 @@ const vertical = StyleSheet.create({
   numberText: { fontSize: 12, color: colors.paper, fontWeight: '600' }, line: { width: 1, flex: 1, backgroundColor: theme.border, marginVertical: 7 },
   stop: { flex: 1, minWidth: 0, padding: 14, gap: 12, backgroundColor: colors.white, borderRadius: 20, borderWidth: 1, borderColor: colors.line },
   day: { fontSize: 11, fontWeight: '700', letterSpacing: 1.3, color: colors.green }, name: { fontSize: 19, lineHeight: 26, color: colors.ink, fontWeight: '600' },
-  photo: { borderRadius: 18, overflow: 'hidden' }, description: { color: colors.muted, fontSize: 14, lineHeight: 23 }, rating: { fontSize: 12, color: colors.ink, lineHeight: 20, fontWeight: '600' },
+  photo: { borderRadius: 18, overflow: 'hidden' }, art: { aspectRatio: 2 }, description: { color: colors.muted, fontSize: 14, lineHeight: 23 }, rating: { fontSize: 12, color: colors.ink, lineHeight: 20, fontWeight: '600' },
 });
 
 function HorizontalStopTimeline({ stops, selectedId, onSelect, onDetails, stacked = false, compact = false }: {
   stops: JourneyStop[]; selectedId: string | null; onSelect: (id: string) => void; onDetails: (id: string) => void; stacked?: boolean; compact?: boolean;
 }) {
   const [reduceMotion, setReduceMotion] = useState(true);
-  // Photos that failed to load fall back to a small map, which then needs the credit line too.
-  const [failedThumbnails, setFailedThumbnails] = useState<readonly string[]>([]);
-  const thumbnailMaps = stops.filter(stop => !stop.photo || failedThumbnails.includes(stop.photo));
-  // Non-stacked cards overlay their text panel on the photo; a map ends above it so
-  // the Mapbox logo (bottom-left) stays visible. Heights are measured per card.
+  const seed = artSeed(null, stops);
+  // Failed carousel photos, so the card hint stops promising a photo.
+  const [failedPhotos, setFailedPhotos] = useState<readonly string[]>([]);
+  // Non-stacked cards overlay their text panel on the photo; stop art keeps its content
+  // above it. Heights are measured per card.
   const [textHeights, setTextHeights] = useState<Readonly<Record<string, number>>>({});
   useEffect(() => {
     let active = true, changed = false;
@@ -106,11 +105,10 @@ function HorizontalStopTimeline({ stops, selectedId, onSelect, onDetails, stacke
       renderItem={({ item, index: i }) => <View style={styles.thumbnailSlot}>
         {i < stops.length - 1 && <View style={styles.connector} />}
         <Pressable accessibilityRole="button" accessibilityLabel={'Stop ' + (i + 1) + ': ' + item.name} accessibilityState={{ selected: item.id === selectedId }} onPress={() => onDetails(item.id)} style={[styles.thumbnail, item.id === selectedId && styles.selectedThumbnail]}>
-          <View style={styles.thumbnailImage}><JourneyPhoto uri={item.photo} label={item.name + ' photo'} ratio={1} thumbnail onError={() => { const photo = item.photo; if (photo) setFailedThumbnails(previous => previous.includes(photo) ? previous : [...previous, photo]); }} map={{ points: [item] }} mapLabel={'Map of ' + item.name + '. No photo yet.'} /></View>
+          <View style={styles.thumbnailImage}><JourneyPhoto uri={item.photo} label={item.name + ' photo'} ratio={1} thumbnail fallback={<StopArt seed={seed} stops={stops} index={i} variant="mini" />} /></View>
           <View style={styles.number}><Text style={styles.numberLabel}>{i + 1}</Text></View>
         </Pressable>
       </View>} />}
-    {!stacked && <StaticMapCredit points={thumbnailMaps} />}
     <View style={styles.progress} accessibilityLiveRegion="polite"><Text style={styles.progressLabel}>Stop {index + 1} of {stops.length}{stops[index]?.dayNumber !== null ? ' · Day ' + stops[index]?.dayNumber : ''}</Text><Text style={styles.swipe}>Swipe to explore →</Text></View>
     {stacked && stops.length > 1 && <View pointerEvents="none" accessible={false} style={styles.stackEdge} />}
     {width > 0 && <FlatList testID="journey-stop-carousel" ref={cards} horizontal data={stops} keyExtractor={stop => stop.id} extraData={selectedId}
@@ -127,8 +125,8 @@ function HorizontalStopTimeline({ stops, selectedId, onSelect, onDetails, stacke
       onScrollEndDrag={dragEnd} onMomentumScrollBegin={() => { if (settleTimer.current) clearTimeout(settleTimer.current); }}
       onMomentumScrollEnd={event => settle(event.nativeEvent.contentOffset.x)}
       renderItem={({ item, index: i }) => <View style={{ width: stride, paddingRight: stacked ? 0 : 10, height: '100%' }}>
-        <Pressable accessibilityRole="button" accessibilityLabel={'Read stop ' + (i + 1) + ': ' + item.name} accessibilityState={{ selected: item.id === selectedId }} accessibilityHint="Opens the full stop story and photo" onPress={() => onDetails(item.id)} style={styles.card}>
-          <View style={stacked ? styles.deckPhoto : { flex: 1 }}><JourneyPhoto uri={item.photo} label={item.name + ' photo'} fill fit={stacked ? 'contain' : 'cover'} map={{ points: [item], bottomInset: stacked ? 0 : textHeights[item.id] ?? 72 }} mapLabel={'Map of ' + item.name + '. No photo yet.'} /></View>
+        <Pressable accessibilityRole="button" accessibilityLabel={'Read stop ' + (i + 1) + ': ' + item.name} accessibilityState={{ selected: item.id === selectedId }} accessibilityHint={item.photo && !failedPhotos.includes(item.photo) ? 'Opens the full stop story and photo' : 'Opens the full stop story'} onPress={() => onDetails(item.id)} style={styles.card}>
+          <View style={stacked ? styles.deckPhoto : { flex: 1 }}><JourneyPhoto uri={item.photo} label={item.name + ' photo'} fill fit={stacked ? 'contain' : 'cover'} onError={() => { const photo = item.photo; if (photo) setFailedPhotos(previous => previous.includes(photo) ? previous : [...previous, photo]); }} fallback={<StopArt seed={seed} stops={stops} index={i} inset={{ bottom: stacked ? 0 : textHeights[item.id] ?? 72 }} />} /></View>
           {!stacked && <View style={styles.cardShade} pointerEvents="none" />}
           <View style={[styles.cardText, stacked && styles.deckText, compact && { padding: 8 }]} pointerEvents="none" onLayout={event => { const height = Math.round(event.nativeEvent.layout.height); if (height > 0) setTextHeights(previous => previous[item.id] === height ? previous : { ...previous, [item.id]: height }); }}>
             <Text maxFontSizeMultiplier={1.3} numberOfLines={compact || stacked ? 1 : 2} style={[styles.cardName, stacked && { color: theme.text }, compact && { fontSize: 18, lineHeight: 23 }]}>{item.name}{compact ? ' ↗' : ''}</Text>

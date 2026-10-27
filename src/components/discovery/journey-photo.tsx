@@ -1,9 +1,11 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { ActivityIndicator, Image, StyleSheet, Text, View } from 'react-native';
 import { StaticMapLayer, useStaticMap, type MapFallback } from './static-map-photo';
 import { colors } from './ui';
 
-export function JourneyPhoto({ uri, label, ratio = 1.9, fill = false, thumbnail = false, onError, fit = 'cover', map, mapLabel }: { uri: string | null; label: string; ratio?: number; fill?: boolean; thumbnail?: boolean; fit?: 'cover' | 'contain'; onError?: () => void; map?: MapFallback | null; mapLabel?: string }) {
+// Photo first; without a usable photo: a static map (create/draft flows), then the
+// caller's fallback (journey/stop art), then the generic fallback.
+export function JourneyPhoto({ uri, label, ratio = 1.9, fill = false, thumbnail = false, onError, fit = 'cover', map, mapLabel, fallback }: { uri: string | null; label: string; ratio?: number; fill?: boolean; thumbnail?: boolean; fit?: 'cover' | 'contain'; onError?: () => void; map?: MapFallback | null; mapLabel?: string; fallback?: ReactNode }) {
   const [failedUri, setFailedUri] = useState<string | null>(null);
   const [loadedUri, setLoadedUri] = useState<string | null>(null);
   const mapState = useStaticMap(map);
@@ -14,6 +16,7 @@ export function JourneyPhoto({ uri, label, ratio = 1.9, fill = false, thumbnail 
         onLoad={() => setLoadedUri(uri)} onError={() => { setFailedUri(uri); onError?.(); }} />
       {loadedUri !== uri && <View pointerEvents="none" style={styles.loading} accessibilityLabel="Loading photo" accessibilityRole="progressbar"><ActivityIndicator color={colors.ink} /></View>}
     </> : mapState.active ? <View style={styles.map} accessible accessibilityRole="image" accessibilityLabel={mapLabel || 'Map preview. No photo yet. ' + label}><StaticMapLayer state={mapState} /></View>
+      : fallback ? <View style={styles.map} testID="journey-photo-fallback">{fallback}</View>
       : <View style={[styles.fallback, thumbnail && { padding: 0, gap: 0 }]} accessible accessibilityLabel="No journey photo available">
       <Text style={[styles.symbol, thumbnail && { fontSize: 20 }]}>↗</Text>{!thumbnail && <Text style={styles.label}>A journey worth discovering</Text>}
     </View>}

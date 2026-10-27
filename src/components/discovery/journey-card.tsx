@@ -3,6 +3,8 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import type { PublicJourney } from '@/types/journey';
 import { journeyFacts, travelerLabel } from '@/lib/discovery/model';
 import { ThumbnailPhoto } from './thumbnail-photo';
+import { JourneyArt } from '@/components/art/journey-art';
+import { artSeed } from '@/lib/art/journey-art';
 import { colors } from './ui';
 import { useBuddyProtectedBounds } from '@/hooks/use-buddy-geometry';
 
@@ -13,7 +15,8 @@ export function JourneyCard({ journey }: { journey: PublicJourney }) {
     onPress={() => router.push({ pathname: '/journey/[id]', params: { id: journey.id } })}
     style={({ pressed }) => [styles.card, pressed && { opacity: 0.85 }]}>
     <View style={styles.cover}>
-      <ThumbnailPhoto uri={journey.cover} thumbnailUri={journey.coverThumbnail} label={journey.title + ' cover photo'} />
+      <ThumbnailPhoto uri={journey.cover} thumbnailUri={journey.coverThumbnail} label={journey.title + ' cover photo'}
+        fallback={<JourneyArt seed={artSeed(journey.id, journey.stops)} stops={journey.stops} />} />
       <View style={styles.badge}><Text style={styles.badgeText}>{travelerLabel(journey.travelerType)}</Text></View>
     </View>
     <View style={styles.content}>

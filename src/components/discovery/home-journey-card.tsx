@@ -4,7 +4,8 @@ import type { PublicJourney } from '@/types/journey';
 import { journeyFacts } from '@/lib/discovery/model';
 import { colors } from './ui';
 import { HomeControlIcon } from './home-control-icon';
-import { TravelPhotoPlaceholder } from './travel-photo-placeholder';
+import { JourneyArt } from '@/components/art/journey-art';
+import { artSeed } from '@/lib/art/journey-art';
 
 export const HomeJourneyCard = memo(function HomeJourneyCard({ journey, expanded, width, selected, onOpen, onLocate, onHeight }: {
   journey: PublicJourney; expanded: boolean; width: number; selected: boolean;
@@ -14,19 +15,24 @@ export const HomeJourneyCard = memo(function HomeJourneyCard({ journey, expanded
   const [failedThumbnail, setFailedThumbnail] = useState<string | null>(null);
   const thumbnail = journey.coverThumbnail && journey.coverThumbnail !== failedThumbnail ? journey.coverThumbnail : null;
   const cover = thumbnail || journey.cover;
+  const likes = typeof journey.likes === 'number' && Number.isSafeInteger(journey.likes) && journey.likes >= 0 ? journey.likes : null;
+  const likesLabel = likes === null ? null : likes + (likes === 1 ? ' like' : ' likes');
   return <View style={[s.card, { width }, selected && s.selected]} onLayout={event => onHeight?.(event.nativeEvent.layout.height)}>
-    <Pressable accessibilityRole="button" accessibilityLabel={'Open journey: ' + journey.title + ', ' + journey.destination}
+    <Pressable accessibilityRole="button" accessibilityLabel={'Open journey: ' + journey.title + ', ' + journey.destination + (likesLabel ? ', ' + likesLabel : '')}
       accessibilityHint="Opens Journey Story" onPress={() => onOpen(journey.id)} style={[s.story, expanded && s.expandedStory]}>
       <View style={[s.cover, expanded && s.expandedCover, expanded && { height: Math.round(width * 9 / 16) }]}>
         {cover && failedUri !== cover
           ? <Image key={cover} source={{ uri: cover }} accessibilityLabel={journey.title + ' cover photo'} style={s.image} resizeMode="cover" onError={() => { if (thumbnail) setFailedThumbnail(thumbnail); else setFailedUri(cover); }} />
-          : <TravelPhotoPlaceholder compact={!expanded} label={'Default travel photo. No journey cover photo available. ' + journey.destination + '. Explore journey'} />}
+          : <JourneyArt seed={artSeed(journey.id, journey.stops)} stops={journey.stops} compact={!expanded} />}
       </View>
       <View style={[s.content, expanded && s.expandedContent]}>
         <Text numberOfLines={1} style={s.destination}>{journey.destination}</Text>
         <Text numberOfLines={expanded ? 2 : 1} style={s.title}>{journey.title}</Text>
         <Text numberOfLines={1} style={s.creator}>By {journey.creatorName}</Text>
-        <Text numberOfLines={1} style={s.facts}>{journeyFacts(journey)}</Text>
+        <View style={s.factsRow}>
+          <Text numberOfLines={1} style={s.facts}>{journeyFacts(journey)}</Text>
+          {likesLabel !== null && <Text numberOfLines={1} style={s.likes} accessibilityLabel={likesLabel}>♡ {likes}</Text>}
+        </View>
       </View>
     </Pressable>
     <View style={s.actions}>
@@ -50,7 +56,9 @@ const s = StyleSheet.create({
   destination: { color: '#2C63AF', fontSize: 10, fontWeight: '600' },
   title: { color: '#14243F', fontSize: 15, lineHeight: 19, fontWeight: '700' },
   creator: { color: colors.muted, fontSize: 10, lineHeight: 14 },
-  facts: { color: colors.muted, fontSize: 10, lineHeight: 14 },
+  factsRow: { flexDirection: 'row', alignItems: 'center', gap: 8, minWidth: 0 },
+  facts: { color: colors.muted, fontSize: 10, lineHeight: 14, flexShrink: 1 },
+  likes: { color: colors.muted, fontSize: 10, lineHeight: 14, flexShrink: 0 },
   actions: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 10, paddingBottom: 4, gap: 8 },
   locate: { minWidth: 76, minHeight: 56, flexShrink: 1, paddingHorizontal: 10, paddingVertical: 6, gap: 4, justifyContent: 'center', alignItems: 'center', borderRadius: 16 },
   actionLabel: { color: '#2C63AF', fontSize: 11, lineHeight: 14, fontWeight: '600', textAlign: 'center', flexShrink: 1 },

@@ -61,7 +61,8 @@ test('panel has an explicit accessible toggle, vertical expanded scrolling, real
   const card = readFileSync('src/components/discovery/home-journey-card.tsx', 'utf8');
   assert.ok(card.includes('source={{ uri: cover }}'));
   assert.ok(card.includes('onError='));
-  assert.ok(card.includes('No journey cover photo available'));
+  assert.ok(card.includes('<JourneyArt '), 'Photo-less covers show journey art');
+  assert.ok(!card.includes('accessibilityLabel={\'Journey art'), 'Art inside the labelled card stays decorative');
   assert.ok(card.includes('onLocate(journey.id)'));
   assert.ok(card.includes('onOpen(journey.id)'));
   const home = readFileSync('src/app/discover.tsx', 'utf8');

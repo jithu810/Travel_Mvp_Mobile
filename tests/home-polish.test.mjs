@@ -27,6 +27,8 @@ function load(file, dependencies, state = null, hookOverrides = {}) {
     if(name==='@/lib/social/saved-queries')return {loadSavedJourneys:async()=>[]};
     if(name==='@/components/journey/journey-action-icon')return {JourneyActionIcon:'JourneyActionIcon'};
     if (name === '../../../assets/images/journey-photo-fallback.png') return 17;
+    if (name === '@/components/art/journey-art') return { JourneyArt: 'JourneyArt', StopArt: 'StopArt' };
+    if (name === '@/lib/art/journey-art') return { artSeed: (id, stops) => 'seed:' + id + ':' + (stops || []).length };
     if (name === './travel-photo-placeholder') return load('src/components/discovery/travel-photo-placeholder.tsx', {});
     if (name === './static-map-photo') return load('src/components/discovery/static-map-photo.tsx', {});
     if (name === '@/lib/media/static-map') return load('src/lib/media/static-map.ts', {});
@@ -229,9 +231,46 @@ test('Home retains title, author, count, Locate and both Story entry points (car
   for (const label of ['Locate journey: Coastal weekend', 'Explore journey: Coastal weekend', 'Open journey: Coastal weekend, Coast']) all.find(n => n.props?.accessibilityLabel === label).props.onPress();
   assert.deepEqual(calls, [['locate', journey.id], ['open', journey.id], ['open', journey.id]]);
 });
+test('Home cards show a display-only like count, including 0, in compact and expanded layouts', () => {
+  for (const expanded of [false, true]) {
+    for (const [likes, label] of [[0, '0 likes'], [1, '1 like'], [12, '12 likes']]) {
+      const component = load('src/components/discovery/home-journey-card.tsx', {
+        '@/lib/discovery/model': { journeyFacts: j => j.stops.length + ' stops' }, './ui': { colors },
+      });
+      const calls = [];
+      const all = nodes(component.HomeJourneyCard({ journey: { ...journey, likes }, expanded, width: 300, selected: false, onOpen: id => calls.push(['open', id]), onLocate: id => calls.push(['locate', id]) }));
+      const count = all.filter(n => n.type === 'Text' && n.props.accessibilityLabel === label);
+      assert.equal(count.length, 1, label);
+      assert.equal([count[0].props.children].flat().join(''), '♡ ' + likes);
+      assert.equal(count[0].props.onPress, undefined, 'Like count is display-only');
+      assert.equal(count[0].props.numberOfLines, 1);
+      const row = all.find(n => [n.props?.children].flat().includes(count[0]));
+      assert.equal(row.props.style.flexDirection, 'row', 'Count shares the facts line so card height is unchanged');
+      const facts = [row.props.children].flat().find(n => n?.props?.children === '1 stops');
+      assert.ok(facts);
+      assert.equal(facts.props.numberOfLines, 1, 'Facts truncate to one line');
+      assert.equal(facts.props.style.flexShrink, 1, 'Facts shrink before the count');
+      assert.equal(count[0].props.style.flexShrink, 0, 'Count is never pushed off the card');
+      const open = all.find(n => n.props?.accessibilityLabel === 'Open journey: Coastal weekend, Coast, ' + label);
+      assert.equal(open.props.accessibilityHint, 'Opens Journey Story');
+      open.props.onPress();
+      for (const action of ['Locate journey: Coastal weekend', 'Explore journey: Coastal weekend']) all.find(n => n.props?.accessibilityLabel === action).props.onPress();
+      assert.deepEqual(calls, [['open', journey.id], ['locate', journey.id], ['open', journey.id]]);
+      assert.ok(!all.some(n => /like/i.test(String(n.props?.accessibilityLabel ?? '')) && n.type === 'Pressable' && !String(n.props.accessibilityLabel).startsWith('Open journey')), 'No like toggle on Home');
+    }
+    for (const likes of [null, undefined, NaN, -1, 1.5]) {
+      const component = load('src/components/discovery/home-journey-card.tsx', {
+        '@/lib/discovery/model': { journeyFacts: j => j.stops.length + ' stops' }, './ui': { colors },
+      });
+      const all = nodes(component.HomeJourneyCard({ journey: { ...journey, likes }, expanded, width: 300, selected: false, onOpen() {}, onLocate() {} }));
+      assert.ok(!all.some(n => n.type === 'Text' && [n.props.children].flat().join('').includes('♡')), 'Unknown count shows nothing');
+      assert.ok(all.some(n => n.props?.accessibilityLabel === 'Open journey: Coastal weekend, Coast'));
+    }
+  }
+});
 test('missing/failed photos retain fallback and a changed URI recovers', () => {
   for (const [uri, failed] of [[null, null], [journey.cover, journey.cover]]) {
-    assert.ok(card(uri, failed).all.some(n => n.props?.accessibilityLabel === 'Default travel photo. No journey cover photo available. Coast. Explore journey'));
+    assert.ok(card(uri, failed).all.some(n => n.type === 'JourneyArt'));
   }
   assert.equal(card('https://example.invalid/new.jpg', journey.cover).all.filter(n => n.type === 'Image').length, 1);
 });
@@ -271,7 +310,7 @@ test('Home image failure falls back, a new URI recovers and card measurement rem
   assert.equal(nodes(unselectedLocate).find(n => n.type === 'Ionicons').props.color, '#3873CE');
   nodes(tree).find(n => n.type === 'Image').props.onError();
   assert.equal(failedUri, journey.cover);
-  assert.ok(nodes(component.HomeJourneyCard(props)).some(n => n.props?.accessibilityLabel === 'Default travel photo. No journey cover photo available. Coast. Explore journey'));
+  assert.ok(nodes(component.HomeJourneyCard(props)).some(n => n.type === 'JourneyArt'));
   tree = component.HomeJourneyCard({ ...props, journey: { ...journey, cover: 'https://example.invalid/landscape.jpg' } });
   assert.equal(nodes(tree).find(n => n.type === 'Image').props.source.uri, 'https://example.invalid/landscape.jpg');
   const {HomeControlIcon}=load('src/components/discovery/home-control-icon.tsx',{});
@@ -279,21 +318,21 @@ test('Home image failure falls back, a new URI recovers and card measurement rem
   assert.equal(world.props.style[0].width,24);assert.equal(world.props.style[1],false,'World keeps its original icon size');
 });
 
-test('Home missing and failed covers use supplied default photo with readable native caption', () => {
+test('Home missing and failed covers use deterministic journey art in the same frame, never the stock photo', () => {
   for (const expanded of [false, true]) for (const [uri, failed] of [[null, null], [journey.cover, journey.cover]]) {
     const { all } = card(uri, failed, expanded);
-    const fallback = all.find(n => n.props?.accessibilityLabel === 'Default travel photo. No journey cover photo available. Coast. Explore journey');
-    assert.equal(fallback.props.accessible, true);
-    const art = nodes(fallback).find(n => n.props?.accessibilityElementsHidden);
-    assert.equal(art.props.accessible, false);
-    assert.equal(art.props.importantForAccessibility, 'no-hide-descendants');
-    const image = nodes(art).find(n => n.type === 'Image');
-    assert.equal(image.props.source, 17);assert.equal(image.props.resizeMode, 'cover');
-    const caption = nodes(fallback).filter(n => n.type === 'Text');
-    assert.equal(caption.length, 1);assert.equal(caption[0].props.children, 'Explore journey');
-    const textStyle=Object.assign({},...caption[0].props.style.filter(Boolean));
-    assert.equal(textStyle.color,'#FFFFFF');assert.equal(textStyle.fontSize,expanded?12:10);
-    assert.ok(!caption.some(n=>n.props.children===journey.destination));
+    const art = all.find(n => n.type === 'JourneyArt');
+    assert.equal(art.props.accessibilityLabel, undefined, 'Decorative: the card Pressable already names the journey');
+    assert.ok(all.some(n => n.type === 'Pressable' && n.props.accessibilityLabel === 'Open journey: Coastal weekend, Coast'));
+    assert.equal(art.props.seed, 'seed:journey-a:1', 'Seeded from the journey');
+    assert.equal(art.props.stops, journey.stops);
+    assert.equal(art.props.compact, !expanded);
+    assert.equal(art.props.showDestination, undefined, 'The card already prints the destination');
+    assert.equal(all.filter(n => n.type === 'Image').length, 0, 'No stock placeholder or map image is requested');
+    const frame = all.find(n => [n.props?.children].flat().includes(art));
+    const frameStyle = Object.assign({}, ...frame.props.style.filter(Boolean));
+    assert.equal(frameStyle.width, expanded ? '100%' : 96, 'Card cover size is unchanged');
+    assert.equal(frameStyle.height, expanded ? Math.round(300 * 9 / 16) : 84);
   }
 });
 test('Journey generic fallback has a distinct caption and honest accessibility label',()=>{
