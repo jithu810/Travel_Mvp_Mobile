@@ -45,7 +45,9 @@ export function createBuddyStore() {
       if (foreground) measurements.forEach(fn => fn());
     },
     getPose(path: string) { return path === snapshot.path ? pose : null; },
-    getCelebration() { return celebration; },
+    // An unclaimed event past its expiry is gone even if no host actor was mounted
+    // to clear it; otherwise it would hide map Buddies indefinitely.
+    getCelebration(now = Date.now()) { return celebration && (celebration.claimed || now < celebration.expiresAt) ? celebration : null; },
     celebrate(path: string, animation: BuddyCelebrationName, operation: object, now = Date.now()) {
       if (celebrated.has(operation)) return false;
       celebrated.add(operation);
@@ -54,7 +56,11 @@ export function createBuddyStore() {
       // Only memory completion may wait for its existing editor/keyboard to close.
       if (animation === 'run' && ([...screens.values()].some(entry => entry.path === path && entry.state.suppressed) || [...blockers.values()].includes(path))) return false;
       if (celebration && now < celebration.expiresAt) return false;
-      celebration = { id: ++celebrationId, path, animation, expiresAt: now + 6000, claimed: false }; publish(); return true;
+      celebration = { id: ++celebrationId, path, animation, expiresAt: now + 6000, claimed: false }; publish();
+      // Publish the expiry so subscribers re-render even when no actor is mounted to clear it.
+      const id = celebration.id, expiry: unknown = setTimeout(() => { if (celebration?.id === id && !celebration.claimed) { celebration = null; publish(); } }, 6000);
+      (expiry as { unref?: () => void }).unref?.();
+      return true;
     },
     claimCelebration(id: number, now = Date.now()) {
       if (!celebration || celebration.id !== id || celebration.claimed || celebration.path !== snapshot.path || !snapshot.foreground || now >= celebration.expiresAt) return null;

@@ -143,7 +143,6 @@ test('native map renders a separate blue route source only when supplied and for
     '@/hooks/use-live-buddy-safety': { useLiveBuddySafety: () => ({ mapRef() {}, moving() {}, idle() {}, clear: false }) },
     '@/lib/buddy/map-image': { buddyMapImageSource: { uri: 'data:image/png;base64,buddy' } }, '@/lib/buddy/map-presentation': { LIVE_BUDDY_OFFSET: [32, -12] },
     './story-walking-buddy': { StoryWalkingBuddy: 'StoryWalkingBuddy' },
-    './story-preview-marker': { StoryPreviewMarker: 'StoryPreviewMarker' },
     '@/components/journey/journey-action-icon': { JourneyActionIcon: 'JourneyActionIcon' },
     '@/lib/journey/nearby': { nearbyFocus: () => null }, '../nearby-locations': { NearbyLocations: 'NearbyLocations' },
     'expo-router': { useFocusEffect() {} },

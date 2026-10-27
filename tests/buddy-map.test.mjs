@@ -8,8 +8,6 @@ function load(file, modules = {}, timers = globalThis) {
   const exports = {}, code = ts.transpileModule(readFileSync(file, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true } }).outputText;
   new Function('require', 'exports', 'setTimeout', 'clearTimeout', code)(name => { assert.ok(name in modules, name); return modules[name]; }, exports, timers.setTimeout, timers.clearTimeout); return exports;
 }
-const mapData = load('src/lib/journey/map-data.ts'), travel = load('src/lib/discovery/travel.ts', { '../journey/map-data': mapData });
-const { createJourneyPreview } = load('src/lib/journey/preview-playback.ts', { '../discovery/travel': travel });
 const model = load('src/lib/buddy/model.ts'), { createBuddyStore } = load('src/lib/buddy/store.ts', { './model': model });
 const { liveBuddyClear } = load('src/lib/buddy/map-presentation.ts');
 const { createBuddyMapImage, buddyMapImageSource } = load('src/lib/buddy/map-image.ts');
@@ -23,28 +21,6 @@ test('map image embeds the unchanged single-pose PNG, never an animation sheet o
   const png = Buffer.from(buddyMapImageSource.uri.split(',')[1], 'base64');
   assert.ok(png.equals(readFileSync('assets/journey-buddy/reference.png')), 'Embedded pixels must match the source asset exactly');
   assert.equal(png.readUInt32BE(16), 128); assert.equal(png.readUInt32BE(20), 128);
-});
-test('Story preview begins on request, retains exact progress/stop dwell on pause and resumes without jumping', () => {
-  const time = clock(), preview = createJourneyPreview([[[0, 0], [1, 0], [2, 0]]], time);
-  assert.equal(preview.get().status, 'idle'); assert.equal(time.jobs.size, 0); assert.equal(preview.play(), false);
-  preview.setReady(true); assert.equal(preview.play(), true); time.advance(4200); preview.pause();
-  assert.equal(preview.progress(), 4200); const midway = [...preview.getPosition().coordinate]; assert.ok(midway[0] > 0.4 && midway[0] < 0.6);
-  time.advance(100000); assert.deepEqual(preview.getPosition().coordinate, midway); assert.equal(time.jobs.size, 0);
-  preview.play(); time.advance(4200); preview.pause(); assert.equal(preview.progress(), 8400); assert.deepEqual(preview.getPosition().coordinate, [1, 0]);
-  preview.play(); time.advance(300); preview.pause(); assert.equal(preview.progress(), 8700); assert.deepEqual(preview.getPosition().coordinate, [1, 0]);
-  time.advance(50000); preview.play(); time.advance(350); assert.deepEqual(preview.getPosition().coordinate, [1, 0], 'Remaining dwell is retained');
-  time.advance(4200); assert.ok(preview.getPosition().coordinate[0] > 1.4); preview.dispose(); assert.equal(time.jobs.size, 0);
-});
-test('Replay resets intentionally; lifecycle/readiness pauses, no simulated bridge crosses missing-coordinate gaps', () => {
-  const time = clock(), preview = createJourneyPreview([[[0, 0], [1, 0]], [[100, 10], [101, 10]]], time);
-  preview.setReady(true); preview.play(); time.advance(8400 + 650 + 1000);
-  assert.ok(preview.getPosition().coordinate[0] >= 100, 'Next segment begins at its own real start');
-  preview.setReady(false); const point = [...preview.getPosition().coordinate]; time.advance(20000);
-  assert.deepEqual(preview.getPosition().coordinate, point); assert.equal(preview.play(), false);
-  preview.setReady(true); assert.equal(preview.replay(), true); assert.deepEqual(preview.getPosition().coordinate, [0, 0]);
-  time.advance(preview.total); assert.equal(preview.get().status, 'finished'); assert.equal(time.jobs.size, 0);
-  assert.equal(preview.play(), false); preview.replay(); assert.equal(preview.progress(), 0); preview.dispose(); assert.equal(preview.play(), false);
-  const empty = createJourneyPreview([[[0, 0]]], clock()); empty.setReady(true); assert.equal(empty.get().status, 'unavailable'); assert.equal(empty.play(), false);
 });
 test('map ownership is route scoped, help captures current action owner and success can take presentation without changing preference', () => {
   const store = createBuddyStore(), owner = {}, map = {}; store.environment('/journey/one', true);
@@ -83,30 +59,43 @@ function hooks() {
   return { react, render(fn, props) { cursor = 0; effects = []; const result = fn(props); effects.forEach(effect => effect()); return result; }, dispose() { slots.forEach(item => item?.cleanup?.()); } };
 }
 const jsx = (type, props) => ({ type, props }), runtime = { jsx, jsxs: jsx, Fragment: 'Fragment' };
-const all = (node, type) => !node || typeof node !== 'object' ? [] : [...(node.type === type ? [node] : []), ...[node.props?.children].flat(Infinity).flatMap(child => all(child, type))];
-test('actual preview marker uses the same coordinate source for Buddy/plane and cleans its only subscription', () => {
-  const h = hooks(), time = clock(), preview = createJourneyPreview([[[0, 0], [1, 0]]], time), sources = [];
-  class AnimatedPoint { constructor(value) { this.value = value; sources.push(this); } setValue(value) { this.value = value; } stopAnimation() {} }
-  const mapbox = { Animated: { ShapeSource: 'ShapeSource' }, SymbolLayer: 'SymbolLayer' };
-  const { StoryPreviewMarker } = load('src/components/journey/map/story-preview-marker.tsx', { react: h.react, 'react/jsx-runtime': runtime, '@rnmapbox/maps': { __esModule: true, default: mapbox, AnimatedPoint } });
-  let tree = h.render(StoryPreviewMarker, { preview, buddy: true });
-  assert.equal(all(tree, 'SymbolLayer')[0].props.style.iconRotationAlignment, 'viewport'); assert.equal(all(tree, 'SymbolLayer')[0].props.style.iconImage, 'journey-map-buddy');
-  preview.setReady(true); preview.play(); time.advance(4200); const point = [...sources[0].value.coordinates];
-  tree = h.render(StoryPreviewMarker, { preview, buddy: false }); assert.equal(all(tree, 'SymbolLayer')[0].props.style.textField, '✈');
-  assert.deepEqual(all(tree, 'SymbolLayer')[0].props.style.textFont, ['Arial Unicode MS Regular']);
-  assert.deepEqual(sources[0].value.coordinates, point); assert.equal(sources.length, 1, 'Comparison never resets position');
-  h.dispose(); time.advance(500); assert.deepEqual(sources[0].value.coordinates, point); preview.dispose();
-});
-test('actual live safety hook hides through motion, coordinate changes, failed/late native projection and unmount', async () => {
+test('actual live safety hook never renders a stale fix and releases on failed/late native projection and unmount', async () => {
   const h = hooks(), time = clock(), timers = { setTimeout: time.set, clearTimeout: time.clear };
-  const { useLiveBuddySafety } = load('src/hooks/use-live-buddy-safety.ts', { react: h.react, '@/lib/buddy/map-presentation': { liveBuddyClear } }, timers);
+  const { useLiveBuddySafety, LIVE_PROJECTION_INTERVAL } = load('src/hooks/use-live-buddy-safety.ts', { react: h.react, '@/lib/buddy/map-presentation': { liveBuddyClear } }, timers);
   let resolve, coords = [[1, 1]], enabled = true;
   const render = () => h.render(() => useLiveBuddySafety(coords, { width: 390, height: 800 }, [], enabled), {});
+  const settle = async () => { await Promise.resolve(); await Promise.resolve(); return render(); };
   let value = render(); value.mapRef({ getPointInView: () => new Promise(done => { resolve = done; }) }); value.idle(); value = render();
-  assert.equal(value.clear, false); resolve([180, 350]); await Promise.resolve(); await Promise.resolve(); value = render(); assert.equal(value.clear, true);
+  assert.equal(value.clear, false); assert.equal(value.present, false, 'Nothing is owned before the first clear projection');
+  time.advance(LIVE_PROJECTION_INTERVAL); resolve([180, 350]); value = await settle(); assert.equal(value.clear, true); assert.equal(value.present, true);
   coords = [[2, 2]]; value = render(); assert.equal(value.clear, false, 'An old fix projection never renders a new fix');
-  time.advance(1500); resolve([180, 350]); await Promise.resolve(); await Promise.resolve(); assert.equal(render().clear, false, 'Timed-out projection cannot return');
-  value.moving(); value = render(); assert.equal(value.clear, false); enabled = false; value = render(); assert.equal(value.clear, false); h.dispose(); assert.equal(time.jobs.size, 0);
+  time.advance(LIVE_PROJECTION_INTERVAL); time.advance(1500); resolve([180, 350]); value = await settle();
+  assert.equal(value.clear, false, 'Timed-out projection cannot return'); assert.equal(value.present, false, 'Failed projection releases ownership');
+  value.moving(); value = render(); assert.equal(value.clear, false); enabled = false; value = render(); assert.equal(value.present, false); h.dispose(); assert.equal(time.jobs.size, 0);
+});
+test('GPS following keeps live ownership through camera motion and new fixes, and projects once per burst', async () => {
+  const h = hooks(), time = clock(), timers = { setTimeout: time.set, clearTimeout: time.clear };
+  const { useLiveBuddySafety, LIVE_PROJECTION_INTERVAL } = load('src/hooks/use-live-buddy-safety.ts', { react: h.react, '@/lib/buddy/map-presentation': { liveBuddyClear } }, timers);
+  let resolve, calls = 0, coords = [[1, 1]], enabled = true, controls = [];
+  const render = () => h.render(() => useLiveBuddySafety(coords, { width: 390, height: 800 }, controls, enabled), {});
+  const settle = async () => { await Promise.resolve(); await Promise.resolve(); return render(); };
+  let value = render(); value.mapRef({ getPointInView: () => new Promise(done => { calls++; resolve = done; }) }); value.idle(); value = render();
+  assert.equal(calls, 0, 'Projection is debounced, not run synchronously on the fix');
+  time.advance(LIVE_PROJECTION_INTERVAL); assert.equal(calls, 1); resolve([180, 350]); value = await settle(); assert.equal(value.present, true);
+  for (let fix = 2; fix < 6; fix++) {
+    value.moving(); value = render();
+    assert.equal(value.present, true, 'Follow camera motion keeps the map companion (no floating Buddy remount)');
+    coords = [[fix, fix]]; value.idle(); value = render(); assert.equal(value.present, true, 'A pending newer fix keeps the last clear answer');
+  }
+  assert.equal(calls, 1, 'Bursts of fixes/camera moves do not project on every fix');
+  time.advance(LIVE_PROJECTION_INTERVAL); assert.equal(calls, 2); resolve([180, 350]); value = await settle(); assert.equal(value.present, true);
+  controls = [{ x: 198, y: 300, width: 44, height: 44 }]; value = render(); time.advance(LIVE_PROJECTION_INTERVAL); resolve([180, 350]); value = await settle();
+  assert.equal(value.present, false, 'A settled overlap genuinely releases ownership');
+  value.moving(); value.idle(); value = render(); assert.equal(value.present, false, 'Motion after a release never re-claims without a clear projection');
+  controls = []; value = render(); time.advance(LIVE_PROJECTION_INTERVAL); resolve([180, 350]); value = await settle(); assert.equal(value.present, true);
+  enabled = false; value = render(); assert.equal(value.present, false, 'Pause/invalid fix/guidance release immediately');
+  enabled = true; value = render(); assert.equal(value.present, false, 'Re-enabling waits for a fresh clear projection');
+  h.dispose(); assert.equal(time.jobs.size, 0);
 });
 
 test('actual map ownership honors off, reduced static presence, routine live guidance, arrival and success handoff', () => {
@@ -144,16 +133,6 @@ test('actual map Help reuses accessible fallback, current action owner, tour and
   tree.props.onNext(); tree = render(); assert.equal(tree.props.tour, 1); tree.props.onTour(); assert.deepEqual(routes, ['/create']);
   store.setTour(null); store.openMapHelp('/journey/one'); tree = render(); store.environment('/discover', true); tree.props.onAddMemory(); assert.equal(adds, 1, 'Stale map Help cannot invoke an old owner'); h.dispose();
 });
-test('actual preview controls retain progress across comparison and expose explicit Play/Pause/Replay with off fallback', () => {
-  const h = hooks(), time = clock(), preview = createJourneyPreview([[[0, 0], [1, 0]]], time); let enabled = true, buddy = true;
-  const { JourneyPreviewControls } = load('src/components/journey/journey-preview-controls.tsx', { react: h.react, 'react/jsx-runtime': runtime, 'react-native': { View: 'View', Text: 'Text', Pressable: 'Pressable', StyleSheet: { create: value => value } }, '@/hooks/use-journey-buddy': { useBuddyPreference: () => ({ enabled }) }, '@/hooks/use-buddy-geometry': { useBuddyProtectedBounds: () => ({}) } });
-  const render = () => h.render(JourneyPreviewControls, { preview, active: true, buddy, onBuddy: value => { buddy = value; } });
-  let tree = render(); assert.equal(all(tree, 'Pressable')[0].props.disabled, true); assert.ok(all(tree, 'Text').some(node => node.props.children === 'Journey preview'));
-  preview.setReady(true); tree = render(); all(tree, 'Pressable')[0].props.onPress(); time.advance(2000); tree = render(); assert.equal(all(tree, 'Pressable')[0].props.accessibilityLabel, 'Pause journey preview');
-  all(tree, 'Pressable')[0].props.onPress(); const progress = preview.progress(); tree = render(); all(tree, 'Pressable')[2].props.onPress(); assert.equal(buddy, false); assert.equal(preview.progress(), progress);
-  tree = render(); all(tree, 'Pressable')[1].props.onPress(); assert.equal(preview.progress(), 0); enabled = false; tree = render(); assert.equal(all(tree, 'Pressable')[2].props.disabled, true);
-  preview.setReady(false); tree = render(); assert.equal(all(tree, 'Pressable')[0].props.disabled, true); assert.equal(preview.get().status, 'paused'); h.dispose(); preview.dispose();
-});
 
 test('map artwork requires decoded load plus layout, fails on errors/timeouts, and rejects old callbacks across retry/cancel', () => {
   const time = clock(), gate = createBuddyMapImage(time);
@@ -181,4 +160,32 @@ test('actual image readiness hook guards ordinary RN layout/decode, local retrie
   value.retry(); value = render(); time.advance(5000); value = render(); assert.equal(value.failed, true);
   value.retry(); value = render(); value.onLayout({ nativeEvent: { layout: { width: 128, height: 128 } } }); value.onLoad(); assert.equal(render().ready, true);
   enabled = false; render(); const late = value; h.dispose(); late.onError(); late.onLoad(); late.retry(); assert.equal(time.jobs.size, 0);
+});
+test('an unclaimed expired celebration stops hiding map Buddies even when no floating actor clears it', () => {
+  const time = clock(), { createBuddyStore: create } = load('src/lib/buddy/store.ts', { './model': model }, { setTimeout: time.set, clearTimeout: time.clear });
+  const store = create(), path = '/journey/one'; store.environment(path, true); let published = 0; store.subscribe(() => published++);
+  assert.equal(store.celebrate(path, 'jump', {}, Date.now() - 6001), true); assert.equal(store.getCelebration(), null, 'Expired unclaimed event is ignored');
+  assert.equal(store.celebrate(path, 'jump', {}), true, 'An expired event cannot block a newer success'); assert.ok(store.getCelebration());
+  const before = published; time.advance(6000); assert.equal(store.getCelebration(), null); assert.ok(published > before, 'Expiry is published to subscribers');
+  store.celebrate(path, 'run', {}); const claimed = store.claimCelebration(store.getCelebration().id); assert.ok(claimed);
+  assert.equal(store.getCelebration(claimed.expiresAt + 1000), claimed, 'A claimed animation is owned by its actor timer');
+  time.advance(6000); assert.equal(store.getCelebration(), claimed, 'Expiry timer never drops a claimed animation');
+  const h = hooks(), api = { store: create(), preference: { get: () => ({ enabled: true }) } }; api.store.environment(path, true);
+  api.store.screen({}, { path, state: { floating: true }, act() {} });
+  const { useMapBuddy } = load('src/hooks/use-map-buddy.ts', { react: h.react, 'expo-router': { usePathname: () => path, useFocusEffect: fn => h.react.useEffect(fn, [fn]) }, 'react-native': { AppState: { currentState: 'active' } }, './use-journey-buddy': { useBuddyApi: () => api, useBuddyPreference: () => ({ enabled: true, loaded: true }) } });
+  api.store.celebrate(path, 'jump', {}, Date.now() - 7000);
+  const render = () => h.render(() => useMapBuddy(true), {}); render(); render();
+  assert.equal(render().visible, true, 'Stale event no longer hides the map Buddy'); assert.equal(api.store.current().mapOwned, true); h.dispose();
+});
+test('map help ownership follows the Story walker: floating Buddy and map help never both apply', () => {
+  const api = { store: createBuddyStore(), preference: { get: () => ({ enabled: true }) } }, path = '/journey/one';
+  api.store.environment(path, true); api.store.screen({}, { path, state: { floating: true }, act() {} });
+  const mount = () => { const h = hooks(); const { useMapBuddy } = load('src/hooks/use-map-buddy.ts', { react: h.react, 'expo-router': { usePathname: () => path, useFocusEffect: fn => h.react.useEffect(fn, [fn]) }, 'react-native': { AppState: { currentState: 'active' } }, './use-journey-buddy': { useBuddyApi: () => api, useBuddyPreference: () => ({ enabled: true, loaded: true }) } }); return { h, useMapBuddy }; };
+  const walker = mount(), map = mount(); let walking = false;
+  const renderWalker = () => walker.h.render(() => walker.useMapBuddy(walking), {}), renderMap = () => map.h.render(() => map.useMapBuddy(false), {});
+  renderWalker(); renderWalker(); assert.equal(renderMap().owned, false, 'Floating Buddy is shown before the walker owns the map');
+  walking = true; renderWalker(); renderWalker(); assert.equal(api.store.current().mapOwned, true); assert.equal(renderMap().owned, true, 'Map help appears only once the floating Buddy is hidden');
+  api.store.setTour(0); renderWalker(); assert.equal(renderMap().owned, false, 'Tour returns presentation to the floating Buddy and removes map help');
+  api.store.setTour(null); renderWalker(); renderWalker(); assert.equal(renderMap().owned, true);
+  walking = false; renderWalker(); assert.equal(renderMap().owned, false); walker.h.dispose(); map.h.dispose();
 });

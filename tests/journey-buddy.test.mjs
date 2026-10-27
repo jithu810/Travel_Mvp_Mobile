@@ -271,19 +271,19 @@ test('success events deduplicate operation identities, reject overlap and clear 
   const first = {}; assert.equal(store.celebrate('/create', 'jump', first, 0), true);
   assert.equal(store.celebrate('/create', 'jump', first, 1), false);
   assert.equal(store.celebrate('/create', 'run', {}, 1), false);
-  const id = store.getCelebration().id;
+  const id = store.getCelebration(1).id;
   assert.ok(store.claimCelebration(id, 2)); assert.equal(store.claimCelebration(id, 3), null);
-  store.interaction(true); assert.equal(store.getCelebration(), null);
-  store.celebrate('/create', 'jump', {}, 10); store.environment('/create', false); assert.equal(store.getCelebration(), null);
+  store.interaction(true); assert.equal(store.getCelebration(3), null);
+  assert.equal(store.celebrate('/create', 'jump', {}, 10), true); assert.ok(store.getCelebration(10)); store.environment('/create', false); assert.equal(store.getCelebration(11), null);
   assert.equal(store.celebrate('/create', 'jump', {}, 11), false);
-  store.environment('/create', true); store.celebrate('/create', 'jump', {}, 20); store.environment('/discover', true); assert.equal(store.getCelebration(), null);
-  store.celebrate('/discover', 'run', {}, 30); store.block({}, '/discover', true); assert.equal(store.getCelebration(), null);
+  store.environment('/create', true); assert.equal(store.celebrate('/create', 'jump', {}, 20), true); assert.ok(store.getCelebration(20)); store.environment('/discover', true); assert.equal(store.getCelebration(21), null);
+  assert.equal(store.celebrate('/discover', 'run', {}, 30), true); assert.ok(store.getCelebration(30)); store.block({}, '/discover', true); assert.equal(store.getCelebration(31), null);
   assert.equal(store.celebrate('/discover', 'run', {}, 31), false, 'Run never queues behind a dialog or keyboard');
-  store.celebrate('/discover', 'jump', {}, 40); store.screen({}, { path: '/discover', state: { suppressed: true }, act() {} }); assert.equal(store.getCelebration(), null);
-  store.celebrate('/discover', 'jump', {}, 50); const stale = store.getCelebration().id;
+  assert.equal(store.celebrate('/discover', 'jump', {}, 40), true); assert.ok(store.getCelebration(40)); store.screen({}, { path: '/discover', state: { suppressed: true }, act() {} }); assert.equal(store.getCelebration(41), null);
+  store.celebrate('/discover', 'jump', {}, 50); const stale = store.getCelebration(50).id;
   assert.equal(store.claimCelebration(stale, 6050), null);
   assert.equal(store.celebrate('/discover', 'jump', {}, 6051), true);
-  store.clearCelebration(stale); assert.ok(store.getCelebration(), 'Old completion cannot clear a newer event');
+  store.clearCelebration(stale); assert.ok(store.getCelebration(6052), 'Old completion cannot clear a newer event');
 });
 test('actual anchored helper offers two contextual actions and never saves automatically', () => {
   const h = hooks(); let creates = 0, drafts = 0, adds = 0;

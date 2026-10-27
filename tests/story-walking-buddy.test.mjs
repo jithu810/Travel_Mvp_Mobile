@@ -59,11 +59,10 @@ test('date-line path and pause/resume remain finite on the shortest arc', () => 
   assert.ok(Math.abs(model.get().coordinate[0]) > 179); model.pause(); const point = [...model.get().coordinate]; model.configure(true, false); assert.deepEqual(model.get().coordinate, point);
   time.advance(1824); assert.deepEqual(model.get().coordinate, [-179, 10]); model.dispose();
 });
-test('Story wires one shared controller into36dp compact and64dp expanded maps without playback/help/plane controls', () => {
-  const screen = readFileSync('src/app/journey/[id].tsx', 'utf8'), native = readFileSync('src/components/journey/map/native-map.tsx', 'utf8');
-  assert.ok(!screen.includes('JourneyPreviewControls')); assert.ok(!screen.includes('storyPreview=')); assert.ok(screen.includes('storyBuddySize={36}')); assert.ok(screen.includes('storyBuddySize={64}'));
-  assert.equal((screen.match(/storyBuddy={storyBuddy}/g) ?? []).length, 2); assert.ok(native.includes('if (storyBuddy) { fit();'));
-  assert.ok(native.includes('playing={!storyBuddy && !storyPreview')); assert.ok(native.includes('ready && !storyBuddy && storyPreview'));
+test('Story wires one shared controller into36dp compact and64dp expanded maps without playback/plane controls', () => {
+  const screen = readFileSync('src/app/journey/[id].tsx', 'utf8');
+  assert.ok(screen.includes('storyBuddySize={36}')); assert.ok(screen.includes('storyBuddySize={64}'));
+  assert.equal((screen.match(/storyBuddy={storyBuddy}/g) ?? []).length, 2);
 });
 test('actual StorySheet releases its blocker only for the explicitly opted-in expanded map', () => {
   const blocked = [], jsx = (type, props) => ({ type, props });

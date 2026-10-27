@@ -18,7 +18,6 @@ function fixture(image = { ready: false, failed: false, version: 0 }) {
     '@/hooks/use-live-buddy-safety': { useLiveBuddySafety: () => ({ mapRef() {}, moving() {}, idle() {}, clear: false }) },
     '@/lib/buddy/map-image': { buddyMapImageSource: { uri: 'data:image/png;base64,buddy' } }, '@/lib/buddy/map-presentation': { LIVE_BUDDY_OFFSET: [32, -12] },
     './story-walking-buddy': { StoryWalkingBuddy: 'StoryWalkingBuddy' },
-    './story-preview-marker': { StoryPreviewMarker: 'StoryPreviewMarker' },
     '@/hooks/use-buddy-geometry': buddyGeometryStub,
     '@/hooks/use-buddy-map-pins': buddyMapPinsStub,
     '@/lib/buddy/map-controls': { journeyBuddyControls: () => [] },

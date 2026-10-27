@@ -5,6 +5,9 @@ import { useMapBuddy } from '@/hooks/use-map-buddy';
 import { resolveBuddyAnimation, spriteFrame } from '@/lib/buddy/animations';
 import { createTravelPlayback, travelPosition, type TravelLeg } from '@/lib/discovery/travel';
 
+// Brief rest at the final stop before the floating Home Buddy (and its help) returns.
+export const HOME_BUDDY_ARRIVAL_REST = 1500;
+
 const idle = resolveBuddyAnimation('idle')!;
 const walk = resolveBuddyAnimation('walk')!;
 
@@ -13,8 +16,10 @@ const walk = resolveBuddyAnimation('walk')!;
 export function TravelingBuddy({ legs, onFailure }: { legs: TravelLeg[]; onFailure: () => void }) {
   const [loaded, setLoaded] = useState({ idle: false, walk: false, layout: false });
   const [failed, setFailed] = useState(false);
+  const [arrived, setArrived] = useState(false), [released, setReleased] = useState(false);
   const ready = loaded.idle && loaded.walk && loaded.layout && !failed;
-  const buddy = useMapBuddy(ready);
+  // Ownership ends with the Locate walk so the map never hides the floating Buddy indefinitely.
+  const buddy = useMapBuddy(ready && !released);
   const [coordinate, setCoordinate] = useState(legs[0].start);
   const [moving, setMoving] = useState(false);
   const [facing, setFacing] = useState<'left' | 'right'>('left');
@@ -26,6 +31,11 @@ export function TravelingBuddy({ legs, onFailure }: { legs: TravelLeg[]; onFailu
     return () => clearTimeout(timeout);
   }, [ready, failed]);
   useEffect(() => { if (failed) onFailure(); }, [failed, onFailure]);
+  useEffect(() => {
+    if (!arrived || released) return;
+    const timer = setTimeout(() => setReleased(true), HOME_BUDDY_ARRIVAL_REST);
+    return () => clearTimeout(timer);
+  }, [arrived, released]);
   useEffect(() => {
     if (!buddy.visible) return;
     let index = 0;
@@ -50,14 +60,14 @@ export function TravelingBuddy({ legs, onFailure }: { legs: TravelLeg[]; onFailu
         easing: Easing.linear, useNativeDriver: false, isInteraction: false });
       animation.start(({ finished }) => {
         if (!active) return;
-        if (finished) { setCoordinate(leg.target); setFrame(0); setMoving(false); }
+        if (finished) { setCoordinate(leg.target); setFrame(0); setMoving(false); if (leg === legs[legs.length - 1]) setArrived(true); }
         done(finished);
       });
     }, () => { current = null; animation?.stop(); });
     playback.start();
     return () => { active = false; playback.cancel(); progress.removeListener(listener); };
   }, [legs, buddy.visible]);
-  if (failed) return null;
+  if (failed || released) return null;
   return <Mapbox.MarkerView coordinate={coordinate} anchor={{ x: 0.5, y: 1 }} allowOverlap pointerEvents="none">
     <View collapsable={false} accessible={false} pointerEvents="none" onLayout={event => {
       if (event.nativeEvent.layout.width > 0 && event.nativeEvent.layout.height > 0) setLoaded(old => old.layout ? old : { ...old, layout: true });

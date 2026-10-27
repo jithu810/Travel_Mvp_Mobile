@@ -28,5 +28,6 @@ export function useMapBuddy(available: boolean, quietLive = false) {
     if (!api?.preference.get().enabled || AppState.currentState !== 'active') return false;
     return api.store.openMapHelp(path);
   }, [api, path]);
-  return { enabled, visible: visible && !!current?.mapOwned, canHelp: enabled && !current?.suppressed && !current?.state?.travel?.guidance && !current?.state?.travel?.arrival, openHelp };
+  // owned: some map artwork on this route currently hides the floating Buddy.
+  return { enabled, owned: !!current?.mapOwned, visible: visible && !!current?.mapOwned, canHelp: enabled && !current?.suppressed && !current?.state?.travel?.guidance && !current?.state?.travel?.arrival, openHelp };
 }

@@ -65,8 +65,20 @@ test('actual sprite walks along stored positions, idles at stops and faces the n
   const dwell = [...h.timeouts.values()][0]; h.timeouts.clear(); dwell(); tree = h.render();
   assert.equal(h.animations.length, 2); assert.deepEqual(tree.props.children.props.style.transform, [{ scaleX: 1 }]);
   const second = h.animations[1]; second.value.setValue(1); second.done({ finished: true }); tree = h.render();
-  assert.deepEqual(tree.props.coordinate, [-1, 0]); assert.equal(tree.props.children.props.children[0].props.style.opacity, 1); assert.equal(h.timeouts.size, 0);
+  assert.deepEqual(tree.props.coordinate, [-1, 0]); assert.equal(tree.props.children.props.children[0].props.style.opacity, 1);
   h.dispose();
+});
+test('finished Locate walk rests briefly at the final stop, then releases map ownership so the floating Buddy and its help return', () => {
+  const h = harness(); h.ready(); const first = h.animations[0]; first.value.setValue(1); first.done({ finished: true }); h.render();
+  assert.equal(h.timeouts.size, 1, 'Only the stop dwell is pending mid-journey'); const dwell = [...h.timeouts.values()][0]; h.timeouts.clear(); dwell(); h.render();
+  const last = h.animations[1]; last.value.setValue(1); last.done({ finished: true }); let tree = h.render();
+  assert.deepEqual(tree.props.coordinate, [-1, 0]); assert.equal(h.ownership.at(-1), true, 'Buddy idles at arrival while still owning the map');
+  assert.equal(h.timeouts.size, 1); const rest = [...h.timeouts.values()][0]; h.timeouts.clear(); rest(); tree = h.render();
+  assert.equal(tree, null, 'Map Buddy leaves instead of duplicating the floating Buddy'); assert.equal(h.ownership.at(-1), false); assert.equal(h.failures, 0, 'Release is not a plane fallback');
+  assert.equal(h.intervals.size, 0); assert.equal(h.timeouts.size, 0); h.render(); assert.equal(h.animations.length, 2, 'Released walk never replays'); h.dispose();
+});
+test('cancelling Locate before arrival never schedules the release rest', () => {
+  const h = harness(); h.ready(); h.animations[0].done({ finished: false }); h.render(); assert.equal(h.timeouts.size, 0); assert.equal(h.ownership.at(-1), true); h.dispose(); assert.equal(h.timeouts.size, 0);
 });
 test('suppression and unmount stop movement, sprite timers and stale completion; a new Locate starts at stop one', () => {
   const h = harness(); h.ready(); const first = h.animations[0];

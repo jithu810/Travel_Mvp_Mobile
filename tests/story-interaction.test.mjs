@@ -47,15 +47,12 @@ function load(path, modules, hooks = harness(false).hooks, timers = globalThis) 
     if(name==='@/hooks/use-journey-buddy')return {useBuddyCelebration:()=>()=>{},useBuddyScreen(){},useBuddySuppression(){},...modules[name]};
     if(name==='@/hooks/use-map-buddy')return modules[name] || {useMapBuddy:()=>({enabled:false,visible:false,openHelp(){}})};
     if(name==='@/hooks/use-buddy-map-image')return modules[name] || {useBuddyMapImage:()=>({ready:true,failed:false,version:0,ref:{current:null},onLoad(){},onError(){},onLayout(){},retry(){}})};
-    if(name==='@/hooks/use-live-buddy-safety')return modules[name] || {useLiveBuddySafety:()=>({mapRef(){},moving(){},idle(){},clear:false})};
+    if(name==='@/hooks/use-live-buddy-safety')return modules[name] || {useLiveBuddySafety:()=>({mapRef(){},moving(){},idle(){},clear:false,present:false})};
     if(name==='@/lib/buddy/animations')return {buddyReference:'buddy-reference'};
     if(name==='@/lib/buddy/map-image')return modules[name] || {buddyMapImageSource:{uri:'data:image/png;base64,buddy'}};
     if(name==='@/lib/buddy/map-presentation')return load('src/lib/buddy/map-presentation.ts',{});
     if(name==='./story-walking-buddy')return {StoryWalkingBuddy:'StoryWalkingBuddy'};
     if(name==='@/lib/journey/story-buddy-playback')return load('src/lib/journey/story-buddy-playback.ts',{'./map-data':mapData,'../discovery/travel':travel});
-    if(name==='./story-preview-marker')return {StoryPreviewMarker:'StoryPreviewMarker'};
-    if(name==='@/components/journey/journey-preview-controls')return {JourneyPreviewControls:'JourneyPreviewControls'};
-    if(name==='@/lib/journey/preview-playback')return load('src/lib/journey/preview-playback.ts',{'../discovery/travel':load('src/lib/discovery/travel.ts',{'../journey/map-data':mapData})});
     if(name==='@/hooks/use-buddy-map-pins')return buddyMapPinsStub;
     if(name==='@/lib/buddy/map-controls')return load('src/lib/buddy/map-controls.ts',{'../discovery/globe-style':load('src/lib/discovery/globe-style.ts',{})});
     if(name==='@/lib/buddy/model')return load('src/lib/buddy/model.ts',{});
@@ -204,7 +201,6 @@ test('Story preserves map browsing while Use opens Travel directly and Remix rem
   const sharedStoryBuddy = find(tree, 'JourneyMap').props.storyBuddy;
   assert.equal(typeof sharedStoryBuddy.select, 'function');
   assert.equal(find(tree, 'JourneyMap').props.storyBuddySize, 36);
-  assert.equal(find(tree, 'JourneyPreviewControls'), null, 'Story uses card selection without playback/comparison controls');
   assert.equal(find(tree, 'StopTimeline').props.selectedId, 'first');
   find(tree, 'StopTimeline').props.onSelect('second');
   tree = h.render(Screen, props);
@@ -1657,11 +1653,11 @@ test('Travel marker switches between compact dot and map-aligned direction above
 });
 
 test('bounded live companion shares accepted off-route coordinates, leaves dot/heading intact and fails back independently', () => {
-  let enabled = true, safe = true;
+  let enabled = true, safe = true, pending = false;
   const imageGate = load('src/lib/buddy/map-image.ts', {});
   const h = nativeMapHarness([mappedStop('a', 0, 76, 8), mappedStop('b', 1, 76.01, 8.01)], { Image: 'DecodedImage' }, globalThis, sessionModel.createTripStore(), hooks => ({
     '@/hooks/use-map-buddy': { useMapBuddy: available => ({ enabled, visible: enabled && available, canHelp: false, openHelp() {} }) },
-    '@/hooks/use-live-buddy-safety': { useLiveBuddySafety: () => ({ mapRef() {}, moving() {}, idle() {}, clear: safe }) },
+    '@/hooks/use-live-buddy-safety': { useLiveBuddySafety: () => ({ mapRef() {}, moving() {}, idle() {}, clear: safe && !pending, present: safe }) },
     '@/hooks/use-buddy-map-image': load('src/hooks/use-buddy-map-image.ts', { '@/lib/buddy/map-image': imageGate }, hooks),
   }));
   Object.assign(h.props, { liveBuddy: true, navigationMode: true, currentPosition: { latitude: 8.03, longitude: 76.05, direction: 120 } });
@@ -1675,7 +1671,10 @@ test('bounded live companion shares accepted off-route coordinates, leaves dot/h
   const icon = all(tree, 'SymbolLayer').find(node => node.props.id === 'travel-buddy-companion-icon');
   assert.equal(icon.props.style.iconRotationAlignment, 'viewport'); assert.deepEqual(icon.props.style.iconTranslate, [32, -12]);
   assert.equal(all(tree, 'SymbolLayer').find(node => node.props.id === 'travel-position-arrow').props.style.iconRotate, 120);
-  safe = false; tree = h.render(); assert.equal(source(tree, 'travel-buddy-companion'), undefined); assert.ok(source(tree, 'travel-current-position'));
+  pending = true; tree = h.render(); assert.ok(source(tree, 'travel-buddy-companion'), 'Follow-camera motion/pending projection keeps the map companion and its ownership');
+  const travelHelp = all(tree, 'Pressable').find(node => node.props.accessibilityLabel === 'Journey Buddy help').props.style.at(-1);
+  assert.equal(travelHelp.top, undefined); assert.equal(travelHelp.bottom, 312, 'Travel help placement is unchanged above the sheet');
+  pending = false; safe = false; tree = h.render(); assert.equal(source(tree, 'travel-buddy-companion'), undefined); assert.ok(source(tree, 'travel-current-position'));
   safe = true; enabled = false; tree = h.render(); assert.equal(source(tree, 'travel-buddy-companion'), undefined); assert.ok(source(tree, 'travel-current-position'));
   enabled = true; find(tree, 'DecodedImage').props.onError(); tree = h.render();
   assert.equal(source(tree, 'travel-buddy-companion'), undefined); assert.ok(source(tree, 'travel-current-position'), 'Asset failure never removes authoritative position');
@@ -1684,36 +1683,49 @@ test('bounded live companion shares accepted off-route coordinates, leaves dot/h
   assert.ok(source(tree, 'travel-buddy-companion'), 'Explicit local retry restores only successfully decoded artwork');
   h.props.currentPosition = null; tree = h.render(); assert.equal(source(tree, 'travel-current-position'), undefined); assert.equal(source(tree, 'travel-buddy-companion'), undefined); h.dispose();
 });
-test('Story asset pending/failure keeps plane and comparison progress, with decoded/layout-gated local retry', () => {
-  const imageGate = load('src/lib/buddy/map-image.ts', {});
-  const preview = { getPosition: () => ({ coordinate: [76, 8], bearing: 0 }), pause() {}, setReady() {} };
-  const h = nativeMapHarness([mappedStop('a', 0, 76, 8), mappedStop('b', 1, 77, 9)], { Image: 'DecodedImage' }, globalThis, sessionModel.createTripStore(), hooks => ({
-    '@/hooks/use-map-buddy': { useMapBuddy: available => ({ enabled: true, visible: available, canHelp: true, openHelp() {} }) },
-    '@/hooks/use-buddy-map-image': load('src/hooks/use-buddy-map-image.ts', { '@/lib/buddy/map-image': imageGate }, hooks),
-  }));
-  Object.assign(h.props, { storyPreview: preview, buddyPreview: true, memoryPhotos: {} });
-  let tree = h.measure(); find(tree, 'MapView').props.onDidFinishLoadingMap(); tree = h.render();
-  assert.equal(find(tree, 'StoryPreviewMarker').props.buddy, false, 'Plane remains until artwork is decoded and laid out');
-  find(tree, 'DecodedImage').props.onError(); tree = h.render(); assert.equal(find(tree, 'StoryPreviewMarker').props.buddy, false);
-  assert.ok(all(tree, 'Pressable').some(node => node.props.accessibilityLabel === 'Retry Buddy image'));
-  assert.equal(find(tree, 'StoryPreviewMarker').props.preview, preview, 'Fallback preserves the same retained progress controller'); h.dispose();
-});
-test('published Story opts into explicit preview while editor keeps its existing plane and map interactions pause retained progress', async () => {
-  const travel = load('src/lib/discovery/travel.ts', { '../journey/map-data': mapData });
-  const { createJourneyPreview } = load('src/lib/journey/preview-playback.ts', { '../discovery/travel': travel });
-  const preview = createJourneyPreview([[[76, 8], [77, 9]]]);
-  const h = nativeMapHarness([mappedStop('a', 0, 76, 8), mappedStop('b', 1, 77, 9)], { AccessibilityInfo: { isReduceMotionEnabled: async () => false, addEventListener: () => ({ remove() {} }) } }, globalThis, sessionModel.createTripStore(), {
-    '@/hooks/use-map-buddy': { useMapBuddy: available => ({ enabled: true, visible: available, canHelp: true, openHelp() {} }) },
-  });
-  Object.assign(h.props, { storyPreview: preview, buddyPreview: true, memoryPhotos: {}, selectedId: null });
-  let tree = h.measure(); find(tree, 'MapView').props.onDidFinishLoadingMap(); await Promise.resolve(); tree = h.render();
-  assert.equal(find(tree, 'StoryPreviewMarker').props.buddy, true); assert.equal(find(tree, 'JourneyOverlays').props.playing, false); assert.equal(preview.get().status, 'idle');
-  assert.equal(preview.play(), true); find(tree, 'MapView').props.onTouchStart(); assert.equal(preview.get().status, 'paused'); const progress = preview.progress();
-  h.props.buddyPreview = false; tree = h.render(); assert.equal(find(tree, 'StoryPreviewMarker').props.buddy, false); assert.equal(preview.progress(), progress);
-  delete h.props.storyPreview; tree = h.render(); assert.equal(find(tree, 'StoryPreviewMarker'), null, 'Non-opted-in editor never renders the new marker');
-  h.dispose(); preview.dispose();
-});
 
+const storyPlayback = () => ({ select() {}, subscribe: () => () => {}, get: () => ({ coordinate: null, moving: false, facing: 'left', revision: 0 }), configure() {}, pause() {} });
+test('Story Buddy card selection moves the camera to the selected stop and never re-fits the journey, even for non-fitting overviews', async () => {
+  const cases = [[[mappedStop('a', 0, 76, 8), mappedStop('b', 1, 77, 9)], 'b', false], [[mappedStop('a', 0, -170, 10), mappedStop('b', 1, 10, 20), mappedStop('c', 2, 170, 89)], 'b', true]];
+  for (const [stops, target, polar] of cases) {
+    const h = nativeMapHarness(stops, { AccessibilityInfo: { isReduceMotionEnabled: () => Promise.resolve(false), addEventListener: () => ({ remove() {} }) } });
+    Object.assign(h.props, { storyBuddy: storyPlayback(), storyBuddySize: 36, memoryPhotos: {}, animateMemoryRoute: false });
+    let tree = h.measure(); await Promise.resolve(); tree = h.render(); const commands = [];
+    find(tree, 'Camera').props.ref.current = { setCamera: command => commands.push(command) };
+    find(tree, 'MapView').props.onDidFinishLoadingMap(); tree = h.render();
+    assert.equal(commands.length, 1); assert.ok(commands[0].padding, 'Initial overview fit is kept');
+    if (polar) assert.ok(all(tree, 'Text').some(node => String(node.props.children).startsWith('Some polar locations')), 'Overview genuinely does not fit');
+    const stop = stops.find(item => item.id === target); h.props.selectedId = target; tree = h.render();
+    assert.equal(commands.length, 2, 'One camera command per selection');
+    assert.equal(commands[1].padding, undefined, 'Selection never re-fits the whole journey');
+    assert.deepEqual(commands[1].centerCoordinate, [stop.longitude, stop.latitude]); assert.equal(commands[1].animationDuration, 450);
+    assert.ok(find(tree, 'StoryWalkingBuddy'), 'Buddy still walks on the selection');
+    h.props.selectedId = stops[0].id; tree = h.render(); assert.deepEqual(commands.at(-1).centerCoordinate, [stops[0].longitude, stops[0].latitude]); assert.equal(commands.at(-1).padding, undefined);
+    h.dispose();
+  }
+});
+test('Story walker map exposes the same accessible Buddy help entry point beside the inset Fit control, only while the walker owns the map', () => {
+  let opened = 0, enabled = true, owned = true;
+  const h = nativeMapHarness([mappedStop('a', 0, 76, 8), mappedStop('b', 1, 77, 9)], { Image: 'DecodedImage' }, globalThis, sessionModel.createTripStore(), {
+    '@/hooks/use-map-buddy': { useMapBuddy: () => ({ enabled, owned, visible: false, canHelp: true, openHelp: () => { opened++; return true; } }) },
+  });
+  Object.assign(h.props, { memoryPhotos: {}, animateMemoryRoute: false, controlTopInset: 24 });
+  let tree = h.measure(); find(tree, 'MapView').props.onDidFinishLoadingMap(); tree = h.render();
+  const help = () => all(tree, 'Pressable').find(node => node.props.accessibilityLabel === 'Journey Buddy help');
+  assert.equal(help(), undefined, 'Maps without a map Buddy keep the floating Buddy as the only help entry');
+  h.props.storyBuddy = storyPlayback(); tree = h.render();
+  assert.equal(help().props.accessibilityRole, 'button'); assert.equal(help().props.accessibilityHint, 'Opens Journey Buddy guidance'); assert.equal(help().props.disabled, false);
+  const fit = all(tree, 'Pressable').find(node => node.props.accessibilityLabel === 'Fit journey and reset map orientation');
+  assert.equal(fit.props.style[1].top, 36); assert.equal(fit.props.style[2].width, 44);
+  assert.equal(help().props.style.at(-1).top, 36, 'Help shares the Fit row so short compact maps cannot clip it');
+  assert.ok(help().props.style.at(-1).left >= 12 + 44 + 8, 'Help sits to the right of Fit without overlapping it');
+  help().props.onPress(); assert.equal(opened, 1);
+  assert.equal(find(tree, 'DecodedImage'), null, 'Story walker does not load the Travel companion image');
+  assert.equal(all(tree, 'Pressable').some(node => node.props.accessibilityLabel === 'Retry Buddy image'), false);
+  owned = false; tree = h.render(); assert.equal(help(), undefined, 'While the floating Buddy is shown (walker not owning the map) only its help is offered');
+  owned = true; tree = h.render(); assert.ok(help());
+  enabled = false; tree = h.render(); assert.equal(help(), undefined, 'Buddy off removes the map help entry'); h.dispose();
+});
 test('rail JourneyOptions preserves anonymous Remix, existing private copy, blocked feedback and About/customize routes', async () => {
   for (const mode of ['anonymous', 'signed-in', 'existing', 'blocked']) {
     const h = harness();
