@@ -5,9 +5,10 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { colors, ui } from '@/components/discovery/ui';
 import type { JourneyMapData } from '@/lib/journey/map-data';
 import { useBuddyProtectedBounds } from '@/hooks/use-buddy-geometry';
+import type { StoryBuddyPlayback } from '@/lib/journey/story-buddy-playback';
 
 export type MapPresentation = 'story' | 'preview' | 'expanded';
-export type MapDisplayProps = { controlTopInset?: number; memoryPhotos?: Readonly<Record<string, string | null>>; animateMemoryRoute?: boolean; playRouteWithSelection?: boolean; travelCamera?: TravelCameraSource; navigationMode?: boolean; navigationPadding?: { top: number; bottom: number }; destinationId?: string | null; presentation?: MapPresentation; onExpand?: () => void; navigationRoute?: RoadGeometry | null; currentPosition?: { latitude: number; longitude: number; direction?: number | null } | null };
+export type MapDisplayProps = { storyBuddy?: StoryBuddyPlayback; storyBuddySize?: number; liveBuddy?: boolean; controlTopInset?: number; memoryPhotos?: Readonly<Record<string, string | null>>; animateMemoryRoute?: boolean; playRouteWithSelection?: boolean; travelCamera?: TravelCameraSource; navigationMode?: boolean; navigationPadding?: { top: number; bottom: number }; destinationId?: string | null; presentation?: MapPresentation; onExpand?: () => void; navigationRoute?: RoadGeometry | null; currentPosition?: { latitude: number; longitude: number; direction?: number | null } | null };
 
 export function MapFrame({ data, children, presentation = 'story' }: { data: JourneyMapData; children: ReactNode } & MapDisplayProps) {
   if (presentation !== 'story') return <View style={[styles.display, presentation === 'expanded' && { flex: 1 }]}>{children}</View>;

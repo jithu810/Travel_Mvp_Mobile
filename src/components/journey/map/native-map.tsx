@@ -5,7 +5,7 @@ import { useFocusEffect } from 'expo-router';
 import { JourneyOverlays } from '@/components/discovery/globe/journey-overlays';
 import Mapbox, { type Camera, type MapState } from '@rnmapbox/maps';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AccessibilityInfo, ActivityIndicator, Alert, AppState, Pressable, StyleSheet, Text, View } from 'react-native';
+import { AccessibilityInfo, ActivityIndicator, Alert, AppState, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { colors } from '@/components/discovery/ui';
 import { globeAtmosphere, spaceColor } from '@/lib/discovery/presentation';
 import { nextGlobeStyle, type GlobeStyle } from '@/lib/discovery/globe-style';
@@ -18,11 +18,19 @@ import { MapFallback, type MapDisplayProps } from './map-frame';
 import { useBuddyProtectedBounds } from '@/hooks/use-buddy-geometry';
 import { journeyBuddyControls } from '@/lib/buddy/map-controls';
 import { useBuddyMapPins } from '@/hooks/use-buddy-map-pins';
+import { useMapBuddy } from '@/hooks/use-map-buddy';
+import { useLiveBuddySafety } from '@/hooks/use-live-buddy-safety';
+import { buddyMapImageSource } from '@/lib/buddy/map-image';
+import { LIVE_BUDDY_OFFSET } from '@/lib/buddy/map-presentation';
+import { StoryWalkingBuddy } from './story-walking-buddy';
+import { useBuddyMapImage } from '@/hooks/use-buddy-map-image';
 
 // Bundled PNG keeps the navigation arrow independent of map fonts and networking.
 const travelArrowImage = { uri: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABwAAAAcCAYAAAByDd+UAAAAeElEQVR4nO3TUQqAIBCEYU/TFTtrpzGIAhvcds3ZLcQfetP56qGUZn8on40JZmgs8EKWdTsedzQURMwdDQUlzA0NBTXsE5CKhoJWjIZqvwIVrI1KUVAc0+oCy5FaeA7hZlT6Ctb5x8vmtxRg86UW6PUOA4rYnN3aARXgn2yondtvAAAAAElFTkSuQmCC' };
 
 const travelArrowImages = { 'travel-direction-arrow': travelArrowImage };
+// A single 128px pose, not the eight-frame Idle sprite sheet.
+const buddyMapImages = { 'journey-map-buddy': buddyMapImageSource };
 
 let configuredToken: string | null = null;
 export async function configureMap(token: string) {
@@ -30,7 +38,7 @@ export async function configureMap(token: string) {
   await Mapbox.setAccessToken(token);
   configuredToken = token;
 }
-export const NativeJourneyMap = memo(function NativeJourneyMap({ data, stops, retry, selectedId, onSelect, presentation = 'story', onExpand, currentPosition, navigationRoute, navigationMode = false, navigationPadding, destinationId, travelCamera, memoryPhotos, animateMemoryRoute = true, playRouteWithSelection = false, controlTopInset = 0 }: {
+export const NativeJourneyMap = memo(function NativeJourneyMap({ data, stops, retry, selectedId, onSelect, presentation = 'story', onExpand, currentPosition, navigationRoute, navigationMode = false, navigationPadding, destinationId, travelCamera, memoryPhotos, animateMemoryRoute = true, playRouteWithSelection = false, controlTopInset = 0, liveBuddy = false, storyBuddy, storyBuddySize = 36 }: {
   data: JourneyMapData; stops: JourneyStop[]; retry: () => void; selectedId?: string | null; onSelect?: (id: string) => void;
 } & MapDisplayProps) {
   const camera = useRef<Camera>(null);
@@ -52,11 +60,28 @@ export const NativeJourneyMap = memo(function NativeJourneyMap({ data, stops, re
   const [viewport, setViewport] = useState({ width: 0, height: 0 });
   const [mapState, setMapState] = useState<{ style: GlobeStyle; ready: boolean }>({ style: 'satellite', ready: false });
   const [reduceMotion, setReduceMotion] = useState(true);
+  const [motionKnown, setMotionKnown] = useState(false);
   const { style, ready } = mapState;
+  const buddyImage = useBuddyMapImage(liveBuddy, style);
   const failed = style === 'failed';
   const pinCoordinates = useMemo(() => data.markers.map(marker => marker.coordinate), [data.markers]);
   const pins = useBuddyMapPins(pinCoordinates, ready && !failed);
   const { setFrame: setPinFrame } = pins;
+  const validCurrentPosition = !!currentPosition && Number.isFinite(currentPosition.latitude) && Math.abs(currentPosition.latitude) <= 90 && Number.isFinite(currentPosition.longitude) && Math.abs(currentPosition.longitude) <= 180;
+  const liveCoordinates = validCurrentPosition ? [[currentPosition!.longitude, currentPosition!.latitude], ...pinCoordinates] : [];
+  const liveControls = [...journeyBuddyControls({ x: 0, y: 0, ...viewport }, navigationMode, bottom, controlTopInset, presentation !== 'preview'),
+    { x: 0, y: 0, width: viewport.width, height: navigationPadding?.top ?? 80 },
+    { x: 0, y: viewport.height - bottom, width: viewport.width, height: bottom },
+    { x: 12, y: viewport.height - bottom - 80, width: 120, height: 44 },
+    { x: viewport.width - 232, y: viewport.height - bottom - 84, width: 170, height: 48 },
+    { x: 12, y: viewport.height - bottom - 136, width: 110, height: 44 }];
+  const liveSafety = useLiveBuddySafety(liveCoordinates, viewport, liveControls, liveBuddy && navigationMode && ready && appActive && !failed && buddyImage.ready && validCurrentPosition);
+  // Camera motion and a pending projection keep ownership once the companion was
+  // clear, so GPS following never hands Buddy back to (and remounts) the floating host.
+  const mapBuddy = useMapBuddy(ready && !failed && buddyImage.ready && appActive && liveBuddy && liveSafety.present, liveBuddy && navigationMode);
+  const { mapRef: pinMapRef } = pins, { mapRef: safetyMapRef } = liveSafety;
+  const mapRef = useCallback((node: Parameters<typeof pinMapRef>[0]) => { pinMapRef(node); safetyMapRef(node); }, [pinMapRef, safetyMapRef]);
+  const buddyHelpProtection = useBuddyProtectedBounds(), buddyRetryProtection = useBuddyProtectedBounds();
   const projectControls = useCallback((rect: { x: number; y: number; width: number; height: number }) => { setPinFrame(rect); return journeyBuddyControls(rect, navigationMode, bottom, controlTopInset, presentation !== 'preview'); }, [setPinFrame, navigationMode, bottom, controlTopInset, presentation]);
   const controlsProtection = useBuddyProtectedBounds(projectControls);
   const selected = data.markers.find(marker => marker.id === selectedId);
@@ -113,8 +138,8 @@ export const NativeJourneyMap = memo(function NativeJourneyMap({ data, stops, re
   useEffect(() => {
     let active = true;
     let changed = false;
-    AccessibilityInfo.isReduceMotionEnabled().then(value => { if (active && !changed) setReduceMotion(value); }).catch(() => {});
-    const subscription = AccessibilityInfo.addEventListener('reduceMotionChanged', value => { changed = true; if (active) setReduceMotion(value); });
+    AccessibilityInfo.isReduceMotionEnabled().then(value => { if (active && !changed) { setReduceMotion(value); setMotionKnown(true); } }).catch(() => {});
+    const subscription = AccessibilityInfo.addEventListener('reduceMotionChanged', value => { changed = true; if (active) { setReduceMotion(value); setMotionKnown(true); } });
     return () => { active = false; subscription.remove(); };
   }, []);
   const points = useMemo(() => ({
@@ -143,6 +168,8 @@ export const NativeJourneyMap = memo(function NativeJourneyMap({ data, stops, re
   useEffect(() => {
     if (!ready || failed || !mounted.current || !foreground.current || (memoryPreview && !focused) || (navigationMode && travelCamera && !canMove())) { if (!memoryPreview) lastSelection.current = selectedId; return; }
     if (selected && selectedId !== lastSelection.current) {
+      // Story Buddy walks toward the selected stop while the camera keeps the
+      // normal move-to-stop behavior; selection never re-fits the whole journey.
       if (navigationMode) explore();
       transitioning.current = !reduceMotion;
       const currentZoom = pose.current?.zoom ?? frame?.camera.zoomLevel ?? 0;
@@ -174,13 +201,14 @@ export const NativeJourneyMap = memo(function NativeJourneyMap({ data, stops, re
       controlsProtection.onLayout();
       setViewport(previous => previous.width === width && previous.height === height ? previous : { width, height });
     }}>
-      {frame && <Mapbox.MapView key={style} ref={pins.mapRef} style={styles.map} projection={navigationMode ? 'mercator' : frame.projection} styleURL={navigationMode ? Mapbox.StyleURL.Street : style === 'satellite' ? Mapbox.StyleURL.SatelliteStreet : Mapbox.StyleURL.Outdoors}
+      {frame && <Mapbox.MapView key={style} ref={mapRef} style={styles.map} projection={navigationMode ? 'mercator' : frame.projection} styleURL={navigationMode ? Mapbox.StyleURL.Street : style === 'satellite' ? Mapbox.StyleURL.SatelliteStreet : Mapbox.StyleURL.Outdoors}
         onPress={presentation === 'preview' ? () => { if (mounted.current) onExpand?.(); } : undefined}
         scrollEnabled={presentation !== 'preview'} zoomEnabled={presentation !== 'preview'} rotateEnabled={presentation !== 'preview'} pitchEnabled={false} surfaceView={false} requestDisallowInterceptTouchEvent
         compassEnabled={presentation !== 'preview'} compassPosition={navigationMode ? { bottom: (navigationPadding?.bottom ?? 220) + 36, right: 12 } : { top: 12 + Math.max(0, controlTopInset), right: 12 }} scaleBarEnabled={false} logoEnabled attributionEnabled
         logoPosition={navigationMode ? { bottom: (navigationPadding?.bottom ?? 220) + 8, left: 12 } : undefined}
         attributionPosition={navigationMode ? { bottom: (navigationPadding?.bottom ?? 220) + 8, right: 12 } : undefined}
         onCameraChanged={state => {
+          if (liveBuddy) liveSafety.moving();
           pins.cameraChanged(state.properties);
           if (!mounted.current || (navigationMode && travelCamera && !canMove())) return;
           pose.current = state.properties;
@@ -190,11 +218,12 @@ export const NativeJourneyMap = memo(function NativeJourneyMap({ data, stops, re
         onTouchStart={memoryPreview ? () => { touching.current = true; setMemoryIdle(false); cancelTransition(); } : undefined}
         onTouchEnd={memoryPreview ? () => { touching.current = false; } : undefined}
         onTouchCancel={memoryPreview ? () => { touching.current = false; } : undefined}
-        onMapIdle={state => { pins.idle(state.properties); if (mounted.current) { transitioning.current = false; if (memoryPreview && !touching.current) setMemoryIdle(true); } }}
+        onMapIdle={state => { pins.idle(state.properties); if (liveBuddy) liveSafety.idle(); if (mounted.current) { transitioning.current = false; if (memoryPreview && !touching.current) setMemoryIdle(true); } }}
         onDidFinishLoadingMap={() => {
           if (mounted.current) setMapState(previous => previous.style === style && !previous.ready ? { ...previous, ready: true } : previous);
         }} onMapLoadingError={mapError}>
         {navigationMode && <Mapbox.Images images={travelArrowImages} />}
+        {liveBuddy && buddyImage.ready && <Mapbox.Images key={buddyImage.version} images={buddyMapImages} onImageMissing={key => { if (key === 'journey-map-buddy') buddyImage.onError(); }} />}
         {!navigationMode && <Mapbox.Atmosphere style={globeAtmosphere} />}
         <Mapbox.Camera ref={camera} defaultSettings={frame.camera} minZoomLevel={0} maxZoomLevel={16} />
         {frame.route.geometry.coordinates.length > 0 && <Mapbox.ShapeSource id="planned-line" shape={frame.route}>
@@ -226,10 +255,20 @@ export const NativeJourneyMap = memo(function NativeJourneyMap({ data, stops, re
             iconRotate: currentPosition.direction, iconRotationAlignment: 'map', iconPitchAlignment: 'map', iconAllowOverlap: true, iconIgnorePlacement: true,
           }} /> : <Mapbox.CircleLayer id="travel-position-dot" style={{ circleRadius: 5, circleColor: '#2677D9', circleStrokeWidth: 2, circleStrokeColor: '#FFFFFF' }} />}
         </Mapbox.ShapeSource>}
+        {liveBuddy && navigationMode && currentPosition && validCurrentPosition && mapBuddy.visible && <Mapbox.ShapeSource id="travel-buddy-companion" shape={{ type: 'Feature', properties: {}, geometry: { type: 'Point', coordinates: [currentPosition.longitude, currentPosition.latitude] } }}>
+          <Mapbox.SymbolLayer id="travel-buddy-companion-icon" style={{ iconImage: 'journey-map-buddy', iconSize: 0.25, iconAnchor: 'bottom', iconRotationAlignment: 'viewport', iconPitchAlignment: 'viewport', iconTranslate: [...LIVE_BUDDY_OFFSET], iconTranslateAnchor: 'viewport', iconAllowOverlap: true, iconIgnorePlacement: true }} />
+        </Mapbox.ShapeSource>}
+        {ready && storyBuddy && <StoryWalkingBuddy playback={storyBuddy} active={!failed && focused && appActive && nearby.length === 0} motionKnown={motionKnown} reducedMotion={reduceMotion} size={storyBuddySize} />}
         {ready && memoryPreview && <JourneyOverlays points={memoryPoints} route={data.line.geometry.coordinates} onOpen={selectMemory}
           drawRoute={false} durationScale={3} selectedId={selectedId} playbackKey={JSON.stringify(data.line.geometry.coordinates)}
-          playing={nearby.length === 0 && animateMemoryRoute && focused && appActive && !reduceMotion && memoryIdle && (!selectedId || playRouteWithSelection)} />}
+          playing={!storyBuddy && nearby.length === 0 && animateMemoryRoute && focused && appActive && !reduceMotion && memoryIdle && (!selectedId || playRouteWithSelection)} />}
       </Mapbox.MapView>}
+      {/* Keep the decode probe in the ordinary RN tree. Android Mapbox.Image
+          reparents children offscreen and cannot attach replacement children
+          reliably; retries must not depend on that native snapshot lifecycle. */}
+      {liveBuddy && <View pointerEvents="none" accessible={false} accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={styles.buddyImageProbe}>
+        <Image key={`${style}:${buddyImage.version}`} source={buddyMapImageSource} accessible={false} fadeDuration={0} resizeMode="contain" style={styles.buddyImageContent} onLoad={buddyImage.onLoad} onError={buddyImage.onError} onLayout={buddyImage.onLayout} />
+      </View>}
       {!ready && <View style={styles.loading} pointerEvents="none" accessibilityLabel="Loading journey map" accessibilityRole="progressbar"><ActivityIndicator color={colors.green} /><Text style={styles.note}>Loading map…</Text></View>}
       {presentation !== 'preview' && <Pressable {...fitProtection} accessibilityRole="button" accessibilityLabel="Fit journey and reset map orientation"
         accessibilityState={{ disabled: !ready || !frame }} disabled={!ready || !frame} onPress={() => { if (navigationMode) follow.explore(); fit(); }} style={[styles.fit, { top: 12 + Math.max(0, controlTopInset) }, !navigationMode && { width: 44, paddingHorizontal: 10, borderRadius: 22 }, navigationMode && { top: undefined, bottom: (navigationPadding?.bottom ?? 220) + 36 }]}>
@@ -241,6 +280,11 @@ export const NativeJourneyMap = memo(function NativeJourneyMap({ data, stops, re
           <Text style={styles.fitLabel}>◎ My Location</Text>
         </Pressable>
       </View>}
+      {/* The map-owned Travel companion and Story walker hide the floating Buddy, so
+          the map offers the same help entry point. Story shows it only while the walker
+          actually owns the map, so floating Buddy and map help never both appear. */}
+      {(liveBuddy || (!!storyBuddy && mapBuddy.owned)) && mapBuddy.enabled && <Pressable {...buddyHelpProtection} accessibilityRole="button" accessibilityLabel="Journey Buddy help" accessibilityHint={mapBuddy.canHelp ? 'Opens Journey Buddy guidance' : 'Available when guidance and arrival prompts are clear'} disabled={!mapBuddy.canHelp} accessibilityState={{ disabled: !mapBuddy.canHelp }} onPress={() => { mapBuddy.openHelp(); }} style={[styles.buddyHelp, navigationMode ? { top: undefined, bottom: bottom + 92 } : { top: 12 + Math.max(0, controlTopInset), left: 64 }]}><Text style={styles.fitLabel}>Buddy help</Text></Pressable>}
+      {liveBuddy && buddyImage.failed && <Pressable {...buddyRetryProtection} accessibilityRole="button" accessibilityLabel="Retry Buddy image" onPress={buddyImage.retry} style={[styles.buddyHelp, { top: navigationMode ? undefined : 108, bottom: navigationMode ? bottom + 144 : undefined }]}><Text style={styles.fitLabel}>Retry Buddy image</Text></Pressable>}
     </View>
     <NearbyLocations points={nearby} onClose={() => setNearby([])} onSelect={id => { setNearby([]); onSelect?.(id); }} />
     {frame && !frame.fitsViewport && presentation !== 'preview' && <Text style={styles.overviewNote} accessibilityLiveRegion="polite">{frame.latitudeClamped ? 'Some polar locations cannot be shown on this overview. All stops remain in the story.' : 'This overview cannot show every stop at once. Select a stop to explore.'}</Text>}
@@ -261,4 +305,7 @@ const styles = StyleSheet.create({
   overviewNote: { color: colors.muted, fontSize: 11, lineHeight: 17, paddingHorizontal: 10, paddingVertical: 6 },
   caption: { padding: 16, gap: 6 }, selected: { color: colors.ink, fontSize: 14, lineHeight: 21, fontWeight: '600' },
   note: { color: colors.muted, fontSize: 12, lineHeight: 19 },
+  buddyHelp: { position: 'absolute', top: 60, left: 12, minHeight: 44, paddingHorizontal: 12, justifyContent: 'center', borderRadius: 20, backgroundColor: colors.paper },
+  buddyImageProbe: { position: 'absolute', top: 0, left: 0, width: 128, height: 128, opacity: 0 },
+  buddyImageContent: { width: 128, height: 128 },
 });

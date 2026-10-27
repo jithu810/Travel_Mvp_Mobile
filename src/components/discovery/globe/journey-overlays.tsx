@@ -6,6 +6,8 @@ import { createTravelPlayback, travelLegs, travelLine, travelPosition, type Trav
 import type { Coordinate } from '@/lib/journey/map-data';
 import { colors } from '../ui';
 import { useThumbnailSource } from '@/hooks/use-thumbnail-source';
+import { useBuddyPreference } from '@/hooks/use-journey-buddy';
+import { TravelingBuddy } from './traveling-buddy';
 
 const PhotoPin = memo(function PhotoPin({ point, onOpen, selected = false }: { selected?: boolean; point: DiscoveryPoints['features'][number]; onOpen: (id: string) => void }) {
   const annotation = useRef<PointAnnotation>(null);
@@ -45,8 +47,14 @@ function TravelingPlane({ legs }: { legs: TravelLeg[] }) {
       textRotate: bearing - 45, textRotationAlignment: 'map', textAllowOverlap: true, textIgnorePlacement: true }} />
   </Mapbox.Animated.ShapeSource>;
 }
-export function JourneyOverlays({ points, route, onOpen, playing, playbackKey, drawRoute = true, durationScale = 1, selectedId, onPointOpen }: {
-  points: DiscoveryPoints; route: Coordinate[][]; onOpen: (id: string) => void; playing: boolean; playbackKey: string; drawRoute?: boolean; durationScale?: number; selectedId?: string | null; onPointOpen?: (id: string) => void;
+function HomeTraveler({ legs }: { legs: TravelLeg[] }) {
+  const preference = useBuddyPreference();
+  const [failed, setFailed] = useState(false);
+  return preference.loaded && preference.enabled && !failed
+    ? <TravelingBuddy legs={legs} onFailure={() => setFailed(true)} /> : <TravelingPlane legs={legs} />;
+}
+export function JourneyOverlays({ points, route, onOpen, playing, playbackKey, drawRoute = true, durationScale = 1, selectedId, onPointOpen, walkingBuddy = false }: {
+  points: DiscoveryPoints; route: Coordinate[][]; onOpen: (id: string) => void; playing: boolean; playbackKey: string; drawRoute?: boolean; durationScale?: number; selectedId?: string | null; onPointOpen?: (id: string) => void; walkingBuddy?: boolean;
 }) {
   const legs = useMemo(() => travelLegs(route).map(leg => ({ ...leg, duration: leg.duration * durationScale })), [route, durationScale]);
   const line = useMemo(() => travelLine(route, legs), [route, legs]);
@@ -60,7 +68,7 @@ export function JourneyOverlays({ points, route, onOpen, playing, playbackKey, d
     </Mapbox.ShapeSource>}
     {points.features.filter(point => point.properties.photo || point.properties.photoThumbnail).map(point => <PhotoPin key={point.id}
       point={point} onOpen={onPointOpen ? () => onPointOpen(String(point.id)) : onOpen} selected={selectedId === point.id} />)}
-    {hasLegs && playing && <TravelingPlane key={playbackKey} legs={legs} />}
+    {hasLegs && playing && (walkingBuddy ? <HomeTraveler key={playbackKey} legs={legs} /> : <TravelingPlane key={playbackKey} legs={legs} />)}
   </>;
 }
 const s = StyleSheet.create({

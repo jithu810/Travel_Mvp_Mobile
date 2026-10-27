@@ -210,7 +210,7 @@ export const NativeGlobe = memo(function NativeGlobe({ points, route, onOpen, re
             textHaloColor: '#FFFFFF', textHaloWidth: 2, textOffset: [0, 2.8] }} />
       </Mapbox.ShapeSource>
       {ready && points.features[0]?.properties.journeyId === selectionId && <JourneyOverlays
-        key={selectionId} playbackKey={travel?.request + ':' + travel?.version} points={points} route={route} onOpen={onOpen} onPointOpen={openPoint}
+        key={selectionId} playbackKey={travel?.request + ':' + travel?.version} points={points} route={route} onOpen={onOpen} onPointOpen={openPoint} walkingBuddy={!preview && homeSearch}
         playing={nearby.length === 0 && travel?.request === requestKey && focused && appActive && !reduceMotion} />}
     </Mapbox.MapView>
     <NearbyLocations points={nearby} onClose={() => setNearby([])} onSelect={id => { setNearby([]); const point = points.features.find(p => String(p.id) === id); if (point) onOpen(point.properties.journeyId); }} />

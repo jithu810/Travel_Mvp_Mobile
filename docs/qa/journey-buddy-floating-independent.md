@@ -13,8 +13,8 @@ QA Tester: independent screenshot assessment and verification for the correction
 
 Images inspected directly:
 
-- `C:/Users/sreej/AppData/Local/Temp/journey-buddy-device/floating-journey-before-ready.png`
-- `C:/Users/sreej/AppData/Local/Temp/journey-buddy-device/floating-journey-initial-after.png`
+- `<local-temp>/journey-buddy-device/floating-journey-before-ready.png`
+- `<local-temp>/journey-buddy-device/floating-journey-initial-after.png`
 - Product-owner reference `1-Photo-1.jpg` supplied in the conversation.
 
 Architect identifies the native screenshots as CPH2813, Android 16, 1080x2344, with the configured Metro session and restored account. QA did not obtain these screenshots or interact with the device. No travel/GPS write is reported.

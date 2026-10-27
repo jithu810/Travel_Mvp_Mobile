@@ -1,5 +1,5 @@
 import { primaryControl } from '@/theme/mobile-theme';
-import { useBuddyScreen } from '@/hooks/use-journey-buddy';
+import { useBuddyCelebration, useBuddyScreen } from '@/hooks/use-journey-buddy';
 import { useBuddyProtectedBounds } from '@/hooks/use-buddy-geometry';
 import { BrandedLoading } from '@/components/branded-loading';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
@@ -97,7 +97,12 @@ export function TravelModeContent({ journey, onExit, refreshNotice }: { journey:
     return () => { disposed = true; interaction.current.focused = false; interaction.current.epoch++; app.remove(); };
   }, []));
   const canInteract = () => interaction.current.focused && AppState.currentState === 'active';
-  const act = (action: TripAction) => canInteract() && tripStore.transition(journey, action, session);
+  const celebrate = useBuddyCelebration();
+  const act = (action: TripAction) => {
+    const accepted = canInteract() && tripStore.transition(journey, action, session);
+    if (accepted && action === 'resume') celebrate('run', tripStore.get(journey.id));
+    return accepted;
+  };
   const requestConfirmation = (action: 'finish' | 'new' | 'complete', stopId?: string) => {
     if (canInteract() && tripStore.get(journey.id) === session) setConfirmation({ action, session, stopId, epoch: interaction.current.epoch });
   };
@@ -120,7 +125,7 @@ export function TravelModeContent({ journey, onExit, refreshNotice }: { journey:
   }, [journey.stops]);
   return <View style={styles.screen} onLayout={event => setViewportHeight(event.nativeEvent.layout.height)}>
     <View style={styles.mapArea}>
-      <JourneyMap stops={journey.stops} selectedId={selectedId} onSelect={select} presentation="expanded" navigationMode
+      <JourneyMap stops={journey.stops} selectedId={selectedId} onSelect={select} presentation="expanded" navigationMode liveBuddy
         travelCamera={travelCamera} navigationPadding={navigationPadding} destinationId={navigation.destination?.id}
         currentPosition={navigationFix(location.position) ? location.position : null} navigationRoute={navigation.remainingGeometry} />
     </View>

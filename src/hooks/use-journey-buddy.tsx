@@ -4,7 +4,7 @@ import { useFocusEffect, usePathname } from 'expo-router';
 import { AppState, Keyboard, View, type GestureResponderEvent } from 'react-native';
 import { createBuddyPreference } from '@/lib/buddy/preference';
 import { createBuddyStore } from '@/lib/buddy/store';
-import type { BuddyAction, BuddyScreen } from '@/lib/buddy/model';
+import type { BuddyAction, BuddyCelebrationName, BuddyScreen } from '@/lib/buddy/model';
 
 function createApi() { return { store: createBuddyStore(), preference: createBuddyPreference(AsyncStorage) }; }
 type BuddyApi = ReturnType<typeof createApi>;
@@ -12,12 +12,20 @@ const BuddyContext = createContext<BuddyApi | null>(null);
 export function JourneyBuddyProvider({ children }: { children: ReactNode }) {
   const [api] = useState(createApi);
   useEffect(() => {
-    const stop = api.preference.subscribe(() => { if (api.preference.get().enabled) api.store.requestMeasurements(); });
+    const stop = api.preference.subscribe(() => { if (api.preference.get().enabled) api.store.requestMeasurements(); else { api.store.clearCelebration(); api.store.closeMapHelp(); } });
     void api.preference.load(); return stop;
   }, [api]);
   return <BuddyContext.Provider value={api}>{children}</BuddyContext.Provider>;
 }
 export function useBuddyApi() { return useContext(BuddyContext); }
+// Success sites supply an operation identity, never a Save/Begin button intent.
+export function useBuddyCelebration() {
+  const api = useBuddyApi(), path = usePathname();
+  return useCallback((animation: BuddyCelebrationName, operation: object) => {
+    if (!api?.preference.get().enabled || AppState.currentState !== 'active') return false;
+    return api.store.celebrate(path, animation, operation);
+  }, [api, path]);
+}
 const absent = { loaded: false, enabled: false, error: null };
 const noopSubscribe = () => () => {};
 const absentPreference = () => absent;
@@ -74,6 +82,7 @@ export function BuddyTouchBoundary({ children }: { children: ReactNode }) {
     if (cooldown.current) clearTimeout(cooldown.current);
     if (!api?.preference.get().enabled || AppState.currentState !== 'active') { cooldown.current = null; api?.store.interaction(false); return; }
     if (event?.nativeEvent.touches.length) { cooldown.current = null; api.store.interaction(true); return; }
+    api.store.touchEnded();
     cooldown.current = setTimeout(() => { cooldown.current = null; api.store.interaction(false); }, 3000);
   };
   return <View style={{ flex: 1 }} onTouchStart={start} onTouchEnd={end} onTouchCancel={end}>{children}</View>;

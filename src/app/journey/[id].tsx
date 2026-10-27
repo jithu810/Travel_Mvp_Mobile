@@ -6,7 +6,7 @@ import { JourneyActionIcon } from '@/components/journey/journey-action-icon';
 import { StatusBar } from 'expo-status-bar';
 import { BrandedLoading } from '@/components/branded-loading';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, Message, ScreenHeader, ui } from '@/components/discovery/ui';
@@ -19,6 +19,7 @@ import { SourceAttribution } from '@/components/remix/source-attribution';
 import { StorySheet } from '@/components/journey/story-sheet';
 import { JourneyOptions } from '@/components/journey/journey-options';
 import { JourneyMap } from '@/components/journey/map/journey-map';
+import { createStoryBuddyPlayback } from '@/lib/journey/story-buddy-playback';
 import { ItinerarySheet } from '@/components/journey/itinerary-sheet';
 import { MapItinerary } from '@/components/journey/map-itinerary';
 import { canOpenTravelMode } from '@/lib/journey/travel-preview';
@@ -57,11 +58,18 @@ export function JourneyStoryContent({ journey, refresh, refreshing, error, saveF
   }, []));
   const window = useWindowDimensions();
   const [requestedId, setRequestedId] = useState<string | null>(null);
+  const storyBuddy = useMemo(() => createStoryBuddyPlayback(journey.stops), [journey.stops]);
+  useEffect(() => () => storyBuddy.pause(), [storyBuddy]);
+  useEffect(() => { if (!focused || (panel !== null && panel !== 'map')) storyBuddy.pause(); }, [focused, panel, storyBuddy]);
   const selectedId = selectedStopId(journey.stops, requestedId);
+  useEffect(() => storyBuddy.select(selectedId), [storyBuddy, selectedId]);
   const selected = journey.stops.find(stop => stop.id === selectedId);
   const select = useCallback((id: string) => {
-    if (journey.stops.some(stop => stop.id === id)) setRequestedId(previous => previous === id ? previous : id);
-  }, [journey.stops]);
+    if (journey.stops.some(stop => stop.id === id)) {
+      storyBuddy.select(id);
+      setRequestedId(previous => previous === id ? previous : id);
+    }
+  }, [journey.stops, storyBuddy]);
   const openMap = useCallback(() => setPanel('map'), [setPanel]);
   const openTravel = useCallback(() => {
     if (!canOpenTravelMode(journey)) return;
@@ -71,13 +79,13 @@ export function JourneyStoryContent({ journey, refresh, refreshing, error, saveF
   const showStop = useCallback((id: string) => { select(id); setPanel('stop'); }, [select, setPanel]);
   const memoryPhotos = useMemo(() => Object.fromEntries(journey.stops.map(stop => [stop.id, stop.photo])), [journey.stops]);
   const missing = buildMapData(journey.stops).missing;
-  useBuddyScreen({ floating: true, suppressed: !focused || panel !== null,
+  useBuddyScreen({ floating: panel !== 'map', suppressed: !focused || (panel !== null && panel !== 'map'),
     ownStory: !auth.loading && !auth.error && !!auth.session && !!journey.creatorId && auth.session.user.id.toLowerCase() === journey.creatorId.toLowerCase() ? { id: journey.id, title: journey.title } : undefined });
   return <View style={styles.screen}>
     {focused && panel === null && <StatusBar style="light" />}
     <ScrollView {...scroll} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" nestedScrollEnabled>
       <View style={[styles.preview, { height: Math.max(150, Math.min(280, window.height * 0.30)) }]}>
-        {focused && panel === null && <JourneyMap stops={journey.stops} memoryPhotos={memoryPhotos} playRouteWithSelection={requestedId === null} animateMemoryRoute={requestedId === null} selectedId={selectedId} onSelect={select} presentation="expanded" controlTopInset={insets.top} onExpand={openMap} />}
+        {focused && panel === null && <JourneyMap stops={journey.stops} memoryPhotos={memoryPhotos} storyBuddy={storyBuddy} storyBuddySize={36} animateMemoryRoute={false} selectedId={selectedId} onSelect={select} presentation="expanded" controlTopInset={insets.top} onExpand={openMap} />}
         <Pressable {...expandProtection} accessibilityRole="button" accessibilityLabel="Expand journey map" onPress={openMap} style={[styles.expand, { top: insets.top + 4 }]}><JourneyActionIcon name="expand" /></Pressable>
       </View>
       <StopTimeline horizontal stacked creator={<StoryCreator journey={journey} />} active={focused && panel === null} stops={journey.stops} selectedId={selectedId} onSelect={select} onDetails={showStop} photoActions={<SocialActions selectedMemoryId={selectedId} key={'social-' + journey.id} journey={journey} layout="rail" saveFirst={saveFirst} />} optionsActions={<JourneyOptions key={journey.id} id={journey.id} onUse={openTravel} presentation="rail" onAbout={() => setPanel('about')} />} />
@@ -86,9 +94,9 @@ export function JourneyStoryContent({ journey, refresh, refreshing, error, saveF
     {canOpenTravelMode(journey) && <View {...footerProtection} style={styles.swipeFooter}><SwipeJourneyStart active={focused && panel === null} onStart={openTravel} /></View>}
     <View pointerEvents="none" testID="journey-status-shade" style={[styles.statusShade, { height: insets.top + 20 }]} />
     {panel === 'stop' && <StopStoryViewer journey={journey} selectedId={selectedId} onSelect={select} onClose={() => setPanel(null)} onMap={openMap} />}
-    <StorySheet visible={panel === 'map' || panel === 'about'} title={panel === 'map' ? journey.title : 'About this journey'} subtitle={panel === 'map' ? journey.stops.length + (journey.stops.length === 1 ? ' stop' : ' stops') + ' · Journey map' : undefined} onClose={() => setPanel(null)} scrollable={panel !== 'map'}>
+    <StorySheet visible={panel === 'map' || panel === 'about'} title={panel === 'map' ? journey.title : 'About this journey'} subtitle={panel === 'map' ? journey.stops.length + (journey.stops.length === 1 ? ' stop' : ' stops') + ' · Journey map' : undefined} onClose={() => setPanel(null)} scrollable={panel !== 'map'} suppressBuddy={panel !== 'map'}>
       {panel === 'map' ? <>
-        <JourneyMap stops={journey.stops} memoryPhotos={memoryPhotos} animateMemoryRoute={false} selectedId={selectedId} onSelect={select} presentation="expanded" />
+        <JourneyMap stops={journey.stops} memoryPhotos={memoryPhotos} storyBuddy={storyBuddy} storyBuddySize={64} animateMemoryRoute={false} selectedId={selectedId} onSelect={select} presentation="expanded" />
         <ItinerarySheet title="Explore the itinerary" subtitle={journey.stops.length + ' stops · ' + (selected?.name || journey.title)}>
         <MapItinerary stops={journey.stops} selectedId={selectedId} onSelect={select} />
         <View style={styles.mapCaption}>

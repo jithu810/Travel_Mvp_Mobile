@@ -1,5 +1,5 @@
 import { DraftRouteIllustration } from '@/components/create/draft-route-illustration';
-import { useBuddyScreen } from '@/hooks/use-journey-buddy';
+import { useBuddyCelebration, useBuddyScreen } from '@/hooks/use-journey-buddy';
 import { useBuddyProtectedBounds, useBuddyScroll } from '@/hooks/use-buddy-geometry';
 import { StatusBar } from 'expo-status-bar';
 import { SwipeAction } from '@/components/journey/swipe-journey-start';
@@ -45,6 +45,7 @@ const DraftMap = memo(function DraftMap({ geometry, photos, thumbnails, selected
 });
 export function NewJourneyEditor({ ownerId, initial, onReload, onDestinationFocus, dismissSearchVersion = 0, keyboardOpen = false }: { ownerId: string; initial?: CreateForm; onReload?: () => void; onDestinationFocus?: (place: Place | null) => void; dismissSearchVersion?: number; keyboardOpen?: boolean }) {
   const router = useRouter(), navigation = useNavigation();
+  const celebrate = useBuddyCelebration();
   const scroll = useBuddyScroll(), footerProtection = useBuddyProtectedBounds();
   const insets = useSafeAreaInsets(), window = useWindowDimensions();
   const [editorFocused, setEditorFocused] = useState(true);
@@ -152,6 +153,7 @@ export function NewJourneyEditor({ ownerId, initial, onReload, onDestinationFocu
     if (result.kind === 'saved') {
       setForm(result.form); setDirty(false); localPhotos.acceptSaved(pendingPhotos);
       if (savingMemory) setMemoryEdit(null);
+      if (savingMemory && focus.current.active && focus.current.generation === generation) celebrate('jump', result);
       if (savingSettings) setSettingsOpen(false);
       if (result.saved.status === 'published') setPublishedId(result.saved.id);
       setMessage(Object.keys(pendingPhotos).length ? (result.saved.status === 'published' ? 'Journey and photos published.' : 'Journey and photos saved privately.') : savingMemory ? 'Memory saved privately.' : result.saved.status === 'draft' ? 'Draft saved. Only you can open it.' : 'Your journey is published.');

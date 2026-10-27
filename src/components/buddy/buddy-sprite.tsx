@@ -18,7 +18,10 @@ export const BuddySprite = memo(function BuddySprite({ animation = 'idle', anima
   }, [clip, animate, failed]);
   if (referenceFailed) return null;
   if (!animate || failed || !clip) return <Image source={buddyReference} accessible={false} fadeDuration={0} resizeMethod="scale" resizeMode="contain" style={{ width: 64, height: 64 }} onError={() => setReferenceFailed(true)} />;
-  return <View accessible={false} pointerEvents="none" style={{ width: 64, height: 64, overflow: 'hidden', transform: [{ scaleX: facing === clip.facing ? 1 : -1 }] }}>
+  // Keep the outer touch canvas and bottom-center anchor unchanged. Jump's
+  // original cells are180×189: clip their exact width so no adjacent frame leaks.
+  const width = 64 * clip.frameWidth / clip.frameHeight;
+  return <View accessible={false} pointerEvents="none" style={{ width, height: 64, alignSelf: 'center', overflow: 'hidden', transform: [{ scaleX: facing === clip.facing ? 1 : -1 }] }}>
     <Image source={clip.source} accessible={false} fadeDuration={0} resizeMethod="scale" resizeMode="stretch" style={{ position: 'absolute', ...spriteFrame(clip, frame) }} onError={() => setFailed(true)} />
   </View>;
 });
