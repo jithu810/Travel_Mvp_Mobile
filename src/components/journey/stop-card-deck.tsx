@@ -1,15 +1,19 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { AccessibilityInfo, Animated, AppState, Image, PanResponder, Pressable, StyleSheet, Text, View } from 'react-native';
 import type { JourneyStop } from '@/types/journey';
-import { TravelPhotoPlaceholder } from '@/components/discovery/travel-photo-placeholder';
+import { StopArt } from '@/components/art/journey-art';
+import { artSeed } from '@/lib/art/journey-art';
 import { theme } from '@/theme/mobile-theme';
 import { useBuddyProtectedBounds } from '@/hooks/use-buddy-geometry';
 
-function StopPhoto({ stop }: { stop: JourneyStop }) {
+// Photo-less stops show stop art (journey route with this stop highlighted) instead of a
+// map image: the live journey map sits directly above this deck. The right edge stays
+// clear for the photo action rail.
+function StopPhoto({ stop, stops, index }: { stop: JourneyStop; stops: JourneyStop[]; index: number }) {
   const [failed, setFailed] = useState<string | null>(null);
   return <View style={s.photo}>{stop.photo && failed !== stop.photo
     ? <Image key={stop.photo} source={{ uri: stop.photo }} accessibilityLabel={stop.name + ' photo'} resizeMode="cover" style={s.image} onError={() => setFailed(stop.photo)} />
-    : <TravelPhotoPlaceholder variant="stop" label={'Default travel photo. No stop photo available. ' + stop.name + '. See this stop'} map={{ points: [stop] }} mapLabel={'Map of ' + stop.name + '. No stop photo yet. See this stop'} />}<View pointerEvents="none" style={s.photoShade} /></View>;
+    : <StopArt seed={artSeed(null, stops)} stops={stops} index={index} name={stop.name} inset={{ right: 56 }} accessibilityLabel={'Stop art. No stop photo available. ' + stop.name + '. See this stop'} />}<View pointerEvents="none" style={s.photoShade} /></View>;
 }
 
 export function StopCardDeck({ stops, selectedId, onSelect, onDetails, active = true, photoActions, optionsActions, creator }: { stops: JourneyStop[]; selectedId: string | null; onSelect: (id: string) => void; onDetails: (id: string) => void; active?: boolean; photoActions?: ReactNode; optionsActions?: ReactNode; creator?: ReactNode }) {
@@ -68,11 +72,11 @@ export function StopCardDeck({ stops, selectedId, onSelect, onDetails, active = 
       <Pressable accessibilityRole="button" accessibilityLabel="Next memory" disabled={index >= stops.length - 1} accessibilityState={{ disabled: index >= stops.length - 1 }} onPress={() => move(1)} style={[s.control, index >= stops.length - 1 && s.disabled]}><Text style={s.link}>→</Text></Pressable>
     </View></View>
     <View style={s.deck}>
-      {behind.map((item, i) => <View key={item.id} pointerEvents="none" accessible={false} accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={[s.rear, { top: (behind.length - i - 1) * 8, left: (behind.length - i) * 8, right: (behind.length - i) * 8, transform: [{ rotate: (i ? '-2deg' : '2deg') }] }]}><StopPhoto stop={item} /></View>)}
+      {behind.map((item, i) => <View key={item.id} pointerEvents="none" accessible={false} accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={[s.rear, { top: (behind.length - i - 1) * 8, left: (behind.length - i) * 8, right: (behind.length - i) * 8, transform: [{ rotate: (i ? '-2deg' : '2deg') }] }]}><StopPhoto stop={item} stops={stops} index={stops.indexOf(item)} /></View>)}
       <Animated.View style={[s.active, { transform: [{ translateX: x }, { rotate: x.interpolate({ inputRange: [-400, 0, 400], outputRange: ['-8deg', '0deg', '8deg'], extrapolate: 'clamp' }) }] }]}>
         <View style={s.card}>
           <View style={s.photoArea}>
-            <View {...swipe.panHandlers} testID="stop-photo-swipe"><Pressable accessibilityRole="button" accessibilityLabel={'View photo for stop ' + (index + 1) + ': ' + stop.name} accessibilityHint="Opens the full stop story and photo" onPress={() => { if (!busy.current && enabled.current && foreground.current) onDetails(stop.id); }}><StopPhoto stop={stop} /></Pressable></View>
+            <View {...swipe.panHandlers} testID="stop-photo-swipe"><Pressable accessibilityRole="button" accessibilityLabel={'View photo for stop ' + (index + 1) + ': ' + stop.name} accessibilityHint="Opens the full stop story and photo" onPress={() => { if (!busy.current && enabled.current && foreground.current) onDetails(stop.id); }}><StopPhoto stop={stop} stops={stops} index={index} /></Pressable></View>
             {photoActions && <View style={s.photoActions} testID="stop-photo-actions">{photoActions}</View>}
           </View>
           <View style={s.captionRow}><View style={s.captionRead} {...swipe.panHandlers} testID="stop-caption-swipe"><Pressable accessibilityRole="button" accessibilityLabel={'Read stop ' + (index + 1) + ': ' + stop.name} onPress={() => { if (!busy.current && enabled.current && foreground.current) onDetails(stop.id); }} style={s.caption}><Text accessibilityRole="header" numberOfLines={2} style={s.name}>{stop.name}</Text>{!!stop.description.trim() && <Text numberOfLines={2} style={s.note}>{stop.description}</Text>}<Text style={s.link}>{stop.rating !== null ? '★ ' + stop.rating + '/5 · ' : ''}Read story ↗</Text></Pressable></View><View style={s.captionFooter}>{creator && <View style={s.creator}>{creator}</View>}{optionsActions && <View testID="stop-options-actions" style={s.optionsActions}>{optionsActions}</View>}</View></View>

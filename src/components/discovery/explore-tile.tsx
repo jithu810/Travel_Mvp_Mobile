@@ -1,8 +1,10 @@
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Image, Pressable, StyleSheet } from 'react-native';
+import { Pressable, StyleSheet } from 'react-native';
 import type { PublicJourney } from '@/types/journey';
 import { JourneyPhoto } from './journey-photo';
+import { JourneyArt } from '@/components/art/journey-art';
+import { artSeed } from '@/lib/art/journey-art';
 import { useBuddyProtectedBounds } from '@/hooks/use-buddy-geometry';
 
 export function ExploreTile({ journey }: { journey: PublicJourney }) {
@@ -18,11 +20,10 @@ export function ExploreTile({ journey }: { journey: PublicJourney }) {
     onPress={() => router.push({ pathname: '/journey/[id]', params: { id: journey.id, source: 'search' } })}
     style={({ pressed }) => [styles.tile, pressed && styles.pressed]}>
     {available ? <JourneyPhoto uri={cover} label={journey.title + ' cover photo'} fill thumbnail onError={() => { if (thumbnail) setFailedThumbnail(thumbnail); else setFailedUri(cover); }} />
-      : <Image source={require('../../../assets/images/journey-photo-fallback.png')} accessibilityLabel={'Default travel photo for ' + journey.title + '. No journey cover photo available'} resizeMode="cover" style={styles.photo} />}
+      : <JourneyArt seed={artSeed(journey.id, journey.stops)} stops={journey.stops} destination={journey.destination} showDestination compact accessibilityLabel={'Journey art for ' + journey.title + '. No journey cover photo available'} />}
   </Pressable>;
 }
 const styles = StyleSheet.create({
   tile: { width: '33.333333%', aspectRatio: 1, padding: 1, minHeight: 44 },
-  photo: { width: '100%', height: '100%' },
   pressed: { opacity: 0.75 },
 });

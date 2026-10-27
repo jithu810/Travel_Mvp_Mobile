@@ -27,6 +27,8 @@ function load(file, dependencies, state = null, hookOverrides = {}) {
     if(name==='@/lib/social/saved-queries')return {loadSavedJourneys:async()=>[]};
     if(name==='@/components/journey/journey-action-icon')return {JourneyActionIcon:'JourneyActionIcon'};
     if (name === '../../../assets/images/journey-photo-fallback.png') return 17;
+    if (name === '@/components/art/journey-art') return { JourneyArt: 'JourneyArt', StopArt: 'StopArt' };
+    if (name === '@/lib/art/journey-art') return { artSeed: (id, stops) => 'seed:' + id + ':' + (stops || []).length };
     if (name === './travel-photo-placeholder') return load('src/components/discovery/travel-photo-placeholder.tsx', {});
     if (name === './static-map-photo') return load('src/components/discovery/static-map-photo.tsx', {});
     if (name === '@/lib/media/static-map') return load('src/lib/media/static-map.ts', {});
@@ -231,7 +233,7 @@ test('Home retains title, author, count, Locate and both Story entry points (car
 });
 test('missing/failed photos retain fallback and a changed URI recovers', () => {
   for (const [uri, failed] of [[null, null], [journey.cover, journey.cover]]) {
-    assert.ok(card(uri, failed).all.some(n => n.props?.accessibilityLabel === 'Default travel photo. No journey cover photo available. Coast. Explore journey'));
+    assert.ok(card(uri, failed).all.some(n => n.props?.accessibilityLabel === 'Journey art. No journey cover photo available. Coast. Explore journey'));
   }
   assert.equal(card('https://example.invalid/new.jpg', journey.cover).all.filter(n => n.type === 'Image').length, 1);
 });
@@ -271,7 +273,7 @@ test('Home image failure falls back, a new URI recovers and card measurement rem
   assert.equal(nodes(unselectedLocate).find(n => n.type === 'Ionicons').props.color, '#3873CE');
   nodes(tree).find(n => n.type === 'Image').props.onError();
   assert.equal(failedUri, journey.cover);
-  assert.ok(nodes(component.HomeJourneyCard(props)).some(n => n.props?.accessibilityLabel === 'Default travel photo. No journey cover photo available. Coast. Explore journey'));
+  assert.ok(nodes(component.HomeJourneyCard(props)).some(n => n.props?.accessibilityLabel === 'Journey art. No journey cover photo available. Coast. Explore journey'));
   tree = component.HomeJourneyCard({ ...props, journey: { ...journey, cover: 'https://example.invalid/landscape.jpg' } });
   assert.equal(nodes(tree).find(n => n.type === 'Image').props.source.uri, 'https://example.invalid/landscape.jpg');
   const {HomeControlIcon}=load('src/components/discovery/home-control-icon.tsx',{});
@@ -279,21 +281,20 @@ test('Home image failure falls back, a new URI recovers and card measurement rem
   assert.equal(world.props.style[0].width,24);assert.equal(world.props.style[1],false,'World keeps its original icon size');
 });
 
-test('Home missing and failed covers use supplied default photo with readable native caption', () => {
+test('Home missing and failed covers use deterministic journey art in the same frame, never the stock photo', () => {
   for (const expanded of [false, true]) for (const [uri, failed] of [[null, null], [journey.cover, journey.cover]]) {
     const { all } = card(uri, failed, expanded);
-    const fallback = all.find(n => n.props?.accessibilityLabel === 'Default travel photo. No journey cover photo available. Coast. Explore journey');
-    assert.equal(fallback.props.accessible, true);
-    const art = nodes(fallback).find(n => n.props?.accessibilityElementsHidden);
-    assert.equal(art.props.accessible, false);
-    assert.equal(art.props.importantForAccessibility, 'no-hide-descendants');
-    const image = nodes(art).find(n => n.type === 'Image');
-    assert.equal(image.props.source, 17);assert.equal(image.props.resizeMode, 'cover');
-    const caption = nodes(fallback).filter(n => n.type === 'Text');
-    assert.equal(caption.length, 1);assert.equal(caption[0].props.children, 'Explore journey');
-    const textStyle=Object.assign({},...caption[0].props.style.filter(Boolean));
-    assert.equal(textStyle.color,'#FFFFFF');assert.equal(textStyle.fontSize,expanded?12:10);
-    assert.ok(!caption.some(n=>n.props.children===journey.destination));
+    const art = all.find(n => n.type === 'JourneyArt');
+    assert.equal(art.props.accessibilityLabel, 'Journey art. No journey cover photo available. Coast. Explore journey');
+    assert.equal(art.props.seed, 'seed:journey-a:1', 'Seeded from the journey');
+    assert.equal(art.props.stops, journey.stops);
+    assert.equal(art.props.compact, !expanded);
+    assert.equal(art.props.showDestination, undefined, 'The card already prints the destination');
+    assert.equal(all.filter(n => n.type === 'Image').length, 0, 'No stock placeholder or map image is requested');
+    const frame = all.find(n => [n.props?.children].flat().includes(art));
+    const frameStyle = Object.assign({}, ...frame.props.style.filter(Boolean));
+    assert.equal(frameStyle.width, expanded ? '100%' : 96, 'Card cover size is unchanged');
+    assert.equal(frameStyle.height, expanded ? Math.round(300 * 9 / 16) : 84);
   }
 });
 test('Journey generic fallback has a distinct caption and honest accessibility label',()=>{

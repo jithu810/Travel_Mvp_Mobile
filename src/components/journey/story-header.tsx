@@ -4,11 +4,14 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import type { PublicJourney } from '@/types/journey';
 import { JourneyPhoto } from '@/components/discovery/journey-photo';
 import { colors } from '@/components/discovery/ui';
+import { JourneyArt } from '@/components/art/journey-art';
+import { artSeed } from '@/lib/art/journey-art';
 
 export function StoryHeader({ journey, height, onAbout }: { journey: PublicJourney; height: number; onAbout: () => void }) {
   const router = useRouter();
   return <View style={[styles.cover, { height }]}>
-    <JourneyPhoto uri={journey.cover} label={journey.title + ' cover photo'} fill />
+    <JourneyPhoto uri={journey.cover} label={journey.title + ' cover photo'} fill
+      fallback={<JourneyArt seed={artSeed(journey.id, journey.stops)} stops={journey.stops} accessibilityLabel={'Journey art. No journey cover photo available. ' + journey.title} />} />
     <View pointerEvents="none" style={styles.shade} />
     <View style={styles.controls}>
       <Pressable accessibilityRole="button" accessibilityLabel="Go back" onPress={() => router.canGoBack() ? router.back() : router.replace('/discover')} style={styles.control}><Text style={styles.back}>‹</Text></Pressable>

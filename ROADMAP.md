@@ -1,3 +1,9 @@
+## Journey art for photo-less journeys and stops - 2026-10-27
+- [x] Deterministic palette/route/pseudo-route art module and View-only JourneyArt/StopArt; list and story surfaces no longer request slot-sized static maps or show the stock photo. Unit/harness tested (743 tests, 1 environment skip), typecheck and lint pass.
+- [x] Optional fixed-size (88x88@2x) circle map with one-line credit in the stop story viewer only.
+- [ ] Device check on phone (palettes, legibility on dark palettes, deck rail clearance, viewer circle), QA and independent review.
+- [ ] Decide whether create/draft/customize flows should also switch from static maps to stop art (needs paths outside this task).
+
 ## Buddy opening investigation - 2026-10-26
 - [x] Correct sparse-placement false no-fit, repeated search cost, above-only manual help and safe dialog fallback. Final focused QA128/128 and independent review64/64 pass. Publication authorized; draft PR prepared.
 - [x] Rebind phone8081 tunnel to this laptop, start fresh Metro from D:/JBuild, confirm runtime attachment and full bubble opening on unconfigured Home. No rebuild performed or required by these JS changes.

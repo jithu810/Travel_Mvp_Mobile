@@ -345,6 +345,7 @@ test('Account draft card shows the direct-source credit only for remixes', () =>
     '@/components/discovery/journey-photo': { JourneyPhoto: 'JourneyPhoto' }, '@/components/discovery/thumbnail-photo': { ThumbnailPhoto: 'ThumbnailPhoto' },
     '@/lib/discovery/model': { journeyFacts: () => '' }, './profile-styles': { profileUIStyles: {} },
     '@/components/delete-draft-action': { DeleteDraftAction: 'DeleteDraftAction' }, '@/hooks/use-buddy-geometry': buddyGeometryStub,
+    '@/components/art/journey-art': { JourneyArt: 'JourneyArt' }, '@/lib/art/journey-art': { artSeed: () => 'seed' },
   });
   const credit = card => nodes(card).find(n => n.props?.testID === 'draft-remix-credit')?.props.children;
   const named = ProfileDraftCard({ draft: { id: draftId, title: 'Remix', sourceId, source }, onDeleted() {} });

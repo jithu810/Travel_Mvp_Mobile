@@ -50,13 +50,15 @@ test('Search preserves refresh, stale-result error, retry and empty/clear-search
   s.state({error:null});let tree=s.render();assert.equal(tree.find(n=>n.type==='FlatList').props.ListEmptyComponent.props.title,'More stories are on their way');
   tree.find(n=>n.type==='TextInput').props.onChangeText('Unknown');list=s.render().find(n=>n.type==='FlatList');assert.equal(list.props.ListEmptyComponent.props.title,'No journeys found');list.props.ListEmptyComponent.props.retry();assert.equal(s.render().find(n=>n.type==='TextInput').props.value,'');
 });
-test('Explore tile navigates with source marker and falls back after image failure, recovering for a changed cover',()=>{
+const artModules={'@/components/art/journey-art':{JourneyArt:'JourneyArt',StopArt:'StopArt'},'@/lib/art/journey-art':{artSeed:(id,stops)=>'seed:'+id+':'+(stops||[]).length}};
+test('Explore tile navigates with source marker and falls back to journey art after image failure, recovering for a changed cover',()=>{
   let failed=null;const routes=[];
-  const {ExploreTile}=load('src/components/discovery/explore-tile.tsx',{'react/jsx-runtime':runtime,react:{useState:()=>[failed,x=>{failed=x;}]},'expo-router':{useRouter:()=>({push:x=>routes.push(x)})},'react-native':native,'./journey-photo':{JourneyPhoto:'JourneyPhoto'},'../../../assets/images/journey-photo-fallback.png':17});
-  const journey={id:'a',title:'Coast',destination:'Kerala',creatorName:'Owner',cover:'https://example.test/a.jpg'};
+  const {ExploreTile}=load('src/components/discovery/explore-tile.tsx',{'react/jsx-runtime':runtime,react:{useState:()=>[failed,x=>{failed=x;}]},'expo-router':{useRouter:()=>({push:x=>routes.push(x)})},'react-native':native,'./journey-photo':{JourneyPhoto:'JourneyPhoto'},...artModules});
+  const journey={id:'a',title:'Coast',destination:'Kerala',creatorName:'Owner',cover:'https://example.test/a.jpg',stops:[{id:'s'}]};
   const render=()=>ExploreTile({journey});let tree=render();tree.props.onPress();assert.deepEqual(routes[0],{pathname:'/journey/[id]',params:{id:'a',source:'search'}});assert.match(tree.props.accessibilityLabel,/Coast.*Kerala.*Owner/);
-  tree.props.children.props.onError();tree=render();assert.equal(tree.props.children.type,'Image');assert.match(tree.props.children.props.accessibilityLabel,/Default travel photo/);
-  journey.cover='https://example.test/b.jpg';assert.equal(render().props.children.type,'JourneyPhoto');journey.cover=null;assert.equal(render().props.children.type,'Image');
+  tree.props.children.props.onError();tree=render();const art=tree.props.children;assert.equal(art.type,'JourneyArt');assert.equal(art.props.accessibilityLabel,'Journey art for Coast. No journey cover photo available');
+  assert.equal(art.props.seed,'seed:a:1');assert.equal(art.props.destination,'Kerala');assert.equal(art.props.showDestination,true,'Image-only tiles print the destination on the art');assert.equal(art.props.compact,true);
+  journey.cover='https://example.test/b.jpg';assert.equal(render().props.children.type,'JourneyPhoto');journey.cover=null;assert.equal(render().props.children.type,'JourneyArt');
 });
 test('Search source reaches the single existing social action owner',()=>{
   const source=readFileSync('src/app/journey/[id].tsx','utf8');assert.match(source,/saveFirst=\{params.source === 'search'\}/);assert.match(source,/<SocialActions[^>]*saveFirst=\{saveFirst\}/);assert.equal((source.match(/<SocialActions /g)||[]).length,1);
@@ -113,12 +115,12 @@ test('shared compact input retains Home pill geometry, real focus and consumer i
 test('Home and Explore prefer thumbnails, retry original once on failure then default; changed URLs recover',()=>{
  for(const kind of ['home','explore']) {
   const h=stateHarness();const journey={id:'a',title:'Coast',destination:'Kerala',creatorName:'Owner',cover:'https://example.test/full.jpg',coverThumbnail:'https://example.test/thumb.jpg',stops:[]};
-  const modules={'react/jsx-runtime':runtime,react:{...h.hooks,memo:fn=>fn},'react-native':native,'expo-router':{useRouter:()=>({push(){}})},'./journey-photo':{JourneyPhoto:'JourneyPhoto'},'../../../assets/images/journey-photo-fallback.png':17,'@/lib/discovery/model':{journeyFacts:()=>''},'./ui':{colors:{}},'./home-control-icon':{HomeControlIcon:'Icon'},'./travel-photo-placeholder':{TravelPhotoPlaceholder:'Placeholder'}};
+  const modules={'react/jsx-runtime':runtime,react:{...h.hooks,memo:fn=>fn},'react-native':native,'expo-router':{useRouter:()=>({push(){}})},'./journey-photo':{JourneyPhoto:'JourneyPhoto'},'@/lib/discovery/model':{journeyFacts:()=>''},'./ui':{colors:{}},'./home-control-icon':{HomeControlIcon:'Icon'},...artModules};
   const exports=load(kind==='home'?'src/components/discovery/home-journey-card.tsx':'src/components/discovery/explore-tile.tsx',modules);
   const render=()=>h.render(()=>kind==='home'?exports.HomeJourneyCard({journey,expanded:false,width:300,onOpen(){},onLocate(){}}):exports.ExploreTile({journey}));
   const remote=tree=>tree.find(n=>n.type==='JourneyPhoto'||n.type==='Image'&&n.props.source?.uri);
   const uri=image=>image.props.uri||image.props.source.uri;
-  let tree=render();assert.equal(uri(remote(tree)),journey.coverThumbnail);remote(tree).props.onError();tree=render();assert.equal(uri(remote(tree)),journey.cover);remote(tree).props.onError();tree=render();assert.equal(remote(tree),undefined);assert.equal(journey.cover,'https://example.test/full.jpg');
+  let tree=render();assert.equal(uri(remote(tree)),journey.coverThumbnail);remote(tree).props.onError();tree=render();assert.equal(uri(remote(tree)),journey.cover);remote(tree).props.onError();tree=render();assert.equal(remote(tree),undefined);assert.equal(tree.filter(n=>n.type==='JourneyArt').length,1,'Both variants failed: journey art, never the stock photo');assert.equal(journey.cover,'https://example.test/full.jpg');
   journey.coverThumbnail='https://example.test/new-thumb.jpg';tree=render();assert.equal(uri(remote(tree)),journey.coverThumbnail);remote(tree).props.onError();journey.cover='https://example.test/new-full.jpg';tree=render();assert.equal(uri(remote(tree)),journey.cover);h.dispose();
  }
 });

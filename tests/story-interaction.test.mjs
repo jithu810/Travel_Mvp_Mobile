@@ -56,8 +56,9 @@ function load(path, modules, hooks = harness(false).hooks, timers = globalThis) 
     if (name === './journey-action-icon') return { JourneyActionIcon: 'JourneyActionIcon' };
     if (name === './stop-card-deck') return { StopCardDeck: 'StopCardDeck' };
     if (name === '@/components/remix/source-attribution') return { SourceAttribution: 'SourceAttribution' };
-    if (name === '@/components/discovery/static-map-photo' && !Object.hasOwn(modules, name)) return { StaticMapCredit: 'StaticMapCredit' };
-    if (name === '@/lib/media/static-map' && !Object.hasOwn(modules, name)) return load('src/lib/media/static-map.ts', {});
+    if (name === '@/components/art/journey-art' && !Object.hasOwn(modules, name)) return { JourneyArt: 'JourneyArt', StopArt: 'StopArt' };
+    if (name === '@/components/art/circle-map' && !Object.hasOwn(modules, name)) return { CircleMap: 'CircleMap' };
+    if (name === '@/lib/art/journey-art' && !Object.hasOwn(modules, name)) return load('src/lib/art/journey-art.ts', {});
     if (name === 'expo-status-bar') return {StatusBar:'StatusBar'};
     if (name === 'react') return hooks;
     if (name === 'expo-router') return { useFocusEffect: fn => hooks.useEffect(fn, [fn]), ...modules[name] };
@@ -1666,4 +1667,34 @@ test('map unavailable fallback respects edge-to-edge status inset',()=>{
  let tree=MapFallback({controlTopInset:36,retry:()=>{}});
  assert.equal(tree.props.style.at(-1).paddingTop,56);
  tree=MapFallback({});assert.equal(tree.props.style.at(-1).paddingTop,20);
+});
+
+test('stop story viewer shows stop art for photo-less or failed photos with one fixed circle map and its credit, never a full-screen map', () => {
+  const h = harness();
+  const { StopStoryViewer } = load('src/components/journey/stop-story-viewer.tsx', {
+    'expo-status-bar': { StatusBar: 'StatusBar' },
+    'react-native': { ...native, Modal: 'Modal', ScrollView: 'ScrollView', PanResponder: { create: () => ({ panHandlers: {} }) } },
+    'react-native-safe-area-context': { SafeAreaView: 'SafeAreaView' },
+    '@/components/discovery/journey-photo': { JourneyPhoto: 'JourneyPhoto' }, '@/components/discovery/ui': ui,
+  }, h.hooks);
+  const art = load('src/lib/art/journey-art.ts', {});
+  const stops = [{ ...stop('a'), latitude: 9.93, longitude: 76.26 }, { ...stop('b'), latitude: 9.96, longitude: 76.24, photo: 'https://example.test/b.jpg' }, { ...stop('c'), latitude: null, longitude: null }];
+  const props = { journey: { id: 'journey-1', title: 'Trip', destination: 'Kochi', stops }, selectedId: 'a', onSelect() {}, onClose() {}, onMap() {} };
+  let tree = h.render(StopStoryViewer, props);
+  let photo = find(tree, 'JourneyPhoto');
+  assert.equal(photo.props.map, undefined, 'No full-screen static map');
+  const stopArt = photo.props.fallback;
+  assert.equal(stopArt.type, 'StopArt'); assert.equal(stopArt.props.index, 0); assert.equal(stopArt.props.stops, stops);
+  assert.equal(stopArt.props.seed, art.artSeed(null, stops), 'Same palette as the deck, which only receives stops');
+  assert.equal(stopArt.props.inset.top, 24 + 88); assert.equal(stopArt.props.inset.bottom, 24 + 180); assert.equal(stopArt.props.inset.right, 112, 'Art content keeps clear of the circle');
+  let circle = find(tree, 'CircleMap');
+  assert.equal(circle.props.point, stops[0]);
+  assert.equal(Object.assign({}, ...[circle.props.style].flat()).top, 24 + 88 + 12, 'Circle sits below the header');
+  props.selectedId = 'b'; tree = h.render(StopStoryViewer, props);
+  assert.equal(find(tree, 'CircleMap'), null, 'A photo wins and needs no circle');
+  find(tree, 'JourneyPhoto').props.onError(); tree = h.render(StopStoryViewer, props);
+  assert.equal(find(tree, 'CircleMap').props.point, stops[1], 'A failed photo falls back to art plus the circle');
+  props.selectedId = 'c'; tree = h.render(StopStoryViewer, props);
+  assert.equal(find(tree, 'CircleMap'), null, 'No coordinates: art only');
+  assert.equal(find(tree, 'JourneyPhoto').props.fallback.props.inset.right, 0);
 });

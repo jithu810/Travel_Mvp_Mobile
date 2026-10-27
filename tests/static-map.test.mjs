@@ -254,59 +254,70 @@ test('JourneyPhoto keeps photos first, then map, then its existing fallback', ()
   assert.ok(nodes(plain).some(n => n.props?.accessibilityLabel === 'No journey photo available'), 'No map prop keeps the original fallback');
 }));
 
-test('map fallbacks are wired only where coordinates are loaded; small timeline thumbnails carry one credit line', () => {
+test('static maps remain only in create/draft flows and the opened-stop circle; list and story surfaces use journey art', () => {
   const read = path => readFileSync(path, 'utf8');
+  // Unchanged private create/draft flows keep their single-place or draft-cover maps.
   assert.match(read('src/components/create/memory-row.tsx'), /map=\{\{ points: \[stop\] \}\}/);
-  assert.match(read('src/components/journey/stop-card-deck.tsx'), /TravelPhotoPlaceholder[^\n]*map=\{\{ points: \[stop\] \}\}/);
   assert.match(read('src/components/journey/customize-stops.tsx'), /JourneyPhoto uri=\{stop\.photo\}[^\n]*map=\{\{ points: \[stop\] \}\}/);
   assert.match(read('src/app/draft/[id].tsx'), /JourneyPhoto uri=\{state\.data\.cover\}[^\n]*map=\{\{ points: state\.data\.stops \}\}/);
-  const timeline = read('src/components/journey/stop-timeline.tsx');
-  assert.equal((timeline.match(/map=\{\{ points: \[(stop|item)\] \}\}/g) || []).length, 2, 'Plain map props: vertical map-only slot and small thumbnails; the vertical photo branch has none and the carousel adds bottomInset');
-  const viewer = read('src/components/journey/stop-story-viewer.tsx');
-  assert.match(viewer, /map=\{\{ points: \[stop\], creditTop: insets\.top \+ headerHeight, bottomInset: insets\.bottom \+ captionHeight \}\}/, 'Story viewer map sits between header and caption sheet');
-  assert.match(viewer, /<View style=\{styles\.caption\} onLayout=\{event => \{[^}]*setCaptionHeight/, 'Caption sheet height is measured');
-  assert.match(timeline, /map=\{\{ points: \[item\], bottomInset: stacked \? 0 : textHeights\[item\.id\] \?\? 72 \}\}/, 'Carousel map ends above the card text overlay');
-  assert.match(timeline, /pointerEvents="none" onLayout=\{event => \{[^}]*setTextHeights/, 'Card text heights are measured');
-  assert.match(timeline, /verticalTimelineMapLimit = 6/);
-  // Card maps are deferred: list RPCs carry no coordinates, so cards keep the stock photo.
-  for (const file of ['src/components/discovery/home-journey-card.tsx', 'src/components/discovery/journey-card.tsx', 'src/components/discovery/explore-tile.tsx', 'src/components/profile/profile-ui.tsx'])
-    assert.doesNotMatch(read(file), /map=\{\{/, file);
+  // List cards, story cover and opened stop surfaces never request slot-sized static maps.
+  for (const file of ['src/components/discovery/home-journey-card.tsx', 'src/components/discovery/journey-card.tsx', 'src/components/discovery/explore-tile.tsx', 'src/components/profile/profile-ui.tsx',
+    'src/components/journey/story-header.tsx', 'src/components/journey/stop-card-deck.tsx', 'src/components/journey/stop-timeline.tsx', 'src/components/journey/stop-story-viewer.tsx']) {
+    const source = read(file);
+    assert.doesNotMatch(source, /map=\{\{/, file);
+    assert.doesNotMatch(source, /static-map/, file + ' imports no static map module');
+    assert.doesNotMatch(source, /journey-photo-fallback\.png/, file + ' no longer uses the stock photo');
+  }
+  for (const file of ['src/components/discovery/home-journey-card.tsx', 'src/components/discovery/journey-card.tsx', 'src/components/discovery/explore-tile.tsx', 'src/components/profile/profile-ui.tsx', 'src/components/journey/story-header.tsx'])
+    assert.match(read(file), /<JourneyArt seed=\{artSeed\(journey\.id, journey\.stops\)\}/, file);
+  for (const file of ['src/components/journey/stop-card-deck.tsx', 'src/components/journey/stop-timeline.tsx', 'src/components/journey/stop-story-viewer.tsx'])
+    assert.match(read(file), /<StopArt /, file);
+  // The only opened-surface map is the fixed-size circle, which carries its own credit line.
+  assert.match(read('src/components/journey/stop-story-viewer.tsx'), /<CircleMap /);
+  const circle = read('src/components/art/circle-map.tsx');
+  assert.match(circle, /staticMapCircleUrl\(point\)/); assert.match(circle, /<StaticMapCredit points=\{\[point\]\} \/>/);
 });
 
-test('horizontal thumbnails show the list credit once a small map can appear, including after a photo fails', () => withToken(() => {
-  const slots = []; let cursor = 0;
-  const react = { useState: initial => { const i = cursor++; if (!(i in slots)) slots[i] = initial; return [slots[i], value => { slots[i] = typeof value === 'function' ? value(slots[i]) : value; }]; },
-    useRef: initial => { const i = cursor++; return slots[i] ??= { current: initial }; }, useEffect() {} };
-  const { StopTimeline } = load('src/components/journey/stop-timeline.tsx', {
-    'react/jsx-runtime': { jsx, jsxs: jsx, Fragment: 'Fragment' }, react, 'react-native': { ...native, AccessibilityInfo: {}, FlatList: 'FlatList', Pressable: 'Pressable' },
-    './stop-card-deck': { StopCardDeck: 'StopCardDeck' }, '@/theme/mobile-theme': { theme: {} }, '@/components/discovery/journey-photo': { JourneyPhoto: 'JourneyPhoto' },
-    '@/components/discovery/ui': { colors: {}, ui: {} }, '@/lib/journey/story-layout': { stopIndexAtOffset: () => 0 }, '@/lib/media/static-map': map,
-    '@/components/discovery/static-map-photo': { StaticMapCredit: 'StaticMapCredit' },
-  });
-  const stop = { id: 'a', name: 'Fort', description: '', sequence: 1, dayNumber: null, photo: 'https://example.test/fort.jpg', rating: null, ...fort };
-  const render = () => { cursor = 0; const element = StopTimeline({ stops: [stop], horizontal: true, selectedId: 'a', onSelect() {}, onDetails() {} }); return element.type(element.props); };
-  let tree = render();
-  let credit = tree.props.children.flat(Infinity).find(n => n?.type === 'StaticMapCredit');
-  assert.deepEqual(credit.props.points, [], 'All photos present: no map can show yet');
-  const thumbnails = tree.props.children.flat(Infinity).find(n => n?.type === 'FlatList' && n.props.testID === 'journey-stop-thumbnails');
-  nodes(thumbnails.props.renderItem({ item: stop, index: 0 })).find(n => n.type === 'JourneyPhoto').props.onError();
-  tree = render();
-  credit = tree.props.children.flat(Infinity).find(n => n?.type === 'StaticMapCredit');
-  assert.deepEqual(credit.props.points.map(item => item.id), ['a'], 'A failed photo now shows a small map, so the credit covers it');
+test('the circle map uses one fixed size per place, so each stop has one cacheable URL', () => {
+  const url = map.staticMapCircleUrl(kochi, token);
+  assert.equal(map.staticMapCircleSize, 88);
+  const parsed = new URL(url);
+  assert.equal(parsed.pathname, '/styles/v1/mapbox/outdoors-v12/static/pin-s+6555cf(76.2673,9.9312)/76.2673,9.9312,13,0/88x88@2x');
+  assert.equal(parsed.searchParams.get('logo'), 'false', 'Below the inline-credit width: the screen shows StaticMapCredit');
+  assert.equal(map.staticMapCircleUrl({ ...kochi }, token), url, 'Stable for equal coordinates');
+  for (const invalid of [null, undefined, { latitude: null, longitude: null }, { latitude: 91, longitude: 0 }]) assert.equal(map.staticMapCircleUrl(invalid, token), null);
+  assert.equal(map.staticMapCircleUrl(kochi, null), null); assert.equal(map.staticMapCircleUrl(kochi, 'sk.secret-synthetic'), null);
+});
+
+test('CircleMap renders the fixed-size map with the credit line, and removes both on failure or without a token', () => withToken(() => {
+  const h = hooks();
+  const { CircleMap } = load('src/components/art/circle-map.tsx', { react: h.react, 'react/jsx-runtime': { jsx, jsxs: jsx, Fragment: 'Fragment' }, 'react-native': native,
+    '@/components/discovery/static-map-photo': { StaticMapCredit: 'StaticMapCredit' }, '@/lib/media/static-map': map });
+  const render = point => h.render(() => CircleMap({ point }));
+  let tree = render(kochi);
+  const image = nodes(tree).find(n => n.type === 'Image');
+  assert.match(image.props.source.uri, /\/88x88@2x\?/);
+  const credit = nodes(tree).find(n => n.type === 'StaticMapCredit');
+  assert.deepEqual(credit.props.points, [kochi], 'Credit shows whenever the circle shows');
+  assert.equal(tree.props.pointerEvents, 'none', 'Never blocks the story tap zones');
+  image.props.onError();
+  assert.equal(render(kochi), null, 'A failed map removes the circle and its credit');
+  assert.equal(render({ latitude: null, longitude: null }), null);
+  delete process.env.EXPO_PUBLIC_MAPBOX_TOKEN;
+  assert.equal(render(fort), null, 'No token: no circle and no credit');
 }));
 
-test('vertical timeline requests maps for at most the first six photo-less located stops', () => withToken(() => {
-  const stops = Array.from({ length: 9 }, (_, index) => ({ id: 's' + index, name: 'Stop ' + index, description: '', sequence: index + 1, dayNumber: null, photo: index === 1 ? 'https://example.test/p.jpg' : null, rating: null, latitude: 9 + index / 100, longitude: 76 }));
-  stops.push({ ...stops[0], id: 'unlocated', latitude: null, longitude: null });
-  const { StopTimeline } = load('src/components/journey/stop-timeline.tsx', {
-    'react/jsx-runtime': { jsx, jsxs: jsx, Fragment: 'Fragment' }, react: {}, 'react-native': { ...native, AccessibilityInfo: {}, FlatList: 'FlatList', Pressable: 'Pressable' },
-    './stop-card-deck': { StopCardDeck: 'StopCardDeck' }, '@/theme/mobile-theme': { theme: {} }, '@/components/discovery/journey-photo': { JourneyPhoto: 'JourneyPhoto' },
-    '@/components/discovery/ui': { colors: {}, ui: {} }, '@/lib/journey/story-layout': { stopIndexAtOffset: () => 0 }, '@/lib/media/static-map': map,
-    '@/components/discovery/static-map-photo': { StaticMapCredit: 'StaticMapCredit' },
-  });
-  const tree = nodes(StopTimeline({ stops }));
-  const photos = tree.filter(n => n.type === 'JourneyPhoto');
-  assert.equal(photos.filter(n => n.props.uri === null).length, 6, 'Map-only slots are capped');
-  assert.equal(photos.filter(n => n.props.uri).length, 1, 'Photos are never capped');
-  assert.deepEqual(photos.filter(n => n.props.uri === null).map(n => n.props.label), ['Stop 0', 'Stop 2', 'Stop 3', 'Stop 4', 'Stop 5', 'Stop 6'].map(name => name + ' photo'));
+test('JourneyPhoto order: photo, then a map where a flow still asks for one, then the caller art, then the generic fallback', () => withToken(() => {
+  const h = hooks(), { JourneyPhoto } = components(h);
+  const art = { type: 'StopArt', props: {} };
+  let tree = h.render(() => JourneyPhoto({ uri: 'https://example.test/p.jpg', label: 'Stop photo', fallback: art }));
+  const photo = nodes(tree).find(n => n.type === 'Image');
+  assert.equal(photo.props.source.uri, 'https://example.test/p.jpg');
+  assert.equal(nodes(tree).includes(art), false, 'Photos always win');
+  photo.props.onError();
+  tree = h.render(() => JourneyPhoto({ uri: 'https://example.test/p.jpg', label: 'Stop photo', fallback: art }));
+  assert.ok(nodes(tree).includes(art), 'A failed photo shows the art');
+  assert.equal(nodes(tree).some(n => n.props?.testID === 'static-map-photo'), false, 'No map is requested without a map prop');
+  const plain = hooks();
+  assert.ok(nodes(plain.render(() => components(plain).JourneyPhoto({ uri: null, label: 'x', fallback: art }))).includes(art));
 }));
