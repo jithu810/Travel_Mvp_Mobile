@@ -26,7 +26,7 @@ function load(file, modules, hooks=harness().hooks, timers=globalThis) {
   const exports={}; const jsx=(type,props)=>({type,props});
   const code=ts.transpileModule(readFileSync(file,'utf8'), {compilerOptions:{module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX,target:ts.ScriptTarget.ES2022}}).outputText;
   new Function('require','exports','setTimeout','clearTimeout',code)(name=>{ if (name === '@/theme/mobile-theme') return mobileTheme;
-    if(name==='@/hooks/use-journey-buddy')return modules[name] || {useBuddyScreen(){}};
+    if(name==='@/hooks/use-journey-buddy')return {useBuddyCelebration:()=>()=>{},useBuddyScreen(){},...modules[name]};
     if(name==='@/hooks/use-buddy-map-pins')return buddyMapPinsStub;
     if(name==='@/lib/buddy/map-controls')return load('src/lib/buddy/map-controls.ts',{'../discovery/globe-style':load('src/lib/discovery/globe-style.ts',{})});
     if(name==='@/lib/buddy/model')return load('src/lib/buddy/model.ts',{});
@@ -59,9 +59,9 @@ const place={name:'Varkala',label:'Varkala, Kerala',latitude:8.7,longitude:76.7,
 function screenHarness(initial, photoState = {}, buddyEvents = []) {
   photoState.candidates ??= {}; photoState.errors ??= {};
   photoState.candidates=Object.fromEntries(Object.entries(photoState.candidates).map(([key,p])=>[key,{width:800,height:600,size:1000,mime:'image/png',...p}]));
-  const h=harness(), writes=[],routes=[],alerts=[],uploads=[];let fail=false, uncertain=true, pending=null, prevented=null, canGoBack=true, focusCleanup=null; const dispatches=[];
+  const h=harness(), writes=[],routes=[],alerts=[],uploads=[],celebrations=[];let fail=false, uncertain=true, pending=null, prevented=null, canGoBack=true, focusCleanup=null; const dispatches=[];
   const modules={
-    '@/hooks/use-journey-buddy':{useBuddyScreen:(state,actions)=>buddyEvents.push({state,actions})},
+    '@/hooks/use-journey-buddy':{useBuddyCelebration:()=> (animation,operation)=>celebrations.push({animation,operation}),useBuddyScreen:(state,actions)=>buddyEvents.push({state,actions})},
     '@/lib/create/photo-save':photoSave,
     '@/lib/create/photo-queries':{checkPhotoDraft:async()=>({ownerId:uid,stopIds:(writes.at(-1)?.stops||initial?.stops||[]).map(s=>s.id)}),uploadJourneyPhoto:async(name,photo)=>{uploads.push({name,photo});if(photoState.uploadFailure)throw new model.SaveFailure(photoState.uploadFailure);}},
     '@/hooks/use-editor-photos':{useEditorPhotos:()=>({data:{'journey-media/raw/stop.png':'https://signed.test/stop',...photoState.previews},error:null,refreshPreview(){}})},
@@ -80,7 +80,7 @@ function screenHarness(initial, photoState = {}, buddyEvents = []) {
   };
   const {NewJourneyEditor,default:CreateScreen}=load('src/app/create.tsx',modules,h.hooks);
   let reloads=0;
-  return {blur:()=>focusCleanup?.(),renderEntry:()=>h.render(CreateScreen,{}),setCanGoBack:value=>{canGoBack=value;},render:(props={})=>h.render(NewJourneyEditor,{ownerId:uid,initial,onReload:()=>reloads++,...props}),writes,routes,alerts,uploads,setFailure:(value=true,ambiguous=true)=>{fail=value;uncertain=ambiguous;},setPending:value=>{pending=value;},prevented:()=>prevented,dispatches,reloads:()=>reloads};
+  return {celebrations,blur:()=>focusCleanup?.(),renderEntry:()=>h.render(CreateScreen,{}),setCanGoBack:value=>{canGoBack=value;},render:(props={})=>h.render(NewJourneyEditor,{ownerId:uid,initial,onReload:()=>reloads++,...props}),writes,routes,alerts,uploads,setFailure:(value=true,ambiguous=true)=>{fail=value;uncertain=ambiguous;},setPending:value=>{pending=value;},prevented:()=>prevented,dispatches,reloads:()=>reloads};
 }
 test('actual editor quick-start saves privately with zero stops and routes to the saved editable journey',async()=>{
   const h=screenHarness();let tree=h.render();let setup=all(tree,'QuickJourneySetup')[0];
@@ -139,6 +139,30 @@ test('destination suggestions debounce, abort obsolete work and select only the 
 const privateForm=()=>({...model.newForm(id),title:'Coast',destination:place,traveler:'solo',days:'3',updatedAt:'2026-10-14T10:00:00Z'});
 const memoryRow=(id,name,extra={})=>({...memory.emptyMemory(id),name,...extra});
 const tick=()=>new Promise(setImmediate);
+
+test('Buddy Jump is emitted only after confirmed memory success, never Save tap, failed save, stale focus or cancellation', async () => {
+  for (const outcome of ['saved', 'failed', 'blurred', 'cancelled']) {
+    const h = screenHarness({ ...privateForm(), stops: [memoryRow(sid, 'Beach')] });
+    let tree = h.render(); all(tree, 'MemoryRow')[0].props.onEdit(); tree = h.render();
+    all(tree, 'MemoryEditorSheet')[0].props.onChange({ description: 'A new memory' }); tree = h.render();
+    if (outcome === 'cancelled') {
+      all(tree, 'MemoryEditorSheet')[0].props.onClose();
+      h.alerts.at(-1)[2].find(button => button.text === 'Discard').onPress();
+      assert.equal(h.writes.length, 0); assert.deepEqual(h.celebrations, []); continue;
+    }
+    let finish; h.setPending(new Promise(resolve => { finish = resolve; }));
+    if (outcome === 'failed') h.setFailure(true, false);
+    all(tree, 'MemoryEditorSheet')[0].props.onSave(); all(tree, 'MemoryEditorSheet')[0].props.onSave();
+    assert.deepEqual(h.celebrations, [], 'Save tap and pending request are not success');
+    if (outcome === 'blurred') h.blur();
+    finish(); await tick();
+    assert.equal(h.writes.length, 1); assert.equal(h.celebrations.length, outcome === 'saved' ? 1 : 0);
+    if (outcome === 'saved') { assert.equal(h.celebrations[0].animation, 'jump'); assert.equal(h.celebrations[0].operation.kind, 'saved'); }
+  }
+  const h = screenHarness({ ...privateForm(), stops: [memoryRow(sid, 'Beach')] });
+  const tree = h.render(); all(tree, 'Pressable').find(node => node.props.accessibilityLabel === 'Save Draft').props.onPress(); await tick();
+  assert.deepEqual(h.celebrations, [], 'Ordinary draft save does not celebrate a memory');
+});
 test('empty hub has one Add memory action and an honest map placeholder, and saves an unlocated named memory only on confirmation',async()=>{
   const h=screenHarness(privateForm());let tree=h.render();
   assert.equal(all(tree,'DraftMap').length,1);assert.equal(all(tree,'MemoryRow').length,0);
@@ -790,6 +814,7 @@ test('shared Home overlays keep original speed and route while editor opts into 
   const mapbox={ShapeSource:'ShapeSource',LineLayer:'LineLayer',PointAnnotation:'PointAnnotation'};
   const {JourneyOverlays}=load('src/components/discovery/globe/journey-overlays.tsx',{
     '@rnmapbox/maps':{__esModule:true,default:mapbox},'../ui':ui,
+    '@/hooks/use-journey-buddy':{useBuddyPreference:()=>({loaded:true,enabled:false})},'./traveling-buddy':{TravelingBuddy:'TravelingBuddy'},
     '@/lib/discovery/travel':{travelLegs:route=>route.length?[{duration:2800}]:[],travelLine:route=>({geometry:{coordinates:route}})},
   });
   const props={points:{features:[]},route:[[[76,8],[77,9]]],playing:true,playbackKey:'route',onOpen(){}};

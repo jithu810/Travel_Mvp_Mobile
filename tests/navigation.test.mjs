@@ -138,6 +138,12 @@ test('native map renders a separate blue route source only when supplied and for
   const mapbox = Object.fromEntries(['MapView','Atmosphere','Camera','ShapeSource','LineLayer','CircleLayer','SymbolLayer'].map(name => [name, name])); mapbox.StyleURL = {};
   const frame = { camera: {}, projection: 'mercator', route: { type: 'Feature', properties: {}, geometry: { type: 'MultiLineString', coordinates: [[[76, 8], [77, 9]]] } }, fitsViewport: true };
   const mocks = {
+    '@/hooks/use-map-buddy': { useMapBuddy: () => ({ enabled: false, visible: false, openHelp() {} }) },
+    '@/hooks/use-buddy-map-image': { useBuddyMapImage: () => ({ ready: false, failed: false, ref: {}, version: 0 }) },
+    '@/hooks/use-live-buddy-safety': { useLiveBuddySafety: () => ({ mapRef() {}, moving() {}, idle() {}, clear: false }) },
+    '@/lib/buddy/map-image': { buddyMapImageSource: { uri: 'data:image/png;base64,buddy' } }, '@/lib/buddy/map-presentation': { LIVE_BUDDY_OFFSET: [32, -12] },
+    './story-walking-buddy': { StoryWalkingBuddy: 'StoryWalkingBuddy' },
+    './story-preview-marker': { StoryPreviewMarker: 'StoryPreviewMarker' },
     '@/components/journey/journey-action-icon': { JourneyActionIcon: 'JourneyActionIcon' },
     '@/lib/journey/nearby': { nearbyFocus: () => null }, '../nearby-locations': { NearbyLocations: 'NearbyLocations' },
     'expo-router': { useFocusEffect() {} },

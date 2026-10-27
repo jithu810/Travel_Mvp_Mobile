@@ -3,11 +3,13 @@ import { AccessibilityInfo, Animated, AppState, PanResponder, StyleSheet, View, 
 import { usePathname, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useBuddyApi } from '@/hooks/use-journey-buddy';
-import { buddyDragged, buddyTravelCopy, travelEvent, type BuddyPoint, type BuddyRect, type BuddyScreen } from '@/lib/buddy/model';
+import { buddyDragged, buddyTravelCopy, travelEvent, type BuddyCelebration, type BuddyPoint, type BuddyRect, type BuddyScreen } from '@/lib/buddy/model';
 import { placeBuddyBubble, createBuddyGeometry, floatingWalkTarget, nearestBuddyPosition, type BuddyGeometry } from '@/lib/buddy/geometry';
 import { BuddySprite } from './buddy-sprite';
 import { BuddyHelpSheet } from './buddy-help-sheet';
 import { createBuddyPositionCapture } from '@/lib/buddy/position';
+import { buddyCelebrationDuration } from '@/lib/buddy/animations';
+import { MapBuddyHelp } from './map-buddy-help';
 
 type Api = NonNullable<ReturnType<typeof useBuddyApi>>;
 export function JourneyBuddyHost() {
@@ -31,10 +33,15 @@ function BuddyHost({ api }: { api: Api }) {
   const protectedKey = JSON.stringify(current.protectedRects), hostKey = JSON.stringify(host), insetKey = JSON.stringify(insets);
   const geometry = useMemo(() => createBuddyGeometry(JSON.parse(hostKey), JSON.parse(insetKey), JSON.parse(protectedKey)), [hostKey, insetKey, protectedKey]);
   useEffect(() => { if (preference.enabled) api.store.requestMeasurements(); }, [api, preference.enabled, path, hostKey, insetKey]);
-  const visible = preference.loaded && preference.enabled && path === revision.path && current.floating && !current.suppressed && !current.geometryPending && geometry.areas.length > 0;
+  const mapHelp = api.store.getMapHelp();
+  const visible = preference.loaded && preference.enabled && path === revision.path && current.floating && !current.suppressed && !current.geometryPending && geometry.areas.length > 0
+    && !mapHelp && (!current.mapOwned || !!api.store.getCelebration() || api.store.getTour() !== null);
+  // Confirmed success needn't wait for its initiating roaming cooldown. Actual
+  // held/new touches and screen interaction still suppress/cancel the celebration.
+  const interacting = current.interacting && !(api.store.getCelebration() && current.touchCooldown);
   // Unmounting destroys clocks whenever hidden; navigation resets the parked position.
   return <View ref={view} collapsable={false} pointerEvents="box-none" style={[StyleSheet.absoluteFill, s.host]} onLayout={measure}>
-    {visible && <BuddyActor key={path} api={api} path={path} geometry={geometry} screen={current.state} interacting={current.interacting} />}
+    {mapHelp ? <MapBuddyHelp /> : visible && <BuddyActor key={path} api={api} path={path} geometry={geometry} screen={current.state} interacting={interacting} />}
   </View>;
 }
 function BuddyActor({ api, path, geometry, screen, interacting }: { api: Api; path: string; geometry: BuddyGeometry; screen?: BuddyScreen; interacting: boolean }) {
@@ -43,6 +50,9 @@ function BuddyActor({ api, path, geometry, screen, interacting }: { api: Api; pa
   const minimumBubbleHeight = Math.ceil(124 * Math.max(1, fontScale));
   const router = useRouter();
   const [reduced, setReduced] = useState(true), [walking, setWalking] = useState(false), [facing, setFacing] = useState<'left' | 'right'>('left');
+  const [motionKnown, setMotionKnown] = useState(false);
+  const pendingCelebration = api.store.getCelebration();
+  const celebration: BuddyCelebration | null = pendingCelebration?.claimed ? pendingCelebration : null;
   const [initialPoint] = useState(() => nearestBuddyPosition(api.store.getPose(path)?.point ?? { x: corridor.x + corridor.width - 64, y: corridor.y + corridor.height - 64 }, geometry)!);
   const project = useCallback((value: BuddyPoint) => nearestBuddyPosition(value, geometry) ?? initialPoint, [geometry, initialPoint]);
   const [position] = useState(() => new Animated.ValueXY(initialPoint));
@@ -75,10 +85,10 @@ function BuddyActor({ api, path, geometry, screen, interacting }: { api: Api; pa
   }, [api, path, capture, poseOwner]);
   useEffect(() => {
     let active = true, changed = false;
-    AccessibilityInfo.isReduceMotionEnabled().then(value => { if (active && !changed) setReduced(value); }).catch(() => {});
-    const motion = AccessibilityInfo.addEventListener('reduceMotionChanged', value => { changed = true; if (active) { setReduced(value); if (value) stopTravelBurst(); } });
+    AccessibilityInfo.isReduceMotionEnabled().then(value => { if (active && !changed) { setReduced(value); setMotionKnown(true); } }).catch(() => { if (active) setMotionKnown(true); });
+    const motion = AccessibilityInfo.addEventListener('reduceMotionChanged', value => { changed = true; if (active) { setReduced(value); setMotionKnown(true); if (value) { stopTravelBurst(); api.store.clearCelebration(); } } });
     return () => { active = false; motion.remove(); };
-  }, [stopTravelBurst]);
+  }, [api, stopTravelBurst]);
   useEffect(() => {
     gestureState.current.generation++; gestureState.current.active = false;
     return capture.read(value => {
@@ -88,7 +98,7 @@ function BuddyActor({ api, path, geometry, screen, interacting }: { api: Api; pa
     });
   }, [geometry, position, capture, project]);
   useEffect(() => {
-    if (!canAnimate || parked || screen?.travel) return;
+    if (!canAnimate || celebration || parked || screen?.travel) return;
     const gesture = gestureState.current;
     let disposed = false, timer: ReturnType<typeof setTimeout>;
     const schedule = () => { timer = setTimeout(walk, 15000 + Math.random() * 15000); };
@@ -108,7 +118,36 @@ function BuddyActor({ api, path, geometry, screen, interacting }: { api: Api; pa
       disposed = true; clearTimeout(timer);
       if (alive.current && !gesture.active) capture.read(value => { point.current = project(value); });
     };
-  }, [canAnimate, parked, geometry, position, screen?.travel, capture, project]);
+  }, [canAnimate, celebration, parked, geometry, position, screen?.travel, capture, project]);
+  const quiet = !!screen?.travel && (!!screen.travel.guidance || screen.travel.arrival);
+  useEffect(() => {
+    const event = api.store.getCelebration();
+    if (!event) return;
+    if (Date.now() >= event.expiresAt || event.path !== path || !api.preference.get().enabled || AppState.currentState !== 'active'
+      || quiet || help || reaction || dragging || (motionKnown && reduced)) {
+      api.store.clearCelebration(event.id); return;
+    }
+    if (celebration || event.claimed || !motionKnown || !canAnimate) return;
+    // Success may skip only the initiating cooldown after release; held/new
+    // touches stay guarded by the host/store, as do guidance and arrival.
+    const claimed = api.store.claimCelebration(event.id);
+    if (!claimed) return;
+    capture.read(value => {
+      if (!alive.current || api.store.getCelebration()?.id !== claimed.id || api.store.current().suppressed) return;
+      stopTravelBurst(); setWalking(false);
+      point.current = project(value); position.setValue(point.current); setAnchor(point.current);
+    });
+  }, [api, path, pendingCelebration, celebration, canAnimate, motionKnown, reduced, quiet, help, reaction, dragging, stopTravelBurst, capture, project, position]);
+  useEffect(() => {
+    if (!celebration) return;
+    const timer = setTimeout(() => api.store.clearCelebration(celebration.id), buddyCelebrationDuration(celebration.animation));
+    return () => { clearTimeout(timer); api.store.clearCelebration(celebration.id); };
+  }, [api, celebration]);
+  useEffect(() => {
+    if (!pendingCelebration || pendingCelebration.claimed) return;
+    const timer = setTimeout(() => api.store.clearCelebration(pendingCelebration.id), Math.max(0, pendingCelebration.expiresAt - Date.now()));
+    return () => clearTimeout(timer);
+  }, [api, pendingCelebration]);
   useEffect(() => {
     const initial = api.store.current().state?.travel;
     let previous = initial;
@@ -120,7 +159,7 @@ function BuddyActor({ api, path, geometry, screen, interacting }: { api: Api; pa
       const progressed = !!travel && !!previous && travel.journeyId === previous.journeyId && (travel.completed > previous.completed || travel.nextStop !== previous.nextStop);
       previous = travel; stopTravelBurst();
       key = next; clearTimeout(expiry); setReaction(null);
-      if (!travel || latest.current.help) return;
+      if (!travel || latest.current.help || api.store.getCelebration()) return;
       if (progressed && travel.status === 'active' && travel.gpsAvailable && !travel.guidance && !travel.arrival && latest.current.canAnimate && !context.interacting) {
         setTravelWalking(true); burstTimer.current = setTimeout(() => { burstTimer.current = undefined; setTravelWalking(false); }, 800);
       }
@@ -150,7 +189,7 @@ function BuddyActor({ api, path, geometry, screen, interacting }: { api: Api; pa
     if (!alive.current || !api.preference.get().enabled || path !== api.store.get().path || api.store.current().suppressed || AppState.currentState !== 'active') return;
     if (api.store.current().state?.travel?.guidance || api.store.current().state?.travel?.arrival) return;
     capture.read(value => { if (alive.current) { point.current = nearestBuddyPosition(value, latest.current.geometry) ?? point.current; position.setValue(point.current); setAnchor(point.current); } });
-    stopTravelBurst(); setWalking(false); setReaction(null);
+    api.store.clearCelebration(); stopTravelBurst(); setWalking(false); setReaction(null);
     setBubbleHeight(0); setHelp({ owner: api.store.actionOwner() });
   };
   const open = useRef<() => void>(() => {});
@@ -204,7 +243,6 @@ function BuddyActor({ api, path, geometry, screen, interacting }: { api: Api; pa
     if (!api.preference.get().enabled || path !== api.store.get().path || AppState.currentState !== 'active' || api.store.current().suppressed) { setHelp(null); return; }
     if (route !== path) setHelp(null); router.navigate(route);
   };
-  const quiet = !!screen?.travel && (!!screen.travel.guidance || screen.travel.arrival);
   const canAct = () => alive.current && api.preference.get().enabled && path === api.store.get().path && AppState.currentState === 'active' && !api.store.current().suppressed && !api.store.current().state?.travel?.guidance && !api.store.current().state?.travel?.arrival;
   const reactionVisible = reaction && !quiet && (reaction.key.startsWith('story:') ? reaction.key === 'story:' + screen?.ownStory?.id : !!screen?.travel && travelEvent(screen.travel) === reaction.key);
   const bubbleWidth = Math.min(252, corridor.width);
@@ -237,7 +275,7 @@ function BuddyActor({ api, path, geometry, screen, interacting }: { api: Api; pa
         accessibilityActions={[{ name: 'activate', label: 'Open journey help' }]} onAccessibilityTap={openHelp}
         onAccessibilityAction={event => { if (event.nativeEvent.actionName === 'activate') openHelp(); }}
         onTouchStart={event => event.stopPropagation()} style={s.touch}>
-        <BuddySprite animation={(walking || travelWalking) && canAnimate ? 'walk' : 'idle'} animate={canAnimate} facing={facing} />
+        <BuddySprite animation={celebration && canAnimate && !quiet ? celebration.animation : (walking || travelWalking) && canAnimate ? 'walk' : 'idle'} animate={canAnimate} facing={facing} />
       </View>
     </Animated.View>
     {(help || reactionVisible) && !quiet && <BuddyHelpSheet canAddMemory={!!screen?.canAddMemory} travel={screen?.travel}

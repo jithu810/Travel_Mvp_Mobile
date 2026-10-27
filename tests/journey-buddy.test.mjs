@@ -245,6 +245,46 @@ test('future non-looping sprites stop their frame clock at the final frame', () 
   const props = { animation: 'wave', animate: true }; h.render(BuddySprite, props); timers.fire(); timers.fire();
   const tree = h.render(BuddySprite, props); assert.equal(timers.jobs.size, 0); assert.equal(all(tree, 'Image')[0].props.style.left, -128); h.dispose();
 });
+
+test('original Jump and Run PNG geometry uses exact cells and Jump clips without neighboring-frame bleed', () => {
+  const jump = animations.resolveBuddyAnimation('jump'), run = animations.resolveBuddyAnimation('run');
+  for (const [name, clip, width, height, cell] of [['jump', jump, 1440, 189, 180], ['run', run, 1024, 128, 128]]) {
+    const png = readFileSync('assets/journey-buddy/' + name + '.png');
+    assert.equal(png.readUInt32BE(16), width); assert.equal(png.readUInt32BE(20), height);
+    assert.equal(png[25], 6, 'Original RGBA remains intact'); assert.equal(clip.frameWidth, cell); assert.equal(clip.frames, 8);
+  }
+  assert.equal(jump.loop, false); assert.equal(jump.fps, 4); assert.equal(run.loop, true);
+  assert.equal(animations.buddyCelebrationDuration('jump'), 2000); assert.equal(animations.buddyCelebrationDuration('run'), 3000);
+  const h = hooks(), timers = clock();
+  const { BuddySprite } = load('src/components/buddy/buddy-sprite.tsx', { react: h.react, 'react/jsx-runtime': runtime, 'react-native': { Image: 'Image', View: 'View' }, '@/lib/buddy/animations': animations }, timers);
+  const props = { animation: 'jump', animate: true };
+  let tree = h.render(BuddySprite, props);
+  assert.equal([...timers.jobs.values()][0].ms, 250, 'One slower cycle displays each of the eight frames');
+  assert.equal(tree.props.style.width, 64 * 180 / 189); assert.equal(tree.props.style.alignSelf, 'center');
+  for (let i = 0; i < 7; i++) timers.fire();
+  tree = h.render(BuddySprite, props); assert.equal(all(tree, 'Image')[0].props.style.left, -7 * 180 * (64 / 189));
+  assert.equal(timers.jobs.size, 0); h.dispose();
+});
+
+test('success events deduplicate operation identities, reject overlap and clear on new touch/background/navigation/dialog', () => {
+  const store = createBuddyStore(); store.environment('/create', true);
+  const first = {}; assert.equal(store.celebrate('/create', 'jump', first, 0), true);
+  assert.equal(store.celebrate('/create', 'jump', first, 1), false);
+  assert.equal(store.celebrate('/create', 'run', {}, 1), false);
+  const id = store.getCelebration().id;
+  assert.ok(store.claimCelebration(id, 2)); assert.equal(store.claimCelebration(id, 3), null);
+  store.interaction(true); assert.equal(store.getCelebration(), null);
+  store.celebrate('/create', 'jump', {}, 10); store.environment('/create', false); assert.equal(store.getCelebration(), null);
+  assert.equal(store.celebrate('/create', 'jump', {}, 11), false);
+  store.environment('/create', true); store.celebrate('/create', 'jump', {}, 20); store.environment('/discover', true); assert.equal(store.getCelebration(), null);
+  store.celebrate('/discover', 'run', {}, 30); store.block({}, '/discover', true); assert.equal(store.getCelebration(), null);
+  assert.equal(store.celebrate('/discover', 'run', {}, 31), false, 'Run never queues behind a dialog or keyboard');
+  store.celebrate('/discover', 'jump', {}, 40); store.screen({}, { path: '/discover', state: { suppressed: true }, act() {} }); assert.equal(store.getCelebration(), null);
+  store.celebrate('/discover', 'jump', {}, 50); const stale = store.getCelebration().id;
+  assert.equal(store.claimCelebration(stale, 6050), null);
+  assert.equal(store.celebrate('/discover', 'jump', {}, 6051), true);
+  store.clearCelebration(stale); assert.ok(store.getCelebration(), 'Old completion cannot clear a newer event');
+});
 test('actual anchored helper offers two contextual actions and never saves automatically', () => {
   const h = hooks(); let creates = 0, drafts = 0, adds = 0;
   const { BuddyHelpSheet } = load('src/components/buddy/buddy-help-sheet.tsx', { react: h.react, 'react/jsx-runtime': runtime, 'react-native': { BackHandler: { addEventListener: () => ({ remove() {} }) }, Modal: 'Modal', Pressable: 'Pressable', ScrollView: 'ScrollView', Text: 'Text', View: 'View', StyleSheet: { create: v => v } }, 'react-native-safe-area-context': { SafeAreaView: 'SafeAreaView' }, '@/lib/buddy/model': model });
@@ -314,7 +354,9 @@ async function hostHarness(openSpace = false) {
     '@/hooks/use-journey-buddy': { useBuddyApi: () => api }, '@/lib/buddy/model': model,
     '@/lib/buddy/position': { createBuddyPositionCapture }, '@/lib/buddy/geometry': { ...geometry,
       placeBuddyBubble(...args) { placementCalls++; return geometry.placeBuddyBubble(...args); } },
+    '@/lib/buddy/animations': animations,
     './buddy-sprite': { BuddySprite: 'BuddySprite' }, './buddy-help-sheet': { BuddyHelpSheet: 'BuddyHelpSheet' },
+    './map-buddy-help': { MapBuddyHelp: 'MapBuddyHelp' },
   }, timers);
   const hostElement = module.JourneyBuddyHost(); let actorElement;
   const renderHost = () => {
@@ -332,6 +374,72 @@ async function hostHarness(openSpace = false) {
     remountActor() { actorHooks.dispose(); actorHooks = hooks(); return renderActor(); },
     path: value => { path = value; api.store.environment(value, true); } };
 }
+
+function fireDelay(h, milliseconds) {
+  for (const [id, job] of [...h.timers.jobs]) if (job.ms === milliseconds) { h.timers.jobs.delete(id); job.fn(); }
+}
+function settleActor(h) { h.renderHost(); h.renderActor(); h.renderHost(); h.renderActor(); return h.renderActor(); }
+test('actual floating host yields to registered map Buddy, returns for successful animation and preserves modal help access', async () => {
+  const h = await hostHarness(true), map = {};
+  h.api.store.mapPresentation(map, '/create', true);
+  assert.equal(h.renderHost().props.children, false, 'Only the map character is presented');
+  h.api.store.celebrate('/create', 'jump', {}); h.renderHost(); h.renderActor(); await tick();
+  let tree = settleActor(h); assert.equal(all(tree, 'BuddySprite')[0].props.animation, 'jump');
+  fireDelay(h, 2000); assert.equal(h.renderHost().props.children, false, 'Map ownership resumes after feedback');
+  assert.equal(h.api.store.openMapHelp('/create'), true);
+  assert.equal(h.renderHost().props.children.type, 'MapBuddyHelp', 'Help remains available without an empty floating corridor');
+  h.api.store.closeMapHelp(); h.actorHooks.dispose(); h.hostHooks.dispose();
+});
+test('actual actor plays Jump once, restores Idle, and cannot replay consumed success after remount', async () => {
+  const h = await hostHarness(true); h.renderHost(); h.renderActor(); await tick(); settleActor(h);
+  const operation = {}, before = all(h.renderActor(), 'AnimatedView')[0].props.style[1].transform;
+  assert.equal(h.api.store.celebrate('/create', 'jump', operation), true);
+  let tree = settleActor(h); assert.equal(all(tree, 'BuddySprite')[0].props.animation, 'jump');
+  assert.deepEqual(all(tree, 'AnimatedView')[0].props.style[1].transform, before);
+  assert.equal(h.api.store.celebrate('/create', 'run', {}), false);
+  assert.equal(h.api.store.celebrate('/create', 'jump', operation), false);
+  fireDelay(h, 800); tree = settleActor(h); assert.equal(all(tree, 'BuddySprite')[0].props.animation, 'jump', 'Jump stays visible beyond the old short duration');
+  fireDelay(h, 2000); tree = settleActor(h); assert.equal(all(tree, 'BuddySprite')[0].props.animation, 'idle');
+  h.remountActor(); await tick(); tree = settleActor(h); assert.equal(all(tree, 'BuddySprite')[0].props.animation, 'idle');
+  h.actorHooks.dispose(); h.hostHooks.dispose(); assert.equal(h.timers.jobs.size, 0);
+});
+test('actual actor waits through initiating interaction, runs in place briefly and cancels for guidance or new touch', async () => {
+  const h = await hostHarness(true);
+  const travel = { journeyId: 'trip', status: 'active', nextStop: 'Hill', gpsAvailable: false, guidance: null, arrival: false, completed: 0 };
+  h.api.store.screen(h.owner, { path: '/create', state: { floating: true, travel }, act() {} });
+  h.renderHost(); h.renderActor(); await tick(); settleActor(h);
+  h.api.store.interaction(true); h.api.store.celebrate('/create', 'run', {});
+  let tree = settleActor(h); assert.equal(all(tree, 'BuddySprite')[0].props.animation, 'idle');
+  h.api.store.interaction(false); const before = all(tree, 'AnimatedView')[0].props.style[1].transform;
+  tree = settleActor(h); assert.equal(all(tree, 'BuddySprite')[0].props.animation, 'run');
+  assert.deepEqual(all(tree, 'AnimatedView')[0].props.style[1].transform, before); assert.equal(h.native.animation, undefined);
+  fireDelay(h, 1000); tree = settleActor(h); assert.equal(all(tree, 'BuddySprite')[0].props.animation, 'run', 'Run stays visible beyond one second');
+  fireDelay(h, 3000); tree = settleActor(h); assert.equal(all(tree, 'BuddySprite')[0].props.animation, 'idle');
+  h.api.store.celebrate('/create', 'run', {}); settleActor(h);
+  h.api.store.screen(h.owner, { path: '/create', state: { floating: true, travel: { ...travel, guidance: 'Turn left' } }, act() {} });
+  tree = settleActor(h); assert.equal(all(tree, 'BuddySprite')[0].props.animation, 'idle'); assert.equal(h.api.store.getCelebration(), null);
+  h.api.store.screen(h.owner, { path: '/create', state: { floating: true, travel }, act() {} }); settleActor(h);
+  h.api.store.celebrate('/create', 'run', {}); settleActor(h);
+  h.api.store.screen(h.owner, { path: '/create', state: { floating: true, travel: { ...travel, arrival: true } }, act() {} });
+  tree = settleActor(h); assert.equal(all(tree, 'BuddySprite')[0].props.animation, 'idle'); assert.equal(h.api.store.getCelebration(), null);
+  h.api.store.screen(h.owner, { path: '/create', state: { floating: true, travel }, act() {} }); settleActor(h);
+  h.api.store.celebrate('/create', 'run', {}); settleActor(h); h.api.store.interaction(true);
+  tree = settleActor(h); assert.equal(all(tree, 'BuddySprite')[0].props.animation, 'idle'); assert.equal(h.api.store.getCelebration(), null);
+  h.actorHooks.dispose(); h.hostHooks.dispose();
+});
+test('actual actor discards reduced-motion, help and arrival celebrations and cleans playback on suppression', async () => {
+  const h = await hostHarness(true); h.renderHost(); h.renderActor(); await tick(); settleActor(h);
+  h.native.motion(true); h.api.store.celebrate('/create', 'jump', {});
+  let tree = settleActor(h); assert.equal(all(tree, 'BuddySprite')[0].props.animate, false); assert.equal(h.api.store.getCelebration(), null);
+  h.native.motion(false); tree = settleActor(h);
+  all(tree, 'View').find(node => node.props.accessibilityLabel === 'Journey Buddy').props.onAccessibilityTap();
+  h.api.store.celebrate('/create', 'jump', {}); tree = settleActor(h);
+  assert.equal(all(tree, 'BuddySprite')[0].props.animation, 'idle'); assert.equal(h.api.store.getCelebration(), null);
+  all(tree, 'BuddyHelpSheet')[0].props.onClose(); settleActor(h);
+  h.api.store.celebrate('/create', 'jump', {}); tree = settleActor(h); assert.equal(all(tree, 'BuddySprite')[0].props.animation, 'jump');
+  h.api.store.block({}, '/create', true); assert.equal(h.renderHost().props.children, false);
+  h.actorHooks.dispose(); h.hostHooks.dispose(); assert.equal(h.api.store.getCelebration(), null); assert.equal(h.timers.jobs.size, 0);
+});
 test('actual global host requires enabled/foreground/allowed route/measured clearance and passes through all empty space', async () => {
   const h = await hostHarness(); let tree = h.renderHost(); assert.equal(tree.props.pointerEvents, 'box-none'); assert.ok(tree.props.children);
   const hostLayer = tree.props.style[1];
@@ -394,8 +502,8 @@ test('actual actor helper actions reject stale route, disabled preference and re
   h.actorHooks.dispose(); help.props.onDrafts(); assert.deepEqual(h.routes, []); h.hostHooks.dispose(); assert.equal(h.timers.jobs.size, 0);
 });
 
-async function integrationHarness() {
-  const h = hooks(), timers = clock(), api = { store: createBuddyStore(), preference: createBuddyPreference({ getItem: async () => null, setItem: async () => {} }) };
+async function integrationHarness(sharedApi = null) {
+  const h = hooks(), timers = clock(), api = sharedApi ?? { store: createBuddyStore(), preference: createBuddyPreference({ getItem: async () => null, setItem: async () => {} }) };
   await api.preference.load(); let path = '/create';
   const appListeners = new Set(), keyboard = new Map();
   const native = { View: 'View',
@@ -422,6 +530,43 @@ test('actual touch boundary initializes keyboard suppression, never captures res
   x.native.AppState.currentState = 'background'; x.appListeners.forEach(fn => fn('background')); assert.equal(x.timers.jobs.size, 0); assert.equal(x.api.store.current().suppressed, true);
   x.native.AppState.currentState = 'active'; x.appListeners.forEach(fn => fn('active')); tree.props.onTouchEnd(); assert.equal(x.timers.jobs.size, 1);
   x.h.dispose(); assert.equal(x.timers.jobs.size, 0); assert.equal(x.appListeners.size, 0); assert.equal(x.keyboard.size, 0);
+});
+
+test('confirmed Jump and Run skip only released-touch cooldown; held/new input and completion overlays retain priority', async () => {
+  const h = await hostHarness(true), boundary = await integrationHarness(h.api);
+  const touch = boundary.h.render(boundary.module.BuddyTouchBoundary, { children: 'app' }).props;
+  touch.onTouchStart();
+  h.api.store.screen(h.owner, { path: '/create', state: { floating: true, suppressed: true }, act() {} });
+  assert.equal(h.api.store.getCelebration(), null, 'Save touch itself has no success animation');
+  touch.onTouchEnd({ nativeEvent: { touches: [] } });
+  h.api.store.celebrate('/create', 'jump', {});
+  assert.equal(h.api.store.current().touchCooldown, true);
+  assert.equal(h.renderHost().props.children, false, 'Editor/keyboard suppression remains absolute');
+  h.api.store.screen(h.owner, { path: '/create', state: { floating: true }, act() {} });
+  assert.equal(h.renderHost().props.children, false, 'Keyboard alone still suppresses Buddy');
+  boundary.keyboard.get('keyboardDidHide')();
+  h.renderHost(); h.renderActor(); await tick();
+  let tree = settleActor(h);
+  assert.equal(all(tree, 'BuddySprite')[0].props.animation, 'jump', 'No cooldown timer advances before Jump');
+  assert.ok([...boundary.timers.jobs.values()].some(job => job.ms === 3000));
+  assert.equal(h.api.store.current().interacting, true, 'Ambient roaming keeps its original cooldown');
+  touch.onTouchStart(); tree = settleActor(h);
+  assert.equal(h.api.store.getCelebration(), null); assert.equal(all(tree, 'BuddySprite')[0].props.animation, 'idle');
+  h.api.store.celebrate('/create', 'jump', {}); tree = settleActor(h);
+  assert.equal(all(tree, 'BuddySprite')[0].props.animation, 'idle', 'Actual held finger still suppresses Jump');
+  assert.equal(h.api.store.current().touchCooldown, false);
+  touch.onTouchEnd({ nativeEvent: { touches: [] } }); tree = settleActor(h);
+  assert.equal(all(tree, 'BuddySprite')[0].props.animation, 'jump', 'Release unblocks success without a cooldown delay');
+  touch.onTouchStart();
+  touch.onTouchEnd({ nativeEvent: { touches: [] } }); h.api.store.celebrate('/create', 'run', {});
+  tree = settleActor(h); assert.equal(all(tree, 'BuddySprite')[0].props.animation, 'run', 'Successful Run starts without waiting three seconds');
+  assert.ok([...boundary.timers.jobs.values()].some(job => job.ms === 3000), 'Roaming cooldown remains scheduled');
+  touch.onTouchStart(); tree = settleActor(h); assert.equal(h.api.store.getCelebration(), null);
+  h.api.store.celebrate('/create', 'run', {}); tree = settleActor(h);
+  assert.equal(all(tree, 'BuddySprite')[0].props.animation, 'idle', 'Run never overrides a held finger');
+  touch.onTouchEnd({ nativeEvent: { touches: [] } }); tree = settleActor(h);
+  assert.equal(all(tree, 'BuddySprite')[0].props.animation, 'run', 'Run starts promptly once the held touch releases');
+  h.actorHooks.dispose(); h.hostHooks.dispose(); boundary.h.dispose();
 });
 test('actual focused screen registration refreshes committed actions, rejects removed owners and isolates old cleanup tokens', async () => {
   const x = await integrationHarness(); x.api.store.environment('/create', true); let actions = 0;

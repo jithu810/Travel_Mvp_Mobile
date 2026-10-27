@@ -6,8 +6,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors } from '@/components/discovery/ui';
 import { useBuddySuppression } from '@/hooks/use-journey-buddy';
 
-export function StorySheet({ visible, title, subtitle, onClose, children, scrollable = true }: { visible: boolean; title: string; subtitle?: string; onClose: () => void; children: ReactNode; scrollable?: boolean }) {
-  useBuddySuppression(visible);
+export function StorySheet({ visible, title, subtitle, onClose, children, scrollable = true, suppressBuddy = true }: { visible: boolean; title: string; subtitle?: string; onClose: () => void; children: ReactNode; scrollable?: boolean; suppressBuddy?: boolean }) {
+  useBuddySuppression(visible && suppressBuddy);
   return <Modal visible={visible} animationType="slide" presentationStyle="fullScreen" onRequestClose={onClose}>
     <SafeAreaView style={styles.safe}>
       {visible && <StatusBar style="dark" />}

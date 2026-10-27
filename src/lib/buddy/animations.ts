@@ -1,5 +1,5 @@
 import type { ImageSourcePropType } from 'react-native';
-export type BuddyAnimationName = 'idle' | 'walk' | 'wave' | 'jump' | 'sleep';
+export type BuddyAnimationName = 'idle' | 'walk' | 'wave' | 'jump' | 'run' | 'sleep';
 export type BuddyAnimation = Readonly<{
   source: ImageSourcePropType; sheetWidth: number; sheetHeight: number;
   frameWidth: number; frameHeight: number; frames: number; columns: number; fps: number;
@@ -11,8 +11,14 @@ export const buddyReference: ImageSourcePropType = require('../../../assets/jour
 export const buddyAnimations: Partial<Record<BuddyAnimationName, BuddyAnimation>> = {
   idle: { ...base, source: require('../../../assets/journey-buddy/idle.png'), fps: 6 },
   walk: { ...base, source: require('../../../assets/journey-buddy/walk.png'), fps: 10 },
+  jump: { ...base, source: require('../../../assets/journey-buddy/jump.png'), sheetWidth: 1440, sheetHeight: 189, frameWidth: 180, frameHeight: 189, fps: 4, loop: false },
+  run: { ...base, source: require('../../../assets/journey-buddy/run.png'), fps: 12 },
 };
 export function resolveBuddyAnimation(name: BuddyAnimationName): BuddyAnimation | undefined { return buddyAnimations[name] ?? buddyAnimations.idle; }
+export function buddyCelebrationDuration(name: 'jump' | 'run') {
+  const clip = resolveBuddyAnimation(name)!;
+  return name === 'jump' ? 1000 * clip.frames / clip.fps : 3000;
+}
 export function spriteFrame(animation: BuddyAnimation, index: number, size = 64) {
   const frame = Math.max(0, Math.min(animation.frames - 1, Math.floor(index))), scale = size / animation.frameHeight;
   return { width: animation.sheetWidth * scale, height: animation.sheetHeight * scale,
