@@ -4,6 +4,10 @@
 - [ ] Device check on phone (palettes, legibility on dark palettes, deck rail clearance, viewer circle), QA and independent review.
 - [ ] Decide whether create/draft/customize flows should also switch from static maps to stop art (needs paths outside this task).
 
+## Home card like count - 2026-10-27
+- [x] Show display-only like count (including 0) on compact and expanded Home cards with accessible pluralised labels. Tests, typecheck and lint pass; merged via PR #18.
+- [ ] Physical-device check of compact/expanded cards (truncation with long facts, larger text, TalkBack label).
+
 ## Buddy opening investigation - 2026-10-26
 - [x] Correct sparse-placement false no-fit, repeated search cost, above-only manual help and safe dialog fallback. Final focused QA128/128 and independent review64/64 pass. Publication authorized; draft PR prepared.
 - [x] Rebind phone8081 tunnel to this laptop, start fresh Metro from D:/JBuild, confirm runtime attachment and full bubble opening on unconfigured Home. No rebuild performed or required by these JS changes.
