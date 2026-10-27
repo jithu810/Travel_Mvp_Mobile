@@ -215,6 +215,17 @@ test('StaticMapCredit renders one line only when a small map can actually draw',
   } finally { if (previous !== undefined) process.env.EXPO_PUBLIC_MAPBOX_TOKEN = previous; }
 });
 
+test('StaticMapCredit stays one capped line only when asked; existing uses are unchanged', () => withToken(() => {
+  const { StaticMapCredit, staticMapCreditLineHeight } = components(hooks());
+  assert.equal(staticMapCreditLineHeight, 14);
+  const plain = StaticMapCredit({ points: [kochi] }).props.children;
+  assert.equal(plain.props.numberOfLines, undefined); assert.equal(plain.props.maxFontSizeMultiplier, undefined);
+  const single = StaticMapCredit({ points: [kochi], singleLine: { maxFontSizeMultiplier: 1.2 } }).props.children;
+  assert.equal(single.props.numberOfLines, 1); assert.equal(single.props.maxFontSizeMultiplier, 1.2);
+  assert.equal(single.props.children, 'Maps © Mapbox © OpenStreetMap');
+  assert.equal(Object.assign({}, ...[single.props.style].flat()).lineHeight, 14, 'Height bounded by lineHeight x multiplier');
+}));
+
 test('branded maps keep Journey Buddy off the top-left credit and bottom-left Mapbox logo', () => withToken(() => {
   const rect = { x: 20, y: 300, width: 320, height: 180 };
   assert.deepEqual(map.staticMapBrandingRects(rect, 0), [{ x: 20, y: 300, width: 170, height: 22 }, { x: 20, y: 444, width: 100, height: 36 }]);
@@ -264,7 +275,8 @@ test('static maps remain only in create/draft flows and the opened-stop circle; 
   for (const file of ['src/components/discovery/home-journey-card.tsx', 'src/components/discovery/journey-card.tsx', 'src/components/discovery/explore-tile.tsx', 'src/components/profile/profile-ui.tsx',
     'src/components/journey/story-header.tsx', 'src/components/journey/stop-card-deck.tsx', 'src/components/journey/stop-timeline.tsx', 'src/components/journey/stop-story-viewer.tsx']) {
     const source = read(file);
-    assert.doesNotMatch(source, /map=\{\{/, file);
+    assert.doesNotMatch(source, /map=/, file + ' passes no map prop');
+    assert.doesNotMatch(source, /useStaticMap|StaticMapLayer|staticMapUrl/, file + ' renders no slot-sized static map');
     assert.doesNotMatch(source, /static-map/, file + ' imports no static map module');
     assert.doesNotMatch(source, /journey-photo-fallback\.png/, file + ' no longer uses the stock photo');
   }
@@ -275,7 +287,7 @@ test('static maps remain only in create/draft flows and the opened-stop circle; 
   // The only opened-surface map is the fixed-size circle, which carries its own credit line.
   assert.match(read('src/components/journey/stop-story-viewer.tsx'), /<CircleMap /);
   const circle = read('src/components/art/circle-map.tsx');
-  assert.match(circle, /staticMapCircleUrl\(point\)/); assert.match(circle, /<StaticMapCredit points=\{\[point\]\} \/>/);
+  assert.match(circle, /staticMapCircleUrl\(point\)/); assert.match(circle, /<StaticMapCredit points=\{\[point\]\} singleLine=\{\{ maxFontSizeMultiplier: circleCreditMaxFontScale \}\} \/>/);
 });
 
 test('the circle map uses one fixed size per place, so each stop has one cacheable URL', () => {
@@ -292,13 +304,17 @@ test('the circle map uses one fixed size per place, so each stop has one cacheab
 test('CircleMap renders the fixed-size map with the credit line, and removes both on failure or without a token', () => withToken(() => {
   const h = hooks();
   const { CircleMap } = load('src/components/art/circle-map.tsx', { react: h.react, 'react/jsx-runtime': { jsx, jsxs: jsx, Fragment: 'Fragment' }, 'react-native': native,
-    '@/components/discovery/static-map-photo': { StaticMapCredit: 'StaticMapCredit' }, '@/lib/media/static-map': map });
+    '@/components/discovery/static-map-photo': { StaticMapCredit: 'StaticMapCredit', staticMapCreditLineHeight: components(hooks()).staticMapCreditLineHeight }, '@/lib/media/static-map': map });
   const render = point => h.render(() => CircleMap({ point }));
   let tree = render(kochi);
   const image = nodes(tree).find(n => n.type === 'Image');
   assert.match(image.props.source.uri, /\/88x88@2x\?/);
   const credit = nodes(tree).find(n => n.type === 'StaticMapCredit');
   assert.deepEqual(credit.props.points, [kochi], 'Credit shows whenever the circle shows');
+  assert.deepEqual(credit.props.singleLine, { maxFontSizeMultiplier: 1.2 }, 'One line with a capped text scale at any font size');
+  const box = nodes(tree).find(n => n.props?.children === credit);
+  const boxStyle = Object.assign({}, ...[box.props.style].flat());
+  assert.equal(boxStyle.maxHeight, Math.ceil(14 * 1.2)); assert.equal(boxStyle.overflow, 'hidden');
   assert.equal(tree.props.pointerEvents, 'none', 'Never blocks the story tap zones');
   image.props.onError();
   assert.equal(render(kochi), null, 'A failed map removes the circle and its credit');

@@ -42,7 +42,7 @@ test('reference profile composition retains real identity/avatar, owner-only fun
 
 test('profile journey and draft cards retain their routes, truthful facts and photo fallbacks',()=>{
   const routes=[],components=shared(routes);const card=components.ProfileJourneyCard({journey});
-  assert.equal(all(card,'JourneyPhoto')[0].props.uri,journey.cover);const art=all(card,'JourneyPhoto')[0].props.fallback;assert.equal(art.type,'JourneyArt');assert.equal(art.props.seed,'seed:real:2');assert.equal(art.props.compact,true);assert.equal(art.props.accessibilityLabel,'Journey art. No journey cover photo available. Hill journey');card.props.onPress();assert.deepEqual(routes.at(-1),{pathname:'/journey/[id]',params:{id:'real'}});
+  assert.equal(all(card,'JourneyPhoto')[0].props.uri,journey.cover);const art=all(card,'JourneyPhoto')[0].props.fallback;assert.equal(art.type,'JourneyArt');assert.equal(art.props.seed,'seed:real:2');assert.equal(art.props.compact,true);assert.equal(art.props.accessibilityLabel,undefined,'Decorative inside the labelled card');card.props.onPress();assert.deepEqual(routes.at(-1),{pathname:'/journey/[id]',params:{id:'real'}});
   assert.ok(all(card,'Text').some(n=>n.props.children==='1 day · 2 stops'));
   const draft=components.ProfileDraftCard({draft:{id:'private',title:'Real private draft'}});all(draft,'Pressable')[0].props.onPress();assert.deepEqual(routes.at(-1),{pathname:'/create',params:{draft:'private'}});
   assert.equal(all(draft,'JourneyPhoto').length,0,'No fabricated cover for title-only draft projection');

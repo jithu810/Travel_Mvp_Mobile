@@ -20,7 +20,7 @@ export function ExploreTile({ journey }: { journey: PublicJourney }) {
     onPress={() => router.push({ pathname: '/journey/[id]', params: { id: journey.id, source: 'search' } })}
     style={({ pressed }) => [styles.tile, pressed && styles.pressed]}>
     {available ? <JourneyPhoto uri={cover} label={journey.title + ' cover photo'} fill thumbnail onError={() => { if (thumbnail) setFailedThumbnail(thumbnail); else setFailedUri(cover); }} />
-      : <JourneyArt seed={artSeed(journey.id, journey.stops)} stops={journey.stops} destination={journey.destination} showDestination compact accessibilityLabel={'Journey art for ' + journey.title + '. No journey cover photo available'} />}
+      : <JourneyArt seed={artSeed(journey.id, journey.stops)} stops={journey.stops} destination={journey.destination} showDestination compact />}
   </Pressable>;
 }
 const styles = StyleSheet.create({

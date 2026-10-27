@@ -23,7 +23,7 @@ export const HomeJourneyCard = memo(function HomeJourneyCard({ journey, expanded
       <View style={[s.cover, expanded && s.expandedCover, expanded && { height: Math.round(width * 9 / 16) }]}>
         {cover && failedUri !== cover
           ? <Image key={cover} source={{ uri: cover }} accessibilityLabel={journey.title + ' cover photo'} style={s.image} resizeMode="cover" onError={() => { if (thumbnail) setFailedThumbnail(thumbnail); else setFailedUri(cover); }} />
-          : <JourneyArt seed={artSeed(journey.id, journey.stops)} stops={journey.stops} compact={!expanded} accessibilityLabel={'Journey art. No journey cover photo available. ' + journey.destination + '. Explore journey'} />}
+          : <JourneyArt seed={artSeed(journey.id, journey.stops)} stops={journey.stops} compact={!expanded} />}
       </View>
       <View style={[s.content, expanded && s.expandedContent]}>
         <Text numberOfLines={1} style={s.destination}>{journey.destination}</Text>

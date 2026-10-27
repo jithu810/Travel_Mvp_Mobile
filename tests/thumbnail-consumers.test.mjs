@@ -63,5 +63,5 @@ test('thumbnail fallback art replaces the stock placeholder only when supplied, 
  const modules={'react/jsx-runtime':runtime,'react-native':native,'expo-router':{useRouter:()=>({push(){}})},'./thumbnail-photo':{ThumbnailPhoto:'SmallPhoto'},'./ui':{colors:{}},'@/lib/discovery/model':{journeyFacts:()=>'',travelerLabel:()=>''},...artModules};
  const journey={id:'j',title:'Trip',destination:'Town',cover:null,coverThumbnail:null,stops:[{id:'a'},{id:'b'}],creatorName:'Owner',likes:null};
  const card=load('src/components/discovery/journey-card.tsx',modules).JourneyCard({journey});const fallback=nodes(card).find(n=>n.type==='SmallPhoto').props.fallback;
- assert.equal(fallback.type,'JourneyArt');assert.equal(fallback.props.seed,'seed:j:2');assert.equal(fallback.props.stops,journey.stops);assert.equal(fallback.props.accessibilityLabel,'Journey art. No journey cover photo available. Trip');
+ assert.equal(fallback.type,'JourneyArt');assert.equal(fallback.props.seed,'seed:j:2');assert.equal(fallback.props.stops,journey.stops);assert.equal(fallback.props.accessibilityLabel,undefined,'Decorative inside the labelled card');
 });

@@ -89,6 +89,9 @@ export function validGeoPoint(point: GeoPoint | null | undefined): point is { la
     && Math.abs(point.latitude) <= 90 && Math.abs(point.longitude) <= 180;
 }
 
+// Smallest extent (degrees of latitude, or cos-corrected longitude) the projection zooms to.
+export const artMinSpanDegrees = 0.005;
+
 export type ProjectedRoute = {
   /** One entry per input point, in order; null where the point is missing or invalid. */
   points: (ArtPoint | null)[];
@@ -98,7 +101,8 @@ export type ProjectedRoute = {
 
 // Equirectangular projection with a cos(latitude) correction, fitted into the padded box
 // while preserving the aspect ratio and centred. A single point or identical points sit
-// in the centre. Longitudes are unwrapped around the first valid point so routes that
+// in the centre, and the drawing never zooms in further than artMinSpanDegrees so stops
+// a few metres apart stay close together instead of stretching across the box. Longitudes are unwrapped around the first valid point so routes that
 // cross the antimeridian stay compact.
 export function projectRoute(points: readonly (GeoPoint | null | undefined)[] | null | undefined, box: ArtBox, padding = 0): ProjectedRoute {
   const input = points || [];
@@ -122,10 +126,9 @@ export function projectRoute(points: readonly (GeoPoint | null | undefined)[] | 
   const pad = Math.max(0, Math.min(padding, box.width / 2, box.height / 2));
   const innerWidth = Math.max(0, box.width - pad * 2), innerHeight = Math.max(0, box.height - pad * 2);
   const spanX = maxX - minX, spanY = maxY - minY;
-  // Treat sub-metre spreads as identical points.
-  const tiny = 1e-7;
-  const scale = spanX <= tiny && spanY <= tiny ? 0
-    : Math.min(spanX > tiny ? innerWidth / spanX : Infinity, spanY > tiny ? innerHeight / spanY : Infinity);
+  // Each axis is fitted as if it spanned at least artMinSpanDegrees (about 550 m), so tiny
+  // spreads draw small and centred; identical points (span 0) collapse onto the centre.
+  const scale = Math.min(innerWidth / Math.max(spanX, artMinSpanDegrees), innerHeight / Math.max(spanY, artMinSpanDegrees));
   const offsetX = (box.width - spanX * scale) / 2, offsetY = (box.height - spanY * scale) / 2;
   const projected = raw.map(point => point ? { x: offsetX + (point.x - minX) * scale, y: offsetY + (point.y - minY) * scale } : null);
   return { points: projected, count: located.length };
@@ -214,16 +217,73 @@ export function artShapes(seed: string, box: ArtBox, palette: ArtPalette, varian
   });
 }
 
-// Bounds route detail on art: keeps every n-th point (always the highlighted and the
-// last one) so long journeys do not render hundreds of Views.
-export function limitRoute<T>(points: readonly T[], max: number, keep?: number): { points: T[]; indices: number[] } {
-  if (points.length <= max || max < 2) return { points: points.slice(), indices: points.map((_, i) => i) };
-  const step = (points.length - 1) / (max - 1);
-  const indices = new Set<number>();
-  for (let i = 0; i < max; i++) indices.add(Math.round(i * step));
-  if (keep !== undefined && keep >= 0 && keep < points.length) indices.add(keep);
-  const sorted = [...indices].sort((a, b) => a - b);
-  return { points: sorted.map(i => points[i]), indices: sorted };
+export type LimitedRoute<T> = {
+  /** Kept points in order; a null marks a break where the input had missing points. */
+  points: (T | null)[];
+  /** Original index of each kept point (-1 for a break). */
+  indices: number[];
+};
+
+// Bounds route detail on art by thinning only VALID points. Every contiguous run of valid
+// points keeps its first and last point, so a run is never dropped and no gap is bridged;
+// the highlighted point and its valid neighbours are always kept. Missing points become a
+// single null break, so segments still stop at them.
+export function limitRoute<T>(points: readonly (T | null | undefined)[], max: number, keep?: number): LimitedRoute<T> {
+  const valid: number[] = [];
+  points.forEach((point, i) => { if (point !== null && point !== undefined) valid.push(i); });
+  const chosen = new Set<number>();
+  if (valid.length <= Math.max(2, max)) valid.forEach(i => chosen.add(i));
+  else {
+    const step = (valid.length - 1) / (Math.max(2, max) - 1);
+    for (let i = 0; i < Math.max(2, max); i++) chosen.add(valid[Math.round(i * step)]);
+    valid.forEach((i, j) => {
+      const previous = valid[j - 1], next = valid[j + 1];
+      if (previous !== i - 1 || next !== i + 1) chosen.add(i);
+    });
+    if (keep !== undefined && points[keep] != null) for (const i of [keep - 1, keep, keep + 1]) if (points[i] != null) chosen.add(i);
+  }
+  const result: LimitedRoute<T> = { points: [], indices: [] };
+  points.forEach((point, i) => {
+    if (point === null || point === undefined) {
+      if (result.points.length && result.points[result.points.length - 1] !== null) { result.points.push(null); result.indices.push(-1); }
+    } else if (chosen.has(i)) { result.points.push(point); result.indices.push(i); }
+  });
+  while (result.points.length && result.points[result.points.length - 1] === null) { result.points.pop(); result.indices.pop(); }
+  return result;
+}
+
+// Maps a stop index onto the (at most pseudoRouteMaxDots) decorative dots proportionally,
+// so stop 9 and later still mark a dot.
+export function pseudoRouteIndex(index: number, count: number): number | undefined {
+  if (!Number.isInteger(index) || index < 0 || !Number.isFinite(count) || index >= count) return undefined;
+  const dots = Math.min(pseudoRouteMaxDots, Math.floor(count));
+  if (dots <= 1) return 0;
+  return count <= dots ? index : Math.round(index * (dots - 1) / (count - 1));
+}
+
+export type RouteScene = {
+  segments: (RouteSegment & { traveled: boolean })[];
+  dots: { point: ArtPoint; index: number; upcoming: boolean }[];
+  highlight: ArtPoint | null;
+};
+
+// Everything needed to draw a real route: thinned points, segments coloured by progress
+// (up to the highlighted stop: traveled; after it: upcoming) and the highlighted point.
+export function routeScene(points: readonly (ArtPoint | null)[], options: { max: number; highlight?: number; thickness: number }): RouteScene {
+  const { highlight } = options;
+  const limited = limitRoute(points, options.max, highlight);
+  const segments = routeSegments(limited.points, options.thickness).map(segment => ({
+    ...segment, traveled: highlight === undefined || limited.indices[segment.to] <= highlight,
+  }));
+  const dots: RouteScene['dots'] = [];
+  let selected: ArtPoint | null = null;
+  limited.points.forEach((point, i) => {
+    if (!point) return;
+    const index = limited.indices[i];
+    if (index === highlight) selected = point;
+    else dots.push({ point, index, upcoming: highlight !== undefined && index > highlight });
+  });
+  return { segments, dots, highlight: selected };
 }
 
 export function artDestination(destination: string | null | undefined): string | null {

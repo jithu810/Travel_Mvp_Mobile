@@ -6,9 +6,11 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { JourneyPhoto } from '@/components/discovery/journey-photo';
 import { colors } from '@/components/discovery/ui';
 import { StopArt } from '@/components/art/journey-art';
-import { CircleMap } from '@/components/art/circle-map';
-import { artSeed, validGeoPoint } from '@/lib/art/journey-art';
+import { CircleMap, circleMapFootprint, circleMapUri } from '@/components/art/circle-map';
+import { artSeed } from '@/lib/art/journey-art';
 import type { PublicJourney } from '@/types/journey';
+
+const circleTop = 12, circleBottomGap = 8;
 
 export function StopStoryViewer({ journey, selectedId, onSelect, onClose, onMap }: {
   journey: PublicJourney; selectedId: string | null; onSelect: (id: string) => void; onClose: () => void; onMap: () => void;
@@ -20,13 +22,22 @@ export function StopStoryViewer({ journey, selectedId, onSelect, onClose, onMap 
   const [headerHeight, setHeaderHeight] = useState(88);
   const [captionHeight, setCaptionHeight] = useState(180);
   const [failedPhoto, setFailedPhoto] = useState<string | null>(null);
+  // Every circle URL that failed, so returning to that stop neither flashes nor retries.
+  const [failedCircles, setFailedCircles] = useState<readonly string[]>([]);
+  // Measured space between the header and the caption sheet (null until laid out).
+  const [openHeight, setOpenHeight] = useState<number | null>(null);
   const index = journey.stops.findIndex(stop => stop.id === selectedId);
   const stop = journey.stops[index];
   const expanded = Boolean(stop && notesId === stop.id);
   // Photo-less (or failed-photo) stops show stop art plus a small fixed-size circle map of
-  // the place; the circle carries its own one-line Mapbox credit.
+  // the place. The circle carries its own one-line Mapbox credit, so it only shows where
+  // nothing can cover that credit: never with the notes sheet open, and only when the
+  // measured space between header and caption fits the circle and credit. Space is
+  // reserved only when the map can actually render, and released if it fails.
   const artShown = Boolean(stop && (!stop.photo || stop.photo === failedPhoto));
-  const circle = artShown && validGeoPoint(stop);
+  const circleUri = artShown && stop ? circleMapUri(stop) : null;
+  const circleFits = openHeight !== null && openHeight >= circleTop + circleMapFootprint + circleBottomGap;
+  const circle = Boolean(circleUri && !failedCircles.includes(circleUri) && !expanded && circleFits);
   const previous = index > 0;
   const next = index >= 0 && index < journey.stops.length - 1;
   function move(direction: -1 | 1) {
@@ -57,8 +68,9 @@ export function StopStoryViewer({ journey, selectedId, onSelect, onClose, onMap 
     <View style={styles.screen} testID="stop-story-viewer">
       <StatusBar style="dark" />
       {stop && <View style={styles.photo}><JourneyPhoto uri={stop.photo} label={stop.name + ' photo'} fill onError={() => setFailedPhoto(stop.photo)}
-        fallback={<StopArt seed={artSeed(journey.id, journey.stops)} stops={journey.stops} index={index} name={stop.name} inset={{ top: insets.top + headerHeight, bottom: insets.bottom + captionHeight, right: circle ? 112 : 0 }} accessibilityLabel={'Stop art. No photo yet. ' + stop.name} />} /></View>}
-      {circle && stop && <CircleMap key={'circle-' + stop.id} point={stop} style={[styles.circle, { top: insets.top + headerHeight + 12 }]} />}
+        fallback={<StopArt seed={artSeed(journey.id, journey.stops)} stops={journey.stops} index={index} name={stop.name} inset={{ top: insets.top + headerHeight, bottom: insets.bottom + captionHeight, right: circle ? 112 : 0 }}
+          accessibilityLabel={'Stop art. ' + (stop.photo ? 'Photo unavailable. ' : 'No photo yet. ') + stop.name} />} /></View>}
+      {circle && stop && <CircleMap key={'circle-' + stop.id} point={stop} onError={uri => setFailedCircles(previous => previous.includes(uri) ? previous : [...previous, uri])} style={[styles.circle, { top: insets.top + headerHeight + circleTop }]} />}
       <View pointerEvents="none" style={[styles.statusBarBacking, { height: insets.top }]} />
       <SafeAreaView style={styles.safe}>
         <View style={styles.header} onLayout={event => { const height = Math.round(event.nativeEvent.layout.height); if (height > 0) setHeaderHeight(previous => previous === height ? previous : height); }}>
@@ -70,7 +82,7 @@ export function StopStoryViewer({ journey, selectedId, onSelect, onClose, onMap 
             <Pressable accessibilityRole="button" accessibilityLabel="Close stop stories" onPress={onClose} style={styles.close}><Text style={styles.closeLabel}>✕</Text></Pressable>
           </View>
         </View>
-        <View style={styles.imageArea} {...swipe.panHandlers}>
+        <View testID="story-image-area" style={styles.imageArea} {...swipe.panHandlers} onLayout={event => { const value = Math.round(event.nativeEvent.layout.height); setOpenHeight(previous => previous === value ? previous : value); }}>
           {!expanded && <View style={styles.tapAreas}>
             <Pressable testID="story-tap-previous" accessible={false} importantForAccessibility="no" disabled={!previous} onPress={() => move(-1)} style={styles.tapZone} />
             <Pressable testID="story-tap-next" accessible={false} importantForAccessibility="no" disabled={!next} onPress={() => move(1)} style={styles.tapZone} />

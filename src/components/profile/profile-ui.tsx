@@ -109,7 +109,7 @@ export function ProfileJourneyCard({ journey }: { journey: PublicJourney }) {
   return <Pressable {...protection} accessibilityRole="button" accessibilityLabel={'Open journey: ' + journey.title + ', ' + journey.destination}
     onPress={() => router.push({ pathname: '/journey/[id]', params: { id: journey.id } })} style={({ pressed }) => [s.card, s.journeyCard, pressed && s.pressed]}>
     <View style={s.thumbnail}><ThumbnailPhoto uri={journey.cover} thumbnailUri={journey.coverThumbnail} ratio={0.9} label={journey.title + ' cover photo'}
-      fallback={<JourneyArt seed={artSeed(journey.id, journey.stops)} stops={journey.stops} compact accessibilityLabel={'Journey art. No journey cover photo available. ' + journey.title} />} /></View>
+      fallback={<JourneyArt seed={artSeed(journey.id, journey.stops)} stops={journey.stops} compact />} /></View>
     <View style={s.cardCopy}>
       {journey.destination !== 'Destination not specified' && <Text numberOfLines={1} style={s.destination}>⌖ {journey.destination}</Text>}
       <Text numberOfLines={2} style={s.cardTitle}>{journey.title}</Text>

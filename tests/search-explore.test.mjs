@@ -56,7 +56,7 @@ test('Explore tile navigates with source marker and falls back to journey art af
   const {ExploreTile}=load('src/components/discovery/explore-tile.tsx',{'react/jsx-runtime':runtime,react:{useState:()=>[failed,x=>{failed=x;}]},'expo-router':{useRouter:()=>({push:x=>routes.push(x)})},'react-native':native,'./journey-photo':{JourneyPhoto:'JourneyPhoto'},...artModules});
   const journey={id:'a',title:'Coast',destination:'Kerala',creatorName:'Owner',cover:'https://example.test/a.jpg',stops:[{id:'s'}]};
   const render=()=>ExploreTile({journey});let tree=render();tree.props.onPress();assert.deepEqual(routes[0],{pathname:'/journey/[id]',params:{id:'a',source:'search'}});assert.match(tree.props.accessibilityLabel,/Coast.*Kerala.*Owner/);
-  tree.props.children.props.onError();tree=render();const art=tree.props.children;assert.equal(art.type,'JourneyArt');assert.equal(art.props.accessibilityLabel,'Journey art for Coast. No journey cover photo available');
+  tree.props.children.props.onError();tree=render();const art=tree.props.children;assert.equal(art.type,'JourneyArt');assert.equal(art.props.accessibilityLabel,undefined,'Decorative inside the labelled tile');
   assert.equal(art.props.seed,'seed:a:1');assert.equal(art.props.destination,'Kerala');assert.equal(art.props.showDestination,true,'Image-only tiles print the destination on the art');assert.equal(art.props.compact,true);
   journey.cover='https://example.test/b.jpg';assert.equal(render().props.children.type,'JourneyPhoto');journey.cover=null;assert.equal(render().props.children.type,'JourneyArt');
 });

@@ -270,7 +270,7 @@ test('Home cards show a display-only like count, including 0, in compact and exp
 });
 test('missing/failed photos retain fallback and a changed URI recovers', () => {
   for (const [uri, failed] of [[null, null], [journey.cover, journey.cover]]) {
-    assert.ok(card(uri, failed).all.some(n => n.props?.accessibilityLabel === 'Journey art. No journey cover photo available. Coast. Explore journey'));
+    assert.ok(card(uri, failed).all.some(n => n.type === 'JourneyArt'));
   }
   assert.equal(card('https://example.invalid/new.jpg', journey.cover).all.filter(n => n.type === 'Image').length, 1);
 });
@@ -310,7 +310,7 @@ test('Home image failure falls back, a new URI recovers and card measurement rem
   assert.equal(nodes(unselectedLocate).find(n => n.type === 'Ionicons').props.color, '#3873CE');
   nodes(tree).find(n => n.type === 'Image').props.onError();
   assert.equal(failedUri, journey.cover);
-  assert.ok(nodes(component.HomeJourneyCard(props)).some(n => n.props?.accessibilityLabel === 'Journey art. No journey cover photo available. Coast. Explore journey'));
+  assert.ok(nodes(component.HomeJourneyCard(props)).some(n => n.type === 'JourneyArt'));
   tree = component.HomeJourneyCard({ ...props, journey: { ...journey, cover: 'https://example.invalid/landscape.jpg' } });
   assert.equal(nodes(tree).find(n => n.type === 'Image').props.source.uri, 'https://example.invalid/landscape.jpg');
   const {HomeControlIcon}=load('src/components/discovery/home-control-icon.tsx',{});
@@ -322,7 +322,8 @@ test('Home missing and failed covers use deterministic journey art in the same f
   for (const expanded of [false, true]) for (const [uri, failed] of [[null, null], [journey.cover, journey.cover]]) {
     const { all } = card(uri, failed, expanded);
     const art = all.find(n => n.type === 'JourneyArt');
-    assert.equal(art.props.accessibilityLabel, 'Journey art. No journey cover photo available. Coast. Explore journey');
+    assert.equal(art.props.accessibilityLabel, undefined, 'Decorative: the card Pressable already names the journey');
+    assert.ok(all.some(n => n.type === 'Pressable' && n.props.accessibilityLabel === 'Open journey: Coastal weekend, Coast'));
     assert.equal(art.props.seed, 'seed:journey-a:1', 'Seeded from the journey');
     assert.equal(art.props.stops, journey.stops);
     assert.equal(art.props.compact, !expanded);

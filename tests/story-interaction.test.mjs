@@ -57,7 +57,7 @@ function load(path, modules, hooks = harness(false).hooks, timers = globalThis) 
     if (name === './stop-card-deck') return { StopCardDeck: 'StopCardDeck' };
     if (name === '@/components/remix/source-attribution') return { SourceAttribution: 'SourceAttribution' };
     if (name === '@/components/art/journey-art' && !Object.hasOwn(modules, name)) return { JourneyArt: 'JourneyArt', StopArt: 'StopArt' };
-    if (name === '@/components/art/circle-map' && !Object.hasOwn(modules, name)) return { CircleMap: 'CircleMap' };
+    if (name === '@/components/art/circle-map' && !Object.hasOwn(modules, name)) return { CircleMap: 'CircleMap', circleMapFootprint: 110, circleMapUri: point => typeof point?.latitude === 'number' && typeof point?.longitude === 'number' ? 'circle:' + point.latitude + ',' + point.longitude : null };
     if (name === '@/lib/art/journey-art' && !Object.hasOwn(modules, name)) return load('src/lib/art/journey-art.ts', {});
     if (name === 'expo-status-bar') return {StatusBar:'StatusBar'};
     if (name === 'react') return hooks;
@@ -1669,32 +1669,69 @@ test('map unavailable fallback respects edge-to-edge status inset',()=>{
  tree=MapFallback({});assert.equal(tree.props.style.at(-1).paddingTop,20);
 });
 
-test('stop story viewer shows stop art for photo-less or failed photos with one fixed circle map and its credit, never a full-screen map', () => {
+test('stop story viewer shows stop art for photo-less or failed photos with one fixed circle map whose credit can never be covered', () => {
+  const previousToken = process.env.EXPO_PUBLIC_MAPBOX_TOKEN;
+  process.env.EXPO_PUBLIC_MAPBOX_TOKEN = 'pk.viewer-synthetic';
+  try {
   const h = harness();
+  // The real circle module: real footprint and real "can render" URL check.
+  const staticMap = load('src/lib/media/static-map.ts', {});
+  const mapPhoto = load('src/components/discovery/static-map-photo.tsx', { 'react-native': native, '@/lib/media/static-map': staticMap, '@/lib/buddy/model': {} });
+  const circleModule = load('src/components/art/circle-map.tsx', { 'react-native': native, '@/components/discovery/static-map-photo': mapPhoto, '@/lib/media/static-map': staticMap });
+  assert.equal(circleModule.circleMapFootprint, staticMap.staticMapCircleSize + 4 + Math.ceil(mapPhoto.staticMapCreditLineHeight * circleModule.circleCreditMaxFontScale));
+  const needed = 12 + circleModule.circleMapFootprint + 8;
   const { StopStoryViewer } = load('src/components/journey/stop-story-viewer.tsx', {
     'expo-status-bar': { StatusBar: 'StatusBar' },
     'react-native': { ...native, Modal: 'Modal', ScrollView: 'ScrollView', PanResponder: { create: () => ({ panHandlers: {} }) } },
     'react-native-safe-area-context': { SafeAreaView: 'SafeAreaView' },
     '@/components/discovery/journey-photo': { JourneyPhoto: 'JourneyPhoto' }, '@/components/discovery/ui': ui,
+    '@/components/art/circle-map': { ...circleModule, CircleMap: 'CircleMap' },
   }, h.hooks);
   const art = load('src/lib/art/journey-art.ts', {});
-  const stops = [{ ...stop('a'), latitude: 9.93, longitude: 76.26 }, { ...stop('b'), latitude: 9.96, longitude: 76.24, photo: 'https://example.test/b.jpg' }, { ...stop('c'), latitude: null, longitude: null }];
+  const stops = [{ ...stop('a'), latitude: 9.93, longitude: 76.26 }, { ...stop('b'), latitude: 9.96, longitude: 76.24, photo: 'https://example.test/b.jpg' }, { ...stop('c'), latitude: null, longitude: null }, { ...stop('d'), latitude: 9.9, longitude: 76.2 }];
+  stops[3].description = 'Notes';
   const props = { journey: { id: 'journey-1', title: 'Trip', destination: 'Kochi', stops }, selectedId: 'a', onSelect() {}, onClose() {}, onMap() {} };
-  let tree = h.render(StopStoryViewer, props);
-  let photo = find(tree, 'JourneyPhoto');
-  assert.equal(photo.props.map, undefined, 'No full-screen static map');
-  const stopArt = photo.props.fallback;
-  assert.equal(stopArt.type, 'StopArt'); assert.equal(stopArt.props.index, 0); assert.equal(stopArt.props.stops, stops);
-  assert.equal(stopArt.props.seed, art.artSeed(null, stops), 'Same palette as the deck, which only receives stops');
-  assert.equal(stopArt.props.inset.top, 24 + 88); assert.equal(stopArt.props.inset.bottom, 24 + 180); assert.equal(stopArt.props.inset.right, 112, 'Art content keeps clear of the circle');
-  let circle = find(tree, 'CircleMap');
+  const render = () => h.render(StopStoryViewer, props);
+  const area = tree => all(tree, 'View').find(n => n.props.testID === 'story-image-area');
+  const stopArt = tree => find(tree, 'JourneyPhoto').props.fallback;
+  let tree = render();
+  assert.equal(find(tree, 'JourneyPhoto').props.map, undefined, 'No full-screen static map');
+  assert.equal(stopArt(tree).type, 'StopArt'); assert.equal(stopArt(tree).props.index, 0); assert.equal(stopArt(tree).props.stops, stops);
+  assert.equal(stopArt(tree).props.seed, art.artSeed(null, stops), 'Same palette as the deck, which only receives stops');
+  assert.equal(stopArt(tree).props.accessibilityLabel, 'Stop art. No photo yet. a');
+  assert.equal(stopArt(tree).props.inset.top, 24 + 88); assert.equal(stopArt(tree).props.inset.bottom, 24 + 180);
+  assert.equal(find(tree, 'CircleMap'), null, 'Hidden until the open space is measured');
+  assert.equal(stopArt(tree).props.inset.right, 0, 'No strip reserved while hidden');
+  area(tree).props.onLayout({ nativeEvent: { layout: { height: needed - 1 } } }); tree = render();
+  assert.equal(find(tree, 'CircleMap'), null, 'Too little space between header and caption for circle plus credit');
+  area(tree).props.onLayout({ nativeEvent: { layout: { height: needed } } }); tree = render();
+  const circle = find(tree, 'CircleMap');
   assert.equal(circle.props.point, stops[0]);
   assert.equal(Object.assign({}, ...[circle.props.style].flat()).top, 24 + 88 + 12, 'Circle sits below the header');
-  props.selectedId = 'b'; tree = h.render(StopStoryViewer, props);
+  assert.equal(stopArt(tree).props.inset.right, 112, 'Art content keeps clear of the circle');
+  circle.props.onError(circleModule.circleMapUri(stops[0])); tree = render();
+  assert.equal(find(tree, 'CircleMap'), null, 'A failed circle disappears');
+  assert.equal(stopArt(tree).props.inset.right, 0, 'and releases its reserved strip');
+  props.selectedId = 'd'; tree = render();
+  find(tree, 'CircleMap').props.onError(circleModule.circleMapUri(stops[3]));
+  props.selectedId = 'a'; tree = render();
+  assert.equal(find(tree, 'CircleMap'), null, 'Returning to an earlier failed stop does not retry');
+  props.selectedId = 'd'; tree = render();
+  assert.equal(find(tree, 'CircleMap'), null, 'Every failed circle URL is remembered');
+  props.selectedId = 'a';
+  props.selectedId = 'b'; tree = render();
   assert.equal(find(tree, 'CircleMap'), null, 'A photo wins and needs no circle');
-  find(tree, 'JourneyPhoto').props.onError(); tree = h.render(StopStoryViewer, props);
+  find(tree, 'JourneyPhoto').props.onError(); tree = render();
   assert.equal(find(tree, 'CircleMap').props.point, stops[1], 'A failed photo falls back to art plus the circle');
-  props.selectedId = 'c'; tree = h.render(StopStoryViewer, props);
-  assert.equal(find(tree, 'CircleMap'), null, 'No coordinates: art only');
-  assert.equal(find(tree, 'JourneyPhoto').props.fallback.props.inset.right, 0);
+  assert.equal(stopArt(tree).props.accessibilityLabel, 'Stop art. Photo unavailable. b');
+  props.selectedId = 'c'; tree = render();
+  assert.equal(find(tree, 'CircleMap'), null, 'Not renderable (no coordinates): no circle');
+  assert.equal(stopArt(tree).props.inset.right, 0, 'and no reserved strip');
+  stops.push({ ...stop('e'), latitude: 9.8, longitude: 76.1, description: 'Notes' });
+  props.selectedId = 'e'; tree = render();
+  assert.ok(find(tree, 'CircleMap'));
+  all(tree, 'Pressable').find(n => n.props.accessibilityLabel === 'Read full description for e').props.onPress(); tree = render();
+  assert.equal(find(tree, 'CircleMap'), null, 'The notes sheet would cover the credit, so the circle hides');
+  assert.equal(stopArt(tree).props.inset.right, 0);
+  } finally { if (previousToken === undefined) delete process.env.EXPO_PUBLIC_MAPBOX_TOKEN; else process.env.EXPO_PUBLIC_MAPBOX_TOKEN = previousToken; }
 });

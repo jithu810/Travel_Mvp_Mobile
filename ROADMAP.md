@@ -1,8 +1,8 @@
 ## Journey art for photo-less journeys and stops - 2026-10-27
-- [x] Deterministic palette/route/pseudo-route art module and View-only JourneyArt/StopArt; list and story surfaces no longer request slot-sized static maps or show the stock photo. Unit/harness tested (743 tests, 1 environment skip), typecheck and lint pass.
-- [x] Optional fixed-size (88x88@2x) circle map with one-line credit in the stop story viewer only.
-- [ ] Device check on phone (palettes, legibility on dark palettes, deck rail clearance, viewer circle), QA and independent review.
-- [ ] Decide whether create/draft/customize flows should also switch from static maps to stop art (needs paths outside this task).
+- [x] Deterministic palette/route/pseudo-route art and View-only JourneyArt/StopArt; list cards and story surfaces no longer request slot-sized static maps or show the stock photo (globe pins and create flows unchanged). Committed locally (base 6579f64), unpublished.
+- [x] QA/review fix round: circle credit never covered (hidden with notes or too little space; reserves space only when renderable), mini cap 8, memoized geometry, 0.005 degree minimum span, proportional pseudo highlight, gap-safe thinning, accessibility labels. 751 tests (1 environment skip); credit kept to one capped line, failed circle URLs remembered, carousel hint honest, typecheck and lint pass.
+- [ ] Device check on phone (palettes, dark-palette legibility, deck rail clearance, viewer circle) and re-review.
+- [ ] Deferred: journey.id seed via src/app/journey/[id].tsx after PR #19; mixed-coordinate timeline consistency; Mapbox no-wordmark policy for maps under 160 px; whether create/draft/customize flows switch to stop art.
 
 ## Home card like count - 2026-10-27
 - [x] Show display-only like count (including 0) on compact and expanded Home cards with accessible pluralised labels. Tests, typecheck and lint pass; merged via PR #18.

@@ -1,8 +1,8 @@
-import { useMemo, useState, type ReactNode } from 'react';
+import { memo, useMemo, useState, type ReactNode } from 'react';
 import { StyleSheet, Text, View, type LayoutChangeEvent, type StyleProp, type ViewStyle } from 'react-native';
 import {
-  artDestination, artShapes, dottedTrail, limitRoute, pickPalette, projectRoute, pseudoRoute, routeSegments, stopTint,
-  type ArtBox, type ArtPalette, type ArtPoint, type GeoPoint,
+  artDestination, artShapes, dottedTrail, pickPalette, projectRoute, pseudoRoute, pseudoRouteIndex, routeScene, stopTint,
+  type ArtBox, type ArtPalette, type ArtPoint, type ArtShape, type GeoPoint, type RouteScene,
 } from '@/lib/art/journey-art';
 
 // Journey art: generated, offline artwork for photo-less journeys and stops. Static
@@ -10,6 +10,8 @@ import {
 // shows it supplies the meaningful accessibility label.
 
 const maxRouteStops = 30;
+// Mini thumbnails (about 48 dp) stay legible and cheap: a few stops around this one.
+export const miniRouteStops = 8;
 
 type ArtStop = GeoPoint & { id?: string };
 
@@ -28,8 +30,8 @@ function artAccessibility(label: string | undefined) {
     : { accessible: false, accessibilityElementsHidden: true, importantForAccessibility: 'no-hide-descendants' as const };
 }
 
-function Shapes({ seed, box, palette, variant }: { seed: string; box: ArtBox; palette: ArtPalette; variant: number }) {
-  return <>{artShapes(seed, box, palette, variant).map((shape, i) => <View key={'shape-' + i} style={[s.shape, {
+function Shapes({ shapes }: { shapes: readonly ArtShape[] }) {
+  return <>{shapes.map((shape, i) => <View key={'shape-' + i} style={[s.shape, {
     left: shape.x - shape.size / 2, top: shape.y - shape.size / 2, width: shape.size, height: shape.size, borderRadius: shape.size / 2, backgroundColor: shape.color, opacity: shape.opacity,
   }]} />)}</>;
 }
@@ -49,30 +51,31 @@ function Line({ segment, color, testID }: { segment: { left: number; top: number
   }]} />;
 }
 
-// A decorative wavy, dotted trail of hollow dots: clearly ornamental, never a map.
-function PseudoRoute({ seed, count, box, palette, padding, highlight }: { seed: string; count: number; box: ArtBox; palette: ArtPalette; padding: number; highlight?: number }) {
-  const points = pseudoRoute(seed, count, box, padding);
+type PseudoScene = { points: ArtPoint[]; trail: ArtPoint[]; small: boolean };
+function pseudoScene(seed: string, count: number, box: ArtBox, padding: number): PseudoScene {
   const small = Math.min(box.width, box.height) < 120;
+  const points = pseudoRoute(seed, count, box, padding);
+  return { points, trail: dottedTrail(points, small ? 6 : 9, 80), small };
+}
+
+// A decorative wavy, dotted trail of hollow dots: clearly ornamental, never a map.
+function PseudoRoute({ scene, palette, highlight }: { scene: PseudoScene; palette: ArtPalette; highlight?: number }) {
+  const { small } = scene;
   const dot = small ? 6 : 9;
   return <View pointerEvents="none" testID="journey-art-pseudo-route" style={StyleSheet.absoluteFill}>
-    {dottedTrail(points, small ? 6 : 9, 80).map((point, i) => <Dot key={'trail-' + i} point={point} size={small ? 2 : 3} color={palette.routeMuted} />)}
-    {points.map((point, i) => i === highlight
+    {scene.trail.map((point, i) => <Dot key={'trail-' + i} point={point} size={small ? 2 : 3} color={palette.routeMuted} />)}
+    {scene.points.map((point, i) => i === highlight
       ? <Dot key={'p-' + i} point={point} size={dot + 4} color={palette.highlight} ring={palette.ring} ringWidth={small ? 2 : 3} testID="journey-art-highlight" />
       : <Dot key={'p-' + i} point={point} size={dot} color={palette.dot} hollow />)}
   </View>;
 }
 
-function RealRoute({ points, box, palette, highlight, small, testID }: { points: readonly (ArtPoint | null)[]; box: ArtBox; palette: ArtPalette; highlight?: number; small: boolean; testID: string }) {
-  const thickness = small ? 2 : 3;
-  const { points: shown, indices } = limitRoute(points, maxRouteStops, highlight);
-  const segments = routeSegments(shown, thickness);
+function RealRoute({ scene, box, palette, small, testID }: { scene: RouteScene; box: ArtBox; palette: ArtPalette; small: boolean; testID: string }) {
   const dot = small ? 5 : 8;
-  const selected = highlight !== undefined ? indices.indexOf(highlight) : -1;
   return <View pointerEvents="none" testID={testID} style={[StyleSheet.absoluteFill, { width: box.width, height: box.height }]}>
-    {segments.map(segment => <Line key={'seg-' + segment.from} segment={segment}
-      color={highlight === undefined || indices[segment.to] <= highlight ? palette.route : palette.routeMuted} />)}
-    {shown.map((point, i) => point && i !== selected ? <Dot key={'stop-' + i} point={point} size={dot} color={highlight !== undefined && indices[i] > highlight ? palette.routeMuted : palette.dot} ring={palette.ring} ringWidth={small ? 1 : 1.5} /> : null)}
-    {selected >= 0 && shown[selected] && <Dot point={shown[selected] as ArtPoint} size={small ? 9 : 16} color={palette.highlight} ring={palette.ring} ringWidth={small ? 2 : 3} testID="journey-art-highlight" />}
+    {scene.segments.map(segment => <Line key={'seg-' + segment.from} segment={segment} color={segment.traveled ? palette.route : palette.routeMuted} />)}
+    {scene.dots.map(item => <Dot key={'stop-' + item.index} point={item.point} size={dot} color={item.upcoming ? palette.routeMuted : palette.dot} ring={palette.ring} ringWidth={small ? 1 : 1.5} />)}
+    {scene.highlight && <Dot point={scene.highlight} size={small ? 9 : 16} color={palette.highlight} ring={palette.ring} ringWidth={small ? 2 : 3} testID="journey-art-highlight" />}
   </View>;
 }
 
@@ -90,7 +93,7 @@ export type JourneyArtProps = {
 
 // Card and cover art: palette background, soft shapes and the real route when the data has
 // coordinates (opened journeys), otherwise a decorative pseudo-route sized by the stop count.
-export function JourneyArt({ seed, stops, destination, showDestination = false, compact = false, accessibilityLabel, style }: JourneyArtProps) {
+export const JourneyArt = memo(function JourneyArt({ seed, stops, destination, showDestination = false, compact = false, accessibilityLabel, style }: JourneyArtProps) {
   const { box, onLayout } = useBox();
   const palette = pickPalette(seed);
   const place = showDestination ? artDestination(destination) : null;
@@ -101,21 +104,29 @@ export function JourneyArt({ seed, stops, destination, showDestination = false, 
   const reserve = place && box ? Math.min(box.height * 0.4, small ? 30 : 44) : 0;
   const routeWidth = box ? box.width : 0, routeHeight = box ? Math.max(1, box.height - reserve) : 0;
   const routeBox = useMemo(() => routeWidth > 0 ? { width: routeWidth, height: routeHeight } : null, [routeWidth, routeHeight]);
-  const projected = useMemo(() => routeBox ? projectRoute(list, routeBox, padding) : null, [list, routeBox, padding]);
+  // Geometry is derived once per size/data change, not on every parent render.
+  const scene = useMemo(() => {
+    if (!routeBox) return null;
+    const projected = projectRoute(list, routeBox, padding);
+    return projected.count > 0
+      ? { real: routeScene(projected.points, { max: maxRouteStops, thickness: small ? 2 : 3 }), pseudo: null }
+      : { real: null, pseudo: pseudoScene(seed, list.length, routeBox, padding) };
+  }, [list, routeBox, padding, small, seed]);
+  const shapes = useMemo(() => box ? artShapes(seed, box, palette, 0) : [], [seed, box, palette]);
   let route: ReactNode = null;
-  if (routeBox && projected) route = projected.count > 0
-    ? <RealRoute points={projected.points} box={routeBox} palette={palette} small={small} testID="journey-art-route" />
-    : <PseudoRoute seed={seed} count={list.length} box={routeBox} palette={palette} padding={padding} />;
+  if (routeBox && scene) route = scene.real
+    ? <RealRoute scene={scene.real} box={routeBox} palette={palette} small={small} testID="journey-art-route" />
+    : scene.pseudo && <PseudoRoute scene={scene.pseudo} palette={palette} />;
   return <View testID="journey-art" onLayout={onLayout} {...artAccessibility(accessibilityLabel)} style={[s.fill, { backgroundColor: palette.tints[0] }, style]}>
     <View pointerEvents="none" accessible={false} accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={s.layer}>
-      {box && <Shapes seed={seed} box={box} palette={palette} variant={0} />}
+      <Shapes shapes={shapes} />
       {route}
     </View>
     {place && <View pointerEvents="none" style={[s.destination, small && s.smallDestination]}>
       <Text numberOfLines={2} maxFontSizeMultiplier={1.3} style={[s.destinationText, small && s.smallDestinationText, { color: palette.ink }]}>{place}</Text>
     </View>}
   </View>;
-}
+});
 
 export type StopArtProps = {
   seed: string;
@@ -133,7 +144,7 @@ export type StopArtProps = {
 
 // A photo-less stop: its number and name with the journey's real route and THIS stop
 // highlighted. Each stop differs in its highlight, route progress and background tint.
-export function StopArt({ seed, stops, index, name, variant = 'full', inset, accessibilityLabel, style }: StopArtProps) {
+export const StopArt = memo(function StopArt({ seed, stops, index, name, variant = 'full', inset, accessibilityLabel, style }: StopArtProps) {
   const { box, onLayout } = useBox();
   const palette = pickPalette(seed);
   const mini = variant === 'mini';
@@ -142,15 +153,25 @@ export function StopArt({ seed, stops, index, name, variant = 'full', inset, acc
   const padding = mini ? 7 : 18;
   const areaWidth = box ? Math.max(1, box.width - left - right) : 0, areaHeight = box ? Math.max(1, box.height - top - bottom - header) : 0;
   const area = useMemo(() => areaWidth > 0 ? { width: areaWidth, height: areaHeight } : null, [areaWidth, areaHeight]);
-  const projected = useMemo(() => area ? projectRoute(stops, area, padding) : null, [stops, area, padding]);
-  const highlight = projected?.points[index] ? index : undefined;
+  const small = mini || (area ? Math.min(area.width, area.height) < 90 : false);
+  const scene = useMemo(() => {
+    if (!area) return null;
+    const projected = projectRoute(stops, area, padding);
+    if (projected.count > 0) {
+      const highlight = projected.points[index] ? index : undefined;
+      return { real: routeScene(projected.points, { max: mini ? miniRouteStops : maxRouteStops, highlight, thickness: small ? 2 : 3 }), pseudo: null };
+    }
+    return { real: null, pseudo: pseudoScene(seed, stops.length, area, padding) };
+  }, [area, stops, padding, index, mini, small, seed]);
+  // Mini thumbnails skip the decorative shapes.
+  const shapes = useMemo(() => box && !mini ? artShapes(seed, box, palette, index + 1) : [], [seed, box, palette, index, mini]);
   return <View testID="stop-art" onLayout={onLayout} {...artAccessibility(accessibilityLabel)} style={[s.fill, { backgroundColor: stopTint(palette, index) }, style]}>
     <View pointerEvents="none" accessible={false} accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={s.layer}>
-      {box && <Shapes seed={seed} box={box} palette={palette} variant={index + 1} />}
-      {area && projected && <View style={[s.area, { left, top: top + header, width: area.width, height: area.height }]}>
-        {projected.count > 0
-          ? <RealRoute points={projected.points} box={area} palette={palette} highlight={highlight} small={mini || Math.min(area.width, area.height) < 90} testID="stop-art-route" />
-          : <PseudoRoute seed={seed} count={stops.length} box={area} palette={palette} padding={padding} highlight={index < 8 ? index : undefined} />}
+      <Shapes shapes={shapes} />
+      {area && scene && <View style={[s.area, { left, top: top + header, width: area.width, height: area.height }]}>
+        {scene.real
+          ? <RealRoute scene={scene.real} box={area} palette={palette} small={small} testID="stop-art-route" />
+          : scene.pseudo && <PseudoRoute scene={scene.pseudo} palette={palette} highlight={pseudoRouteIndex(index, stops.length)} />}
       </View>}
     </View>
     {!mini && <View pointerEvents="none" style={[s.header, { top: top + 12, left: left + 12, right: right + 12 }]}>
@@ -158,7 +179,7 @@ export function StopArt({ seed, stops, index, name, variant = 'full', inset, acc
       {!!name?.trim() && <Text numberOfLines={2} maxFontSizeMultiplier={1.2} style={[s.name, { color: palette.ink }]}>{name.trim()}</Text>}
     </View>}
   </View>;
-}
+});
 
 const s = StyleSheet.create({
   fill: { flex: 1, width: '100%', overflow: 'hidden' },

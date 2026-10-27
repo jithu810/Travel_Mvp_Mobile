@@ -9,15 +9,18 @@ import { useBuddyProtectedBounds } from '@/hooks/use-buddy-geometry';
 // Photo-less stops show stop art (journey route with this stop highlighted) instead of a
 // map image: the live journey map sits directly above this deck. The right edge stays
 // clear for the photo action rail.
-function StopPhoto({ stop, stops, index }: { stop: JourneyStop; stops: JourneyStop[]; index: number }) {
-  const [failed, setFailed] = useState<string | null>(null);
-  return <View style={s.photo}>{stop.photo && failed !== stop.photo
-    ? <Image key={stop.photo} source={{ uri: stop.photo }} accessibilityLabel={stop.name + ' photo'} resizeMode="cover" style={s.image} onError={() => setFailed(stop.photo)} />
-    : <StopArt seed={artSeed(null, stops)} stops={stops} index={index} name={stop.name} inset={{ right: 56 }} accessibilityLabel={'Stop art. No stop photo available. ' + stop.name + '. See this stop'} />}<View pointerEvents="none" style={s.photoShade} /></View>;
+// The card's Pressable carries the label, so the art stays hidden from accessibility.
+function StopPhoto({ stop, stops, index, failed, onError }: { stop: JourneyStop; stops: JourneyStop[]; index: number; failed: boolean; onError: (photo: string) => void }) {
+  return <View style={s.photo}>{stop.photo && !failed
+    ? <Image key={stop.photo} source={{ uri: stop.photo }} accessibilityLabel={stop.name + ' photo'} resizeMode="cover" style={s.image} onError={() => { if (stop.photo) onError(stop.photo); }} />
+    : <StopArt seed={artSeed(null, stops)} stops={stops} index={index} name={stop.name} inset={{ right: 56 }} />}<View pointerEvents="none" style={s.photoShade} /></View>;
 }
+const showsPhoto = (stop: JourneyStop, failed: readonly string[]) => Boolean(stop.photo && !failed.includes(stop.photo));
 
 export function StopCardDeck({ stops, selectedId, onSelect, onDetails, active = true, photoActions, optionsActions, creator }: { stops: JourneyStop[]; selectedId: string | null; onSelect: (id: string) => void; onDetails: (id: string) => void; active?: boolean; photoActions?: ReactNode; optionsActions?: ReactNode; creator?: ReactNode }) {
   const [reduceMotion, setReduceMotion] = useState(true);
+  const [failedPhotos, setFailedPhotos] = useState<readonly string[]>([]);
+  const photoFailed = useCallback((photo: string) => setFailedPhotos(previous => previous.includes(photo) ? previous : [...previous, photo]), []);
   const [width, setWidth] = useState(320);
   const protection = useBuddyProtectedBounds();
   const [x] = useState(() => new Animated.Value(0));
@@ -72,11 +75,11 @@ export function StopCardDeck({ stops, selectedId, onSelect, onDetails, active = 
       <Pressable accessibilityRole="button" accessibilityLabel="Next memory" disabled={index >= stops.length - 1} accessibilityState={{ disabled: index >= stops.length - 1 }} onPress={() => move(1)} style={[s.control, index >= stops.length - 1 && s.disabled]}><Text style={s.link}>→</Text></Pressable>
     </View></View>
     <View style={s.deck}>
-      {behind.map((item, i) => <View key={item.id} pointerEvents="none" accessible={false} accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={[s.rear, { top: (behind.length - i - 1) * 8, left: (behind.length - i) * 8, right: (behind.length - i) * 8, transform: [{ rotate: (i ? '-2deg' : '2deg') }] }]}><StopPhoto stop={item} stops={stops} index={stops.indexOf(item)} /></View>)}
+      {behind.map((item, i) => <View key={item.id} pointerEvents="none" accessible={false} accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={[s.rear, { top: (behind.length - i - 1) * 8, left: (behind.length - i) * 8, right: (behind.length - i) * 8, transform: [{ rotate: (i ? '-2deg' : '2deg') }] }]}><StopPhoto stop={item} stops={stops} index={stops.indexOf(item)} failed={!showsPhoto(item, failedPhotos)} onError={photoFailed} /></View>)}
       <Animated.View style={[s.active, { transform: [{ translateX: x }, { rotate: x.interpolate({ inputRange: [-400, 0, 400], outputRange: ['-8deg', '0deg', '8deg'], extrapolate: 'clamp' }) }] }]}>
         <View style={s.card}>
           <View style={s.photoArea}>
-            <View {...swipe.panHandlers} testID="stop-photo-swipe"><Pressable accessibilityRole="button" accessibilityLabel={'View photo for stop ' + (index + 1) + ': ' + stop.name} accessibilityHint="Opens the full stop story and photo" onPress={() => { if (!busy.current && enabled.current && foreground.current) onDetails(stop.id); }}><StopPhoto stop={stop} stops={stops} index={index} /></Pressable></View>
+            <View {...swipe.panHandlers} testID="stop-photo-swipe"><Pressable accessibilityRole="button" accessibilityLabel={(showsPhoto(stop, failedPhotos) ? 'View photo for stop ' : 'View stop ') + (index + 1) + ': ' + stop.name} accessibilityHint={showsPhoto(stop, failedPhotos) ? 'Opens the full stop story and photo' : 'Opens the full stop story'} onPress={() => { if (!busy.current && enabled.current && foreground.current) onDetails(stop.id); }}><StopPhoto stop={stop} stops={stops} index={index} failed={!showsPhoto(stop, failedPhotos)} onError={photoFailed} /></Pressable></View>
             {photoActions && <View style={s.photoActions} testID="stop-photo-actions">{photoActions}</View>}
           </View>
           <View style={s.captionRow}><View style={s.captionRead} {...swipe.panHandlers} testID="stop-caption-swipe"><Pressable accessibilityRole="button" accessibilityLabel={'Read stop ' + (index + 1) + ': ' + stop.name} onPress={() => { if (!busy.current && enabled.current && foreground.current) onDetails(stop.id); }} style={s.caption}><Text accessibilityRole="header" numberOfLines={2} style={s.name}>{stop.name}</Text>{!!stop.description.trim() && <Text numberOfLines={2} style={s.note}>{stop.description}</Text>}<Text style={s.link}>{stop.rating !== null ? '★ ' + stop.rating + '/5 · ' : ''}Read story ↗</Text></Pressable></View><View style={s.captionFooter}>{creator && <View style={s.creator}>{creator}</View>}{optionsActions && <View testID="stop-options-actions" style={s.optionsActions}>{optionsActions}</View>}</View></View>

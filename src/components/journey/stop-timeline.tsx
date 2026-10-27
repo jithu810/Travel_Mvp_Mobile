@@ -20,7 +20,7 @@ export function StopTimeline(props: CarouselProps | { stops: JourneyStop[]; hori
 // The private draft screen continues using its existing read-only vertical presentation.
 function VerticalStopTimeline({ stops }: { stops: JourneyStop[] }) {
   const seed = artSeed(null, stops);
-  const art = (stop: JourneyStop, index: number) => <StopArt seed={seed} stops={stops} index={index} name={stop.name} accessibilityLabel={'Stop art. No photo yet. ' + stop.name} />;
+  const art = (stop: JourneyStop, index: number) => <StopArt seed={seed} stops={stops} index={index} name={stop.name} accessibilityLabel={'Stop art. ' + (stop.photo ? 'Photo unavailable. ' : 'No photo yet. ') + stop.name} />;
   if (!stops.length) return <View style={vertical.empty}><Text style={ui.sectionTitle}>The itinerary is still unwritten</Text><Text style={vertical.description}>The creator hasn’t added stops yet. Enjoy the story and check back for more places.</Text></View>;
   return <View><View style={vertical.heading}><View style={vertical.rule} /><Text style={ui.eyebrow}>THE PLACES IN BETWEEN</Text></View><Text accessibilityRole="header" style={vertical.title}>Along the way</Text>{stops.map((stop, index) => <View key={stop.id} style={vertical.row}>
     <View style={vertical.rail}><View style={vertical.number}><Text style={vertical.numberText}>{index + 1}</Text></View>{index < stops.length - 1 && <View style={vertical.line} />}</View>
@@ -51,6 +51,8 @@ function HorizontalStopTimeline({ stops, selectedId, onSelect, onDetails, stacke
 }) {
   const [reduceMotion, setReduceMotion] = useState(true);
   const seed = artSeed(null, stops);
+  // Failed carousel photos, so the card hint stops promising a photo.
+  const [failedPhotos, setFailedPhotos] = useState<readonly string[]>([]);
   // Non-stacked cards overlay their text panel on the photo; stop art keeps its content
   // above it. Heights are measured per card.
   const [textHeights, setTextHeights] = useState<Readonly<Record<string, number>>>({});
@@ -123,8 +125,8 @@ function HorizontalStopTimeline({ stops, selectedId, onSelect, onDetails, stacke
       onScrollEndDrag={dragEnd} onMomentumScrollBegin={() => { if (settleTimer.current) clearTimeout(settleTimer.current); }}
       onMomentumScrollEnd={event => settle(event.nativeEvent.contentOffset.x)}
       renderItem={({ item, index: i }) => <View style={{ width: stride, paddingRight: stacked ? 0 : 10, height: '100%' }}>
-        <Pressable accessibilityRole="button" accessibilityLabel={'Read stop ' + (i + 1) + ': ' + item.name} accessibilityState={{ selected: item.id === selectedId }} accessibilityHint="Opens the full stop story and photo" onPress={() => onDetails(item.id)} style={styles.card}>
-          <View style={stacked ? styles.deckPhoto : { flex: 1 }}><JourneyPhoto uri={item.photo} label={item.name + ' photo'} fill fit={stacked ? 'contain' : 'cover'} fallback={<StopArt seed={seed} stops={stops} index={i} inset={{ bottom: stacked ? 0 : textHeights[item.id] ?? 72 }} accessibilityLabel={'Stop art. No photo yet. ' + item.name} />} /></View>
+        <Pressable accessibilityRole="button" accessibilityLabel={'Read stop ' + (i + 1) + ': ' + item.name} accessibilityState={{ selected: item.id === selectedId }} accessibilityHint={item.photo && !failedPhotos.includes(item.photo) ? 'Opens the full stop story and photo' : 'Opens the full stop story'} onPress={() => onDetails(item.id)} style={styles.card}>
+          <View style={stacked ? styles.deckPhoto : { flex: 1 }}><JourneyPhoto uri={item.photo} label={item.name + ' photo'} fill fit={stacked ? 'contain' : 'cover'} onError={() => { const photo = item.photo; if (photo) setFailedPhotos(previous => previous.includes(photo) ? previous : [...previous, photo]); }} fallback={<StopArt seed={seed} stops={stops} index={i} inset={{ bottom: stacked ? 0 : textHeights[item.id] ?? 72 }} />} /></View>
           {!stacked && <View style={styles.cardShade} pointerEvents="none" />}
           <View style={[styles.cardText, stacked && styles.deckText, compact && { padding: 8 }]} pointerEvents="none" onLayout={event => { const height = Math.round(event.nativeEvent.layout.height); if (height > 0) setTextHeights(previous => previous[item.id] === height ? previous : { ...previous, [item.id]: height }); }}>
             <Text maxFontSizeMultiplier={1.3} numberOfLines={compact || stacked ? 1 : 2} style={[styles.cardName, stacked && { color: theme.text }, compact && { fontSize: 18, lineHeight: 23 }]}>{item.name}{compact ? ' ↗' : ''}</Text>

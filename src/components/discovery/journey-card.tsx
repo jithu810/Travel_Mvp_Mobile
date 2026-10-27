@@ -16,7 +16,7 @@ export function JourneyCard({ journey }: { journey: PublicJourney }) {
     style={({ pressed }) => [styles.card, pressed && { opacity: 0.85 }]}>
     <View style={styles.cover}>
       <ThumbnailPhoto uri={journey.cover} thumbnailUri={journey.coverThumbnail} label={journey.title + ' cover photo'}
-        fallback={<JourneyArt seed={artSeed(journey.id, journey.stops)} stops={journey.stops} accessibilityLabel={'Journey art. No journey cover photo available. ' + journey.title} />} />
+        fallback={<JourneyArt seed={artSeed(journey.id, journey.stops)} stops={journey.stops} />} />
       <View style={styles.badge}><Text style={styles.badgeText}>{travelerLabel(journey.travelerType)}</Text></View>
     </View>
     <View style={styles.content}>

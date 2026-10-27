@@ -56,15 +56,19 @@ export function StaticMapLayer({ state }: { state: StaticMapState }) {
 
 // One attribution line per screen or list that shows small (< 160 px) map thumbnails,
 // rendered only when at least one of those thumbnails can actually draw a map.
-export function StaticMapCredit({ points }: { points: readonly MapPoint[] | null | undefined }) {
+export const staticMapCreditLineHeight = 14;
+// singleLine (opt-in) keeps the credit to one line with a capped text scale, so its height
+// never exceeds staticMapCreditLineHeight * maxFontSizeMultiplier (fixed-footprint layouts).
+export function StaticMapCredit({ points, singleLine }: { points: readonly MapPoint[] | null | undefined; singleLine?: { maxFontSizeMultiplier: number } }) {
   const protection = useBuddyProtectedBounds();
   if (!canDrawStaticMap(points)) return null;
-  return <View {...protection}><Text testID="static-map-credit" accessibilityLabel="Maps by Mapbox and OpenStreetMap" style={s.credit}>{staticMapCreditText}</Text></View>;
+  return <View {...protection}><Text testID="static-map-credit" accessibilityLabel="Maps by Mapbox and OpenStreetMap" style={s.credit}
+    {...(singleLine ? { numberOfLines: 1, maxFontSizeMultiplier: singleLine.maxFontSizeMultiplier } : {})}>{staticMapCreditText}</Text></View>;
 }
 
 const s = StyleSheet.create({
   fill: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: '#E4ECF4', overflow: 'hidden' },
   image: { width: '100%', height: '100%' },
-  credit: { color: '#505D73', fontSize: 10, lineHeight: 14 },
+  credit: { color: '#505D73', fontSize: 10, lineHeight: staticMapCreditLineHeight },
   inline: { position: 'absolute', left: 4, color: '#101B2E', fontSize: 9, lineHeight: 12, backgroundColor: 'rgba(255,255,255,0.75)', paddingHorizontal: 4, borderRadius: 4, overflow: 'hidden' },
 });

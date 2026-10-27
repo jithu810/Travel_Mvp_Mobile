@@ -114,16 +114,70 @@ test('pseudo-route: deterministic decorative wave of at most eight dots inside t
   assert.equal(art.dottedTrail([{ x: 0, y: 0 }, { x: 10000, y: 0 }], 2, 50).length, 50, 'Bounded');
 });
 
-test('long routes are thinned but keep the ends and the highlighted stop', () => {
-  const points = Array.from({ length: 100 }, (_, i) => i);
+test('long routes are thinned but keep the ends, the highlighted stop and its neighbours', () => {
+  const points = Array.from({ length: 100 }, (_, i) => ({ i }));
   const limited = art.limitRoute(points, 10, 57);
-  assert.ok(limited.indices.includes(0) && limited.indices.includes(99) && limited.indices.includes(57));
-  assert.ok(limited.points.length <= 11);
-  assert.deepEqual(limited.points, limited.indices);
+  for (const kept of [0, 99, 56, 57, 58]) assert.ok(limited.indices.includes(kept), 'keeps ' + kept);
+  assert.ok(limited.points.length <= 13, 'Bounded: ' + limited.points.length);
+  assert.deepEqual(limited.points.map(point => point.i), limited.indices);
   assert.deepEqual(art.limitRoute([1, 2, 3], 10).indices, [0, 1, 2]);
   assert.equal(art.artDestination('  Kochi '), 'Kochi');
   assert.equal(art.artDestination('Destination not specified'), null);
   assert.equal(art.artDestination(null), null);
+});
+
+test('thinning never bridges a missing stop and never drops a run of valid stops', () => {
+  const p = i => ({ x: i * 10, y: 0, i });
+  // runs: 0-14, gap 15-16, 17-17 (single), gap 18, 19-39
+  const input = Array.from({ length: 40 }, (_, i) => i === 15 || i === 16 || i === 18 ? null : p(i));
+  const limited = art.limitRoute(input, 8);
+  for (const end of [0, 14, 17, 19, 39]) assert.ok(limited.indices.includes(end), 'run end ' + end + ' kept');
+  assert.equal(limited.points.filter(point => point === null).length, 2, 'One break per gap, merged when consecutive');
+  const segments = art.routeSegments(limited.points);
+  for (const segment of segments) {
+    const from = limited.indices[segment.from], to = limited.indices[segment.to];
+    assert.ok(input.slice(from, to + 1).every(Boolean), 'Segment ' + from + '->' + to + ' spans only valid stops');
+  }
+  assert.ok(segments.some(segment => limited.indices[segment.from] === 0), 'The first run still draws');
+  assert.ok(segments.some(segment => limited.indices[segment.to] === 39), 'The last run still draws');
+  assert.equal(limited.points[0].i, 0); assert.notEqual(limited.points.at(-1), null, 'No trailing break');
+  assert.deepEqual(art.limitRoute([null, p(1), null], 8).indices, [1], 'Leading and trailing gaps add no breaks');
+});
+
+test('near-zero spans draw small and centred instead of stretching across the box', () => {
+  const box = { width: 200, height: 200 };
+  // Two stops about one metre apart.
+  const tiny = art.projectRoute([{ latitude: 9.93, longitude: 76.26 }, { latitude: 9.93001, longitude: 76.26001 }], box, 10).points;
+  assert.ok(Math.hypot(tiny[1].x - tiny[0].x, tiny[1].y - tiny[0].y) < 1, 'Metres apart stay together');
+  for (const point of tiny) assert.ok(Math.abs(point.x - 100) < 1 && Math.abs(point.y - 100) < 1, 'Centred');
+  assert.equal(art.artMinSpanDegrees, 0.005);
+  // A route larger than the minimum still fills the box.
+  const big = art.projectRoute([{ latitude: 9.9, longitude: 76.2 }, { latitude: 10.0, longitude: 76.2 }], box, 10).points;
+  close(Math.abs(big[1].y - big[0].y), 180, 'Real spans fill the padded box');
+});
+
+test('route scenes colour progress up to the highlighted stop and mute what comes after', () => {
+  const points = [0, 1, 2, 3, 4].map(i => ({ x: i * 20, y: 10 }));
+  const scene = art.routeScene(points, { max: 30, highlight: 2, thickness: 3 });
+  assert.deepEqual(scene.segments.map(segment => [segment.from, segment.to, segment.traveled]), [[0, 1, true], [1, 2, true], [2, 3, false], [3, 4, false]]);
+  assert.deepEqual(scene.dots.map(dot => [dot.index, dot.upcoming]), [[0, false], [1, false], [3, true], [4, true]]);
+  assert.deepEqual(scene.highlight, points[2]);
+  const plain = art.routeScene(points, { max: 30, thickness: 3 });
+  assert.ok(plain.segments.every(segment => segment.traveled) && plain.dots.every(dot => !dot.upcoming) && plain.highlight === null, 'Journey art: all solid, no highlight');
+  const mini = art.routeScene(Array.from({ length: 40 }, (_, i) => ({ x: i, y: i % 3 })), { max: 8, highlight: 23, thickness: 2 });
+  assert.deepEqual(mini.highlight, { x: 23, y: 23 % 3 }, 'The mini cap keeps the highlighted stop');
+  for (const neighbour of [22, 24]) assert.ok(mini.dots.some(dot => dot.index === neighbour), 'and its neighbours');
+  assert.ok(mini.dots.length + 1 <= 11, 'Capped near 8: ' + (mini.dots.length + 1));
+});
+
+test('pseudo-route highlight maps stop indices proportionally so stops 9 and later still mark a dot', () => {
+  assert.equal(art.pseudoRouteIndex(3, 5), 3);
+  assert.equal(art.pseudoRouteIndex(0, 20), 0);
+  assert.equal(art.pseudoRouteIndex(19, 20), 7, 'The last stop marks the last dot');
+  assert.equal(art.pseudoRouteIndex(12, 20), Math.round(12 * 7 / 19));
+  for (let i = 0; i < 30; i++) { const dot = art.pseudoRouteIndex(i, 30); assert.ok(dot >= 0 && dot <= 7); }
+  assert.equal(art.pseudoRouteIndex(0, 1), 0);
+  for (const [index, count] of [[-1, 5], [5, 5], [1.5, 5], [0, 0]]) assert.equal(art.pseudoRouteIndex(index, count), undefined);
 });
 
 // Component harness: JSX as plain objects, minimal hooks; hook-free inner components expand in place.
@@ -133,6 +187,7 @@ const native = { StyleSheet: { create: value => value, absoluteFill: { position:
 function hooks() {
   const slots = []; let cursor = 0;
   const react = {
+    memo: component => component,
     useState: initial => { const i = cursor++; if (!(i in slots)) slots[i] = typeof initial === 'function' ? initial() : initial; return [slots[i], value => { slots[i] = typeof value === 'function' ? value(slots[i]) : value; }]; },
     useMemo: (fn, deps) => { const i = cursor++; if (!slots[i] || deps.some((value, j) => value !== slots[i].deps[j])) slots[i] = { value: fn(), deps }; return slots[i].value; },
   };
@@ -195,6 +250,14 @@ test('StopArt highlights its own stop, so every stop looks different; mini thumb
   assert.deepEqual(nodes(draw(1, 'mini')).filter(n => n.type === 'Text'), [], 'Mini: route only');
   const unlocated = [...located.slice(0, 2), { id: 'x', latitude: null, longitude: null }];
   assert.equal(highlight(draw(2, 'full', unlocated)), undefined, 'A stop without coordinates is not highlighted on the real route');
+  const long = Array.from({ length: 40 }, (_, i) => ({ id: 'l' + i, latitude: 9 + i / 100, longitude: 76 + (i % 4) / 100 }));
+  const mini = draw(30, 'mini', long);
+  assert.ok(highlight(mini), 'Mini cap keeps the highlighted stop');
+  assert.ok(nodes(mini).filter(n => style(n).width === style(n).height && style(n).width < 12).length <= 12, 'Mini draws only a few stops');
+  assert.equal(nodes(mini).filter(n => style(n).opacity !== undefined).length, 0, 'Mini skips the decorative shapes');
+  assert.ok(nodes(draw(30, 'full', long)).some(n => style(n).opacity !== undefined), 'Full art keeps them');
+  const unlocatedMany = Array.from({ length: 20 }, (_, i) => ({ id: 'u' + i, latitude: null, longitude: null }));
+  assert.ok(highlight(draw(15, 'full', unlocatedMany)), 'Stop 16 of 20 still marks a pseudo-route dot');
   const none = draw(1, 'full', located.map(stop => ({ id: stop.id, latitude: null, longitude: null })));
   assert.ok(nodes(none).some(n => n.props?.testID === 'journey-art-pseudo-route'), 'No geography: decorative fallback');
   assert.ok(highlight(none), 'The pseudo-route still marks this stop');
@@ -228,4 +291,27 @@ test('stop timeline uses stop art for photo-less stops in thumbnails, cards and 
   assert.equal(thumb.props.map, undefined); assert.equal(thumb.props.fallback.props.variant, 'mini'); assert.equal(thumb.props.fallback.props.index, 3);
   const card = nodes(lists.find(n => n.props.testID === 'journey-stop-carousel').props.renderItem({ item: stops[4], index: 4 })).find(n => n.type === 'JourneyPhoto');
   assert.equal(card.props.map, undefined); assert.equal(card.props.fallback.props.index, 4); assert.equal(card.props.fallback.props.inset.bottom, 72, 'Art content stays above the text panel');
+});
+
+test('carousel hint promises a photo only while a usable photo exists', () => {
+  const slots = []; let cursor = 0;
+  const react = { useState: initial => { const i = cursor++; if (!(i in slots)) slots[i] = initial === 0 ? 320 : initial; return [slots[i], value => { slots[i] = typeof value === 'function' ? value(slots[i]) : value; }]; },
+    useRef: initial => { const i = cursor++; return slots[i] ??= { current: initial }; }, useEffect() {} };
+  const { StopTimeline } = load('src/components/journey/stop-timeline.tsx', {
+    'react/jsx-runtime': runtime, react, 'react-native': { ...native, AccessibilityInfo: {}, FlatList: 'FlatList', Pressable: 'Pressable' },
+    './stop-card-deck': { StopCardDeck: 'StopCardDeck' }, '@/theme/mobile-theme': { theme: {} }, '@/components/discovery/journey-photo': { JourneyPhoto: 'JourneyPhoto' },
+    '@/components/discovery/ui': { colors: {}, ui: {} }, '@/lib/journey/story-layout': { stopIndexAtOffset: () => 0 },
+    '@/components/art/journey-art': { StopArt: 'StopArt' }, '@/lib/art/journey-art': art,
+  });
+  const stops = [{ id: 'p', name: 'Photo', description: '', sequence: 1, dayNumber: null, photo: 'https://example.test/p.jpg', rating: null, latitude: 9, longitude: 76 },
+    { id: 'n', name: 'None', description: '', sequence: 2, dayNumber: null, photo: null, rating: null, latitude: 9.1, longitude: 76 }];
+  const render = () => { cursor = 0; const element = StopTimeline({ stops, horizontal: true, selectedId: 'p', onSelect() {}, onDetails() {} }); return element.type(element.props); };
+  const card = (tree, i) => nodes(nodes(tree).find(n => n.type === 'FlatList' && n.props.testID === 'journey-stop-carousel').props.renderItem({ item: stops[i], index: i }));
+  let tree = render();
+  const hint = (tree, i) => card(tree, i).find(n => n.type === 'Pressable').props.accessibilityHint;
+  assert.equal(hint(tree, 0), 'Opens the full stop story and photo');
+  assert.equal(hint(tree, 1), 'Opens the full stop story');
+  card(tree, 0).find(n => n.type === 'JourneyPhoto').props.onError();
+  tree = render();
+  assert.equal(hint(tree, 0), 'Opens the full stop story', 'A failed photo is no longer promised');
 });
