@@ -59,7 +59,7 @@ function load(path, modules, hooks = harness(false).hooks, timers = globalThis) 
     if(name==='@/components/buddy/buddy-space')return {BuddySpace:'BuddySpace'};
     if (name === '@/theme/mobile-theme') return mobileTheme;
     if(name==='@/lib/journey/nearby')return load('src/lib/journey/nearby.ts',{}); if(name.endsWith('/nearby-locations'))return {NearbyLocations:'NearbyLocations'}; if (name === 'react/jsx-runtime') return { jsx, jsxs: jsx };
-    if (name === '@/components/journey/swipe-journey-start') return { SwipeJourneyStart: 'SwipeJourneyStart' };
+    if (name === '@/components/journey/swipe-journey-start') return { SwipeJourneyStart: 'SwipeJourneyStart', SwipeAction: 'SwipeAction' };
     if (name === '@/components/journey/journey-action-icon') return { JourneyActionIcon: 'JourneyActionIcon' };
     if (name === './journey-action-icon') return { JourneyActionIcon: 'JourneyActionIcon' };
     if (name === './stop-card-deck') return { StopCardDeck: 'StopCardDeck' };
@@ -201,6 +201,7 @@ test('Story preserves map browsing while Use opens Travel directly and Remix rem
   const sharedStoryBuddy = find(tree, 'JourneyMap').props.storyBuddy;
   assert.equal(typeof sharedStoryBuddy.select, 'function');
   assert.equal(find(tree, 'JourneyMap').props.storyBuddySize, 36);
+  assert.equal(find(tree,'JourneyMap').props.storyBuddyMotion,'walk');
   assert.equal(find(tree, 'StopTimeline').props.selectedId, 'first');
   find(tree, 'StopTimeline').props.onSelect('second');
   tree = h.render(Screen, props);
@@ -278,6 +279,30 @@ test('Story preserves map browsing while Use opens Travel directly and Remix rem
   tree = h.render(Screen, { ...props, journey: { ...journey, stops: [] } });
   const routeCount = routes.length; find(tree, 'JourneyOptions').props.onUse(); assert.equal(routes.length, routeCount);
   assert.equal(all(tree, 'Pressable').some(item => item.props.accessibilityLabel === 'Start Journey'), false);
+
+  // The identical Story presentation is safe for a synthetic temporary journey.
+  const removed = [];let cardsBack=0;
+  const temporary = { onBack:()=>{cardsBack++;}, onRemove: id => removed.push(id), editingBlocked: false, error: null };
+  const selectedProps = { ...props, journey: { ...journey, creatorId: journeyId, sourceId: 'public-source' }, temporary };
+  buddyAuth = { loading: false, session: { user: { id: journeyId } }, error: null };
+  find(tree, 'StorySheet').props.onClose(); tree = h.render(Screen, selectedProps);
+  assert.equal(find(tree, 'SocialActions'), null);assert.equal(find(tree, 'JourneyOptions'), null);assert.equal(find(tree, 'SourceAttribution'), null);
+  assert.equal(buddyState.ownStory, undefined, 'Temporary IDs cannot become editable owned stories');
+  assert.equal(find(tree,'JourneyMap').props.storyBuddyMotion,'run');
+  all(tree,'Pressable').find(item=>item.props.accessibilityLabel==='Back to magic cards').props.onPress();assert.equal(cardsBack,1);
+  const selectedBuddy=find(tree,'JourneyMap').props.storyBuddy;
+  find(tree,'JourneyMap').props.onExpand();tree=h.render(Screen,selectedProps);
+  assert.equal(find(tree,'JourneyMap').props.storyBuddyMotion,'run');assert.equal(find(tree,'JourneyMap').props.storyBuddy,selectedBuddy);
+  find(tree,'StorySheet').props.onClose();tree=h.render(Screen,selectedProps);
+  assert.equal(find(tree, 'SwipeJourneyStart'), null);assert.equal(find(tree, 'SwipeAction').props.label, 'Swipe to journey');
+  const remove = () => all(tree, 'Pressable').find(item => item.props.accessibilityLabel?.startsWith('Remove '));
+  remove().props.onPress();assert.deepEqual(removed, ['first']);
+  tree=h.render(Screen,{...selectedProps,temporary:{...temporary,editingBlocked:true}});
+  assert.equal(remove().props.disabled,true);remove().props.onPress();assert.equal(removed.length,1);
+  tree=h.render(Screen,{...selectedProps,journey:{...journey,stops:[journey.stops[0]]}});
+  assert.equal(remove().props.disabled,true);remove().props.onPress();assert.equal(removed.length,1);
+  tree=h.render(Screen,selectedProps);find(tree,'SwipeAction').props.onStart();
+  assert.deepEqual(routes.at(-1),{pathname:'/travel/[id]',params:{id:journeyId,customized:'1'}});
 });
 
 test('Travel Mode eligibility refuses empty, invalid and duplicate itineraries without requiring GPS coordinates', () => {

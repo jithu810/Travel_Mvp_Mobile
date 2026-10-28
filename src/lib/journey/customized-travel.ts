@@ -6,7 +6,9 @@ import type { PublicJourney } from '../../types/journey';
 
 // Process memory only: these IDs are never submitted to a backend query or write.
 const itineraries = new Map<string, PublicJourney>();
+const sourceIds = new Map<string, string>();
 export function customizedTravel(id: string) { return itineraries.get(id) ?? null; }
+export function customizedSourceId(id: string) { return sourceIds.get(id) ?? null; }
 export function customizedTravelIssue(source: PublicJourney, selectedIds: readonly string[]) {
   if (!canOpenTravelMode(source) || !selectedIds.length || selectedIds.length > 50
     || new Set(selectedIds).size !== selectedIds.length || selectedIds.some(id => typeof id !== 'string')) {
@@ -26,6 +28,20 @@ export function createCustomizedTravel(source: PublicJourney, selectedIds: reado
   const journey = { ...source, id, stops: stops.map(stop => ({ ...stop })) };
   if (!canOpenTravelMode(journey)) throw new Error('Selected stops are unavailable.');
   itineraries.set(id, journey);
+  sourceIds.set(id, sourceIds.get(source.id) ?? source.id);
+  return id;
+}
+
+// Remove only from this in-memory selection; captured trips and the source stay intact.
+export function removeCustomizedStop(expected: PublicJourney, stopId: string) {
+  if (customizedTravel(expected.id) !== expected) throw new Error('This route changed. Open the selected journey again.');
+  const session = tripStore.get(expected.id);
+  if (session.status === 'active' || session.status === 'paused') throw new Error('Finish this trip in Travel Mode before removing a stop.');
+  if (!expected.stops.some(stop => stop.id === stopId)) throw new Error('This stop is no longer selected.');
+  if (expected.stops.length <= 1) throw new Error('Keep at least one stop for your journey.');
+  const id = createCustomizedTravel(expected, expected.stops.filter(stop => stop.id !== stopId).map(stop => stop.id));
+  const next = itineraries.get(id)!;
+  for (const [key, value] of itineraries) if (value === expected) itineraries.set(key, next);
   return id;
 }
 

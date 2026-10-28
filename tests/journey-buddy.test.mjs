@@ -139,8 +139,8 @@ test('short walks stay in the same safe corridor, turn at edges, and distinguish
   assert.equal(model.buddyDragged(7, 0), false); assert.equal(model.buddyDragged(0, 8), true); assert.equal(model.buddyDragged(6, 6), true);
 });
 test('route policy excludes authentication, profile editing and unknown routes', () => {
-  for (const path of ['/discover', '/search', '/account', '/create', '/draft/id', '/journey/id', '/travel/id', '/profile/explorer']) assert.equal(model.isBuddyRoute(path), true, path);
-  for (const path of ['/auth', '/profile/edit', '/customize/id', '/unknown']) assert.equal(model.isBuddyRoute(path), false, path);
+  for (const path of ['/discover', '/search', '/account', '/create', '/draft/id', '/journey/id', '/customized/id', '/travel/id', '/profile/explorer']) assert.equal(model.isBuddyRoute(path), true, path);
+  for (const path of ['/auth', '/profile/edit', '/customize/id', '/customized', '/customized/id/edit', '/unknown']) assert.equal(model.isBuddyRoute(path), false, path);
 
 });
 

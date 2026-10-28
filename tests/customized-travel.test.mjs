@@ -35,48 +35,47 @@ test('invalid/missing selections fail closed and secure ID failures never use or
   r.fail();assert.throws(()=>r.createCustomizedTravel(source,['stop-1']),/Secure ID/);assert.equal(r.customizedTravel(source.id),null);
 });
 
-test('local journey preview shares selected map/card state and opens Travel with the same token without GPS or public reads',()=>{
+test('selected journey reuses Story presentation, only removes local stops and fails closed',()=>{
   const r=registry(),id=r.createCustomizedTravel(source,['stop-1','stop-3']),routes=[];
-  const slots=[];let cursor=0,params={id};
+  const slots=[];let cursor=0,params={id},hasHistory=true,backs=0;
   const react={useRef:value=>{const i=cursor++;return slots[i]??={current:value};},useCallback:fn=>fn,useState:initial=>{const i=cursor++;if(!(i in slots))slots[i]=initial;return [slots[i],v=>{slots[i]=v;}];}};
   const jsx=(type,props)=>({type,props});
   const all=(node,type)=>!node||typeof node!=='object'?[]:[...(node.type===type?[node]:[]),...[node.props?.children].flat(Infinity).flatMap(child=>all(child,type))];
   const Screen=load('src/app/customized/[id].tsx',{
-    react,'react/jsx-runtime':{jsx,jsxs:jsx},'expo-router':{useLocalSearchParams:()=>params,useRouter:()=>({push:route=>routes.push(route),replace:route=>{routes.push(route);params=route.params;}}),useFocusEffect:()=>{}},
-    'react-native':{useWindowDimensions:()=>({height:700,width:400}),ScrollView:'ScrollView',Text:'Text',View:'View',StyleSheet:{create:v=>v}},'react-native-safe-area-context':{SafeAreaView:'SafeAreaView'},
-    '@/components/discovery/ui':{Action:'Action',Message:'Message',ScreenHeader:'ScreenHeader',colors:{muted:'gray'},ui:{}},
-    '@/components/journey/map/journey-map':{JourneyMap:'JourneyMap'},'@/components/journey/stop-timeline':{StopTimeline:'StopTimeline'},'@/components/journey/story-sheet':{StorySheet:'StorySheet'},
-    '@/components/create/place-picker':{PlacePicker:'PlacePicker'},'@/hooks/use-trip-session':{useTripSnapshot:id=>r.store.get(id)},'@/components/journey/swipe-journey-start':{SwipeAction:'SwipeAction'},'@/lib/journey/customized-travel':r,
-    '@/lib/journey/story-layout':{selectedStopId:(stops,requested)=>stops.find(s=>s.id===requested)?.id??stops[0]?.id??null},
+    react,'react/jsx-runtime':{jsx,jsxs:jsx},'expo-router':{useLocalSearchParams:()=>params,useRouter:()=>({canGoBack:()=>hasHistory,back:()=>{backs++;},replace:route=>{routes.push(route);params=route.params;}}),useFocusEffect:()=>{}},
+    'react-native':{View:'View'},'react-native-safe-area-context':{SafeAreaView:'SafeAreaView'},
+    '@/components/discovery/ui':{Message:'Message',ScreenHeader:'ScreenHeader',ui:{}},
+    '@/app/journey/[id]':{JourneyStoryContent:'JourneyStoryContent'},
+    '@/hooks/use-trip-session':{useTripSnapshot:id=>r.store.get(id)},'@/lib/journey/customized-travel':r,
   }).default;
   const render=()=>{cursor=0;return Screen();};let tree=render();
-  const map=()=>all(tree,'JourneyMap')[0].props, cards=()=>all(tree,'StopTimeline')[0].props;
-  assert.deepEqual(map().stops.map(s=>s.id),['stop-1','stop-3']);assert.equal(cards().stops,map().stops);
-  cards().onSelect('stop-3');tree=render();assert.equal(map().selectedId,'stop-3');
-  map().onSelect('missing');tree=render();assert.equal(cards().selectedId,'stop-3');
-  cards().onDetails('stop-1');tree=render();assert.equal(all(tree,'StorySheet')[0].props.visible,true);assert.equal(all(tree,'SwipeAction')[0].props.active,false);
-  all(tree,'StorySheet')[0].props.onClose();tree=render();all(tree,'SwipeAction')[0].props.onComplete();
-  assert.deepEqual(routes,[{pathname:'/travel/[id]',params:{id,customized:'1'}}]);
-  assert.equal(cards().stacked,true);
-  all(tree,'Action').find(v=>v.props.label==='View full map').props.onPress();tree=render();assert.equal(all(tree,'JourneyMap').length,1,'Expanded map replaces compact map');
-  all(tree,'StorySheet').find(v=>v.props.title==='Your route').props.onClose();tree=render();
-  const openAdd=()=>{all(tree,'Action').find(v=>v.props.label==='Add stop').props.onPress();tree=render();};
-  const picker=()=>all(tree,'PlacePicker')[0].props;
-  openAdd();const cancelled=picker().onSelect;
-  all(tree,'StorySheet').find(v=>v.props.title==='Add a stop').props.onClose();tree=render();
-  cancelled({name:'Late result',latitude:4,longitude:5});assert.equal(routes.length,1,'Cancelled picker callback cannot append');
-  openAdd();picker().onSelect({name:'Invalid',latitude:999,longitude:5});tree=render();assert.equal(routes.length,1);assert.ok(all(tree,'Text').some(v=>v.props.accessibilityRole==='alert'));
-  const stale=picker().onSelect;
-  picker().onSelect({name:'Extra',latitude:4,longitude:5});tree=render();
-  const editedId=params.id;assert.notEqual(editedId,id);assert.equal(cards().stops.length,3);assert.equal(cards().stops.at(-1).name,'Extra');
-  stale({name:'Stale',latitude:5,longitude:6});assert.equal(routes.length,2,'Successful append invalidates old picker callbacks');
-  params={id};tree=render();assert.equal(cards().stops.length,3,'Original selection token follows its edited route');
-  all(tree,'SwipeAction')[0].props.onComplete();assert.equal(routes.at(-1).params.id,editedId);
-  const current=r.customizedTravel(id);r.store.transition(current,'begin',r.store.get(editedId));tree=render();
-  assert.equal(all(tree,'Action').find(v=>v.props.label==='Add stop').props.disabled,true);
-  all(tree,'Action').find(v=>v.props.label==='Add stop').props.onPress();tree=render();assert.equal(all(tree,'PlacePicker').length,0);
-  params={id:'missing'};tree=render();assert.equal(all(tree,'JourneyMap').length,0);assert.equal(all(tree,'SwipeAction').length,0);assert.equal(all(tree,'Message')[0].props.title,'Selection unavailable');
-  params={id:[id]};tree=render();assert.equal(all(tree,'SwipeAction').length,0);
+  const story=()=>all(tree,'JourneyStoryContent')[0].props;
+  assert.deepEqual(story().journey.stops.map(s=>s.id),['stop-1','stop-3']);
+  story().temporary.onBack();assert.equal(backs,1,'Back preserves the retained Customize deck instead of replacing it');
+  const stale=story().temporary.onRemove;
+  story().temporary.onRemove('stop-1');tree=render();const editedId=params.id;
+  assert.notEqual(editedId,id);assert.deepEqual(story().journey.stops.map(s=>s.id),['stop-3']);
+  assert.equal(r.customizedTravel(id),story().journey);assert.equal(source.stops.length,3);
+  stale('stop-3');assert.equal(routes.length,1,'Stale callback cannot edit superseded snapshot');
+  story().temporary.onRemove('stop-3');tree=render();assert.match(story().temporary.error,/at least one/);
+  const current=story().journey;r.store.transition(current,'begin',r.store.get(editedId));tree=render();
+  assert.equal(story().temporary.editingBlocked,true);story().temporary.onRemove('stop-3');assert.equal(routes.length,1);
+  hasHistory=false;story().temporary.onBack();tree=render();assert.match(story().temporary.error,/Finish/);assert.equal(routes.length,1);
+  r.store.transition(current,'finish',r.store.get(editedId));tree=render();story().temporary.onBack();assert.deepEqual(routes.at(-1),{pathname:'/customize/[id]',params:{id:source.id}});
+  params={id:'missing'};tree=render();assert.equal(all(tree,'JourneyStoryContent').length,0);assert.equal(all(tree,'Message')[0].props.title,'Selection unavailable');
+  params={id:[id]};tree=render();assert.equal(all(tree,'JourneyStoryContent').length,0);
+});
+
+test('removal preserves order and snapshots, keeps aliases current and blocks active/paused/stale/last-stop edits',()=>{
+  const r=registry(),id=r.createCustomizedTravel(source,['stop-1','stop-2','stop-3']),original=r.customizedTravel(id);
+  assert.throws(()=>r.removeCustomizedStop(original,'missing'),/no longer/);
+  const nextId=r.removeCustomizedStop(original,'stop-2'),next=r.customizedTravel(nextId);
+  assert.equal(r.customizedTravel(id),next);assert.deepEqual(next.stops.map(s=>s.id),['stop-1','stop-3']);assert.equal(original.stops.length,3);
+  assert.throws(()=>r.removeCustomizedStop(original,'stop-1'),/changed/);
+  r.store.transition(next,'begin',r.store.get(nextId));assert.throws(()=>r.removeCustomizedStop(next,'stop-1'),/Finish/);
+  r.store.transition(next,'pause',r.store.get(nextId));assert.throws(()=>r.removeCustomizedStop(next,'stop-1'),/Finish/);
+  r.store.transition(next,'finish',r.store.get(nextId));const lastId=r.removeCustomizedStop(next,'stop-1');
+  assert.equal(r.customizedTravel(id),r.customizedTravel(lastId));assert.equal(r.customizedSourceId(lastId),source.id);assert.equal(r.customizedSourceId(id),source.id);assert.throws(()=>r.removeCustomizedStop(r.customizedTravel(lastId),'stop-3'),/at least one/);
 });
 
 test('append validates searched places, preserves selection order, issues a new identity and blocks active/paused/stale edits',()=>{

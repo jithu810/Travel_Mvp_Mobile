@@ -1,3 +1,15 @@
+## PR #22 publication and merge preparation - 2026-10-28
+- Product owner explicitly approved publishing codex/customize-travel-preview and merging its PR into main. Existing PR #22 is the target. Follow-up selected Story view, temporary removal, running Buddy and Back to cards are included; unrelated workflow/agent instruction edits are excluded.
+- Reused unchanged reviewed code evidence: 147 affected tests, TypeScript/scoped ESLint and native CPH2813 checks passed; independent review has no actionable findings. Diff check passed at publication. Expanded native animation, actual GPS trip and broad accessibility checks remain pending.
+
+## Selected journey Buddy and return to cards - 2026-10-28
+- LOCAL, UNPUBLISHED: selected-route compact/expanded maps use existing running Buddy; customized route added to Buddy visibility rules. Back to cards below map returns to retained choices and Undo. Original Story keeps walking animation. No backend/native dependency changes.
+- VERIFIED: 147 affected tests, TypeScript, scoped ESLint, diff check and independent review pass. CPH2813 Android16: Buddy visible/moving between selected cards, back returns to retained five selections and Undo. Expanded native animation and broader accessibility pending. See docs/qa/selected-journey-story.md.
+
+## Selected journey uses Story view - 2026-10-28
+- LOCAL, UNPUBLISHED follow-up on codex/customize-travel-preview: after the magic deck, selected stops reuse the existing journey Story map/cards/details with Remove and Swipe to journey. Add stop is removed from this flow; removal affects only the temporary selection and guards last-stop, stale and active/paused trips. Backend unchanged.
+- VERIFIED: 87 affected tests, TypeScript, scoped ESLint and diff check pass; independent review found no actionable issues. CPH2813 Android16: four-stop Story view, removal to three stops, swipe to Travel Ready with new first stop confirmed. No Begin Trip/live writes. Expanded accessibility/actual GPS checks pending. See docs/qa/selected-journey-story.md.
+
 ## Customize temporary route and travel preview - 2026-10-28
 - [x] Local card selection -> selected journey preview -> optional local Add stop -> Travel Mode; no customization draft/review/publish flow. Reuses map/card/sheet/picker primitives, validates and isolates local routes, preserves resume identity and prevents active-trip route edits.
 - [x] Independent QA78/78; typecheck/scoped lint; independent review fixes verified. Earlier812-test regression covered after isolated local-PG retry. Native four-stop preview/full map, local append to five stops and Travel Ready state verified.
