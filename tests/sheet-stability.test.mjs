@@ -73,12 +73,19 @@ function harness() {
     get tree() { return tree; }, get value() { return tree.props.style[1].height.value; } };
 }
 
-test('touch rerenders retain the animated height node, responder and list keys', () => {
+test('horizontal card browsing retains the height graph and never marks the whole sheet as moving', () => {
   const h = harness(), node = h.tree.props.style[1].height, responder = h.responder().onPanResponderGrant;
   const keys = () => h.nodes().filter(n => n.key !== undefined).map(n => n.key);
   const lists = keys();
   assert.deepEqual(lists, ['false', 'true']);
-  for (let i = 0; i < 8; i++) { h.tree.props.onTouchStart(); h.render(); h.tree.props.onTouchEnd(); h.render(); }
+  const interactionCount = h.interactions.length;
+  for (let i = 0; i < 8; i++) {
+    assert.equal(h.responder().onMoveShouldSetPanResponderCapture(null, { dx: 80, dy: 3, numberActiveTouches: 1 }), false);
+    const cards = h.nodes().find(n => n.type === 'FlatList' && n.props.horizontal);
+    assert.equal(cards.props.onScrollBeginDrag, undefined, 'Compact carousel never acquires the global geometry-motion lease');
+    cards.props.onScroll({ nativeEvent: { contentOffset: { x: i * 100, y: 0 } } }); h.render(true);
+  }
+  assert.equal(h.interactions.length, interactionCount, 'Card browsing cannot hide/remount the floating Buddy');
   assert.equal(h.tree.props.style[1].height, node);
   assert.equal(h.responder().onPanResponderGrant, responder);
   assert.deepEqual(keys(), lists);

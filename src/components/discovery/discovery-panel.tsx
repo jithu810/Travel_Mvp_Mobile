@@ -29,8 +29,7 @@ export function DiscoveryPanel({ journeys, selectedId, onLocate, onOpen, notice,
   // Touch/search updates rerender Home; retain the same animation graph.
   const panelHeight = useMemo(() => Animated.add(sheet.height, clearance), [sheet.height, clearance]);
   const [visible, setVisible] = useState(24);
-  return <Animated.View {...protection} style={[s.sheet, { height: panelHeight }]}
-    onTouchStart={sheet.touchStart} onTouchEnd={sheet.touchEnd} onTouchCancel={sheet.touchEnd}>
+  return <Animated.View {...protection} style={[s.sheet, { height: panelHeight }]}>
     <View onLayout={event => {
       // Expanded descriptions/notices must never redefine the compact snap.
       // Otherwise collapse first lands at the expanded chrome height, then jumps.
@@ -63,9 +62,10 @@ export function DiscoveryPanel({ journeys, selectedId, onLocate, onOpen, notice,
     </View>
     <View style={[s.list, !expanded && { marginBottom: clearance }]} {...sheet.responders.content}>
     {[false, true].map(listExpanded => <View key={String(listExpanded)} style={[s.list, { display: expanded === listExpanded ? 'flex' : 'none' }]}>
-    <FlatList {...scroll} horizontal={!listExpanded}
+    {/* Horizontal cards stay inside the protected panel; only vertical list motion changes protected content. */}
+    <FlatList {...(listExpanded ? scroll : {})} horizontal={!listExpanded}
       initialNumToRender={listExpanded ? 3 : 2} maxToRenderPerBatch={2} windowSize={3} updateCellsBatchingPeriod={50}
-      onScroll={event => { scroll.onScroll(); if (listExpanded) sheet.offset.current = event.nativeEvent.contentOffset.y; }} scrollEventThrottle={16}
+      onScroll={event => { if (listExpanded) { scroll.onScroll(); sheet.offset.current = event.nativeEvent.contentOffset.y; } }} scrollEventThrottle={16}
       data={expanded === listExpanded ? journeys.slice(0, visible) : []} keyExtractor={item => item.id} style={s.list}
       showsHorizontalScrollIndicator={false} showsVerticalScrollIndicator={listExpanded}
       contentContainerStyle={[s.items, listExpanded && s.expandedItems, listExpanded && { paddingBottom: clearance + 10 }]}

@@ -1738,27 +1738,14 @@ test('Story Buddy card selection moves the camera to the selected stop and never
     h.dispose();
   }
 });
-test('Story walker map exposes the same accessible Buddy help entry point beside the inset Fit control, only while the walker owns the map', () => {
-  let opened = 0, enabled = true, owned = true;
+test('Story walker map omits the separate Buddy help button', () => {
   const h = nativeMapHarness([mappedStop('a', 0, 76, 8), mappedStop('b', 1, 77, 9)], { Image: 'DecodedImage' }, globalThis, sessionModel.createTripStore(), {
-    '@/hooks/use-map-buddy': { useMapBuddy: () => ({ enabled, owned, visible: false, canHelp: true, openHelp: () => { opened++; return true; } }) },
+    '@/hooks/use-map-buddy': { useMapBuddy: () => ({ enabled: true, owned: true, visible: false, canHelp: true, openHelp() {} }) },
   });
-  Object.assign(h.props, { memoryPhotos: {}, animateMemoryRoute: false, controlTopInset: 24 });
+  Object.assign(h.props, { memoryPhotos: {}, animateMemoryRoute: false, controlTopInset: 24, storyBuddy: storyPlayback() });
   let tree = h.measure(); find(tree, 'MapView').props.onDidFinishLoadingMap(); tree = h.render();
-  const help = () => all(tree, 'Pressable').find(node => node.props.accessibilityLabel === 'Journey Buddy help');
-  assert.equal(help(), undefined, 'Maps without a map Buddy keep the floating Buddy as the only help entry');
-  h.props.storyBuddy = storyPlayback(); tree = h.render();
-  assert.equal(help().props.accessibilityRole, 'button'); assert.equal(help().props.accessibilityHint, 'Opens Journey Buddy guidance'); assert.equal(help().props.disabled, false);
-  const fit = all(tree, 'Pressable').find(node => node.props.accessibilityLabel === 'Fit journey and reset map orientation');
-  assert.equal(fit.props.style[1].top, 36); assert.equal(fit.props.style[2].width, 44);
-  assert.equal(help().props.style.at(-1).top, 36, 'Help shares the Fit row so short compact maps cannot clip it');
-  assert.ok(help().props.style.at(-1).left >= 12 + 44 + 8, 'Help sits to the right of Fit without overlapping it');
-  help().props.onPress(); assert.equal(opened, 1);
-  assert.equal(find(tree, 'DecodedImage'), null, 'Story walker does not load the Travel companion image');
-  assert.equal(all(tree, 'Pressable').some(node => node.props.accessibilityLabel === 'Retry Buddy image'), false);
-  owned = false; tree = h.render(); assert.equal(help(), undefined, 'While the floating Buddy is shown (walker not owning the map) only its help is offered');
-  owned = true; tree = h.render(); assert.ok(help());
-  enabled = false; tree = h.render(); assert.equal(help(), undefined, 'Buddy off removes the map help entry'); h.dispose();
+  assert.equal(all(tree, 'Pressable').some(node => node.props.accessibilityLabel === 'Journey Buddy help'), false);
+  assert.ok(find(tree, 'StoryWalkingBuddy')); h.dispose();
 });
 test('rail JourneyOptions preserves anonymous Remix, existing private copy, blocked feedback and About/customize routes', async () => {
   for (const mode of ['anonymous', 'signed-in', 'existing', 'blocked']) {

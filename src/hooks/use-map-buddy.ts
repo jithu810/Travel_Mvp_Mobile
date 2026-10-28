@@ -14,7 +14,7 @@ export function useMapBuddy(available: boolean, quietLive = false) {
   const current = api?.store.current();
   const enabled = preference.loaded && preference.enabled;
   const visible = !!(available && enabled && focused && api && api.store.get().path === path && !current?.suppressed
-    && AppState.currentState === 'active' && !api.store.getCelebration() && !api.store.getMapHelp() && api.store.getTour() === null
+    && AppState.currentState === 'active' && (!api.store.getMapHelp() || !!api.store.getMapHelp()?.anchor) && !api.store.getCelebration() && api.store.getTour() === null
     && (quietLive || !current?.state?.travel?.guidance) && !current?.state?.travel?.arrival);
   useEffect(() => {
     const owner = token.current; api?.store.mapPresentation(owner, path, visible);
@@ -24,10 +24,10 @@ export function useMapBuddy(available: boolean, quietLive = false) {
     const owner = token.current; setFocused(true);
     return () => { setFocused(false); api?.store.mapPresentation(owner, path, false); };
   }, [api, path]));
-  const openHelp = useCallback(() => {
+  const openHelp = useCallback((anchor?: { x: number; y: number }) => {
     if (!api?.preference.get().enabled || AppState.currentState !== 'active') return false;
-    return api.store.openMapHelp(path);
+    return api.store.openMapHelp(path, anchor);
   }, [api, path]);
   // owned: some map artwork on this route currently hides the floating Buddy.
-  return { enabled, owned: !!current?.mapOwned, visible: visible && !!current?.mapOwned, canHelp: enabled && !current?.suppressed && !current?.state?.travel?.guidance && !current?.state?.travel?.arrival, openHelp };
+  return { helping: !!api?.store.getMapHelp(), enabled, owned: !!current?.mapOwned, visible: visible && !!current?.mapOwned, canHelp: enabled && !current?.suppressed && !current?.state?.travel?.guidance && !current?.state?.travel?.arrival, openHelp };
 }

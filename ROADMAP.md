@@ -1,3 +1,12 @@
+## Buddy contextual text and gestures - 2026-10-28
+- [x] Matching Wave/Curious assets, preset local contextual messages, cooldown/expiry and interaction/sleep/Travel guards.58 focused checks, static checks and independent review pass.
+- [ ] Complete native automatic/manual speech/gesture capture and accessibility matrix. Local/unpublished; no AI or audio.
+
+## Buddy sleep and tap-to-wake - 2026-10-28
+- [x] Dedicated sleeping artwork and focused local inactivity/wake implementation.
+- [x]50 focused tests, TypeScript/scoped lint and independent review pass; native idle sleep/first-tap wake observed.
+- [ ] Cleaned-art repeat and native reduced-motion/TalkBack/broader matrix. Local/unpublished; no attack animation in this scope.
+
 ## PR #22 publication and merge preparation - 2026-10-28
 - Product owner explicitly approved publishing codex/customize-travel-preview and merging its PR into main. Existing PR #22 is the target. Follow-up selected Story view, temporary removal, running Buddy and Back to cards are included; unrelated workflow/agent instruction edits are excluded.
 - Reused unchanged reviewed code evidence: 147 affected tests, TypeScript/scoped ESLint and native CPH2813 checks passed; independent review has no actionable findings. Diff check passed at publication. Expanded native animation, actual GPS trip and broad accessibility checks remain pending.

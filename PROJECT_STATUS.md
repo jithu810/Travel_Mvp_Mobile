@@ -1,3 +1,24 @@
+## Mobile Buddy/UI publication preparation - 2026-10-28
+- Owner authorized push and merge to main. Prepared codex/buddy-polish from main53cfab6 with floating Story swipe, tappable map Buddy/messages, Account grid placement, curious idle/sleep/wake/Wave/Curious/contextual text and Home tap/carousel fixes. Unrelated workflow/instruction edits excluded.
+- VERIFIED:837/837 full tests, TypeScript and source/test lint passed before the final expanded-map layer fix;74 affected checks and static checks passed afterward. Final independent review has no remaining findings. Phone disconnected, so final expanded-map native test remains pending; earlier native evidence and limitations are in docs/qa/buddy-contextual.md. No backend writes/dependency/native changes.
+- Publication readiness checkpoint; subsequent GitHub PR/merge state is authoritative. Earlier local/unpublished entries below are historical.
+
+## Home card-swipe Buddy continuity - 2026-10-28
+- LOCAL, UNPUBLISHED: Home idle stays animated during ordinary card touches/cooldown; compact card scroll no longer marks the protected panel as moving or restarts Buddy. Actual vertical panel drag/expanded scroll and Buddy-own gesture/sleep/reduced-motion guards retained. No backend changes.
+- VERIFIED:62 Buddy plus40 Home/sheet tests, TypeScript/scoped lint/diff check and independent review pass. Native two captures during one1500ms card swipe show different Buddy poses while cards move. See docs/qa/buddy-contextual.md; no full performance/other-device claim.
+
+## Home Buddy tap correction - 2026-10-28
+- LOCAL, UNPUBLISHED: tap-release no longer waits for native position capture; reused message height retained and missing layout gets a manual-only visible fallback after500ms. Journey map path unchanged.
+- VERIFIED:60 focused checks, TypeScript/scoped lint/diff check and independent review pass. Native Home wake/open/Back-close/reopen succeeds with Buddy visible. See docs/qa/buddy-contextual.md.
+
+## Buddy contextual text and gestures - 2026-10-28
+- LOCAL, UNPUBLISHED: Wave/Curious clips and occasional preset Explore/Search/Create/Account bubbles; contextual manual help. No AI/audio/network/backend/dependency changes. Safe-space-only passive bubbles expire and respect cooldown, sleep and Travel priority.
+- VERIFIED:58 focused tests, TypeScript/scoped lint/diff check and independent review pass. Device app loaded/Search grid clear; final auto-gesture/message timing and manual-copy capture remain pending after reload/navigation changed screens. See docs/qa/buddy-contextual.md.
+
+## Buddy sleep and tap-to-wake - 2026-10-28
+- LOCAL, UNPUBLISHED: focused floating-Buddy sleep after60 seconds without user interaction, first tap wakes only. Dedicated eight-frame closed-eye breathing artwork and static reduced-motion pose. Story map walkers and Travel remain alert. No backend, permissions or dependency changes.
+- VERIFIED:50 focused tests, TypeScript/scoped lint/diff check pass; independent review issue fixed and re-reviewed with no remaining findings. Native Account idle-to-sleep and first-tap wake without help observed. Native cleaned-art repeat/reduced-motion/TalkBack and broader matrix pending. See docs/qa/buddy-sleep.md. Existing local Story/footer/Profile changes preserved.
+
 ## PR #22 publication and merge preparation - 2026-10-28
 - Product owner explicitly approved publishing codex/customize-travel-preview and merging its PR into main. Existing PR #22 is the target. Follow-up selected Story view, temporary removal, running Buddy and Back to cards are included; unrelated workflow/agent instruction edits are excluded.
 - Reused unchanged reviewed code evidence: 147 affected tests, TypeScript/scoped ESLint and native CPH2813 checks passed; independent review has no actionable findings. Diff check passed at publication. Expanded native animation, actual GPS trip and broad accessibility checks remain pending.
