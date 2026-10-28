@@ -88,9 +88,6 @@ export default function DiscoverScreen() {
       <View {...headerProtection} style={[s.header, { top: headerTop }]} onLayout={event => { headerProtection.onLayout(); setHeaderHeight(event.nativeEvent.layout.height); }}>
         <View style={s.search}><PlacePicker label="Search places" homeSearch compact embeddedSuggestions autoSuggest disabled={false}
           dismissVersion={dismissVersion} proximity={userProximity || mapProximity} onSelect={selectPlace} /></View>
-        <View accessible accessibilityRole="image" accessibilityLabel="Notifications, coming soon" style={s.iconButton}>
-          <View style={s.notificationSurface}><View style={s.bell}><View style={s.bellBody} /><View style={s.bellRim} /><View style={s.bellClapper} /></View></View>
-        </View>
       </View>
       <View style={s.exploration} onTouchStart={dismissSearch} onLayout={event => {
         const { width, height } = event.nativeEvent.layout;
@@ -118,14 +115,7 @@ const s = StyleSheet.create({
   safe: { flex: 1, backgroundColor: theme.background },
   page: { flex: 1, width: '100%', maxWidth: 900, alignSelf: 'center' },
   header: { position: 'absolute', left: 0, right: 0, elevation: 10, minHeight: 52, paddingHorizontal: 18, paddingVertical: 6, flexDirection: 'row', alignItems: 'center', gap: 8, zIndex: 10 },
-  // Keep the touch area large; only the inner painted surface is compact.
   search: { flex: 1, minWidth: 0, minHeight: 44, justifyContent: 'center' },
-  notificationSurface: { backgroundColor: theme.surface, borderRadius: 17, width: 34, height: 34, alignItems: 'center', justifyContent: 'center' },
-  iconButton: { width: 44, minHeight: 44, flexShrink: 0, alignItems: 'center', justifyContent: 'center' },
-  bell: { width: 18, height: 18, alignItems: 'center', justifyContent: 'center' },
-  bellBody: { width: 12, height: 12, borderWidth: 1.5, borderColor: theme.muted, borderTopLeftRadius: 9, borderTopRightRadius: 9 },
-  bellRim: { width: 16, height: 1.5, backgroundColor: theme.muted },
-  bellClapper: { width: 4, height: 2, marginTop: 2, borderRadius: 3, backgroundColor: theme.muted },
   banner: { position: 'absolute', left: 16, right: 16, zIndex: 3, minHeight: 54, borderRadius: 20, paddingHorizontal: 12, paddingVertical: 4,
     flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 6, backgroundColor: theme.surface, borderWidth: 1, borderColor: theme.border },
   bannerCopy: { flexGrow: 1, flexShrink: 1, flexBasis: 130, gap: 2 },
