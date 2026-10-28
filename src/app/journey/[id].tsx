@@ -84,7 +84,7 @@ export function JourneyStoryContent({ journey, refresh, refreshing, error, saveF
   return <View style={styles.screen}>
     {focused && panel === null && <StatusBar style="light" />}
     <ScrollView {...scroll} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" nestedScrollEnabled>
-      <View style={[styles.preview, { height: Math.max(150, Math.min(280, window.height * 0.30)) }]}>
+      <View style={[styles.preview, { height: Math.max(180, Math.min(310, window.height * 0.33)) }]}>
         {focused && panel === null && <JourneyMap stops={journey.stops} memoryPhotos={memoryPhotos} storyBuddy={storyBuddy} storyBuddySize={36} animateMemoryRoute={false} selectedId={selectedId} onSelect={select} presentation="expanded" controlTopInset={insets.top} onExpand={openMap} />}
         <Pressable {...expandProtection} accessibilityRole="button" accessibilityLabel="Expand journey map" onPress={openMap} style={[styles.expand, { top: insets.top + 4 }]}><JourneyActionIcon name="expand" /></Pressable>
       </View>
@@ -118,7 +118,7 @@ export function JourneyStoryContent({ journey, refresh, refreshing, error, saveF
         {journey.likes !== null && <Text style={ui.body}>{journey.likes} {journey.likes === 1 ? 'like' : 'likes'}</Text>}
         <StorySnapshot journey={journey} />
         {hasStory(journey) && <Text selectable style={ui.body}>{journey.description}</Text>}
-        <Text style={ui.body}>Use opens the original public route and stops. Remix requires sign-in and creates a private draft. Editing comes later.</Text>
+        <Text style={ui.body}>Start Journey travels the original route. Customize chooses stops for this trip without creating a draft. Remix requires sign-in and creates your own editable private draft.</Text>
         <Text style={ui.body}>Like and Save require sign-in. Share is available without an account. Open the journey map for Travel Mode with a local session timer. No GPS tracking.</Text>
         {error && <Text accessibilityRole="alert" style={ui.body}>Couldn’t refresh: {error}</Text>}
         <Pressable accessibilityRole="button" accessibilityLabel="Refresh journey" disabled={refreshing} accessibilityState={{ disabled: refreshing }} onPress={refresh} style={styles.textAction}>{refreshing ? <ActivityIndicator color={colors.ink} /> : <Text style={styles.link}>Refresh journey ↻</Text>}</Pressable>
@@ -137,7 +137,7 @@ const styles = StyleSheet.create({
   story: { padding: 14, gap: 6, borderRadius: 22, backgroundColor: '#F0F3F9', borderWidth: 1, borderColor: '#FFFFFF' },
   compactTitle: { flex: 1, minWidth: 0, minHeight: 44, justifyContent: 'center', paddingHorizontal: 8 },
   title: { color: '#18243B', fontSize: 18, lineHeight: 24, fontWeight: '700' },
-  swipeFooter: { paddingHorizontal: 16, paddingTop: 4, paddingBottom: 8 },
+  swipeFooter: { paddingHorizontal: 16, paddingTop: 12, paddingBottom: 0 },
   storyAuthor: { paddingHorizontal: 4 },
   people: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 44 },
   creator: { width: '34%', minWidth: 0 },

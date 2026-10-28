@@ -1,3 +1,13 @@
+## Customize temporary route and travel preview - 2026-10-28
+- [x] Local card selection -> selected journey preview -> optional local Add stop -> Travel Mode; no customization draft/review/publish flow. Reuses map/card/sheet/picker primitives, validates and isolates local routes, preserves resume identity and prevents active-trip route edits.
+- [x] Independent QA78/78; typecheck/scoped lint; independent review fixes verified. Earlier812-test regression covered after isolated local-PG retry. Native four-stop preview/full map, local append to five stops and Travel Ready state verified.
+- [ ] Real GPS trip, accessibility/large-text and other-device matrix; publication not requested. Local routes last only for this app process.
+
+## Remix direct editor and running Buddy - 2026-10-27
+- [x] Local implementation: skip remix summary, preserve legacy links/owner loading, use Story numbered map and remix-only Run/Idle on card selection; preserve Story walking and normal create map. Forward keyboard state into loaded editors.
+- [x] 188 focused tests pass independently; typecheck and source/test lint pass. Independent review has no remaining actionable findings after keyboard-forwarding fix. Existing remix native forward/reverse movement and arrival Idle observed on CPH2813 / Android 16. Shared UI-only preflight policy updated for both repositories; no live writes or publication.
+- [ ] Expanded accessibility/lifecycle/performance device matrix and fresh remix completion verification (requires authorized live copy). Full lint has existing ignored backup import errors; broader isolated PostgreSQL verification limitations are recorded in the QA report. GitHub publication not requested.
+
 ## PR #19 review fix round - 2026-10-27
 - [x] Merge origin/main; restore move-to-stop camera on Story selection; Story map Buddy help entry; Home Locate ownership release after arrival; Travel follow ownership without floating flicker plus throttled projection; expired celebration handling; remove dead Story preview code; scrub LAN/user paths from docs; Story help beside Fit and shown only while the walker owns the map. Published as an update to PR #19 (pending device checks); npm test 794 tests (793 pass, 1 environment skip), typecheck and lint pass.
 - [ ] QA, independent review and physical-device check (Story help placement in compact/expanded maps, Home floating Buddy return after Locate, Travel follow without flicker).

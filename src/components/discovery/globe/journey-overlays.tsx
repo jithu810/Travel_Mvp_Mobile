@@ -9,15 +9,15 @@ import { useThumbnailSource } from '@/hooks/use-thumbnail-source';
 import { useBuddyPreference } from '@/hooks/use-journey-buddy';
 import { TravelingBuddy } from './traveling-buddy';
 
-const PhotoPin = memo(function PhotoPin({ point, onOpen, selected = false }: { selected?: boolean; point: DiscoveryPoints['features'][number]; onOpen: (id: string) => void }) {
+const PhotoPin = memo(function PhotoPin({ point, onOpen, selected = false, size = 42 }: { size?: number; selected?: boolean; point: DiscoveryPoints['features'][number]; onOpen: (id: string) => void }) {
   const annotation = useRef<PointAnnotation>(null);
   const { uri, onError } = useThumbnailSource(point.properties.photo, point.properties.photoThumbnail);
-  useEffect(() => { annotation.current?.refresh(); }, [selected, uri]);
+  useEffect(() => { annotation.current?.refresh(); }, [selected, uri, size]);
   return <Mapbox.PointAnnotation ref={annotation} id={'photo-' + point.id} coordinate={point.geometry.coordinates}
     onSelected={() => onOpen(point.properties.journeyId)}>
-    <View collapsable={false} style={[s.photoRing, selected && { borderColor: '#63D4EF' }]}>
+    <View collapsable={false} style={[s.photoRing, { width: size, height: size, borderRadius: size / 2, borderWidth: size < 42 ? 2 : 3 }, selected && { borderColor: '#63D4EF' }]}>
       <Image key={uri || 'default'} accessibilityLabel={uri ? 'Photo at ' + point.properties.name : 'Default travel photo at ' + point.properties.name}
-        source={uri ? { uri } : require('../../../../assets/images/journey-photo-fallback.png')} style={s.photo}
+        source={uri ? { uri } : require('../../../../assets/images/journey-photo-fallback.png')} style={[s.photo, { width: size - (size < 42 ? 4 : 6), height: size - (size < 42 ? 4 : 6), borderRadius: size / 2 }]}
         resizeMode="cover" fadeDuration={0} onLoad={() => annotation.current?.refresh()} onError={() => { if (uri) onError(); }} />
     </View>
   </Mapbox.PointAnnotation>;
@@ -53,8 +53,8 @@ function HomeTraveler({ legs }: { legs: TravelLeg[] }) {
   return preference.loaded && preference.enabled && !failed
     ? <TravelingBuddy legs={legs} onFailure={() => setFailed(true)} /> : <TravelingPlane legs={legs} />;
 }
-export function JourneyOverlays({ points, route, onOpen, playing, playbackKey, drawRoute = true, durationScale = 1, selectedId, onPointOpen, walkingBuddy = false }: {
-  points: DiscoveryPoints; route: Coordinate[][]; onOpen: (id: string) => void; playing: boolean; playbackKey: string; drawRoute?: boolean; durationScale?: number; selectedId?: string | null; onPointOpen?: (id: string) => void; walkingBuddy?: boolean;
+export function JourneyOverlays({ points, route, onOpen, playing, playbackKey, drawRoute = true, durationScale = 1, selectedId, onPointOpen, walkingBuddy = false, photoPinSize = 42 }: {
+  points: DiscoveryPoints; route: Coordinate[][]; onOpen: (id: string) => void; playing: boolean; playbackKey: string; drawRoute?: boolean; durationScale?: number; selectedId?: string | null; onPointOpen?: (id: string) => void; walkingBuddy?: boolean; photoPinSize?: number;
 }) {
   const legs = useMemo(() => travelLegs(route).map(leg => ({ ...leg, duration: leg.duration * durationScale })), [route, durationScale]);
   const line = useMemo(() => travelLine(route, legs), [route, legs]);
@@ -67,7 +67,7 @@ export function JourneyOverlays({ points, route, onOpen, playing, playbackKey, d
         style={{ lineColor: '#4A9D7C', lineWidth: 2.5, lineOpacity: 0.9, lineDasharray: [2, 2], lineCap: 'round' }} />
     </Mapbox.ShapeSource>}
     {points.features.filter(point => point.properties.photo || point.properties.photoThumbnail).map(point => <PhotoPin key={point.id}
-      point={point} onOpen={onPointOpen ? () => onPointOpen(String(point.id)) : onOpen} selected={selectedId === point.id} />)}
+      point={point} size={photoPinSize} onOpen={onPointOpen ? () => onPointOpen(String(point.id)) : onOpen} selected={selectedId === point.id} />)}
     {hasLegs && playing && (walkingBuddy ? <HomeTraveler key={playbackKey} legs={legs} /> : <TravelingPlane key={playbackKey} legs={legs} />)}
   </>;
 }

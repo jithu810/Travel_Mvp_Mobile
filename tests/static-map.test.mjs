@@ -265,12 +265,15 @@ test('JourneyPhoto keeps photos first, then map, then its existing fallback', ()
   assert.ok(nodes(plain).some(n => n.props?.accessibilityLabel === 'No journey photo available'), 'No map prop keeps the original fallback');
 }));
 
-test('static maps remain only in create/draft flows and the opened-stop circle; list and story surfaces use journey art', () => {
+test('static maps remain in normal create flows and the opened-stop circle; remix cards use art; legacy draft links redirect without a cover map', () => {
   const read = path => readFileSync(path, 'utf8');
-  // Unchanged private create/draft flows keep their single-place or draft-cover maps.
+  // Normal create cards retain maps; remix cards supply the existing stop artwork.
   assert.match(read('src/components/create/memory-row.tsx'), /map=\{\{ points: \[stop\] \}\}/);
-  assert.match(read('src/components/journey/customize-stops.tsx'), /JourneyPhoto uri=\{stop\.photo\}[^\n]*map=\{\{ points: \[stop\] \}\}/);
-  assert.match(read('src/app/draft/[id].tsx'), /JourneyPhoto uri=\{state\.data\.cover\}[^\n]*map=\{\{ points: state\.data\.stops \}\}/);
+  assert.doesNotMatch(read('src/components/journey/customize-stops.tsx'), /\bmap=/);
+  assert.match(read('src/components/journey/customize-stops.tsx'), /fallback=\{<StopArt/);
+  assert.match(read('src/app/create.tsx'), /fallback=\{form\.sourceId \? <StopArt/);
+  assert.doesNotMatch(read('src/app/draft/[id].tsx'), /JourneyPhoto|JourneyMap|loadPrivateDraft/);
+  assert.match(read('src/app/draft/[id].tsx'), /<Redirect href=\{\{ pathname: '\/create', params: \{ draft: id \} \}\}/);
   // List cards, story cover and opened stop surfaces never request slot-sized static maps.
   for (const file of ['src/components/discovery/home-journey-card.tsx', 'src/components/discovery/journey-card.tsx', 'src/components/discovery/explore-tile.tsx', 'src/components/profile/profile-ui.tsx',
     'src/components/journey/story-header.tsx', 'src/components/journey/stop-card-deck.tsx', 'src/components/journey/stop-timeline.tsx', 'src/components/journey/stop-story-viewer.tsx']) {

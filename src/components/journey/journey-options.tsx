@@ -30,7 +30,7 @@ export function JourneyOptions({ id, onUse, inlineFeedback = false, menu, presen
     if (!userId) { if (intent.begin(id, 'remix')) router.push('/auth'); return; }
     const generation = focus.current.generation;
     const copyId = await remixStore.run(key, () => remixJourney(id, userId));
-    if (copyId && focus.current.active && generation === focus.current.generation) router.push({ pathname: '/draft/[id]', params: { id: copyId } });
+    if (copyId && focus.current.active && generation === focus.current.generation) router.push({ pathname: '/create', params: { draft: copyId } });
   }, [id, intent, key, router, userId]);
   useFocusEffect(useCallback(() => {
     if (userId && !auth.loading && intent.pending?.journeyId === id && intent.pending.action === 'remix') {
@@ -38,9 +38,9 @@ export function JourneyOptions({ id, onUse, inlineFeedback = false, menu, presen
     }
   }, [userId, auth.loading, id, intent, copy]));
   if (presentation === 'rail') return <View style={styles.rail}>
-    <Pressable accessibilityRole="button" accessibilityLabel={state.copyId ? 'Open private copy' : 'Remix This Journey'} accessibilityHint="Requires sign-in. Creates or opens your private draft." disabled={auth.loading || state.busy || (state.blocked && !state.copyId)} accessibilityState={{ disabled: auth.loading || state.busy || (state.blocked && !state.copyId) }} onPress={() => { if (state.copyId) router.push({ pathname: '/draft/[id]', params: { id: state.copyId } }); else void copy(); }} style={[styles.railButton, (auth.loading || state.busy || (state.blocked && !state.copyId)) && { opacity: 0.6 }]}>{state.busy ? <ActivityIndicator color={colors.ink} /> : <JourneyActionIcon name="remix" />}</Pressable>
-    <Pressable accessibilityRole="button" accessibilityLabel="Customize stops" accessibilityHint="Choose stops before creating your own editable draft." onPress={() => router.push({ pathname: '/customize/[id]', params: { id } })} style={styles.railButton}><JourneyActionIcon name="route" /></Pressable>
-    <Pressable accessibilityRole="button" accessibilityLabel="About this journey" onPress={onAbout} style={styles.railButton}><JourneyActionIcon name="info" /></Pressable>
+    <Pressable accessibilityRole="button" accessibilityLabel={state.copyId ? 'Open private copy' : 'Remix This Journey'} accessibilityHint="Requires sign-in. Creates or opens your private draft." disabled={auth.loading || state.busy || (state.blocked && !state.copyId)} accessibilityState={{ disabled: auth.loading || state.busy || (state.blocked && !state.copyId) }} onPress={() => { if (state.copyId) router.push({ pathname: '/create', params: { draft: state.copyId } }); else void copy(); }} style={[styles.railButton, (auth.loading || state.busy || (state.blocked && !state.copyId)) && { opacity: 0.6 }]}>{state.busy ? <ActivityIndicator color={colors.ink} /> : <JourneyActionIcon name="remix" />}<Text style={styles.railLabel}>{state.copyId ? 'My draft' : 'Remix'}</Text></Pressable>
+    <Pressable accessibilityRole="button" accessibilityLabel="Customize stops" accessibilityHint="Choose stops for this trip. No draft is created." onPress={() => router.push({ pathname: '/customize/[id]', params: { id } })} style={styles.railButton}><JourneyActionIcon name="route" /><Text style={styles.railLabel}>Customize</Text></Pressable>
+    <Pressable accessibilityRole="button" accessibilityLabel="About this journey" onPress={onAbout} style={styles.railButton}><JourneyActionIcon name="info" /><Text style={styles.railLabel}>About</Text></Pressable>
     {(state.error || state.blocked) && <Pressable accessibilityRole="button" accessibilityLabel={state.error || 'Check your Account drafts before retrying Remix'} onPress={() => setFeedbackOpen(true)} style={styles.railFeedback}><Text accessibilityLiveRegion="polite" style={styles.remixLabel}>!</Text></Pressable>}
     <StorySheet visible={feedbackOpen} title="Remix journey" onClose={() => setFeedbackOpen(false)}>
       {state.error && <Text accessibilityRole="alert" style={ui.body}>{state.error}</Text>}
@@ -51,12 +51,12 @@ export function JourneyOptions({ id, onUse, inlineFeedback = false, menu, presen
     <View style={styles.buttons}>
     <Pressable accessibilityRole="button" accessibilityLabel="Use This Journey" accessibilityHint="Use all stops. Opens Travel Mode. Begin Trip starts the timer and location tracking." onPress={onUse} style={({ pressed }) => [styles.use, pressed && { opacity: 0.7 }]}><Text style={styles.useLabel}>↗ Use all stops</Text></Pressable>
     <Pressable accessibilityRole="button" disabled={auth.loading || state.busy || (state.blocked && !state.copyId)} accessibilityState={{ disabled: auth.loading || state.busy || (state.blocked && !state.copyId) }}
-      onPress={() => { if (state.copyId) router.push({ pathname: '/draft/[id]', params: { id: state.copyId } }); else void copy(); }} accessibilityLabel={state.copyId ? "Open private copy" : "Remix This Journey"} accessibilityHint="Requires sign-in. Creates or opens your private draft." style={({ pressed }) => [styles.remix, (auth.loading || state.busy || (state.blocked && !state.copyId) || pressed) && { opacity: 0.65 }]}>
+      onPress={() => { if (state.copyId) router.push({ pathname: '/create', params: { draft: state.copyId } }); else void copy(); }} accessibilityLabel={state.copyId ? "Open private copy" : "Remix This Journey"} accessibilityHint="Requires sign-in. Creates or opens your private draft." style={({ pressed }) => [styles.remix, (auth.loading || state.busy || (state.blocked && !state.copyId) || pressed) && { opacity: 0.65 }]}>
       {state.busy ? <ActivityIndicator color={colors.ink} /> : <Text style={styles.remixLabel}>{state.copyId ? 'My draft ↗' : '↻ Remix'}</Text>}
     </Pressable>
     {!inlineFeedback && (state.error || state.blocked) && <Pressable accessibilityRole="button" accessibilityLabel={state.error || 'Check your Account drafts before retrying Remix'} onPress={() => setFeedbackOpen(true)} style={styles.feedback}><Text accessibilityLiveRegion="polite" style={styles.remixLabel}>!</Text></Pressable>}
     </View>
-    <Pressable accessibilityRole="button" accessibilityLabel="Customize stops" accessibilityHint="Choose stops before creating your own editable draft." onPress={() => { menu?.onClose(); router.push({ pathname: '/customize/[id]', params: { id } }); }} style={styles.menuAction}><Text style={styles.remixLabel}>Customize stops →</Text></Pressable>
+    <Pressable accessibilityRole="button" accessibilityLabel="Customize stops" accessibilityHint="Choose stops for this trip. No draft is created." onPress={() => { menu?.onClose(); router.push({ pathname: '/customize/[id]', params: { id } }); }} style={styles.menuAction}><Text style={styles.remixLabel}>Customize stops →</Text></Pressable>
     {inlineFeedback && <View style={{ gap: 10 }}>
       {state.error && <Text accessibilityRole="alert" style={ui.body}>{state.error}</Text>}
       {state.blocked && <Action label="Check Account drafts" onPress={() => router.push('/account')} />}
@@ -84,7 +84,7 @@ export function JourneyOptions({ id, onUse, inlineFeedback = false, menu, presen
 }
 
 const styles = StyleSheet.create({
-  rail: { gap: 3, flexDirection: 'row' }, railButton: { width: 44, minHeight: 44, borderRadius: 14, backgroundColor: 'transparent', alignItems: 'center', justifyContent: 'center' }, railFeedback: { position: 'absolute', right: 48, top: 0, width: 44, minHeight: 44, borderRadius: 22, backgroundColor: colors.pale, alignItems: 'center', justifyContent: 'center' },
+  rail: { gap: 3, flexDirection: 'row' }, railLabel: { color: colors.ink, fontSize: 10, lineHeight: 14, fontWeight: '600', textAlign: 'center' }, railButton: { minWidth: 56, minHeight: 54, paddingHorizontal: 3, borderRadius: 14, backgroundColor: 'transparent', alignItems: 'center', justifyContent: 'center' }, railFeedback: { position: 'absolute', right: 48, top: 0, width: 44, minHeight: 44, borderRadius: 22, backgroundColor: colors.pale, alignItems: 'center', justifyContent: 'center' },
   menuOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.35)' },
   menuBackdrop: { position: 'absolute', top: 0, bottom: 0, left: 0, right: 0 },
   menuPanel: { maxHeight: '80%', backgroundColor: colors.paper, borderTopLeftRadius: 24, borderTopRightRadius: 24 },

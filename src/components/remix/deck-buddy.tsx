@@ -4,7 +4,7 @@ import { BuddySprite } from '@/components/buddy/buddy-sprite';
 import { theme } from '@/theme/mobile-theme';
 
 export type DeckMood = 'idle' | 'discard' | 'select' | 'undo' | 'done';
-export const deckBuddyLines: Record<DeckMood, string> = { idle: 'Build your hand!', discard: 'Discarded!', select: 'Selected!', undo: 'Back in the deck!', done: 'That’s your hand! Let’s review.' };
+export const deckBuddyLines: Record<DeckMood, string> = { idle: 'Build your hand!', discard: 'Discarded!', select: 'Selected!', undo: 'Back in the deck!', done: 'That’s your hand! Let’s explore.' };
 
 // Decorative companion beside the deck: never interactive, so it cannot cover touches.
 // Each decision is announced once by the progress live region; the buddy only announces

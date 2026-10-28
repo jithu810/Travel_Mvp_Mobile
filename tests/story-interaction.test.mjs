@@ -38,7 +38,7 @@ function harness(runEffects = true) {
   };
 }
 function load(path, modules, hooks = harness(false).hooks, timers = globalThis) {
-  modules={'@/hooks/use-buddy-geometry':buddyGeometryStub,...modules};
+  modules={'@/lib/journey/customized-travel':{customizedTravel:()=>null},'@/hooks/use-buddy-geometry':buddyGeometryStub,...modules};
   const source = ts.transpileModule(readFileSync(path, 'utf8'), {
     compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true },
   }).outputText;
@@ -290,14 +290,15 @@ test('Travel Mode eligibility refuses empty, invalid and duplicate itineraries w
 });
 
 test('Travel Mode reloads the route ID using existing queries and handles exit, hardware back, loading and invalid data', async () => {
-  const h = harness(); const calls = []; let id = journeyId, back, removed = 0, canGoBack = true, loader;
+  const h = harness(); const calls = []; let id = journeyId, customized, localJourney = null, back, removed = 0, canGoBack = true, loader;
   const store = sessionModel.createTripStore();
   const valid = { id: journeyId, title: 'Public journey', stops: [{ ...stop('first'), sequence: 0 }] };
   let state = { data: valid, loading: false, error: null, retry: () => {} };
   const router = { canGoBack: () => canGoBack, back: () => calls.push('back'), replace: route => calls.push(route) };
   const { default: Screen, TravelModeContent } = load('src/app/travel/[id].tsx', {
+    '@/lib/journey/customized-travel': { customizedTravel: () => localJourney },
     ...sessionMocks(store),
-    'expo-router': { useRouter: () => router, useLocalSearchParams: () => ({ id }), useFocusEffect: callback => h.hooks.useEffect(callback, [callback]) },
+    'expo-router': { useRouter: () => router, useLocalSearchParams: () => ({ id, customized }), useFocusEffect: callback => h.hooks.useEffect(callback, [callback]) },
     'react-native': { ...native, ScrollView: 'ScrollView', BackHandler: { addEventListener: (event, cb) => { assert.equal(event, 'hardwareBackPress'); back = cb; return { remove: () => removed++ }; } } },
     'react-native-safe-area-context': { SafeAreaView: 'SafeAreaView' }, '@/components/discovery/ui': ui,
     '@/components/journey/map/journey-map': { JourneyMap: 'JourneyMap' }, '@/components/journey/map-itinerary': { MapItinerary: 'MapItinerary' },
@@ -312,6 +313,14 @@ test('Travel Mode reloads the route ID using existing queries and handles exit, 
   const signal = new AbortController().signal;
   assert.equal(await loader(signal), valid);
   assert.deepEqual(calls.pop(), { value: journeyId, signal });
+  customized = '1'; localJourney = { ...valid, stops: [valid.stops[0]] };
+  tree = h.render(Screen, {}); assert.equal(find(tree, TravelModeContent).props.journey, localJourney);
+  assert.equal(await loader(signal), localJourney); assert.equal(calls.length,0,'Custom preview does not fetch from backend');
+  localJourney = null; tree = h.render(Screen, {});
+  assert.equal(await loader(signal),null); assert.equal(find(tree, TravelModeContent),null,'Missing selection does not fall back to stale public data');
+  assert.match(find(tree,'Message').props.body,/local selection is unavailable/);
+  customized = ['1']; tree = h.render(Screen, {}); assert.equal(find(tree,TravelModeContent),null);
+  customized = undefined; id = journeyId; tree = h.render(Screen, {});
   find(tree, TravelModeContent).props.onExit(); assert.equal(calls.pop(), 'back');
   assert.equal(back(), true); assert.equal(calls.pop(), 'back');
   canGoBack = false; back(); assert.deepEqual(calls.pop(), { pathname: '/journey/[id]', params: { id: journeyId } });
@@ -1604,7 +1613,7 @@ test('popup JourneyOptions preserves Use, sign-in Remix, private copy reuse and 
     } else {
       remix.props.onPress(); await new Promise(resolve => setImmediate(resolve));
       if (mode === 'anonymous') { assert.deepEqual(intents, [[journeyId, 'remix']]); assert.equal(routes.at(-1), '/auth'); }
-      else assert.deepEqual(routes.at(-1), { pathname: '/draft/[id]', params: { id: mode === 'existing' ? 'private-copy' : 'new-copy' } });
+      else assert.deepEqual(routes.at(-1), { pathname: '/create', params: { draft: mode === 'existing' ? 'private-copy' : 'new-copy' } });
       assert.equal(copies.length, mode === 'signed-in' ? 1 : 0);
     }
     assert.equal(find(tree, 'StorySheet').props.visible, false, 'No stacked feedback modal in the popup');
@@ -1755,7 +1764,7 @@ test('rail JourneyOptions preserves anonymous Remix, existing private copy, bloc
     } else {
       remix.props.onPress(); await new Promise(resolve => setImmediate(resolve));
       if (mode === 'anonymous') { assert.deepEqual(intents, [[journeyId, 'remix']]); assert.equal(routes.at(-1), '/auth'); }
-      else assert.deepEqual(routes.at(-1), { pathname: '/draft/[id]', params: { id: mode === 'existing' ? 'private-copy' : 'new-copy' } });
+      else assert.deepEqual(routes.at(-1), { pathname: '/create', params: { draft: mode === 'existing' ? 'private-copy' : 'new-copy' } });
       assert.equal(copies.length, mode === 'signed-in' ? 1 : 0);
     }
     if(mode!=='blocked')assert.equal(find(tree,'StorySheet').props.visible,false);

@@ -25,24 +25,28 @@ import { loadPublicJourney } from '@/lib/discovery/queries';
 import { isJourneyId } from '@/lib/discovery/model';
 import { buildMapData, hasCoordinates } from '@/lib/journey/map-data';
 import { selectedStopId } from '@/lib/journey/story-layout';
+import { customizedTravel } from '@/lib/journey/customized-travel';
 import { canOpenTravelMode } from '@/lib/journey/travel-preview';
 import type { PublicJourney } from '@/types/journey';
 
 export default function TravelModeScreen() {
-  const params = useLocalSearchParams<{ id: string | string[] }>();
-  const id = typeof params.id === 'string' ? params.id : '';
+  const params = useLocalSearchParams<{ id: string | string[]; customized?: string | string[] }>();
+  const routeId = typeof params.id === 'string' ? params.id : '';
+  const local = params.customized !== undefined;
+  const localJourney = local && params.customized === '1' ? customizedTravel(routeId) : null;
+  const id = localJourney?.id ?? routeId;
   const router = useRouter();
-  const loader = useCallback((signal: AbortSignal) => loadPublicJourney(id, signal), [id]);
+  const loader = useCallback((signal: AbortSignal) => local ? Promise.resolve(localJourney) : loadPublicJourney(id, signal), [id, local, localJourney]);
   const state = useLoad(loader);
   const session = useTripSnapshot(id);
-  const available = session.journey ?? state.data;
+  const available = local ? (localJourney ? session.journey ?? localJourney : null) : session.journey ?? state.data;
   const [leaving, setLeaving] = useState(false);
   useBuddyScreen({ suppressed: leaving || !canOpenTravelMode(available) });
   const exit = useCallback(() => {
     if (router.canGoBack()) router.back();
-    else if (isJourneyId(id)) router.replace({ pathname: '/journey/[id]', params: { id } });
+    else if (!local && isJourneyId(id)) router.replace({ pathname: '/journey/[id]', params: { id } });
     else router.replace('/discover');
-  }, [router, id]);
+  }, [router, id, local]);
   const requestExit = useCallback(() => {
     const current = tripStore.get(id);
     if (current.status === 'active' || current.status === 'paused') setLeaving(true);
@@ -56,7 +60,7 @@ export default function TravelModeScreen() {
     {canOpenTravelMode(available) ? <TravelModeContent key={available.id} journey={available} onExit={requestExit} refreshNotice={session.journey && state.error ? 'Original could not refresh. Using this session’s itinerary.' : undefined} /> : <SafeAreaView style={styles.unavailable}>
       <View style={styles.header}><Text accessibilityRole="header" style={styles.title}>Travel Mode</Text><Exit onExit={requestExit} /></View>
       <View style={styles.unavailable}>{state.loading ? <BrandedLoading message="Opening your itinerary…" />
-        : <Message title="Journey unavailable" body={state.error || 'Choose a public journey with at least one stop to open Travel Mode.'} retry={state.error ? state.retry : undefined} />}</View>
+        : <Message title="Journey unavailable" body={(local ? 'This local selection is unavailable. Return to Customize stops and select again.' : state.error) || 'Choose a public journey with at least one stop to open Travel Mode.'} retry={state.error ? state.retry : undefined} />}</View>
     </SafeAreaView>}
     {leaving && <TripConfirmation title="Leave Travel Mode?" body={(session.status === 'active' ? 'Your local timer keeps running while you’re away.' : 'Your local session stays paused.') + ' Reopen this journey’s Travel Mode to return. This session is kept only until the app process closes.'} confirmLabel="Leave and keep session" onCancel={() => setLeaving(false)} onConfirm={() => { setLeaving(false); exit(); }} />}
   </View>;

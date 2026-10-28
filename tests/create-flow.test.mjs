@@ -15,14 +15,14 @@ function harness() {
     useRef: value => { const i=cursor++; return slots[i]??={current:value}; },
     useEffect: (fn,deps) => { const i=cursor++; if (!deps || !slots[i] || deps.some((v,j)=>slots[i].deps?.[j]!==v)) { slots[i]?.cleanup?.(); const slot={deps}; slots[i]=slot; effects.push(()=>{slot.cleanup=fn();}); } },
   };
-  return { hooks, render(fn, props) { cursor=0;effects=[];const result=fn(props);effects.forEach(fn=>fn());return result; } };
+  return { hooks, reset(){slots.forEach(slot=>slot?.cleanup?.());slots.length=0;}, render(fn, props) { cursor=0;effects=[];const result=fn(props);effects.forEach(fn=>fn());return result; } };
 }
 const native = Object.fromEntries(['Image','View','Text','TextInput','Pressable','ScrollView','KeyboardAvoidingView','ActivityIndicator','Modal'].map(name=>[name,name]));
 native.useWindowDimensions=()=>({width:390,height:844,fontScale:1});
 native.AppState={addEventListener(){return {remove(){}};}};native.Animated={View:'AnimatedView'};native.Keyboard={dismiss(){},addListener(){return {remove(){}};}};native.StyleSheet={create:value=>value};native.Platform={OS:'android'};
 const ui = { colors: {}, ui: {}, Action:'Action', Message:'Message', ScreenHeader:'ScreenHeader' };
 function load(file, modules, hooks=harness().hooks, timers=globalThis) {
-  modules={'@/hooks/use-buddy-geometry':buddyGeometryStub,...modules};
+  modules={'@/components/journey/story-sheet':{StorySheet:'StorySheet'},'@/components/journey/journey-action-icon':{JourneyActionIcon:'JourneyActionIcon'},'@/hooks/use-buddy-geometry':buddyGeometryStub,'@/components/art/journey-art':{StopArt:'StopArt'},'@/lib/art/journey-art':{artSeed:(_id,stops)=>'stop:'+stops[0]?.id},...modules};
   const exports={}; const jsx=(type,props)=>({type,props});
   const code=ts.transpileModule(readFileSync(file,'utf8'), {compilerOptions:{module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX,target:ts.ScriptTarget.ES2022}}).outputText;
   new Function('require','exports','setTimeout','clearTimeout',code)(name=>{ if (name === '@/theme/mobile-theme') return mobileTheme;
@@ -45,6 +45,7 @@ function load(file, modules, hooks=harness().hooks, timers=globalThis) {
     if(name==='@/lib/create/thumbnail-device')return {prepareThumbnail:async()=>{throw Error('Thumbnail not enabled in this test');},removeThumbnail(){}};
     if(name==='@/components/discovery/compact-search-input')return load('src/components/discovery/compact-search-input.tsx',{},hooks);
     if(name==='@/lib/journey/nearby')return load('src/lib/journey/nearby.ts',{}); if(name.endsWith('/nearby-locations'))return {NearbyLocations:'NearbyLocations'}; if(name==='@/components/branded-loading')return {BrandedLoading:'BrandedLoading'};if(name==='@/lib/discovery/destination-camera')return destinationHelpers;if(name==='@/hooks/use-discovery-sheet')return modules[name] || {useDiscoverySheet:()=>({height:56,expanded:true,responders:{handle:{},content:{}},offset:{current:0},setScrollOffset(){},toggle(){}})};if(name==='@/components/create/create-journey-header')return {CreateJourneyHeader:'CreateJourneyHeader'};if(name==='expo-status-bar')return {StatusBar:'StatusBar'};if(name==='react')return hooks;if(name==='react/jsx-runtime')return {jsx,jsxs:jsx,Fragment:'Fragment'};
+    if(name==='@/lib/journey/story-buddy-playback'){const map=load('src/lib/journey/map-data.ts',{});return load('src/lib/journey/story-buddy-playback.ts',{'./map-data':map,'../discovery/travel':load('src/lib/discovery/travel.ts',{'../journey/map-data':map})});}
     if(name==='../home-control-icon')return {HomeControlIcon:'HomeControlIcon'};if(name==='react-native')return {...native,...modules[name]};if(name==='expo-router')return {Stack:{Screen:'StackScreen'},...modules[name]};if(name in modules)return modules[name];throw Error(name);
   },exports,timers.setTimeout,timers.clearTimeout);return exports;
 }
@@ -78,9 +79,9 @@ function screenHarness(initial, photoState = {}, buddyEvents = []) {
     '@/components/journey/map/journey-map':{JourneyMap:'JourneyMap'},'@/hooks/session-context':{useSessionState:()=>({loading:false,session:{user:{id:uid}}})},'@/hooks/use-load':{useLoad:()=>({data:{'journey-media/raw/stop.png':'https://signed.test/stop'},error:null})},'@/lib/remix/queries':{},
     '@/lib/create/model':model,'@/lib/create/queries':{saveNewJourney:async payload=>{writes.push(payload);if(pending)await pending;if(fail)throw new model.SaveFailure('This journey changed. Reload saved draft.',uncertain);return {id,status:payload.status,updated_at:'2026-10-14T12:00:00Z'};}},
   };
-  const {NewJourneyEditor,default:CreateScreen}=load('src/app/create.tsx',modules,h.hooks);
+  const {NewJourneyEditor,RemixDraftMap,default:CreateScreen}=load('src/app/create.tsx',modules,h.hooks);
   let reloads=0;
-  return {celebrations,blur:()=>focusCleanup?.(),renderEntry:()=>h.render(CreateScreen,{}),setCanGoBack:value=>{canGoBack=value;},render:(props={})=>h.render(NewJourneyEditor,{ownerId:uid,initial,onReload:()=>reloads++,...props}),writes,routes,alerts,uploads,setFailure:(value=true,ambiguous=true)=>{fail=value;uncertain=ambiguous;},setPending:value=>{pending=value;},prevented:()=>prevented,dispatches,reloads:()=>reloads};
+  return {celebrations,blur:()=>focusCleanup?.(),mountChild:node=>{h.reset();return h.render(node.type,node.props);},renderRemixMap:props=>h.render(RemixDraftMap,props),renderEntry:()=>h.render(CreateScreen,{}),setCanGoBack:value=>{canGoBack=value;},render:(props={})=>h.render(NewJourneyEditor,{ownerId:uid,initial,onReload:()=>reloads++,...props}),writes,routes,alerts,uploads,setFailure:(value=true,ambiguous=true)=>{fail=value;uncertain=ambiguous;},setPending:value=>{pending=value;},prevented:()=>prevented,dispatches,reloads:()=>reloads};
 }
 test('actual editor quick-start saves privately with zero stops and routes to the saved editable journey',async()=>{
   const h=screenHarness();let tree=h.render();let setup=all(tree,'QuickJourneySetup')[0];
@@ -669,7 +670,9 @@ test('Create passes selected destination/version and outside-dismiss state witho
     assert.deepEqual(tree.props.edges,['left','right','bottom']);assert.equal(all(tree,'StackScreen')[0].props.options.statusBarStyle,'light');
     all(tree,'View').find(n=>n.props.onTouchStart).props.onTouchStart();tree=h.renderEntry();assert.equal(all(tree,'NewJourneyEditor')[0].props.dismissSearchVersion,1);
     listeners.keyboardDidShow();tree=h.renderEntry();assert.equal(all(tree,'CreateJourneyHeader')[0].props.keyboardOpen,true);assert.equal(all(tree,'NewJourneyEditor')[0].props.keyboardOpen,true);
-    const draft=screenHarness(privateForm()).renderEntry();assert.deepEqual(draft.props.edges,['left','right','bottom']);assert.equal(all(draft,'StackScreen')[0].props.options.statusBarStyle,'dark');
+    const draftHarness=screenHarness(privateForm()),draft=draftHarness.renderEntry();assert.deepEqual(draft.props.edges,['left','right','bottom']);assert.equal(all(draft,'StackScreen')[0].props.options.statusBarStyle,'dark');
+    assert.equal(all(draft,'DraftEditorEntry')[0].props.keyboardOpen,false);listeners.keyboardDidShow();const draftEntry=all(draftHarness.renderEntry(),'DraftEditorEntry')[0];assert.equal(draftEntry.props.keyboardOpen,true);
+    assert.equal(all(draftHarness.mountChild(draftEntry),'NewJourneyEditor')[0].props.keyboardOpen,true,'Hydrated draft entry forwards actual route keyboard state to the editor');
     const editorTree=screenHarness().render({keyboardOpen:true});assert.equal(all(editorTree,'DraftShortcuts')[0].props.keyboardHidden,true);
   } finally {native.Keyboard.addListener=old;}
   const shared=load('src/components/discovery/ui.tsx',{'expo-router':{useRouter:()=>({})}});
@@ -808,6 +811,36 @@ test('memory map receives resolved photos and selection without changing geometr
   delete photos.candidates[sid];tree=h.render();assert.equal(all(tree,'DraftMap')[0].props.geometry,geometry);assert.equal(JSON.parse(all(tree,'DraftMap')[0].props.photos)[sid],'https://signed.test/stop');
   all(tree,'MemoryRow')[0].props.onEdit();tree=h.render();assert.equal(all(tree,'DraftMap')[0].props.active,false);assert.equal(all(tree,'DraftMap')[0].props.selectedId,sid);
   assert.equal(h.writes.length,0,'Map selection and photo previews do not persist anything');
+});
+
+test('remix editor opts into running Story map and pauses it behind keyboard, settings, memory sheet and blur without writing',()=>{
+  const initial={...privateForm(),sourceId:uid,stops:[memoryRow(sid,'First',{latitude:8,longitude:76}),memoryRow(uid,'Second',{latitude:9,longitude:77})]};
+  const h=screenHarness(initial);let tree=h.render();
+  assert.equal(all(tree,'DraftMap')[0].props.remix,true);assert.equal(all(tree,'DraftMap')[0].props.active,true);
+  all(tree,'MemoryDeck')[0].props.onSelect(uid);tree=h.render();assert.equal(all(tree,'DraftMap')[0].props.selectedId,uid);
+  tree=h.render({keyboardOpen:true});assert.equal(all(tree,'DraftMap')[0].props.active,false);
+  tree=h.render({keyboardOpen:false});all(tree,'Pressable').find(n=>n.props.accessibilityLabel==='Journey settings').props.onPress();tree=h.render();assert.equal(all(tree,'DraftMap')[0].props.active,false);
+  all(tree,'Pressable').find(n=>n.props.accessibilityLabel==='Close journey settings').props.onPress();tree=h.render();
+  all(tree,'MemoryRow')[0].props.onEdit();tree=h.render();assert.equal(all(tree,'DraftMap')[0].props.active,false);
+  h.blur();tree=h.render();assert.equal(all(tree,'DraftMap')[0].props.active,false);assert.equal(h.writes.length,0);
+  const own=screenHarness({...initial,sourceId:undefined});assert.equal(all(own.render(),'DraftMap')[0].props.remix,false);
+});
+
+test('actual remix map shares card and pin selection, runs only its selected route, preserves controller until geometry changes and releases old timers',()=>{
+  const h=screenHarness(),selected=[];
+  const props={geometry:JSON.stringify([memoryRow(sid,'First',{latitude:8,longitude:76}),memoryRow(uid,'Second',{latitude:9,longitude:77})]),selectedId:sid,onSelect:id=>selected.push(id),active:true,topInset:24};
+  let tree=h.renderRemixMap(props),map=all(tree,'JourneyMap')[0],playback=map.props.storyBuddy;
+  assert.equal(map.props.presentation,'expanded');assert.equal(map.props.storyBuddyMotion,'run');assert.equal(map.props.storyBuddySize,36);assert.equal(map.props.memoryPhotos,undefined);assert.equal(map.props.animateMemoryRoute,undefined);assert.equal(map.props.controlTopInset,24);
+  map.props.onExpand(); tree=h.renderRemixMap(props);
+  assert.equal(all(tree,'StorySheet').length,1);assert.equal(all(tree,'JourneyMap').length,1);
+  assert.equal(all(tree,'JourneyMap')[0].props.storyBuddy,playback);assert.equal(all(tree,'JourneyMap')[0].props.storyBuddySize,64);
+  all(tree,'StorySheet')[0].props.onClose();tree=h.renderRemixMap(props);map=all(tree,'JourneyMap')[0];
+  assert.equal(all(tree,'StorySheet').length,0);assert.equal(map.props.storyBuddySize,36);assert.equal(h.writes.length,0);
+  assert.deepEqual(playback.get().coordinate,[76,8]);playback.configure(true,false);
+  props.selectedId=uid;tree=h.renderRemixMap(props);map=all(tree,'JourneyMap')[0];assert.equal(map.props.storyBuddy,playback);assert.equal(playback.get().moving,true);map.props.onSelect(sid);assert.deepEqual(selected,[sid]);
+  props.active=false;tree=h.renderRemixMap(props);assert.equal(all(tree,'JourneyMap')[0].props.storyBuddy,undefined);assert.equal(playback.get().moving,false);
+  props.active=true;tree=h.renderRemixMap(props);assert.equal(all(tree,'JourneyMap')[0].props.storyBuddy,playback);
+  props.geometry=JSON.stringify([memoryRow(uid,'Remaining',{latitude:9,longitude:77})]);tree=h.renderRemixMap(props);const replacement=all(tree,'JourneyMap')[0].props.storyBuddy;assert.notEqual(replacement,playback);assert.deepEqual(replacement.get().coordinate,[77,9]);replacement.dispose();
 });
 
 test('shared Home overlays keep original speed and route while editor opts into slow indicator and existing line',()=>{

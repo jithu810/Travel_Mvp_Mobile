@@ -85,19 +85,32 @@ function hooks() {
     useEffect(fn, deps) { const i = cursor++; if (!slots[i] || deps.some((value, j) => value !== slots[i].deps[j])) { slots[i]?.cleanup?.(); const entry = slots[i] = { deps }; effects.push(() => { entry.cleanup = fn(); }); } } };
   return { react, render(fn, props) { cursor = 0; effects = []; const tree = fn(props); effects.forEach(fn => fn()); return tree; }, dispose() { slots.forEach(entry => entry?.cleanup?.()); } };
 }
-test('actual Story annotation decodes both sheets before ownership, walks at selected size and releases timers/ownership on failure', () => {
+for (const motion of ['walk','run']) test(`actual ${motion} annotation decodes idle and motion before ownership, animates at its clip rate and releases timers on failure`, () => {
   const { model, time } = playback(), h = hooks(), intervals = new Map(), timeouts = new Map(), ownership = []; let id = 0;
-  const timers = { setInterval(fn) { intervals.set(++id, fn); return id; }, clearInterval(key) { intervals.delete(key); }, setTimeout(fn) { timeouts.set(++id, fn); return id; }, clearTimeout(key) { timeouts.delete(key); } };
-  const clips = Object.fromEntries(['idle', 'walk'].map(name => [name, { source: name, frames: 8, fps: 10, facing: 'left' }])); const jsx = (type, props) => ({ type, props });
+  const delays=[];
+  const timers = { setInterval(fn,delay) { delays.push(delay);intervals.set(++id, fn); return id; }, clearInterval(key) { intervals.delete(key); }, setTimeout(fn) { timeouts.set(++id, fn); return id; }, clearTimeout(key) { timeouts.delete(key); } };
+  const clips = Object.fromEntries(['idle', 'walk','run'].map(name => [name, { source: name, frames: 8, fps: name==='run'?12:10, facing: 'left' }])); const jsx = (type, props) => ({ type, props });
   const { StoryWalkingBuddy } = load('src/components/journey/map/story-walking-buddy.tsx', { react: h.react, 'react/jsx-runtime': { jsx, jsxs: jsx }, '@rnmapbox/maps': { MarkerView: 'MarkerView' }, 'react-native': { Image: 'Image', View: 'View' }, '@/hooks/use-map-buddy': { useMapBuddy(available) { ownership.push(available); return { visible: available }; } }, '@/lib/buddy/animations': { resolveBuddyAnimation: name => clips[name], spriteFrame: (_clip, frame, size) => ({ left: -frame * size }) } }, timers);
   model.select('b'); time.advance(640); const retained = [...model.get().coordinate];
-  const props = { playback: model, active: true, reducedMotion: true, motionKnown: false, size: 36 }, render = () => h.render(StoryWalkingBuddy, props);
+  const props = { playback: model, active: true, reducedMotion: true, motionKnown: false, size: 36,...(motion==='run'?{motion}:{}) }, render = () => h.render(StoryWalkingBuddy, props);
   let tree = render(); assert.equal(ownership.at(-1), false); assert.equal(tree.props.children.props.style.width, 36);
   tree.props.children.props.children.forEach(image => image.props.onLoad()); tree.props.children.props.onLayout({ nativeEvent: { layout: { width: 36, height: 36 } } }); render(); tree = render();
   assert.equal(ownership.at(-1), false); assert.deepEqual(model.get().coordinate, retained, 'Unknown preference during expansion pauses without snapping to the target');
   props.motionKnown = true; props.reducedMotion = false; render(); tree = render(); assert.equal(ownership.at(-1), true); assert.deepEqual(model.get().coordinate, retained);
   model.select('b'); time.advance(640); tree = render(); assert.equal(tree.props.children.props.children[1].props.style.opacity, 1);
+  assert.equal(tree.props.children.props.children[1].props.source,motion);assert.equal(delays.at(-1),1000/clips[motion].fps);
   [...intervals.values()][0](); tree = render(); assert.equal(tree.props.children.props.children[1].props.style.left, -36);
   props.size = 64; tree = render(); assert.equal(tree.props.children.props.style.width, 64); assert.equal(tree.props.children.props.children[1].props.style.left, -64);
   tree.props.children.props.children[1].props.onError(); assert.equal(render(), null); assert.equal(ownership.at(-1), false); assert.equal(intervals.size, 0); assert.equal(time.jobs.size, 0); h.dispose(); model.dispose(); assert.equal(timeouts.size, 0);
+});
+
+test('run annotation rests on idle after arrival and reduced motion never starts sprite or route timers',()=>{
+  const {model,time}=playback(),h=hooks(),intervals=new Map();let id=0;
+  const timers={setInterval(fn){intervals.set(++id,fn);return id;},clearInterval(key){intervals.delete(key);},setTimeout:()=>++id,clearTimeout(){}};
+  const clips=Object.fromEntries(['idle','run'].map(source=>[source,{source,frames:8,fps:12,facing:'left'}])),jsx=(type,props)=>({type,props});
+  const {StoryWalkingBuddy}=load('src/components/journey/map/story-walking-buddy.tsx',{react:h.react,'react/jsx-runtime':{jsx,jsxs:jsx},'@rnmapbox/maps':{MarkerView:'MarkerView'},'react-native':{Image:'Image',View:'View'},'@/hooks/use-map-buddy':{useMapBuddy:available=>({visible:available})},'@/lib/buddy/animations':{resolveBuddyAnimation:name=>clips[name],spriteFrame:()=>({})}},timers);
+  const props={playback:model,active:true,reducedMotion:false,motion:'run',size:36},render=()=>h.render(StoryWalkingBuddy,props);
+  let tree=render();tree.props.children.props.children.forEach(image=>image.props.onLoad());tree.props.children.props.onLayout({nativeEvent:{layout:{width:36,height:36}}});render();render();model.select('b');time.advance(1856);tree=render();
+  assert.equal(model.get().moving,false);assert.equal(tree.props.children.props.children[0].props.source,'idle');assert.equal(tree.props.children.props.children[0].props.style.opacity,1);assert.equal(tree.props.children.props.children[1].props.style.opacity,0);
+  props.reducedMotion=true;render();model.select('a');render();assert.equal(intervals.size,0);assert.equal(time.jobs.size,0);assert.deepEqual(model.get().coordinate,[0,0]);h.dispose();model.dispose();
 });

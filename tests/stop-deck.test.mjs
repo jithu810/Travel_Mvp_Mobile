@@ -129,11 +129,11 @@ test('stale fly-offs are dropped after unmount, background, lock, route blur, Re
   }
 });
 
-test('undo returns the last card from its pile and the buddy narrates; finished deck shows the review prompt', async () => {
+test('undo returns the last card from its pile and the buddy narrates; finished deck shows the completion prompt', async () => {
   const t = await setup();
   for (const [keep, id] of [[true, 'a'], [false, 'b'], [true, 'c']]) { t.ref.current.play(keep); t.env.pending.pop().fn({ finished: true }); t.decide(keep, id); }
   assert.deepEqual(t.calls, [[true, 'a'], [false, 'b'], [true, 'c']]);
-  assert.equal(t.card(), undefined); assert.ok(find(t.tree(), 'Ready'), 'Finish state renders the review prompt');
+  assert.equal(t.card(), undefined); assert.ok(find(t.tree(), 'Ready'), 'Finish state renders the completion prompt');
   assert.equal(find(t.tree(), 'DeckBuddy').props.mood, 'done');
   assert.equal(t.ref.current.restore(true, 'c'), true); t.props.cursor = 2; t.props.decisions = { a: true, b: false }; t.render();
   const back = t.env.pending.pop(); assert.equal(back.kind, 'parallel'); assert.deepEqual(back.detail[0].options.toValue, { x: 0, y: 0 });
@@ -145,7 +145,7 @@ test('undo returns the last card from its pile and the buddy narrates; finished 
 test('deck buddy speaks each beat politely, animates only with motion and never takes touches', () => {
   const h = hooksHarness(), env = native(false);
   const { DeckBuddy, deckBuddyLines } = load('src/components/remix/deck-buddy.tsx', { 'react-native': env.rn, '@/components/buddy/buddy-sprite': { BuddySprite: 'BuddySprite' } }, h.hooks);
-  assert.deepEqual(deckBuddyLines, { idle: 'Build your hand!', discard: 'Discarded!', select: 'Selected!', undo: 'Back in the deck!', done: 'That’s your hand! Let’s review.' });
+  assert.deepEqual(deckBuddyLines, { idle: 'Build your hand!', discard: 'Discarded!', select: 'Selected!', undo: 'Back in the deck!', done: 'That’s your hand! Let’s explore.' });
   let tree = h.render(DeckBuddy, { mood: 'select', beat: 1, reduced: false });
   assert.equal(tree.props.pointerEvents, 'none');
   const line = find(tree, 'Text'); assert.equal(line.props.numberOfLines, 3, 'Long lines wrap instead of truncating'); assert.equal(line.props.adjustsFontSizeToFit, true); assert.equal(line.props.maxFontSizeMultiplier, 1.3);
@@ -157,7 +157,7 @@ test('deck buddy speaks each beat politely, animates only with motion and never 
   assert.equal(find(tree, 'BuddySprite').props.animate, false); assert.deepEqual(env.announcements, []);
   tree = h.render(DeckBuddy, { mood: 'undo', beat: 3, reduced: false }); assert.equal(find(tree, 'Text').props.children, 'Back in the deck!');
   tree = h.render(DeckBuddy, { mood: 'done', beat: 3, reduced: false }); assert.equal(env.pending.length, 2, 'Finished hand hops');
-  assert.deepEqual(env.announcements, ['Back in the deck!', 'That’s your hand! Let’s review.']);
+  assert.deepEqual(env.announcements, ['Back in the deck!', 'That’s your hand! Let’s explore.']);
   h.dispose();
 });
 
