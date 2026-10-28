@@ -1,3 +1,25 @@
+## PR #22 publication and merge preparation - 2026-10-28
+- Product owner explicitly approved publishing codex/customize-travel-preview and merging its PR into main. Existing PR #22 is the target. Follow-up selected Story view, temporary removal, running Buddy and Back to cards are included; unrelated workflow/agent instruction edits are excluded.
+- Reused unchanged reviewed code evidence: 147 affected tests, TypeScript/scoped ESLint and native CPH2813 checks passed; independent review has no actionable findings. Diff check passed at publication. Expanded native animation, actual GPS trip and broad accessibility checks remain pending.
+
+## Selected journey Buddy and return to cards - 2026-10-28
+- LOCAL, UNPUBLISHED: selected-route compact/expanded maps use existing running Buddy; customized route added to Buddy visibility rules. Back to cards below map returns to retained choices and Undo. Original Story keeps walking animation. No backend/native dependency changes.
+- VERIFIED: 147 affected tests, TypeScript, scoped ESLint, diff check and independent review pass. CPH2813 Android16: Buddy visible/moving between selected cards, back returns to retained five selections and Undo. Expanded native animation and broader accessibility pending. See docs/qa/selected-journey-story.md.
+
+## Selected journey uses Story view - 2026-10-28
+- LOCAL, UNPUBLISHED follow-up on codex/customize-travel-preview: after the magic deck, selected stops reuse the existing journey Story map/cards/details with Remove and Swipe to journey. Add stop is removed from this flow; removal affects only the temporary selection and guards last-stop, stale and active/paused trips. Backend unchanged.
+- VERIFIED: 87 affected tests, TypeScript, scoped ESLint and diff check pass; independent review found no actionable issues. CPH2813 Android16: four-stop Story view, removal to three stops, swipe to Travel Ready with new first stop confirmed. No Begin Trip/live writes. Expanded accessibility/actual GPS checks pending. See docs/qa/selected-journey-story.md.
+
+## Customize temporary route and travel preview - 2026-10-28
+- [x] Local card selection -> selected journey preview -> optional local Add stop -> Travel Mode; no customization draft/review/publish flow. Reuses map/card/sheet/picker primitives, validates and isolates local routes, preserves resume identity and prevents active-trip route edits.
+- [x] Independent QA78/78; typecheck/scoped lint; independent review fixes verified. Earlier812-test regression covered after isolated local-PG retry. Native four-stop preview/full map, local append to five stops and Travel Ready state verified.
+- [ ] Real GPS trip, accessibility/large-text and other-device matrix; publication not requested. Local routes last only for this app process.
+
+## Remix direct editor and running Buddy - 2026-10-27
+- [x] Local implementation: skip remix summary, preserve legacy links/owner loading, use Story numbered map and remix-only Run/Idle on card selection; preserve Story walking and normal create map. Forward keyboard state into loaded editors.
+- [x] 188 focused tests pass independently; typecheck and source/test lint pass. Independent review has no remaining actionable findings after keyboard-forwarding fix. Existing remix native forward/reverse movement and arrival Idle observed on CPH2813 / Android 16. Shared UI-only preflight policy updated for both repositories; no live writes or publication.
+- [ ] Expanded accessibility/lifecycle/performance device matrix and fresh remix completion verification (requires authorized live copy). Full lint has existing ignored backup import errors; broader isolated PostgreSQL verification limitations are recorded in the QA report. GitHub publication not requested.
+
 ## PR #19 review fix round - 2026-10-27
 - [x] Merge origin/main; restore move-to-stop camera on Story selection; Story map Buddy help entry; Home Locate ownership release after arrival; Travel follow ownership without floating flicker plus throttled projection; expired celebration handling; remove dead Story preview code; scrub LAN/user paths from docs; Story help beside Fit and shown only while the walker owns the map. Published as an update to PR #19 (pending device checks); npm test 794 tests (793 pass, 1 environment skip), typecheck and lint pass.
 - [ ] QA, independent review and physical-device check (Story help placement in compact/expanded maps, Home floating Buddy return after Locate, Travel follow without flicker).

@@ -324,7 +324,13 @@ test('draft-screen credit uses the same "Remix of … · by …" copy with the V
   tree = h.SourceAttribution({ id: sourceId });
   assert.equal(text(tree), remix.unavailableSourceCopy);
   assert.deepEqual(nodes(tree).filter(n => n.type === 'Action').map(n => n.props.label), ['Retry source attribution']);
-  assert.equal(readFileSync('src/app/draft/[id].tsx', 'utf8').includes('function SourceAttribution'), false, 'The screen uses the shared component');
+});
+
+test('legacy private draft links redirect directly to the guarded editor without an intermediate summary',()=>{
+  for(const value of [draftId,'invalid-id','',undefined,[draftId]]){
+    const {default:Screen}=component('src/app/draft/[id].tsx',{'react/jsx-runtime':{jsx,jsxs:jsx},'expo-router':{Redirect:'Redirect',useLocalSearchParams:()=>({id:value})}});
+    const tree=Screen();assert.equal(tree.type,'Redirect');assert.deepEqual(tree.props.href,{pathname:'/create',params:{draft:typeof value==='string'&&value?value:'invalid'}});
+  }
 });
 
 test('screens wire the credits and the optional, non-blocking photo hint', () => {

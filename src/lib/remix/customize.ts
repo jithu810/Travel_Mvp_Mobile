@@ -18,7 +18,7 @@ export function undoSelection(state: Selection): Selection {
 }
 export function selectedStops(stops: readonly JourneyStop[], state: Selection) { return orderedStops(stops).filter(stop => state.decisions[stop.id] === true); }
 export function selectionIssue(stops: readonly JourneyStop[]) {
-  if (!stops.length) return 'Keep at least one stop to create your draft.';
+  if (!stops.length) return 'Select at least one stop to travel.';
   if (stops.length > 50) return 'Keep no more than 50 stops.';
   if (new Set(stops.map(stop => stop.id)).size !== stops.length) return 'This journey has duplicate stops. Reload before continuing.';
   if (stops.some(stop => !coordinates(stop))) return 'Every selected stop needs a valid map location. Skip stops without a location before continuing.';

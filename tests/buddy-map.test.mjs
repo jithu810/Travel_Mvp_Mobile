@@ -189,3 +189,18 @@ test('map help ownership follows the Story walker: floating Buddy and map help n
   api.store.setTour(null); renderWalker(); renderWalker(); assert.equal(renderMap().owned, true);
   walking = false; renderWalker(); assert.equal(renderMap().owned, false); walker.h.dispose(); map.h.dispose();
 });
+
+
+test('selected journey can own its map Buddy while magic cards and blocked screens stay suppressed', () => {
+  let path = '/customized/selection';
+  const h = hooks(), api = { store: createBuddyStore(), preference: { get: () => ({ enabled: true }) } };
+  api.store.environment(path, true);api.store.screen({}, { path, state: { floating: true }, act() {} });
+  const { useMapBuddy } = load('src/hooks/use-map-buddy.ts', { react: h.react, 'expo-router': { usePathname: () => path, useFocusEffect: fn => h.react.useEffect(fn, [fn]) }, 'react-native': { AppState: { currentState: 'active' } }, './use-journey-buddy': { useBuddyApi: () => api, useBuddyPreference: () => ({ enabled: true, loaded: true }) } });
+  const render = () => h.render(() => useMapBuddy(true), {});
+  render();render();assert.equal(render().visible,true);assert.equal(api.store.current().mapOwned,true);
+  const blocker={};api.store.block(blocker,path,true);assert.equal(render().visible,false);
+  api.store.block(blocker,path,false);render();assert.equal(render().visible,true);
+  path='/customize/original';api.store.environment(path,true);assert.equal(render().visible,false,'Card deck does not opt into Buddy presentation');
+  path='/customized/selection';api.store.environment(path,false);assert.equal(render().visible,false,'Background keeps the selected-route Buddy hidden');
+  h.dispose();assert.equal(api.store.current().mapOwned,false);
+});

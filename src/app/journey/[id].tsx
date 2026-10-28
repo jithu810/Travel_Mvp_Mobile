@@ -1,4 +1,4 @@
-import { SwipeJourneyStart } from '@/components/journey/swipe-journey-start';
+import { SwipeAction, SwipeJourneyStart } from '@/components/journey/swipe-journey-start';
 import { useBuddyScreen } from '@/hooks/use-journey-buddy';
 import { useSessionState } from '@/hooks/session-context';
 import { useBuddyProtectedBounds, useBuddyScroll } from '@/hooks/use-buddy-geometry';
@@ -45,10 +45,11 @@ export default function JourneyStoryScreen() {
   </View></SafeAreaView>;
 }
 
-export function JourneyStoryContent({ journey, refresh, refreshing, error, saveFirst = false }: { journey: PublicJourney; saveFirst?: boolean; refresh: () => void; refreshing: boolean; error: string | null }) {
+type TemporaryStory = { onRemove: (stopId: string) => void; onBack: () => void; editingBlocked: boolean; error: string | null };
+export function JourneyStoryContent({ journey, refresh, refreshing, error, saveFirst = false, temporary }: { journey: PublicJourney; saveFirst?: boolean; refresh: () => void; refreshing: boolean; error: string | null; temporary?: TemporaryStory }) {
   const auth = useSessionState();
   const router = useRouter();
-  const footerProtection = useBuddyProtectedBounds(), expandProtection = useBuddyProtectedBounds(), scroll = useBuddyScroll();
+  const footerProtection = useBuddyProtectedBounds(), expandProtection = useBuddyProtectedBounds(), backProtection = useBuddyProtectedBounds(), scroll = useBuddyScroll();
   const insets = useSafeAreaInsets();
   const [panel, setPanel] = useState<'map' | 'about' | 'stop' | null>(null);
   const [focused, setFocused] = useState(true);
@@ -74,29 +75,31 @@ export function JourneyStoryContent({ journey, refresh, refreshing, error, saveF
   const openTravel = useCallback(() => {
     if (!canOpenTravelMode(journey)) return;
     setPanel(null); setFocused(false);
-    router.push({ pathname: '/travel/[id]', params: { id: journey.id } });
-  }, [journey, router, setPanel, setFocused]);
+    router.push({ pathname: '/travel/[id]', params: { id: journey.id, ...(temporary ? { customized: '1' } : {}) } });
+  }, [journey, router, setPanel, setFocused, temporary]);
   const showStop = useCallback((id: string) => { select(id); setPanel('stop'); }, [select, setPanel]);
   const memoryPhotos = useMemo(() => Object.fromEntries(journey.stops.map(stop => [stop.id, stop.photo])), [journey.stops]);
   const missing = buildMapData(journey.stops).missing;
   useBuddyScreen({ floating: panel !== 'map', suppressed: !focused || (panel !== null && panel !== 'map'),
-    ownStory: !auth.loading && !auth.error && !!auth.session && !!journey.creatorId && auth.session.user.id.toLowerCase() === journey.creatorId.toLowerCase() ? { id: journey.id, title: journey.title } : undefined });
+    ownStory: !temporary && !auth.loading && !auth.error && !!auth.session && !!journey.creatorId && auth.session.user.id.toLowerCase() === journey.creatorId.toLowerCase() ? { id: journey.id, title: journey.title } : undefined });
   return <View style={styles.screen}>
     {focused && panel === null && <StatusBar style="light" />}
     <ScrollView {...scroll} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" nestedScrollEnabled>
-      <View style={[styles.preview, { height: Math.max(150, Math.min(280, window.height * 0.30)) }]}>
-        {focused && panel === null && <JourneyMap stops={journey.stops} memoryPhotos={memoryPhotos} storyBuddy={storyBuddy} storyBuddySize={36} animateMemoryRoute={false} selectedId={selectedId} onSelect={select} presentation="expanded" controlTopInset={insets.top} onExpand={openMap} />}
+      <View style={[styles.preview, { height: Math.max(180, Math.min(310, window.height * 0.33)) }]}>
+        {focused && panel === null && <JourneyMap stops={journey.stops} memoryPhotos={memoryPhotos} storyBuddy={storyBuddy} storyBuddySize={36} storyBuddyMotion={temporary ? 'run' : 'walk'} animateMemoryRoute={false} selectedId={selectedId} onSelect={select} presentation="expanded" controlTopInset={insets.top} onExpand={openMap} />}
         <Pressable {...expandProtection} accessibilityRole="button" accessibilityLabel="Expand journey map" onPress={openMap} style={[styles.expand, { top: insets.top + 4 }]}><JourneyActionIcon name="expand" /></Pressable>
       </View>
-      <StopTimeline horizontal stacked creator={<StoryCreator journey={journey} />} active={focused && panel === null} stops={journey.stops} selectedId={selectedId} onSelect={select} onDetails={showStop} photoActions={<SocialActions selectedMemoryId={selectedId} key={'social-' + journey.id} journey={journey} layout="rail" saveFirst={saveFirst} />} optionsActions={<JourneyOptions key={journey.id} id={journey.id} onUse={openTravel} presentation="rail" onAbout={() => setPanel('about')} />} />
-      {journey.sourceId && <SourceAttribution key={'source-' + journey.sourceId} id={journey.sourceId} variant="published" />}
+      {temporary && <Pressable {...backProtection} accessibilityRole="button" accessibilityLabel="Back to magic cards" accessibilityHint="Return to your choices. Use Undo to choose stops again." onPress={temporary.onBack} style={styles.backToCards}><Text style={styles.link}>{'\u2039'} Back to cards</Text></Pressable>}
+      <StopTimeline horizontal stacked creator={<StoryCreator journey={journey} />} active={focused && panel === null} stops={journey.stops} selectedId={selectedId} onSelect={select} onDetails={showStop} photoActions={temporary ? <Pressable accessibilityRole="button" accessibilityLabel={'Remove ' + (selected?.name || 'stop') + ' from this trip'} accessibilityHint="Only removes this stop from your temporary selection." disabled={temporary.editingBlocked || journey.stops.length <= 1} accessibilityState={{ disabled: temporary.editingBlocked || journey.stops.length <= 1 }} onPress={() => { if (focused && panel === null && selectedId && !temporary.editingBlocked && journey.stops.length > 1) temporary.onRemove(selectedId); }} style={[styles.removeStop, (temporary.editingBlocked || journey.stops.length <= 1) && { opacity: 0.45 }]}><Text style={styles.removeLabel}>Remove</Text></Pressable> : <SocialActions selectedMemoryId={selectedId} key={'social-' + journey.id} journey={journey} layout="rail" saveFirst={saveFirst} />} optionsActions={temporary ? <Pressable accessibilityRole="button" accessibilityLabel="About your selected journey" onPress={() => setPanel('about')} style={styles.textAction}><Text style={styles.link}>About</Text></Pressable> : <JourneyOptions key={journey.id} id={journey.id} onUse={openTravel} presentation="rail" onAbout={() => setPanel('about')} />} />
+      {!temporary && journey.sourceId && <SourceAttribution key={'source-' + journey.sourceId} id={journey.sourceId} variant="published" />}
+      {temporary && <View style={styles.selectionNote}><Text style={styles.note}>{journey.stops.length} selected {journey.stops.length === 1 ? 'stop' : 'stops'} for this trip. {temporary.editingBlocked ? 'Finish your current trip before removing stops.' : journey.stops.length <= 1 ? 'Keep at least one stop to start your journey.' : 'Remove a place using its card.'}</Text>{temporary.error && <Text accessibilityRole="alert" style={styles.note}>{temporary.error}</Text>}</View>}
     </ScrollView>
-    {canOpenTravelMode(journey) && <View {...footerProtection} style={styles.swipeFooter}><SwipeJourneyStart active={focused && panel === null} onStart={openTravel} /></View>}
+    {canOpenTravelMode(journey) && <View {...footerProtection} style={styles.swipeFooter}>{temporary ? <SwipeAction active={focused && panel === null} resetKey={journey.id} label="Swipe to journey" onStart={openTravel} /> : <SwipeJourneyStart active={focused && panel === null} onStart={openTravel} />}</View>}
     <View pointerEvents="none" testID="journey-status-shade" style={[styles.statusShade, { height: insets.top + 20 }]} />
     {panel === 'stop' && <StopStoryViewer journey={journey} selectedId={selectedId} onSelect={select} onClose={() => setPanel(null)} onMap={openMap} />}
     <StorySheet visible={panel === 'map' || panel === 'about'} title={panel === 'map' ? journey.title : 'About this journey'} subtitle={panel === 'map' ? journey.stops.length + (journey.stops.length === 1 ? ' stop' : ' stops') + ' · Journey map' : undefined} onClose={() => setPanel(null)} scrollable={panel !== 'map'} suppressBuddy={panel !== 'map'}>
       {panel === 'map' ? <>
-        <JourneyMap stops={journey.stops} memoryPhotos={memoryPhotos} storyBuddy={storyBuddy} storyBuddySize={64} animateMemoryRoute={false} selectedId={selectedId} onSelect={select} presentation="expanded" />
+        <JourneyMap stops={journey.stops} memoryPhotos={memoryPhotos} storyBuddy={storyBuddy} storyBuddySize={64} storyBuddyMotion={temporary ? 'run' : 'walk'} animateMemoryRoute={false} selectedId={selectedId} onSelect={select} presentation="expanded" />
         <ItinerarySheet title="Explore the itinerary" subtitle={journey.stops.length + ' stops · ' + (selected?.name || journey.title)}>
         <MapItinerary stops={journey.stops} selectedId={selectedId} onSelect={select} />
         <View style={styles.mapCaption}>
@@ -107,7 +110,7 @@ export function JourneyStoryContent({ journey, refresh, refreshing, error, saveF
             {!hasCoordinates(selected) && <Text style={styles.note}>No map coordinates for this stop.</Text>}
           </Pressable> : <Text style={ui.body}>No stops have been added yet.</Text>}
         </View>
-        <Text style={styles.routeNote}>Creator’s planned connections · No live navigation or recorded GPS track.{missing ? ' ' + missing + (missing === 1 ? ' stop has' : ' stops have') + ' no coordinates and ' + (missing === 1 ? 'is' : 'are') + ' not on the map; lines break at these stops.' : ''}</Text>
+        <Text style={styles.routeNote}>{temporary ? 'Your selected stops. ' : ''}Creator’s planned connections · No live navigation or recorded GPS track.{missing ? ' ' + missing + (missing === 1 ? ' stop has' : ' stops have') + ' no coordinates and ' + (missing === 1 ? 'is' : 'are') + ' not on the map; lines break at these stops.' : ''}</Text>
         </ItinerarySheet>
         {canOpenTravelMode(journey) && <Pressable accessibilityRole="button" accessibilityLabel="Start Journey" accessibilityHint="Opens Travel Mode. Begin Trip starts the timer and location tracking." onPress={openTravel} style={styles.start}><Text style={styles.startLabel}>Start Journey →</Text><Text style={styles.startHint}>Open Travel Mode</Text></Pressable>}
       </> : panel === 'about' ? <>
@@ -118,16 +121,20 @@ export function JourneyStoryContent({ journey, refresh, refreshing, error, saveF
         {journey.likes !== null && <Text style={ui.body}>{journey.likes} {journey.likes === 1 ? 'like' : 'likes'}</Text>}
         <StorySnapshot journey={journey} />
         {hasStory(journey) && <Text selectable style={ui.body}>{journey.description}</Text>}
-        <Text style={ui.body}>Use opens the original public route and stops. Remix requires sign-in and creates a private draft. Editing comes later.</Text>
+        {temporary ? <Text style={ui.body}>Travel through your selected stops in their original order. This selection is temporary and the original journey stays unchanged. Begin Trip enables location tracking.</Text> : <><Text style={ui.body}>Start Journey travels the original route. Customize chooses stops for this trip without creating a draft. Remix requires sign-in and creates your own editable private draft.</Text>
         <Text style={ui.body}>Like and Save require sign-in. Share is available without an account. Open the journey map for Travel Mode with a local session timer. No GPS tracking.</Text>
         {error && <Text accessibilityRole="alert" style={ui.body}>Couldn’t refresh: {error}</Text>}
-        <Pressable accessibilityRole="button" accessibilityLabel="Refresh journey" disabled={refreshing} accessibilityState={{ disabled: refreshing }} onPress={refresh} style={styles.textAction}>{refreshing ? <ActivityIndicator color={colors.ink} /> : <Text style={styles.link}>Refresh journey ↻</Text>}</Pressable>
+        <Pressable accessibilityRole="button" accessibilityLabel="Refresh journey" disabled={refreshing} accessibilityState={{ disabled: refreshing }} onPress={refresh} style={styles.textAction}>{refreshing ? <ActivityIndicator color={colors.ink} /> : <Text style={styles.link}>Refresh journey ↻</Text>}</Pressable></>}
       </> : null}
     </StorySheet>
     {(error || refreshing) && <Pressable accessibilityRole="button" accessibilityLabel={error ? 'Journey refresh failed. View details.' : 'Refreshing journey'} accessibilityLiveRegion="polite" onPress={() => setPanel('about')} style={[styles.refreshStatus, { top: insets.top + 14 }]}><Text style={styles.link}>{refreshing ? '↻' : '!'}</Text></Pressable>}
   </View>;
 }
 const styles = StyleSheet.create({
+  backToCards: { minHeight: 44, alignSelf: 'flex-start', paddingHorizontal: 12, borderRadius: 22, backgroundColor: colors.paper, justifyContent: 'center' },
+  removeStop: { minHeight: 44, minWidth: 60, paddingHorizontal: 8, justifyContent: 'center', alignItems: 'center', borderRadius: 16, backgroundColor: colors.paper },
+  removeLabel: { fontSize: 12, color: colors.ink, fontWeight: '600' },
+  selectionNote: { paddingHorizontal: 8, gap: 6 },
   statusShade: { position: 'absolute', top: 0, left: 0, right: 0, experimental_backgroundImage: 'linear-gradient(180deg, rgba(5,15,30,0.78) 0%, rgba(5,15,30,0.55) 65%, rgba(5,15,30,0) 100%)' },
   screen: { flex: 1, minHeight: 0 },
   content: { paddingHorizontal: 16, paddingTop: 0, paddingBottom: 12, gap: 8 },
@@ -137,7 +144,7 @@ const styles = StyleSheet.create({
   story: { padding: 14, gap: 6, borderRadius: 22, backgroundColor: '#F0F3F9', borderWidth: 1, borderColor: '#FFFFFF' },
   compactTitle: { flex: 1, minWidth: 0, minHeight: 44, justifyContent: 'center', paddingHorizontal: 8 },
   title: { color: '#18243B', fontSize: 18, lineHeight: 24, fontWeight: '700' },
-  swipeFooter: { paddingHorizontal: 16, paddingTop: 4, paddingBottom: 8 },
+  swipeFooter: { paddingHorizontal: 16, paddingTop: 12, paddingBottom: 0 },
   storyAuthor: { paddingHorizontal: 4 },
   people: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 44 },
   creator: { width: '34%', minWidth: 0 },
