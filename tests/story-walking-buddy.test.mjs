@@ -86,17 +86,19 @@ function hooks() {
   return { react, render(fn, props) { cursor = 0; effects = []; const tree = fn(props); effects.forEach(fn => fn()); return tree; }, dispose() { slots.forEach(entry => entry?.cleanup?.()); } };
 }
 for (const motion of ['walk','run']) test(`actual ${motion} annotation decodes idle and motion before ownership, animates at its clip rate and releases timers on failure`, () => {
-  const { model, time } = playback(), h = hooks(), intervals = new Map(), timeouts = new Map(), ownership = []; let id = 0;
+  const { model, time } = playback(), h = hooks(), intervals = new Map(), timeouts = new Map(), ownership = []; let id = 0, opened = 0;
   const delays=[];
   const timers = { setInterval(fn,delay) { delays.push(delay);intervals.set(++id, fn); return id; }, clearInterval(key) { intervals.delete(key); }, setTimeout(fn) { timeouts.set(++id, fn); return id; }, clearTimeout(key) { timeouts.delete(key); } };
   const clips = Object.fromEntries(['idle', 'walk','run'].map(name => [name, { source: name, frames: 8, fps: name==='run'?12:10, facing: 'left' }])); const jsx = (type, props) => ({ type, props });
-  const { StoryWalkingBuddy } = load('src/components/journey/map/story-walking-buddy.tsx', { react: h.react, 'react/jsx-runtime': { jsx, jsxs: jsx }, '@rnmapbox/maps': { MarkerView: 'MarkerView' }, 'react-native': { Image: 'Image', View: 'View' }, '@/hooks/use-map-buddy': { useMapBuddy(available) { ownership.push(available); return { visible: available }; } }, '@/lib/buddy/animations': { resolveBuddyAnimation: name => clips[name], spriteFrame: (_clip, frame, size) => ({ left: -frame * size }) } }, timers);
+  const { StoryWalkingBuddy } = load('src/components/journey/map/story-walking-buddy.tsx', { react: h.react, 'react/jsx-runtime': { jsx, jsxs: jsx }, '@rnmapbox/maps': { MarkerView: 'MarkerView' }, 'react-native': { Image: 'Image', View: 'View', Pressable: 'Pressable' }, '@/hooks/use-map-buddy': { useMapBuddy(available) { ownership.push(available); return { visible: available, canHelp: true, openHelp() { opened++; } }; } }, '@/lib/buddy/animations': { resolveBuddyAnimation: name => clips[name], spriteFrame: (_clip, frame, size) => ({ left: -frame * size }) } }, timers);
   model.select('b'); time.advance(640); const retained = [...model.get().coordinate];
   const props = { playback: model, active: true, reducedMotion: true, motionKnown: false, size: 36,...(motion==='run'?{motion}:{}) }, render = () => h.render(StoryWalkingBuddy, props);
   let tree = render(); assert.equal(ownership.at(-1), false); assert.equal(tree.props.children.props.style.width, 36);
+  assert.equal(tree.props.children.props.disabled, true); tree.props.children.props.onPress({ nativeEvent: { pageX: 120, pageY: 220 } }); assert.equal(opened, 0);
   tree.props.children.props.children.forEach(image => image.props.onLoad()); tree.props.children.props.onLayout({ nativeEvent: { layout: { width: 36, height: 36 } } }); render(); tree = render();
   assert.equal(ownership.at(-1), false); assert.deepEqual(model.get().coordinate, retained, 'Unknown preference during expansion pauses without snapping to the target');
   props.motionKnown = true; props.reducedMotion = false; render(); tree = render(); assert.equal(ownership.at(-1), true); assert.deepEqual(model.get().coordinate, retained);
+  assert.equal(tree.props.children.type, 'Pressable'); assert.equal(tree.props.children.props.disabled, false); tree.props.children.props.onPress({ nativeEvent: { pageX: 120, pageY: 220 } }); assert.equal(opened, 1);
   model.select('b'); time.advance(640); tree = render(); assert.equal(tree.props.children.props.children[1].props.style.opacity, 1);
   assert.equal(tree.props.children.props.children[1].props.source,motion);assert.equal(delays.at(-1),1000/clips[motion].fps);
   [...intervals.values()][0](); tree = render(); assert.equal(tree.props.children.props.children[1].props.style.left, -36);

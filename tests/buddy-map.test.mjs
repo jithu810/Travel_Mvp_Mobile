@@ -120,8 +120,12 @@ test('actual map ownership honors off, reduced static presence, routine live gui
 test('actual map Help reuses accessible fallback, current action owner, tour and route guards', () => {
   const h = hooks(), store = createBuddyStore(), routes = [], api = { store, preference: { get: () => ({ enabled: true }) } };
   let adds = 0; const owner = {}; store.environment('/journey/one', true); store.screen(owner, { path: '/journey/one', state: { canAddMemory: true }, act: () => adds++ });
-  const { MapBuddyHelp } = load('src/components/buddy/map-buddy-help.tsx', { react: h.react, 'react/jsx-runtime': runtime, 'expo-router': { useRouter: () => ({ navigate: path => routes.push(path) }) }, 'react-native': { AppState: { currentState: 'active' }, useWindowDimensions: () => ({ width: 390, height: 800 }) }, '@/hooks/use-journey-buddy': { useBuddyApi: () => api }, './buddy-help-sheet': { BuddyHelpSheet: 'BuddyHelpSheet' } });
+  const { MapBuddyHelp } = load('src/components/buddy/map-buddy-help.tsx', { react: h.react, 'react/jsx-runtime': runtime, 'expo-router': { useRouter: () => ({ navigate: path => routes.push(path) }) }, 'react-native': { Modal: 'Modal', View: 'View', Pressable: 'Pressable', StyleSheet: { absoluteFill: { position: 'absolute' } }, AppState: { currentState: 'active' }, useWindowDimensions: () => ({ width: 390, height: 800 }) }, '@/hooks/use-journey-buddy': { useBuddyApi: () => api }, './buddy-help-sheet': { BuddyHelpSheet: 'BuddyHelpSheet' } });
   const element = MapBuddyHelp(), render = () => h.render(element.type, element.props);
+  store.openMapHelp('/journey/one', { x: 120, y: 220 }); const layer = render(); let bubble = layer.props.children.props.children[1];
+  assert.equal(layer.type, 'Modal');
+  assert.equal(bubble.props.fallback, false); assert.ok(bubble.props.placement.y > 220, 'Near-top Buddy gets a bubble below');
+  assert.ok(bubble.props.placement.x >= 0); bubble.props.onClose();
   store.openMapHelp('/journey/one'); let tree = render(); assert.equal(tree.props.fallback, true); assert.equal(tree.props.canAddMemory, true);
   const staleClose = tree.props.onClose;
   tree.props.onAddMemory(); assert.equal(adds, 1); assert.equal(store.getMapHelp(), null);
@@ -185,6 +189,7 @@ test('map help ownership follows the Story walker: floating Buddy and map help n
   const renderWalker = () => walker.h.render(() => walker.useMapBuddy(walking), {}), renderMap = () => map.h.render(() => map.useMapBuddy(false), {});
   renderWalker(); renderWalker(); assert.equal(renderMap().owned, false, 'Floating Buddy is shown before the walker owns the map');
   walking = true; renderWalker(); renderWalker(); assert.equal(api.store.current().mapOwned, true); assert.equal(renderMap().owned, true, 'Map help appears only once the floating Buddy is hidden');
+  api.store.openMapHelp(path, { x: 120, y: 220 }); renderWalker(); assert.equal(renderWalker().visible, true, 'Anchored messages keep the map Buddy visible'); assert.equal(renderWalker().helping, true); api.store.closeMapHelp();
   api.store.setTour(0); renderWalker(); assert.equal(renderMap().owned, false, 'Tour returns presentation to the floating Buddy and removes map help');
   api.store.setTour(null); renderWalker(); renderWalker(); assert.equal(renderMap().owned, true);
   walking = false; renderWalker(); assert.equal(renderMap().owned, false); walker.h.dispose(); map.h.dispose();
@@ -203,4 +208,25 @@ test('selected journey can own its map Buddy while magic cards and blocked scree
   path='/customize/original';api.store.environment(path,true);assert.equal(render().visible,false,'Card deck does not opt into Buddy presentation');
   path='/customized/selection';api.store.environment(path,false);assert.equal(render().visible,false,'Background keeps the selected-route Buddy hidden');
   h.dispose();assert.equal(api.store.current().mapOwned,false);
+});
+
+
+test('anchored map messages present above the expanded native map, use window coordinates and retain guarded dismissal', () => {
+  const h = hooks(), store = createBuddyStore(), routes = [], api = { store, preference: { get: () => ({ enabled: true }) } };
+  const path = '/journey/expanded'; store.environment(path, true); store.screen({}, { path, state: { floating: true }, act() {} });
+  const native = { AppState: { currentState: 'active' }, Modal: 'Modal', View: 'View', Pressable: 'Pressable', StyleSheet: { absoluteFill: { position: 'absolute', top: 0, bottom: 0, left: 0, right: 0 } }, useWindowDimensions: () => ({ width: 390, height: 800 }) };
+  const { MapBuddyHelp } = load('src/components/buddy/map-buddy-help.tsx', { react: h.react, 'react/jsx-runtime': runtime, 'expo-router': { useRouter: () => ({ navigate: route => routes.push(route) }) }, 'react-native': native, '@/hooks/use-journey-buddy': { useBuddyApi: () => api }, './buddy-help-sheet': { BuddyHelpSheet: 'BuddyHelpSheet' } });
+  const element = MapBuddyHelp({ origin: { x: 17, y: 29 } }), render = () => h.render(element.type, element.props);
+  store.openMapHelp(path, { x: 120, y: 220 }); let layer = render();
+  assert.equal(layer.type, 'Modal'); assert.equal(layer.props.visible, true); assert.equal(layer.props.transparent, true); assert.equal(layer.props.presentationStyle, 'overFullScreen');
+  assert.equal(layer.props.statusBarTranslucent, true); assert.equal(layer.props.navigationBarTranslucent, true); assert.equal(layer.props.animationType, 'none');
+  const surface = layer.props.children, backdrop = surface.props.children[0], bubble = surface.props.children[1];
+  assert.equal(surface.props.accessibilityViewIsModal, true); assert.equal(surface.props.style.backgroundColor, undefined, 'No dim scrim hides Buddy');
+  assert.equal(backdrop.type, 'Pressable'); assert.equal(bubble.type, 'BuddyHelpSheet'); assert.equal(bubble.props.fallback, false, 'Anchored bubble does not open a second native Modal');
+  assert.deepEqual(bubble.props.placement, { x: 24, y: 248, above: false, tailX: 96 }, 'Page anchor uses full-window coordinates regardless of root host offset');
+  const staleBack = layer.props.onRequestClose, staleBackdrop = backdrop.props.onPress; layer.props.onRequestClose(); assert.equal(store.getMapHelp(), null);
+  store.openMapHelp(path, { x: 170, y: 280 }); const newer = store.getMapHelp(); layer = render(); staleBack(); staleBackdrop(); assert.equal(store.getMapHelp(), newer, 'Old modal callbacks cannot close a newer request');
+  layer.props.children.props.children[0].props.onPress(); assert.equal(store.getMapHelp(), null, 'Backdrop dismisses current request');
+  store.openMapHelp(path); const legacy = render(); assert.equal(legacy.type, 'BuddyHelpSheet'); assert.equal(legacy.props.fallback, true, 'Legacy unanchored help keeps its existing single fallback Modal');
+  const oldCreate = legacy.props.onCreate; store.environment('/discover', true); oldCreate(); assert.deepEqual(routes, []); h.dispose();
 });

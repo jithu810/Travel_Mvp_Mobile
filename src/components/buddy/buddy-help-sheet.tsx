@@ -11,9 +11,9 @@ export const buddyTour = [
 
 // Historical module name; this is an anchored bubble, not a modal or bottom sheet.
 export function BuddyHelpSheet({ canAddMemory, travel, onAddMemory, onCreate, onDrafts, onClose, onTour, onNext,
-  tour = null, reaction, placement, fallback = false, width = 252, maxHeight = 320, onMeasure }: {
+  tour = null, reaction, contextualLine, placement, fallback = false, width = 252, maxHeight = 320, onMeasure }: {
   canAddMemory: boolean; travel?: BuddyTravel; onAddMemory: () => void; onCreate: () => void; onDrafts: () => void; onClose: () => void;
-  onTour?: () => void; onNext?: () => void; tour?: number | null; reaction?: string;
+  onTour?: () => void; onNext?: () => void; tour?: number | null; reaction?: string; contextualLine?: string;
   placement?: { x: number; y: number; above: boolean; tailX: number }; width?: number; maxHeight?: number; onMeasure?: (height: number) => void;
   fallback?: boolean;
 }) {
@@ -24,7 +24,7 @@ export function BuddyHelpSheet({ canAddMemory, travel, onAddMemory, onCreate, on
   const step = tour !== null ? buddyTour[tour] : undefined;
   const text = reaction ?? step?.text ?? (travel
     ? (travel.status === 'ready' ? 'Adventure time! Tiny backpack reporting for duty.' : buddyTravelCopy(travel)) + (canAddMemory ? '' : ' Capture moments in a private draft. Leaving Travel Mode stops GPS.')
-    : canAddMemory ? 'A moment worth keeping? Let’s tuck it into your story.' : 'Tiny backpack, big adventures! Shall we explore?');
+    : contextualLine ?? (canAddMemory ? 'A moment worth keeping? Let’s tuck it into your story.' : 'Tiny backpack, big adventures! Shall we explore?'));
   const shown = fallback || !!placement;
   const content = <View testID="buddy-speech-bubble" accessibilityViewIsModal={fallback} pointerEvents={shown ? 'auto' : 'none'} accessibilityElementsHidden={!shown} importantForAccessibility={shown ? 'auto' : 'no-hide-descendants'} onTouchStart={event => event.stopPropagation()}
     onLayout={fallback ? undefined : event => onMeasure?.(event.nativeEvent.layout.height)}

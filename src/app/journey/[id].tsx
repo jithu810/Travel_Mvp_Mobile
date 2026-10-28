@@ -52,6 +52,7 @@ export function JourneyStoryContent({ journey, refresh, refreshing, error, saveF
   const footerProtection = useBuddyProtectedBounds(), expandProtection = useBuddyProtectedBounds(), backProtection = useBuddyProtectedBounds(), scroll = useBuddyScroll();
   const insets = useSafeAreaInsets();
   const [panel, setPanel] = useState<'map' | 'about' | 'stop' | null>(null);
+  const [swipeFooterHeight, setSwipeFooterHeight] = useState(90);
   const [focused, setFocused] = useState(true);
   useFocusEffect(useCallback(() => {
     setFocused(true);
@@ -84,7 +85,7 @@ export function JourneyStoryContent({ journey, refresh, refreshing, error, saveF
     ownStory: !temporary && !auth.loading && !auth.error && !!auth.session && !!journey.creatorId && auth.session.user.id.toLowerCase() === journey.creatorId.toLowerCase() ? { id: journey.id, title: journey.title } : undefined });
   return <View style={styles.screen}>
     {focused && panel === null && <StatusBar style="light" />}
-    <ScrollView {...scroll} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" nestedScrollEnabled>
+    <ScrollView {...scroll} contentContainerStyle={[styles.content, canOpenTravelMode(journey) && { paddingBottom: swipeFooterHeight + 16 }]} keyboardShouldPersistTaps="handled" nestedScrollEnabled>
       <View style={[styles.preview, { height: Math.max(180, Math.min(310, window.height * 0.33)) }]}>
         {focused && panel === null && <JourneyMap stops={journey.stops} memoryPhotos={memoryPhotos} storyBuddy={storyBuddy} storyBuddySize={36} storyBuddyMotion={temporary ? 'run' : 'walk'} animateMemoryRoute={false} selectedId={selectedId} onSelect={select} presentation="expanded" controlTopInset={insets.top} onExpand={openMap} />}
         <Pressable {...expandProtection} accessibilityRole="button" accessibilityLabel="Expand journey map" onPress={openMap} style={[styles.expand, { top: insets.top + 4 }]}><JourneyActionIcon name="expand" /></Pressable>
@@ -94,7 +95,7 @@ export function JourneyStoryContent({ journey, refresh, refreshing, error, saveF
       {!temporary && journey.sourceId && <SourceAttribution key={'source-' + journey.sourceId} id={journey.sourceId} variant="published" />}
       {temporary && <View style={styles.selectionNote}><Text style={styles.note}>{journey.stops.length} selected {journey.stops.length === 1 ? 'stop' : 'stops'} for this trip. {temporary.editingBlocked ? 'Finish your current trip before removing stops.' : journey.stops.length <= 1 ? 'Keep at least one stop to start your journey.' : 'Remove a place using its card.'}</Text>{temporary.error && <Text accessibilityRole="alert" style={styles.note}>{temporary.error}</Text>}</View>}
     </ScrollView>
-    {canOpenTravelMode(journey) && <View {...footerProtection} style={styles.swipeFooter}>{temporary ? <SwipeAction active={focused && panel === null} resetKey={journey.id} label="Swipe to journey" onStart={openTravel} /> : <SwipeJourneyStart active={focused && panel === null} onStart={openTravel} />}</View>}
+    {canOpenTravelMode(journey) && <View {...footerProtection} onLayout={event => { footerProtection.onLayout(); setSwipeFooterHeight(event.nativeEvent.layout.height); }} style={styles.swipeFooter}>{temporary ? <SwipeAction active={focused && panel === null} resetKey={journey.id} label="Swipe to journey" onStart={openTravel} /> : <SwipeJourneyStart active={focused && panel === null} onStart={openTravel} />}</View>}
     <View pointerEvents="none" testID="journey-status-shade" style={[styles.statusShade, { height: insets.top + 20 }]} />
     {panel === 'stop' && <StopStoryViewer journey={journey} selectedId={selectedId} onSelect={select} onClose={() => setPanel(null)} onMap={openMap} />}
     <StorySheet visible={panel === 'map' || panel === 'about'} title={panel === 'map' ? journey.title : 'About this journey'} subtitle={panel === 'map' ? journey.stops.length + (journey.stops.length === 1 ? ' stop' : ' stops') + ' · Journey map' : undefined} onClose={() => setPanel(null)} scrollable={panel !== 'map'} suppressBuddy={panel !== 'map'}>
@@ -144,7 +145,7 @@ const styles = StyleSheet.create({
   story: { padding: 14, gap: 6, borderRadius: 22, backgroundColor: '#F0F3F9', borderWidth: 1, borderColor: '#FFFFFF' },
   compactTitle: { flex: 1, minWidth: 0, minHeight: 44, justifyContent: 'center', paddingHorizontal: 8 },
   title: { color: '#18243B', fontSize: 18, lineHeight: 24, fontWeight: '700' },
-  swipeFooter: { paddingHorizontal: 16, paddingTop: 12, paddingBottom: 0 },
+  swipeFooter: { position: 'absolute', bottom: 0, left: 0, right: 0, paddingHorizontal: 16, paddingTop: 12, paddingBottom: 8 },
   storyAuthor: { paddingHorizontal: 4 },
   people: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 44 },
   creator: { width: '34%', minWidth: 0 },

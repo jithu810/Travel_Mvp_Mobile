@@ -12,7 +12,7 @@ export function createBuddyStore() {
   const reacted = new Set<string>();
   const celebrated = new WeakSet<object>();
   const mapPresentations = new Map<object, { path: string; visible: boolean }>();
-  let mapHelp: { path: string; owner: object | null } | null = null;
+  let mapHelp: { path: string; owner: object | null; anchor?: { x: number; y: number } } | null = null;
   let celebration: BuddyCelebration | null = null, celebrationId = 0;
   let touchCooldown = false;
   let snapshot = { revision: 0, path: '', foreground: false, interacting: false, measurement: 0 };
@@ -73,13 +73,13 @@ export function createBuddyStore() {
       else if (mapPresentations.delete(token)) publish();
     },
     getMapHelp() { return mapHelp; },
-    openMapHelp(path: string) {
+    openMapHelp(path: string, anchor?: { x: number; y: number }) {
       const entries = [...screens.entries()].filter(([, entry]) => entry.path === path);
       const travel = entries.find(([, entry]) => entry.state.travel)?.[1].state.travel;
       if (path !== snapshot.path || !snapshot.foreground || entries.some(([, entry]) => entry.state.suppressed)
         || [...blockers.values()].includes(path) || travel?.guidance || travel?.arrival) return false;
       celebration = null;
-      mapHelp = { path, owner: entries.reverse().find(([, entry]) => entry.state.canAddMemory)?.[0] ?? null }; publish(); return true;
+      mapHelp = { path, anchor, owner: entries.reverse().find(([, entry]) => entry.state.canAddMemory)?.[0] ?? null }; publish(); return true;
     },
     closeMapHelp() { if (mapHelp) { mapHelp = null; publish(); } },
     getTour() { return tour; },

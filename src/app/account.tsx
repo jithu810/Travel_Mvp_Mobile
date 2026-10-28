@@ -1,7 +1,7 @@
 import { BrandedLoading } from '@/components/branded-loading';
 import { useCallback, useRef, useState } from 'react';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { ActivityIndicator, FlatList, Modal, Pressable, RefreshControl, ScrollView, Switch, Text, View } from 'react-native';
+import { ActivityIndicator, FlatList, Modal, Pressable, RefreshControl, ScrollView, Switch, Text, useWindowDimensions, View } from 'react-native';
 import { useBuddyPreference, useBuddyScreen } from '@/hooks/use-journey-buddy';
 import { useBuddyProtectedBounds, useBuddyScroll } from '@/hooks/use-buddy-geometry';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -41,6 +41,11 @@ export default function AccountScreen() {
   const [deleteMessage, setDeleteMessage] = useState('');
   const [error, setError] = useState<string | null>(null);
   const buddy = useBuddyPreference();
+  const window = useWindowDimensions();
+  const buddyGridProtection = useBuddyProtectedBounds(useCallback(rect => [
+    { x: 0, y: 0, width: window.width, height: Math.max(0, rect.y - 8) },
+    { x: 0, y: rect.y + rect.height + 8, width: window.width, height: window.height },
+  ], [window.width, window.height]));
   const scroll = useBuddyScroll(), footerProtection = useBuddyProtectedBounds();
   useBuddyScreen({ floating: true, suppressed: settings || busy || auth.loading });
   const refreshDrafts = drafts.refresh, refreshPublished = published.refresh;
@@ -64,6 +69,7 @@ export default function AccountScreen() {
   if (auth.session && loading && !drafts.data && !published.data) return <BrandedLoading message="Opening your journeys…" />;
   return <SafeAreaView edges={['left', 'right', 'bottom']} style={ui.safe}><View style={ui.page}>
     <ProfileHeader onSettings={() => setSettings(true)} />
+    <View style={{ flex: 1, minHeight: 0 }}>
     {auth.loading ? <ActivityIndicator accessibilityLabel="Loading account" /> : !auth.session ? <View style={s.content}><Message title="Your next chapter" body="Sign in to Like, Save, and create private journey copies." retry={() => router.push('/auth')} action="Sign in or register" />{auth.error && <Text accessibilityRole="alert" style={ui.body}>{auth.error}</Text>}</View>
       : <FlatList {...scroll} data={rows} keyExtractor={row => row.kind + ':' + (row.kind === 'draft' ? row.draft.id : row.journey.id)} contentContainerStyle={s.content} showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={tab === 'drafts' ? drafts.refreshing : published.refreshing} onRefresh={refresh} tintColor={colors.ink} />}
@@ -72,6 +78,7 @@ export default function AccountScreen() {
           {deleteMessage ? <Text accessibilityLiveRegion="polite" style={s.notice}>{deleteMessage}</Text> : null}
           <ProfileIdentity name={name} username={profile?.username || null} bio={bio} avatar={avatar} owner count={null} onCreate={() => router.push('/create')} />
           <ProfileCollections publishedCount={published.data ? published.data.journeys.length : null} draftCount={drafts.data ? drafts.data.length : null} selected={tab} onSelect={setTab} />
+          {buddy.loaded && buddy.enabled && <View {...buddyGridProtection} testID="profile-buddy-grid" pointerEvents="none" accessible={false} style={{ height: 88 }} />}
           <View style={s.section}><View style={s.sectionTop}><Text accessibilityRole="header" style={s.heading}>My journeys</Text><Text style={s.sectionNote}>{tab === 'drafts' ? 'Pick up where you left off' : 'Your shared stories'}</Text></View></View>
           {(error || auth.error) && <Text accessibilityRole="alert" style={ui.body}>{error || auth.error}</Text>}
           {collectionError && rows.length > 0 && <Message title="Couldn’t refresh journeys" body={collectionError} retry={retry} />}
@@ -79,6 +86,7 @@ export default function AccountScreen() {
         ListEmptyComponent={loading ? <ActivityIndicator accessibilityLabel={tab === 'drafts' ? 'Loading private drafts' : 'Loading published journeys'} /> : collectionError ? <Message title={tab === 'drafts' ? 'Couldn’t load drafts' : 'Couldn’t load journeys'} body={collectionError} retry={retry} />
           : <Message title={tab === 'drafts' ? 'No private drafts yet' : 'No public journeys yet'} body={tab === 'drafts' ? 'Remix a public journey or start your own story.' : 'Your published journeys will appear here.'} retry={() => router.push('/create')} action="Create Journey" />}
         ListFooterComponent={<Pressable {...footerProtection} accessibilityRole="button" accessibilityLabel={tab === 'drafts' ? 'Refresh drafts' : 'Refresh published journeys'} onPress={refresh} style={s.close}><Text style={ui.body}>↻ Refresh {tab === 'drafts' ? 'drafts' : 'journeys'}</Text></Pressable>} />}
+    </View>
     <Modal visible={settings} transparent animationType="none" onRequestClose={() => { if (!busy) setSettings(false); }}>
       <View style={s.shade}><SafeAreaView edges={['bottom', 'left', 'right']} style={s.sheet}><ScrollView keyboardShouldPersistTaps="handled">
         <View style={s.settingsRow}><Text accessibilityRole="header" style={s.heading}>Account settings</Text><Pressable accessibilityRole="button" accessibilityLabel="Close account settings" disabled={busy} onPress={() => setSettings(false)} style={s.close}><Text style={s.heading}>×</Text></Pressable></View>

@@ -1,5 +1,5 @@
 import { memo, useEffect, useState } from 'react';
-import { Image, View } from 'react-native';
+import { Image, Text, View } from 'react-native';
 import { buddyReference, resolveBuddyAnimation, spriteFrame, type BuddyAnimationName } from '@/lib/buddy/animations';
 
 // The frame clock belongs only to this leaf; it never updates navigation or the global host.
@@ -17,11 +17,12 @@ export const BuddySprite = memo(function BuddySprite({ animation = 'idle', anima
     return () => clearInterval(timer);
   }, [clip, animate, failed]);
   if (referenceFailed) return null;
-  if (!animate || failed || !clip) return <Image source={buddyReference} accessible={false} fadeDuration={0} resizeMethod="scale" resizeMode="contain" style={{ width: 64, height: 64 }} onError={() => setReferenceFailed(true)} />;
+  if ((!animate && animation !== 'sleep') || failed || !clip) return <Image source={buddyReference} accessible={false} fadeDuration={0} resizeMethod="scale" resizeMode="contain" style={{ width: 64, height: 64 }} onError={() => setReferenceFailed(true)} />;
   // Keep the outer touch canvas and bottom-center anchor unchanged. Jump's
   // original cells are180×189: clip their exact width so no adjacent frame leaks.
   const width = 64 * clip.frameWidth / clip.frameHeight;
   return <View accessible={false} pointerEvents="none" style={{ width, height: 64, alignSelf: 'center', overflow: 'hidden', transform: [{ scaleX: facing === clip.facing ? 1 : -1 }] }}>
-    <Image source={clip.source} accessible={false} fadeDuration={0} resizeMethod="scale" resizeMode="stretch" style={{ position: 'absolute', ...spriteFrame(clip, frame) }} onError={() => setFailed(true)} />
+    {animation === 'sleep' && <Text accessible={false} style={{ position: 'absolute', top: 0, right: 0, zIndex: 1, color: '#536486', fontSize: 10, fontWeight: '700' }}>Zzz</Text>}
+    <Image source={clip.source} accessible={false} fadeDuration={0} resizeMethod="scale" resizeMode="stretch" style={{ position: 'absolute', ...spriteFrame(clip, animate ? frame : 0) }} onError={() => setFailed(true)} />
   </View>;
 });

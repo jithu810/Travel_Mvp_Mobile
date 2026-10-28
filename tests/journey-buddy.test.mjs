@@ -197,13 +197,17 @@ test('travel reactions are once per event, cooldown limited, quiet for maneuver/
 });
 
 test('bundled sprites match manifest frame geometry and optional future animations fall back to idle', () => {
-  for (const [name, fps] of [['idle', 6], ['walk', 10]]) {
-    const animation = animations.resolveBuddyAnimation(name), png = readFileSync('assets/journey-buddy/' + name + '.png');
+  for (const [name, fps] of [['idle', 4], ['walk', 10], ['sleep', 4]]) {
+    const animation = animations.resolveBuddyAnimation(name), png = readFileSync('assets/journey-buddy/' + (name === 'idle' ? 'idle-curious' : name) + '.png');
     assert.equal(png.toString('ascii', 1, 4), 'PNG'); assert.equal(png.readUInt32BE(16), animation.sheetWidth); assert.equal(png.readUInt32BE(20), animation.sheetHeight);
-    assert.equal(animation.frames, 8); assert.equal(animation.fps, fps); assert.equal(animation.anchor.y, 1);
-    assert.deepEqual(animations.spriteFrame(animation, 7), { width: 512, height: 64, left: -448, top: -0 });
+    assert.equal(animation.frames, name === 'idle' ? 16 : 8); assert.equal(animation.fps, fps); assert.equal(animation.anchor.y, 1);
+    assert.deepEqual(animations.spriteFrame(animation, 7), name === 'idle' ? { width: 256, height: 256, left: -192, top: -64 } : { width: 512, height: 64, left: -448, top: -0 });
+    for (let frame = 0; frame < animation.frames; frame++) {
+      const crop = animations.spriteFrame(animation, frame);
+      assert.ok(-crop.left + 64 <= crop.width && -crop.top + 64 <= crop.height, 'Every frame stays inside the sheet');
+    }
   }
-  assert.equal(animations.resolveBuddyAnimation('wave'), animations.resolveBuddyAnimation('idle'));
+  assert.equal(animations.resolveBuddyAnimation('missing'), animations.resolveBuddyAnimation('idle'));
   const ref = readFileSync('assets/journey-buddy/reference.png'); assert.equal(ref.readUInt32BE(16), 128); assert.equal(ref.readUInt32BE(20), 128);
 });
 
@@ -230,7 +234,7 @@ const runtime = { jsx, jsxs: jsx, Fragment: 'Fragment' };
 function all(tree, type) { if (!tree || typeof tree !== 'object') return []; return [...(type === undefined || tree.type === type ? [tree] : []), ...[tree.props?.children].flat(Infinity).flatMap(n => all(n, type))]; }
 test('actual isolated sprite clock crops Walk, freezes for reduced/paused motion, falls back on image errors and cleans unmount', () => {
   const h = hooks(), timers = clock();
-  const { BuddySprite } = load('src/components/buddy/buddy-sprite.tsx', { react: h.react, 'react/jsx-runtime': runtime, 'react-native': { Image: 'Image', View: 'View' }, '@/lib/buddy/animations': animations }, timers);
+  const { BuddySprite } = load('src/components/buddy/buddy-sprite.tsx', { react: h.react, 'react/jsx-runtime': runtime, 'react-native': { Image: 'Image', View: 'View', Text: 'Text' }, '@/lib/buddy/animations': animations }, timers);
   let props = { animation: 'walk', animate: true, facing: 'right' }, tree = h.render(BuddySprite, props);
   assert.equal(timers.jobs.size, 1); assert.equal([...timers.jobs.values()][0].ms, 100); timers.fire();
   tree = h.render(BuddySprite, props); assert.equal(all(tree, 'Image')[0].props.style.left, -64); assert.equal(tree.props.style.transform[0].scaleX, -1);
@@ -241,7 +245,7 @@ test('actual isolated sprite clock crops Walk, freezes for reduced/paused motion
 });
 test('future non-looping sprites stop their frame clock at the final frame', () => {
   const h = hooks(), timers = clock(), clip = { ...animations.resolveBuddyAnimation('idle'), frames: 3, loop: false, fps: 10 };
-  const { BuddySprite } = load('src/components/buddy/buddy-sprite.tsx', { react: h.react, 'react/jsx-runtime': runtime, 'react-native': { Image: 'Image', View: 'View' }, '@/lib/buddy/animations': { ...animations, resolveBuddyAnimation: () => clip } }, timers);
+  const { BuddySprite } = load('src/components/buddy/buddy-sprite.tsx', { react: h.react, 'react/jsx-runtime': runtime, 'react-native': { Image: 'Image', View: 'View', Text: 'Text' }, '@/lib/buddy/animations': { ...animations, resolveBuddyAnimation: () => clip } }, timers);
   const props = { animation: 'wave', animate: true }; h.render(BuddySprite, props); timers.fire(); timers.fire();
   const tree = h.render(BuddySprite, props); assert.equal(timers.jobs.size, 0); assert.equal(all(tree, 'Image')[0].props.style.left, -128); h.dispose();
 });
@@ -249,14 +253,14 @@ test('future non-looping sprites stop their frame clock at the final frame', () 
 test('original Jump and Run PNG geometry uses exact cells and Jump clips without neighboring-frame bleed', () => {
   const jump = animations.resolveBuddyAnimation('jump'), run = animations.resolveBuddyAnimation('run');
   for (const [name, clip, width, height, cell] of [['jump', jump, 1440, 189, 180], ['run', run, 1024, 128, 128]]) {
-    const png = readFileSync('assets/journey-buddy/' + name + '.png');
+    const png = readFileSync('assets/journey-buddy/' + (name === 'idle' ? 'idle-curious' : name) + '.png');
     assert.equal(png.readUInt32BE(16), width); assert.equal(png.readUInt32BE(20), height);
     assert.equal(png[25], 6, 'Original RGBA remains intact'); assert.equal(clip.frameWidth, cell); assert.equal(clip.frames, 8);
   }
   assert.equal(jump.loop, false); assert.equal(jump.fps, 4); assert.equal(run.loop, true);
   assert.equal(animations.buddyCelebrationDuration('jump'), 2000); assert.equal(animations.buddyCelebrationDuration('run'), 3000);
   const h = hooks(), timers = clock();
-  const { BuddySprite } = load('src/components/buddy/buddy-sprite.tsx', { react: h.react, 'react/jsx-runtime': runtime, 'react-native': { Image: 'Image', View: 'View' }, '@/lib/buddy/animations': animations }, timers);
+  const { BuddySprite } = load('src/components/buddy/buddy-sprite.tsx', { react: h.react, 'react/jsx-runtime': runtime, 'react-native': { Image: 'Image', View: 'View', Text: 'Text' }, '@/lib/buddy/animations': animations }, timers);
   const props = { animation: 'jump', animate: true };
   let tree = h.render(BuddySprite, props);
   assert.equal([...timers.jobs.values()][0].ms, 250, 'One slower cycle displays each of the eight frames');
@@ -322,7 +326,7 @@ test('manual help dialog is visible without measurement, retains actions and dis
   h.dispose();
 });
 
-async function hostHarness(openSpace = false) {
+async function hostHarness(openSpace = false, contextual = false) {
   const hostHooks = hooks(); let actorHooks = hooks(); const timers = clock(); let currentHooks = hostHooks;
   const react = Object.fromEntries(Object.keys(hostHooks.react).map(name => [name, (...args) => currentHooks.react[name](...args)]));
   react.useSyncExternalStore = (_, get) => get();
@@ -335,7 +339,7 @@ async function hostHarness(openSpace = false) {
   api.store.onMeasure(() => api.store.protect(region, path, api.store.current().protectedRects));
   const native = {
     delayCaptures: false, pendingCaptures: [], nativePoint: null,
-    View: 'View', Pressable: 'Pressable', Text: 'Text', StyleSheet: { create: v => v, absoluteFill: {} }, AppState: { currentState: 'active' },
+    View: 'View', Pressable: 'Pressable', Text: 'Text', StyleSheet: { create: v => v, absoluteFill: {} }, AppState: { currentState: 'active', addEventListener: (_, fn) => { native.appState = fn; return { remove() {} }; } },
     useWindowDimensions: () => ({ width: 360, height: 800 }),
     AccessibilityInfo: { isReduceMotionEnabled: async () => false, addEventListener: (_, fn) => { native.motion = fn; return { remove() {} }; } },
     PanResponder: { create: config => ({ panHandlers: config }) },
@@ -352,9 +356,11 @@ async function hostHarness(openSpace = false) {
     'expo-router': { usePathname: () => path, useRouter: () => ({ navigate: route => routes.push(route) }) },
     'react-native-safe-area-context': { useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 4, right: 4 }) },
     '@/hooks/use-journey-buddy': { useBuddyApi: () => api }, '@/lib/buddy/model': model,
+    '@/hooks/use-buddy-sleep': load('src/hooks/use-buddy-sleep.ts', { react, 'react-native': native }, timers),
     '@/lib/buddy/position': { createBuddyPositionCapture }, '@/lib/buddy/geometry': { ...geometry,
       placeBuddyBubble(...args) { placementCalls++; return geometry.placeBuddyBubble(...args); } },
     '@/lib/buddy/animations': animations,
+    '@/lib/buddy/contextual-lines': { ...load('src/lib/buddy/contextual-lines.ts'), ...(!contextual ? { buddyContextLine: () => undefined } : {}) },
     './buddy-sprite': { BuddySprite: 'BuddySprite' }, './buddy-help-sheet': { BuddyHelpSheet: 'BuddyHelpSheet' },
     './map-buddy-help': { MapBuddyHelp: 'MapBuddyHelp' },
   }, timers);
@@ -377,6 +383,9 @@ async function hostHarness(openSpace = false) {
 
 function fireDelay(h, milliseconds) {
   for (const [id, job] of [...h.timers.jobs]) if (job.ms === milliseconds) { h.timers.jobs.delete(id); job.fn(); }
+}
+function fireRoaming(h) {
+  for (const [id, job] of [...h.timers.jobs]) if (job.ms >= 15000 && job.ms <= 30000) { h.timers.jobs.delete(id); job.fn(); }
 }
 function settleActor(h) { h.renderHost(); h.renderActor(); h.renderHost(); h.renderActor(); return h.renderActor(); }
 test('actual floating host yields to registered map Buddy, returns for successful animation and preserves modal help access', async () => {
@@ -462,14 +471,14 @@ test('actual global host requires enabled/foreground/allowed route/measured clea
 });
 test('actual actor walks on low-frequency schedule, pauses interaction, clamps drag, parks and never turns a drag back to origin into a tap', async () => {
   const h = await hostHarness(); h.renderHost(); let tree = h.renderActor(); await tick(); tree = h.renderActor();
-  assert.equal(h.timers.jobs.size, 1); const wait = [...h.timers.jobs.values()][0].ms; assert.ok(wait >= 15000 && wait <= 30000);
-  h.timers.fire(); tree = h.renderActor(); assert.equal(all(tree, 'BuddySprite')[0].props.animation, 'walk');
+  assert.equal(h.timers.jobs.size, 2); const wait = [...h.timers.jobs.values()].find(job => job.ms !== 60000).ms; assert.ok(wait >= 15000 && wait <= 30000);
+  fireRoaming(h); tree = h.renderActor(); assert.equal(all(tree, 'BuddySprite')[0].props.animation, 'walk');
   assert.equal(h.native.animation.config.useNativeDriver, true); assert.equal(h.native.animation.config.isInteraction, false);
   h.native.animation.finish(); tree = h.renderActor(); assert.equal(all(tree, 'BuddySprite')[0].props.animation, 'idle');
-  tree = h.renderActor({ interacting: true }); assert.equal(h.timers.jobs.size, 0); assert.equal(all(tree, 'BuddySprite')[0].props.animate, false);
+  tree = h.renderActor({ interacting: true }); assert.equal([...h.timers.jobs.values()].filter(job => job.ms !== 60000).length, 0); assert.equal(all(tree, 'BuddySprite')[0].props.animate, false);
   tree = h.renderActor(); const responder = all(tree, 'View').find(n => n.props.onPanResponderGrant).props;
   responder.onPanResponderGrant(); responder.onPanResponderMove(null, { dx: -9999, dy: 9999 }); responder.onPanResponderMove(null, { dx: 0, dy: 0 }); responder.onPanResponderRelease(null, { dx: 0, dy: 0 });
-  tree = h.renderActor(); assert.equal(all(tree, 'BuddyHelpSheet').length, 0); assert.equal(h.timers.jobs.size, 0);
+  tree = h.renderActor(); assert.equal(all(tree, 'BuddyHelpSheet').length, 0); assert.equal([...h.timers.jobs.values()].filter(job => job.ms !== 60000).length, 0);
   const transform = all(tree, 'AnimatedView')[0].props.style[1].transform;
   assert.ok(transform[0].translateX >= 8); assert.ok(transform[1].translateY <= 608);
   h.actorHooks.dispose(); h.hostHooks.dispose(); assert.equal(h.timers.jobs.size, 0);
@@ -494,7 +503,7 @@ test('one bounded accessible View owns native Buddy gestures; drag cannot trigge
 });
 test('actual actor helper actions reject stale route, disabled preference and removed owner; reduced motion is static', async () => {
   const h = await hostHarness(); h.renderHost(); let tree = h.renderActor(); await tick(); h.renderActor();
-  h.native.motion(true); tree = h.renderActor(); assert.equal(all(tree, 'BuddySprite')[0].props.animate, false); assert.equal(h.timers.jobs.size, 0);
+  h.native.motion(true); tree = h.renderActor(); assert.equal(all(tree, 'BuddySprite')[0].props.animate, false); assert.equal([...h.timers.jobs.values()].filter(job => job.ms !== 60000).length, 0);
   all(tree, 'View').find(n => n.props.accessibilityLabel === 'Journey Buddy').props.onAccessibilityTap(); tree = h.renderActor(); const help = all(tree, 'BuddyHelpSheet')[0]; assert.ok(help); assert.equal(help.props.canAddMemory, true);
   await h.api.preference.setEnabled(false); help.props.onAddMemory(); assert.equal(h.adds(), 0);
   await h.api.preference.setEnabled(true); h.api.store.removeScreen(h.owner); help.props.onAddMemory(); assert.equal(h.adds(), 0);
@@ -585,7 +594,7 @@ test('parked pose survives keyboard/modal/background actor remounts on the same 
   responder.onPanResponderGrant(); responder.onPanResponderMove(null, { dx: -100, dy: 0 }); responder.onPanResponderRelease(null, { dx: -100, dy: 0 }); tree = h.renderActor();
   const before = all(tree, 'AnimatedView')[0].props.style[1].transform;
   tree = h.remountActor(); await tick(); tree = h.renderActor();
-  assert.deepEqual(all(tree, 'AnimatedView')[0].props.style[1].transform, before); assert.equal(h.timers.jobs.size, 0, 'Remounted parked Buddy does not resume roaming');
+  assert.deepEqual(all(tree, 'AnimatedView')[0].props.style[1].transform, before); assert.equal([...h.timers.jobs.values()].filter(job => job.ms !== 60000).length, 0, 'Remounted parked Buddy has only the inactivity clock');
   h.api.store.environment('/create', false); h.api.store.environment('/create', true); assert.equal(h.api.store.getPose('/create').parked, true);
   h.actorHooks.dispose(); h.path('/search'); assert.equal(h.api.store.getPose('/search'), null); h.hostHooks.dispose();
 });
@@ -594,13 +603,13 @@ test('native scalar capture ignores stale JS cache, buffers deltas until both co
   const capture = createBuddyPositionCapture(value); let old = null, latest = null;
   capture.read(point => { old = point; }); capture.read(point => { latest = point; });
   pending[0](); pending[1](); assert.equal(old, null); pending[3](); assert.equal(latest, null); pending[2](); assert.deepEqual(latest, { x: 140, y: 600 });
-  const h = await hostHarness(); h.renderHost(); let tree = h.renderActor(); await tick(); tree = h.renderActor(); h.timers.fire(); tree = h.renderActor();
+  const h = await hostHarness(); h.renderHost(); let tree = h.renderActor(); await tick(); tree = h.renderActor(); fireRoaming(h); tree = h.renderActor();
   h.native.nativePoint = { x: 150, y: 608 }; h.native.delayCaptures = true;
   const responder = all(tree, 'View').find(n => n.props.onPanResponderGrant).props;
   responder.onPanResponderGrant(); h.renderActor(); responder.onPanResponderMove(null, { dx: 20, dy: 0 }); responder.onPanResponderRelease(null, { dx: 20, dy: 0 }); tree = h.renderActor();
   h.native.pendingCaptures.shift()(); assert.notEqual(all(h.renderActor(), 'AnimatedView')[0].props.style[1].transform[0].translateX, 170);
   h.native.pendingCaptures.shift()(); tree = h.renderActor(); assert.equal(all(tree, 'AnimatedView')[0].props.style[1].transform[0].translateX, 170, 'Uses actual native x150 plus buffered20, not JS endpoint');
-  assert.equal(all(tree, 'BuddyHelpSheet').length, 0); assert.equal(h.timers.jobs.size, 0);
+  assert.equal(all(tree, 'BuddyHelpSheet').length, 0); assert.equal([...h.timers.jobs.values()].filter(job => job.ms !== 60000).length, 0);
   h.actorHooks.dispose(); h.native.pendingCaptures.forEach(fn => fn()); h.hostHooks.dispose();
 });
 test('Travel Walk is a bounded stationary progress reaction, never an active-status loop or replay', async () => {
@@ -726,4 +735,152 @@ test('a measured no-fit bubble stays usable in a manual dialog and closes before
   all(tree,'BuddyHelpSheet')[0].props.onMeasure(200); tree = h.renderActor(); assert.ok(all(tree,'BuddyHelpSheet')[0].props.placement);
   all(tree,'BuddyHelpSheet')[0].props.onClose(); tree=h.renderActor(); assert.equal(all(tree,'BuddyHelpSheet').length,0);
   h.actorHooks.dispose();h.hostHooks.dispose();
+});
+
+
+test('actual floating Buddy sleeps without resetting on roaming, first touch only wakes and next opens help', async () => {
+  const h = await hostHarness(true); let tree = settleActor(h); await tick(); tree = settleActor(h);
+  const sleepTimer = [...h.timers.jobs].find(([, job]) => job.ms === 60000)[0];
+  fireRoaming(h); h.native.animation?.finish(); tree = settleActor(h);
+  assert.equal(h.timers.jobs.has(sleepTimer), true, 'Automatic walking preserves the original inactivity deadline');
+  fireDelay(h, 60000); tree = settleActor(h);
+  assert.equal(all(tree, 'BuddySprite')[0].props.animation, 'sleep');
+  assert.equal([...h.timers.jobs.values()].some(job => job.ms >= 15000 && job.ms <= 30000), false);
+  const touch = () => all(tree, 'View').find(node => node.props.onPanResponderGrant).props;
+  h.api.store.interaction(true); tree = settleActor(h);
+  touch().onPanResponderGrant(); touch().onPanResponderRelease(null, { dx: 0, dy: 0 }); tree = settleActor(h);
+  assert.equal(all(tree, 'BuddySprite')[0].props.animation, 'idle'); assert.equal(all(tree, 'BuddyHelpSheet').length, 0);
+  h.api.store.interaction(false); tree = settleActor(h);
+  touch().onPanResponderGrant(); touch().onPanResponderRelease(null, { dx: 0, dy: 0 }); tree = settleActor(h);
+  assert.equal(all(tree, 'BuddyHelpSheet').length, 1);
+  h.actorHooks.dispose(); h.hostHooks.dispose(); assert.equal(h.timers.jobs.size, 0);
+});
+
+test('static reduced-motion Sleep uses its real first frame without a sprite clock', () => {
+  const h = hooks(), timers = clock();
+  const { BuddySprite } = load('src/components/buddy/buddy-sprite.tsx', { react: h.react, 'react/jsx-runtime': runtime, 'react-native': { Image: 'Image', View: 'View', Text: 'Text' }, '@/lib/buddy/animations': animations }, timers);
+  const tree = h.render(BuddySprite, { animation: 'sleep', animate: false });
+  assert.equal(all(tree, 'Image')[0].props.source, animations.resolveBuddyAnimation('sleep').source);
+  assert.equal(all(tree, 'Image')[0].props.style.left, -0); assert.equal(timers.jobs.size, 0);
+  assert.equal(all(tree, 'Text')[0].props.children, 'Zzz'); h.dispose();
+});
+
+
+test('sleep interrupts an unfinished roam and accessibility wake returns to idle without help', async () => {
+  const h = await hostHarness(true); let tree = settleActor(h); await tick(); tree = settleActor(h);
+  fireRoaming(h); tree = settleActor(h); assert.equal(all(tree, 'BuddySprite')[0].props.animation, 'walk');
+  const staleFinish = h.native.animation.finish;
+  fireDelay(h, 60000); tree = settleActor(h); assert.equal(all(tree, 'BuddySprite')[0].props.animation, 'sleep');
+  all(tree, 'View').find(node => node.props.onAccessibilityTap).props.onAccessibilityTap(); tree = settleActor(h);
+  assert.equal(all(tree, 'BuddySprite')[0].props.animation, 'idle'); assert.equal(all(tree, 'BuddyHelpSheet').length, 0);
+  staleFinish(); tree = settleActor(h); assert.equal(all(tree, 'BuddySprite')[0].props.animation, 'idle', 'Canceled roam cannot restore walking');
+  h.actorHooks.dispose(); h.hostHooks.dispose(); assert.equal(h.timers.jobs.size, 0);
+});
+
+
+test('contextual bubbles animate once, dismiss after five seconds, preserve sleep deadline and never reopen on remount', async () => {
+  const h = await hostHarness(true, true); let tree = settleActor(h); await tick(); tree = settleActor(h);
+  const idleTimer = [...h.timers.jobs].find(([, job]) => job.ms === 60000)[0];
+  fireDelay(h, 8000); tree = settleActor(h);
+  let bubble = all(tree, 'BuddyHelpSheet')[0]; assert.match(bubble.props.reaction, /next chapter/); assert.equal(bubble.props.fallback, false);
+  assert.equal(all(tree, 'BuddySprite')[0].props.animation, 'curious'); assert.equal(all(tree, 'BuddySprite')[0].props.animate, true);
+  assert.equal(h.timers.jobs.has(idleTimer), true, 'Passive talking does not renew the inactivity clock');
+  bubble.props.onMeasure(124); tree = settleActor(h); bubble = all(tree, 'BuddyHelpSheet')[0]; assert.ok(bubble.props.placement);
+  fireDelay(h, 5000); tree = settleActor(h); assert.equal(all(tree, 'BuddyHelpSheet').length, 0);
+  h.remountActor(); await tick(); tree = settleActor(h); fireDelay(h, 8000); tree = settleActor(h); assert.equal(all(tree, 'BuddyHelpSheet').length, 0);
+  h.actorHooks.dispose(); h.hostHooks.dispose(); assert.equal(h.timers.jobs.size, 0);
+});
+
+test('Explore greets with Wave and manual Account help keeps contextual copy plus normal actions', async () => {
+  const h = await hostHarness(true, true); h.path('/discover'); h.api.store.screen(h.owner, { path: '/discover', state: { floating: true }, act() {} });
+  let tree = settleActor(h); await tick(); tree = settleActor(h); fireDelay(h, 8000); tree = settleActor(h);
+  assert.equal(all(tree, 'BuddySprite')[0].props.animation, 'wave'); assert.match(all(tree, 'BuddyHelpSheet')[0].props.reaction, /Hello, explorer/);
+  h.actorHooks.dispose(); h.path('/account'); h.api.store.screen(h.owner, { path: '/account', state: { floating: true }, act() {} }); h.renderHost(); tree = h.remountActor(); await tick(); tree = settleActor(h);
+  all(tree, 'View').find(node => node.props.onAccessibilityTap).props.onAccessibilityTap(); tree = settleActor(h);
+  const bubble = all(tree, 'BuddyHelpSheet')[0]; assert.match(bubble.props.contextualLine, /stories, all together/); assert.equal(bubble.props.reaction, undefined);
+  h.actorHooks.dispose(); h.hostHooks.dispose();
+});
+
+test('automatic contextual bubbles skip cramped geometry, Travel and asleep Buddy', async () => {
+  const cramped = await hostHarness(false, true); let tree = settleActor(cramped); await tick(); tree = settleActor(cramped); fireDelay(cramped, 8000); tree = settleActor(cramped);
+  assert.equal(all(tree, 'BuddyHelpSheet').length, 0); cramped.actorHooks.dispose(); cramped.hostHooks.dispose();
+  const h = await hostHarness(true, true); h.api.store.screen(h.owner, { path: '/create', state: { floating: true, travel: { status: 'ready', journeyId: 'trip' } }, act() {} });
+  tree = settleActor(h); await tick(); tree = settleActor(h); assert.equal([...h.timers.jobs.values()].some(job => job.ms === 8000), false); fireDelay(h, 8000); tree = settleActor(h); assert.equal(all(tree, 'BuddyHelpSheet').length, 0);
+  h.api.store.screen(h.owner, { path: '/create', state: { floating: true }, act() {} }); tree = settleActor(h);
+  fireDelay(h, 60000); tree = settleActor(h); assert.equal(all(tree, 'BuddySprite')[0].props.animation, 'sleep'); assert.equal(all(tree, 'BuddyHelpSheet').length, 0);
+  fireDelay(h, 8000); tree = settleActor(h); assert.equal(all(tree, 'BuddySprite')[0].props.animation, 'sleep'); assert.equal(all(tree, 'BuddyHelpSheet').length, 0);
+  h.actorHooks.dispose(); h.hostHooks.dispose();
+});
+
+test('interaction cancels a contextual bubble immediately and reduced motion leaves novelty still', async () => {
+  const h = await hostHarness(true, true); let tree = settleActor(h); await tick(); tree = settleActor(h); h.native.motion(true); tree = settleActor(h);
+  fireDelay(h, 8000); tree = settleActor(h); assert.equal(all(tree, 'BuddyHelpSheet').length, 1); assert.equal(all(tree, 'BuddySprite')[0].props.animate, false);
+  h.api.store.interaction(true); tree = settleActor(h); assert.equal(all(tree, 'BuddyHelpSheet').length, 0); assert.equal([...h.timers.jobs.values()].some(job => job.ms === 5000), false);
+  h.api.store.interaction(false); tree = settleActor(h); fireDelay(h, 8000); tree = settleActor(h); assert.equal(all(tree, 'BuddyHelpSheet').length, 0);
+  h.actorHooks.dispose(); h.hostHooks.dispose(); assert.equal(h.timers.jobs.size, 0);
+});
+
+test('Wave and Curious assets use eight exact non-looping cells and stop at their last frame', () => {
+  for (const name of ['wave', 'curious']) {
+    const clip = animations.resolveBuddyAnimation(name), png = readFileSync('assets/journey-buddy/' + name + '.png');
+    assert.equal(png.readUInt32BE(16), 512); assert.equal(png.readUInt32BE(20), 256); assert.equal(clip.columns, 4); assert.equal(clip.frames, 8); assert.equal(clip.fps, 4); assert.equal(clip.loop, false);
+    assert.deepEqual(animations.spriteFrame(clip, 7), { width: 256, height: 128, left: -192, top: -64 });
+    const h = hooks(), timers = clock(); const { BuddySprite } = load('src/components/buddy/buddy-sprite.tsx', { react: h.react, 'react/jsx-runtime': runtime, 'react-native': { Image: 'Image', View: 'View', Text: 'Text' }, '@/lib/buddy/animations': animations }, timers);
+    h.render(BuddySprite, { animation: name, animate: true }); for (let i = 0; i < 10; i++) timers.fire();
+    const tree = h.render(BuddySprite, { animation: name, animate: true }); assert.equal(timers.jobs.size, 0); assert.equal(all(tree, 'Image')[0].props.style.top, -64); assert.equal(all(tree, 'Image')[0].props.style.left, -192); h.dispose();
+  }
+});
+
+
+test('Home tap opens help on release even when native capture is late and render effects run between grant and release', async () => {
+  const h = await hostHarness(true, true); h.path('/discover'); h.api.store.screen(h.owner, { path: '/discover', state: { floating: true }, act() {} });
+  let tree = settleActor(h); await tick(); tree = settleActor(h); h.native.delayCaptures = true;
+  const touch = () => all(tree, 'View').find(node => node.props.onPanResponderGrant).props;
+  touch().onPanResponderGrant(); tree = settleActor(h); touch().onPanResponderRelease(null, { dx: 0, dy: 0 }); tree = settleActor(h);
+  assert.equal(all(tree, 'BuddyHelpSheet').length, 1, 'Help must not await native stopAnimation callbacks');
+  while (h.native.pendingCaptures.length) h.native.pendingCaptures.shift()(); tree = settleActor(h);
+  assert.equal(all(tree, 'BuddyHelpSheet').length, 1); assert.equal(all(tree, 'BuddySprite')[0].props.animate, false);
+  h.actorHooks.dispose(); h.hostHooks.dispose();
+});
+
+test('manual help reuses measured automatic bubble and falls back visibly if a first measurement never arrives', async () => {
+  const h = await hostHarness(true, true); let tree = settleActor(h); await tick(); tree = settleActor(h); fireDelay(h, 8000); tree = settleActor(h);
+  all(tree, 'BuddyHelpSheet')[0].props.onMeasure(124); tree = settleActor(h);
+  all(tree, 'View').find(node => node.props.onAccessibilityTap).props.onAccessibilityTap(); tree = settleActor(h);
+  assert.ok(all(tree, 'BuddyHelpSheet')[0].props.placement, 'Same-sized native View may not emit onLayout again');
+  h.actorHooks.dispose(); h.hostHooks.dispose();
+  const fresh = await hostHarness(true); tree = settleActor(fresh); await tick(); tree = settleActor(fresh);
+  all(tree, 'View').find(node => node.props.onAccessibilityTap).props.onAccessibilityTap(); tree = settleActor(fresh); fireDelay(fresh, 500); tree = settleActor(fresh);
+  assert.equal(all(tree, 'BuddyHelpSheet')[0].props.fallback, true, 'Manual message remains reachable even if native layout never replies');
+  fresh.actorHooks.dispose(); fresh.hostHooks.dispose(); assert.equal(fresh.timers.jobs.size, 0);
+});
+
+
+test('Home card browsing keeps the actual idle sprite clock through held touches and cooldown, while positional roaming stays paused', async () => {
+  const h = await hostHarness(true); h.path('/discover'); h.api.store.screen(h.owner, { path: '/discover', state: { floating: true }, act() {} });
+  let tree = settleActor(h); await tick(); tree = settleActor(h);
+  const leaf = hooks(), spriteTimers = clock(); const { BuddySprite } = load('src/components/buddy/buddy-sprite.tsx', { react: leaf.react, 'react/jsx-runtime': runtime, 'react-native': { Image: 'Image', View: 'View', Text: 'Text' }, '@/lib/buddy/animations': animations }, spriteTimers);
+  const spriteProps = () => all(tree, 'BuddySprite')[0].props;
+  leaf.render(BuddySprite, spriteProps()); spriteTimers.fire(); let sprite = leaf.render(BuddySprite, spriteProps()); assert.equal(all(sprite, 'Image')[0].props.style.left, -64);
+  h.api.store.interaction(true); tree = settleActor(h); assert.equal(spriteProps().animation, 'idle'); assert.equal(spriteProps().animate, true);
+  sprite = leaf.render(BuddySprite, spriteProps()); assert.equal(all(sprite, 'Image')[0].props.style.left, -64, 'Card touch does not swap to the static reference or reset frame');
+  assert.equal([...h.timers.jobs.values()].some(job => job.ms >= 15000 && job.ms <= 30000), false, 'Position never roams across held card gestures');
+  h.api.store.touchEnded(); tree = settleActor(h); assert.equal(spriteProps().animate, true); spriteTimers.fire(); sprite = leaf.render(BuddySprite, spriteProps()); assert.equal(all(sprite, 'Image')[0].props.style.left, -128, 'Idle clock advances during cooldown');
+  h.api.store.interaction(false); tree = settleActor(h); sprite = leaf.render(BuddySprite, spriteProps()); assert.equal(all(sprite, 'Image')[0].props.style.left, -128);
+  leaf.dispose(); h.actorHooks.dispose(); h.hostHooks.dispose(); assert.equal(h.timers.jobs.size, 0); assert.equal(spriteTimers.jobs.size, 0);
+});
+
+test('Home ambient animation still yields to own drag, help, reduced motion, success, background and navigation', async () => {
+  const h = await hostHarness(true); h.path('/discover'); h.api.store.screen(h.owner, { path: '/discover', state: { floating: true }, act() {} });
+  let tree = settleActor(h); await tick(); tree = settleActor(h); h.api.store.interaction(true); tree = settleActor(h);
+  const touch = () => all(tree, 'View').find(node => node.props.onPanResponderGrant).props;
+  touch().onPanResponderGrant(); tree = settleActor(h); assert.equal(all(tree, 'BuddySprite')[0].props.animate, false, 'Actual Buddy touch stays quiet');
+  touch().onPanResponderRelease(null, { dx: 0, dy: 0 }); tree = settleActor(h); assert.equal(all(tree, 'BuddyHelpSheet').length, 1); assert.equal(all(tree, 'BuddySprite')[0].props.animate, false);
+  all(tree, 'BuddyHelpSheet')[0].props.onClose(); tree = settleActor(h); h.native.motion(true); tree = settleActor(h); assert.equal(all(tree, 'BuddySprite')[0].props.animate, false);
+  h.native.motion(false); tree = settleActor(h); assert.equal(all(tree, 'BuddySprite')[0].props.animate, true);
+  h.api.store.celebrate('/discover', 'jump', {}); tree = settleActor(h); assert.equal(all(tree, 'BuddySprite')[0].props.animation, 'idle'); assert.equal(all(tree, 'BuddySprite')[0].props.animate, false, 'Held screen touch still blocks success playback');
+  h.api.store.clearCelebration(); h.native.AppState.currentState = 'background'; h.api.store.environment('/discover', false); tree = h.renderActor(); assert.equal(all(tree, 'BuddySprite')[0].props.animate, false);
+  h.native.AppState.currentState = 'active'; h.path('/account'); tree = h.renderActor(); assert.equal(all(tree, 'BuddySprite')[0].props.animate, false, 'Old Home actor cannot keep ambient animation after navigation');
+  h.actorHooks.dispose(); h.hostHooks.dispose();
+  const other = await hostHarness(true); tree = settleActor(other); await tick(); tree = settleActor(other); other.api.store.interaction(true); tree = settleActor(other); assert.equal(all(tree, 'BuddySprite')[0].props.animate, false, 'Non-Home touch behavior remains unchanged'); other.actorHooks.dispose(); other.hostHooks.dispose();
 });

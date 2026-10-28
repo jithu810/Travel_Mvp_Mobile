@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore
 import { AccessibilityInfo, Animated, AppState, PanResponder, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { usePathname, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useBuddySleep } from '@/hooks/use-buddy-sleep';
 import { useBuddyApi } from '@/hooks/use-journey-buddy';
 import { buddyDragged, buddyTravelCopy, travelEvent, type BuddyCelebration, type BuddyPoint, type BuddyRect, type BuddyScreen } from '@/lib/buddy/model';
 import { placeBuddyBubble, createBuddyGeometry, floatingWalkTarget, nearestBuddyPosition, type BuddyGeometry } from '@/lib/buddy/geometry';
@@ -9,6 +10,7 @@ import { BuddySprite } from './buddy-sprite';
 import { BuddyHelpSheet } from './buddy-help-sheet';
 import { createBuddyPositionCapture } from '@/lib/buddy/position';
 import { buddyCelebrationDuration } from '@/lib/buddy/animations';
+import { buddyContextLine, claimBuddyContext, BUDDY_CONTEXT_DELAY, BUDDY_CONTEXT_DURATION, type BuddyContextLine } from '@/lib/buddy/contextual-lines';
 import { MapBuddyHelp } from './map-buddy-help';
 
 type Api = NonNullable<ReturnType<typeof useBuddyApi>>;
@@ -41,7 +43,7 @@ function BuddyHost({ api }: { api: Api }) {
   const interacting = current.interacting && !(api.store.getCelebration() && current.touchCooldown);
   // Unmounting destroys clocks whenever hidden; navigation resets the parked position.
   return <View ref={view} collapsable={false} pointerEvents="box-none" style={[StyleSheet.absoluteFill, s.host]} onLayout={measure}>
-    {mapHelp ? <MapBuddyHelp /> : visible && <BuddyActor key={path} api={api} path={path} geometry={geometry} screen={current.state} interacting={interacting} />}
+    {mapHelp ? <MapBuddyHelp origin={{ x: host.x, y: host.y }} /> : visible && <BuddyActor key={path} api={api} path={path} geometry={geometry} screen={current.state} interacting={interacting} />}
   </View>;
 }
 function BuddyActor({ api, path, geometry, screen, interacting }: { api: Api; path: string; geometry: BuddyGeometry; screen?: BuddyScreen; interacting: boolean }) {
@@ -64,11 +66,15 @@ function BuddyActor({ api, path, geometry, screen, interacting }: { api: Api; pa
   useEffect(() => { alive.current = true; return () => { alive.current = false; }; }, []);
   const [help, setHelp] = useState<{ owner: object | null } | null>(() => api.store.getTour() !== null ? { owner: api.store.actionOwner() } : null);
   const [reaction, setReaction] = useState<{ text: string; key: string } | null>(null);
+  const [helpMeasurementFailed, setHelpMeasurementFailed] = useState(false);
+  const [contextual, setContextual] = useState<BuddyContextLine | null>(null);
   const [bubbleHeight, setBubbleHeight] = useState(0), [anchor, setAnchor] = useState(initialPoint);
   const storyId = screen?.ownStory?.id;
   const [travelWalking, setTravelWalking] = useState(false), burstTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const stopTravelBurst = useCallback(() => { clearTimeout(burstTimer.current); burstTimer.current = undefined; setTravelWalking(false); }, []);
-  const canAnimate = !reduced && !interacting && !help && !reaction && !dragging;
+  const { asleep, wake: wakeBuddy } = useBuddySleep(api, path, !!screen?.travel || !!help || !!reaction || !!pendingCelebration || dragging, interacting);
+  const wakeGesture = useRef(false);
+  const canAnimate = !reduced && !interacting && !help && !reaction && !contextual && !dragging;
   const latest = useRef({ corridor, geometry, help, parked, canAnimate });
   useEffect(() => { latest.current = { corridor, geometry, help, parked, canAnimate }; });
   useEffect(() => {
@@ -98,7 +104,7 @@ function BuddyActor({ api, path, geometry, screen, interacting }: { api: Api; pa
     });
   }, [geometry, position, capture, project]);
   useEffect(() => {
-    if (!canAnimate || celebration || parked || screen?.travel) return;
+    if (!canAnimate || asleep || celebration || parked || screen?.travel) return;
     const gesture = gestureState.current;
     let disposed = false, timer: ReturnType<typeof setTimeout>;
     const schedule = () => { timer = setTimeout(walk, 15000 + Math.random() * 15000); };
@@ -116,9 +122,12 @@ function BuddyActor({ api, path, geometry, screen, interacting }: { api: Api; pa
     schedule();
     return () => {
       disposed = true; clearTimeout(timer);
-      if (alive.current && !gesture.active) capture.read(value => { point.current = project(value); });
+      if (alive.current && !gesture.active) capture.read(value => {
+        if (!alive.current) return;
+        point.current = project(value); setWalking(false);
+      });
     };
-  }, [canAnimate, celebration, parked, geometry, position, screen?.travel, capture, project]);
+  }, [canAnimate, asleep, celebration, parked, geometry, position, screen?.travel, capture, project]);
   const quiet = !!screen?.travel && (!!screen.travel.guidance || screen.travel.arrival);
   useEffect(() => {
     const event = api.store.getCelebration();
@@ -185,12 +194,39 @@ function BuddyActor({ api, path, geometry, screen, interacting }: { api: Api; pa
     const expiry = setTimeout(() => setReaction(null), 7000);
     return () => { clearTimeout(expiry); setReaction(old => old?.key === 'story:' + storyId ? null : old); };
   }, [api, storyId, help, interacting, capture, path, position, corridor.width, minimumBubbleHeight]);
+  useEffect(() => {
+    const line = buddyContextLine(path);
+    if (!line || screen?.travel || help || reaction || interacting || dragging || asleep || pendingCelebration) return;
+    let active = true, expiry: ReturnType<typeof setTimeout> | undefined;
+    const allowed = () => active && alive.current && api.preference.get().enabled && api.store.get().path === path
+      && AppState.currentState === 'active' && !api.store.current().suppressed && !api.store.current().interacting
+      && !api.store.current().state?.travel && !api.store.getCelebration() && !api.store.getMapHelp() && api.store.getTour() === null;
+    const timer = setTimeout(() => {
+      if (!allowed()) return;
+      capture.read(value => {
+        if (!allowed()) return;
+        const safe = nearestBuddyPosition(value, geometry);
+        if (!safe || !placeBuddyBubble(safe, geometry, Math.min(252, corridor.width), minimumBubbleHeight)
+          || !claimBuddyContext(api.store, path)) return;
+        point.current = safe; position.setValue(safe); setWalking(false); setAnchor(safe); setBubbleHeight(0);
+        setContextual(line);
+        expiry = setTimeout(() => { if (active && alive.current) setContextual(null); }, BUDDY_CONTEXT_DURATION);
+      });
+    }, BUDDY_CONTEXT_DELAY);
+    return () => { active = false; clearTimeout(timer); clearTimeout(expiry); if (alive.current) setContextual(null); };
+  }, [api, path, screen?.travel, help, reaction, interacting, dragging, asleep, pendingCelebration, capture, geometry, corridor.width, minimumBubbleHeight, position]);
   const openHelp = () => {
     if (!alive.current || !api.preference.get().enabled || path !== api.store.get().path || api.store.current().suppressed || AppState.currentState !== 'active') return;
     if (api.store.current().state?.travel?.guidance || api.store.current().state?.travel?.arrival) return;
+    if (wakeGesture.current) { wakeGesture.current = false; return; }
+    if (wakeBuddy()) return;
+    // Opening help must not wait for the asynchronous native position reply.
+    setAnchor(nearestBuddyPosition(point.current, latest.current.geometry) ?? point.current);
     capture.read(value => { if (alive.current) { point.current = nearestBuddyPosition(value, latest.current.geometry) ?? point.current; position.setValue(point.current); setAnchor(point.current); } });
-    api.store.clearCelebration(); stopTravelBurst(); setWalking(false); setReaction(null);
-    setBubbleHeight(0); setHelp({ owner: api.store.actionOwner() });
+    api.store.clearCelebration(); stopTravelBurst(); setWalking(false); setReaction(null); setContextual(null);
+    // A same-sized native bubble needn't emit onLayout twice. Keep its last
+    // measured height; a bounded fallback covers missing first measurements.
+    setHelpMeasurementFailed(false); setHelp({ owner: api.store.actionOwner() });
   };
   const open = useRef<() => void>(() => {});
   useEffect(() => { open.current = openHelp; });
@@ -203,6 +239,7 @@ function BuddyActor({ api, path, geometry, screen, interacting }: { api: Api; pa
     onMoveShouldSetPanResponder: shouldStart,
     onPanResponderGrant: () => {
       if (!alive.current || !api.preference.get().enabled || path !== api.store.get().path || api.store.current().suppressed) return;
+      wakeGesture.current = wakeBuddy();
       dragged.current = false; stopTravelBurst(); setDragging(true); setWalking(false);
       const epoch = ++gestureState.current.generation;
       Object.assign(gestureState.current, { active: true, ready: false, released: false, dx: 0, dy: 0 });
@@ -231,13 +268,18 @@ function BuddyActor({ api, path, geometry, screen, interacting }: { api: Api; pa
       const gesture = gestureState.current;
       gesture.released = true; gesture.dx = move.dx; gesture.dy = move.dy;
       if (buddyDragged(move.dx, move.dy)) { dragged.current = true; setParked(true); }
+      if (!dragged.current) {
+        // A tap has no drag delta to resolve. Late/obsolete native captures must
+        // not keep dragging=true or prevent the requested message from opening.
+        gesture.generation++; gesture.active = false; setDragging(false); open.current(); return;
+      }
       if (!gesture.ready) return;
       gesture.active = false; setDragging(false);
-      if (dragged.current) setParked(true); else open.current();
+      if (dragged.current) { wakeGesture.current = false; setParked(true); } else open.current();
     },
     onPanResponderTerminationRequest: () => true,
-    onPanResponderTerminate: () => { gestureState.current.generation++; gestureState.current.active = false; capture.cancel(); if (alive.current) { setDragging(false); setParked(true); } },
-  }), [position, shouldStart, api, path, capture, poseOwner, stopTravelBurst]);
+    onPanResponderTerminate: () => { wakeGesture.current = false; gestureState.current.generation++; gestureState.current.active = false; capture.cancel(); if (alive.current) { setDragging(false); setParked(true); } },
+  }), [position, shouldStart, api, path, capture, poseOwner, stopTravelBurst, wakeBuddy]);
   const navigate = (route: '/discover' | '/create' | '/account') => {
     if (!alive.current) return;
     if (!api.preference.get().enabled || path !== api.store.get().path || AppState.currentState !== 'active' || api.store.current().suppressed) { setHelp(null); return; }
@@ -245,8 +287,15 @@ function BuddyActor({ api, path, geometry, screen, interacting }: { api: Api; pa
   };
   const canAct = () => alive.current && api.preference.get().enabled && path === api.store.get().path && AppState.currentState === 'active' && !api.store.current().suppressed && !api.store.current().state?.travel?.guidance && !api.store.current().state?.travel?.arrival;
   const reactionVisible = reaction && !quiet && (reaction.key.startsWith('story:') ? reaction.key === 'story:' + screen?.ownStory?.id : !!screen?.travel && travelEvent(screen.travel) === reaction.key);
+  const contextualVisible = !!contextual && !asleep && !interacting && !help && !reaction && !dragging && !screen?.travel && !pendingCelebration;
+  const contextualAnimate = contextualVisible && motionKnown && !reduced && AppState.currentState === 'active';
+  // Browsing Home cards pauses positional roaming, not the leaf's gentle idle
+  // frame clock. Buddy's own gestures and higher-priority states still stop it.
+  const homeIdleAnimate = ['/', '/index', '/discover'].includes(path) && motionKnown && !reduced && !asleep
+    && !dragging && !help && !reaction && !contextual && !pendingCelebration && !screen?.travel
+    && api.store.get().path === path && !api.store.current().suppressed && AppState.currentState === 'active';
   const bubbleWidth = Math.min(252, corridor.width);
-  const bubbleActive = !!(help || reactionVisible) && !quiet;
+  const bubbleActive = !!(help || reactionVisible || contextualVisible) && !quiet;
   const manualHelp = !!help;
   const bubbleFit = useMemo(() => {
     if (!bubbleActive) return { maxHeight: minimumBubbleHeight, fits: false, aboveOnly: false };
@@ -261,34 +310,40 @@ function BuddyActor({ api, path, geometry, screen, interacting }: { api: Api; pa
   const bubbleMaxHeight = bubbleFit.maxHeight;
   const placement = useMemo(() => bubbleActive && bubbleFit.fits && bubbleHeight ? placeBuddyBubble(anchor, geometry, bubbleWidth, Math.min(bubbleHeight, bubbleMaxHeight), bubbleFit.aboveOnly ? 'above' : undefined) : null, [bubbleActive, bubbleFit.fits, bubbleFit.aboveOnly, anchor, geometry, bubbleWidth, bubbleHeight, bubbleMaxHeight]);
   useEffect(() => {
-    if (!help && !reactionVisible) return;
+    if (!help && !reactionVisible && !contextualVisible) return;
     if (!bubbleHeight) return;
     if (!placement) return;
     point.current = placement.buddy; position.setValue(placement.buddy);
-  }, [help, reactionVisible, placement, position, bubbleHeight]);
-  const closeBubble = () => { setHelp(null); setReaction(null); api.store.setTour(null); };
+  }, [help, reactionVisible, contextualVisible, placement, position, bubbleHeight]);
+  useEffect(() => {
+    if (!help || !bubbleFit.fits || placement || helpMeasurementFailed) return;
+    const timer = setTimeout(() => { if (alive.current && api.store.get().path === path) setHelpMeasurementFailed(true); }, 500);
+    return () => clearTimeout(timer);
+  }, [api, path, help, bubbleFit.fits, placement, helpMeasurementFailed]);
+  const manualFallback = !!help && (!bubbleFit.fits || helpMeasurementFailed);
+  const closeBubble = () => { setHelp(null); setReaction(null); setContextual(null); api.store.setTour(null); };
   const tour = api.store.getTour();
   return <>
     <Animated.View pointerEvents="box-none" style={[s.character, { transform: position.getTranslateTransform() }]}>
       <View {...gesture.panHandlers} collapsable={false} pointerEvents="box-only" accessible focusable
-        accessibilityRole="button" accessibilityLabel="Journey Buddy" accessibilityHint="Double tap for journey help. Drag to park Buddy."
-        accessibilityActions={[{ name: 'activate', label: 'Open journey help' }]} onAccessibilityTap={openHelp}
+        accessibilityRole="button" accessibilityLabel="Journey Buddy" accessibilityHint={asleep ? 'Buddy is sleeping. Double tap to wake Buddy.' : 'Double tap for journey help. Drag to park Buddy.'}
+        accessibilityActions={[{ name: 'activate', label: asleep ? 'Wake Buddy' : 'Open journey help' }]} onAccessibilityTap={openHelp}
         onAccessibilityAction={event => { if (event.nativeEvent.actionName === 'activate') openHelp(); }}
         onTouchStart={event => event.stopPropagation()} style={s.touch}>
-        <BuddySprite animation={celebration && canAnimate && !quiet ? celebration.animation : (walking || travelWalking) && canAnimate ? 'walk' : 'idle'} animate={canAnimate} facing={facing} />
+        <BuddySprite animation={asleep ? 'sleep' : contextualVisible ? contextual.animation : celebration && canAnimate && !quiet ? celebration.animation : (walking || travelWalking) && canAnimate ? 'walk' : 'idle'} animate={canAnimate || contextualAnimate || homeIdleAnimate} facing={facing} />
       </View>
     </Animated.View>
-    {(help || reactionVisible) && !quiet && <BuddyHelpSheet canAddMemory={!!screen?.canAddMemory} travel={screen?.travel}
-      fallback={!!help && !bubbleFit.fits} width={help && !bubbleFit.fits ? Math.min(320, corridor.width - 32) : bubbleWidth}
-      maxHeight={help && !bubbleFit.fits ? Math.max(124, corridor.height - 48) : bubbleMaxHeight} onMeasure={height => {
+    {(help || reactionVisible || contextualVisible) && !quiet && <BuddyHelpSheet canAddMemory={!!screen?.canAddMemory} travel={screen?.travel}
+      fallback={manualFallback} width={manualFallback ? Math.min(320, corridor.width - 32) : bubbleWidth}
+      maxHeight={manualFallback ? Math.max(124, corridor.height - 48) : bubbleMaxHeight} onMeasure={height => {
         if (!bubbleFit.fits) {
-          if (!help) setReaction(null);
+          if (!help) { setReaction(null); setContextual(null); }
           return;
         }
         setBubbleHeight(old => old === height ? old : height);
       }}
       placement={placement ? { ...placement.rect, above: placement.above, tailX: placement.tailX } : undefined}
-      reaction={!help && reactionVisible ? reaction?.text : undefined} tour={help ? tour : null}
+      contextualLine={buddyContextLine(path)?.text} reaction={contextualVisible ? contextual.text : !help && reactionVisible ? reaction?.text : undefined} tour={help ? tour : null}
       onTour={() => { if (!canAct()) return; if (tour === null) { api.store.setTour(0); } else navigate((['/discover', '/create', '/account'] as const)[tour]); }}
       onNext={() => { if (!canAct()) return; if (tour === 2) closeBubble(); else { api.store.setTour((tour ?? -1) + 1); } }}
       onClose={closeBubble} onCreate={() => navigate('/create')} onDrafts={() => { api.store.setTour(null); navigate('/account'); }}

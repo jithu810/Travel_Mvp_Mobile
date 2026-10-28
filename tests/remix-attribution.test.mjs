@@ -340,7 +340,7 @@ test('screens wire the credits and the optional, non-blocking photo hint', () =>
   assert.match(create, /\{photoHint && <Text testID="remix-photo-hint"/);
   const swipe = create.slice(create.indexOf('<SwipeAction'), create.indexOf('/>', create.indexOf('<SwipeAction')));
   assert.ok(swipe.includes('!readiness') && !swipe.includes('photoHint'), 'Publishing is not gated by photos');
-  assert.match(readFileSync('src/app/journey/[id].tsx', 'utf8'), /\{journey\.sourceId && <SourceAttribution [^>]*variant="published" \/>\}/);
+  assert.match(readFileSync('src/app/journey/[id].tsx', 'utf8'), /\{!temporary && journey\.sourceId && <SourceAttribution [^>]*variant="published" \/>\}/);
 });
 
 test('Account draft card shows the direct-source credit only for remixes', () => {
