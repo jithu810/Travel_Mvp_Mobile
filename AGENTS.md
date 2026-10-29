@@ -16,8 +16,10 @@
 - tests/*.test.mjs uses Node's built-in runner and TypeScript compilation/transpilation with fixtures/mocks. Follow existing test patterns; do not equate mocks or exports with physical-device verification.
 
 ## Validation and handoff
-Run relevant tests, npm run typecheck and npm run lint for application changes. For native/runtime changes, also check Expo compatibility and the development build; native dependency changes may require a new approved EAS development build. Never silently upgrade packages to satisfy Doctor.
-Read PROJECT_STATUS.md and ROADMAP.md at chat startup. Update their implemented/tested/pending distinctions when work changes; older README/docs milestones are historical and may describe superseded limits. Record checks actually run, device evidence, limitations and remaining Git changes.
+Follow the shared backend-impact policy in `D:/Travel_Mvp/docs/multi-agent-workflow.md`. Before feature implementation, Architect records a repository-based impact assessment. UI-only layout, styling, navigation and local animation changes need no live Supabase check or Backend Developer assignment when existing data contracts, authentication/authorization, persistence, RPC/API behavior and Storage access remain unchanged; record the inspected paths, rationale and local verification plan. Unavailable Supabase access does not block that UI-only path. Backend-impacting or uncertain tasks require the full Backend Developer read-only live-schema preflight before affected implementation. Reassess if scope expands. This exception never authorizes live changes or production test records.
+
+Select checks using the proportional verification tiers in D:/Travel_Mvp/docs/multi-agent-workflow.md. Cosmetic changes need diff/visual inspection, with no specialist or full suite by default. Focused changes use affected tests and relevant static checks; major/sensitive changes require specialist implementation, QA, independent review and broader regression/static checks. For affected native/runtime changes, also check Expo compatibility and the development build; native dependency changes may require a new approved EAS development build. Never silently upgrade packages to satisfy Doctor.
+Read PROJECT_STATUS.md and ROADMAP.md at chat startup. Update their implemented/tested/pending distinctions for material feature/status changes, not every cosmetic edit; older README/docs milestones are historical and may describe superseded limits. Record checks actually run, device evidence, limitations and remaining Git changes.
 
 ## Unified product-owner approval rule
 - Requests to "fix" or "implement" authorize local work only.
@@ -29,3 +31,9 @@ Read PROJECT_STATUS.md and ROADMAP.md at chat startup. Update their implemented/
 
 ## Secret access
 Never read .env or .env.* files, including nested files or files in another repository. Do not bypass this through shell commands, interpreters, search, alternate tools or indirect reads. Use variable names only; never expose secrets.
+
+## Proportional checks for Codex and Claude
+Follow `D:/Travel_Mvp/docs/multi-agent-workflow.md#proportional-verification-and-agent-budget` for task tiers, direct implementation, bounded delegation and check selection. State tier/check scope briefly; no separate QA/reviewer or full suite for a button colour/copy/spacing change by default. Major/sensitive changes retain specialist QA and independent review. Backend-impact assessment and all approval/secret/preservation rules remain in force. If shared instructions are unavailable, use these defaults and report the missing context; backend-impacting work still requires preflight.
+
+## Shared Android phone session
+For authorized physical-device work, follow `D:/Travel_Mvp/.agents/skills/phone-session/SKILL.md` once per conversation and after a device ownership change. Codex uses Metro/reverse port 8081; Claude Code uses 8082. Android wireless-debugging/pairing ports are separate and must come from the phone. One phone has one active testing owner: coordinate handoff before switching sessions; never replace the other session's mapping or stop its server. If the shared skill is unavailable, report it before operating the phone.
