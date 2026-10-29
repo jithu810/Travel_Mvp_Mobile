@@ -324,7 +324,7 @@ function BuddyActor({ api, path, geometry, screen, interacting }: { api: Api; pa
   const manualFallback = !!help && (!bubbleFit.fits || helpMeasurementFailed);
   const closeBubble = () => { setHelp(null); setReaction(null); setContextual(null); api.store.setTour(null); };
   const tour = api.store.getTour();
-  const helpPrimary = buddyHelpPrimary(path);
+  const helpPrimary = screen?.resume ? { label: 'Continue editing', onPress: () => { api.store.setTour(null); if (path === '/account' && api.preference.get().enabled) router.push({ pathname: '/create', params: { draft: screen.resume!.id } }); } } : undefined;
   return <>
     <Animated.View pointerEvents="box-none" style={[s.character, { transform: position.getTranslateTransform() }]}>
       <View {...gesture.panHandlers} collapsable={false} pointerEvents="box-only" accessible focusable
@@ -348,7 +348,7 @@ function BuddyActor({ api, path, geometry, screen, interacting }: { api: Api; pa
       contextualLine={buddyContextLine(path)?.text ?? buddyHelpLine(path)} reaction={contextualVisible ? contextual.text : !help && reactionVisible ? reaction?.text : undefined} tour={help ? tour : null}
       onTour={() => { if (!canAct()) return; if (tour === null) { api.store.setTour(0); } else navigate((['/discover', '/create', '/account'] as const)[tour]); }}
       onNext={() => { if (!canAct()) return; if (tour === 2) closeBubble(); else { api.store.setTour((tour ?? -1) + 1); } }}
-      primary={helpPrimary ? { label: helpPrimary.label, onPress: () => { api.store.setTour(null); navigate(helpPrimary.route); } } : undefined}
+      primary={helpPrimary ? { label: helpPrimary.label, onPress: helpPrimary.onPress } : buddyHelpPrimary(path) ? { label: buddyHelpPrimary(path)!.label, onPress: () => { api.store.setTour(null); navigate(buddyHelpPrimary(path)!.route); } } : undefined}
       onClose={closeBubble} onCreate={() => navigate('/create')} onDrafts={() => { api.store.setTour(null); navigate('/account'); }}
       onAddMemory={() => { if (!alive.current || !api.preference.get().enabled || !help) return; const captured = help; setHelp(null); api.store.act(captured.owner, path, 'addMemory'); }} />}
   </>;

@@ -47,7 +47,9 @@ export default function AccountScreen() {
     { x: 0, y: rect.y + rect.height + 8, width: window.width, height: window.height },
   ], [window.width, window.height]));
   const scroll = useBuddyScroll(), footerProtection = useBuddyProtectedBounds();
-  useBuddyScreen({ floating: true, suppressed: settings || busy || auth.loading });
+  // Only a loaded draft is offered; nothing is written and no copy is made from here.
+  const resumeDraft = drafts.data?.[0];
+  useBuddyScreen({ floating: true, suppressed: settings || busy || auth.loading, resume: resumeDraft ? { id: resumeDraft.id, title: resumeDraft.title } : undefined });
   const refreshDrafts = drafts.refresh, refreshPublished = published.refresh;
   useFocusEffect(useCallback(() => { refreshDrafts(); refreshPublished(); }, [refreshDrafts, refreshPublished]));
   async function signOut() {
