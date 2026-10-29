@@ -71,7 +71,7 @@ export default function SearchScreen() {
             {query.length > 0 && <Pressable accessibilityRole="button" accessibilityLabel="Clear search" onPress={() => changeQuery('')} hitSlop={6} style={styles.compactClear}><Text style={styles.clearText}>x</Text></Pressable>}
           </CompactSearchInput></View>
           <Pressable accessibilityRole="button" accessibilityLabel={savedOnly ? 'Show all public journeys' : 'Show saved journeys'} accessibilityState={{ selected: savedOnly }}
-            onPress={() => setSavedOnly(value => !value)} style={[styles.savedToggle, savedOnly && styles.savedSelected]}><JourneyActionIcon name="bookmark" selected={savedOnly} /></Pressable>
+            onPress={() => setSavedOnly(value => !value)} style={[styles.savedToggle, savedOnly && styles.savedSelected]}><JourneyActionIcon name="bookmark" selected={savedOnly} /><Text style={[styles.savedLabel, savedOnly && styles.savedLabelSelected]}>Saved</Text></Pressable>
         </View> : <View style={styles.inputRow}>
           <TextInput accessibilityLabel="Search journeys, places, stops or creators" placeholder="Try a place, stop or creator"
             placeholderTextColor={colors.muted} value={query} onChangeText={changeQuery} maxLength={120}
@@ -91,13 +91,13 @@ export default function SearchScreen() {
           {!collection.loading && !holding && (!explore || Boolean(query.trim()) || showSaved) && <Text accessibilityLiveRegion="polite" style={ui.body}>{query.trim() ? results.length + (results.length === 1 ? ' journey found' : ' journeys found') : showSaved ? 'Saved journeys' : 'Explore recent journeys'}</Text>}
           {collection.error && results.length > 0 && <Message title="Couldn’t refresh results" body={collection.error} retry={showSaved ? saved.refresh : refreshPublic} />}
         </View>}
-        ListEmptyComponent={showSaved && (auth.loading || auth.error || !userId) ? <Message title={auth.loading ? 'Checking your account...' : auth.error ? 'Account unavailable' : 'Your saved journeys'}
+        ListEmptyComponent={<View style={styles.emptyWrap}>{showSaved && (auth.loading || auth.error || !userId) ? <Message title={auth.loading ? 'Checking your account...' : auth.error ? 'Account unavailable' : 'Your saved journeys'}
           body={auth.loading ? 'Please wait while your session is restored.' : auth.error ? 'Your session could not be restored. Reopen the app to retry.' : 'Sign in to browse journeys you have saved.'}
           retry={!auth.loading && !auth.error ? () => router.push('/auth') : undefined} action="Sign in" /> : collection.loading || holding ? <LoadingCards /> : collection.error
           ? <Message title="Search took a detour" body={collection.error} retry={showSaved ? saved.retry : refreshPublic} />
           : query.trim() ? <Message title="No journeys found" body={'Try a different place, stop, journey title or creator. ' + (showSaved ? 'Search covers your saved public journeys.' : 'Search covers the latest 100 public journeys.')} retry={() => changeQuery('')} action="Clear search" />
           : onlyOwn ? <Message title="Only your journeys so far" body="Search to find them." />
-          : <Message title={showSaved ? 'No saved journeys yet' : 'More stories are on their way'} body={showSaved ? 'Save a public journey using its bookmark to find it here. Unavailable journeys are omitted.' : 'There are no public journeys to explore yet.'} retry={showSaved ? saved.refresh : refreshPublic} action="Refresh journeys" />}
+          : <Message title={showSaved ? 'No saved journeys yet' : 'More stories are on their way'} body={showSaved ? 'Save a public journey using its bookmark to find it here. Unavailable journeys are omitted.' : 'There are no public journeys to explore yet.'} retry={showSaved ? saved.refresh : refreshPublic} action="Refresh journeys" />}</View>}
       />
     </KeyboardAvoidingView>
   </SafeAreaView>;
@@ -106,9 +106,12 @@ const styles = StyleSheet.create({
   compactRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   compactField: { flex: 1, minWidth: 0 },
   compactClear: { minWidth: 44, minHeight: 32, alignItems: 'center', justifyContent: 'center', marginVertical: -5 },
-  savedToggle: { width: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center', borderRadius: 22 },
+  savedToggle: { minWidth: 44, minHeight: 44, paddingHorizontal: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, borderRadius: 22 },
   savedSelected: { backgroundColor: colors.pale, borderWidth: 1, borderColor: colors.green },
+  savedLabel: { color: colors.ink, fontSize: 12, fontWeight: '600' },
+  savedLabelSelected: { color: colors.green },
   grid: { flexGrow: 1, paddingBottom: 20 },
+  emptyWrap: { paddingHorizontal: 22, paddingTop: 8 },
   exploreControls: { paddingHorizontal: 12, paddingTop: 8, paddingBottom: 10 },
   exploreResults: { paddingHorizontal: 12, paddingBottom: 0 },
   controls: { paddingHorizontal: 22, paddingBottom: 14, gap: 10 },
