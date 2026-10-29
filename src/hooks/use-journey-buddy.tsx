@@ -26,13 +26,24 @@ export function useBuddyCelebration() {
     return api.store.celebrate(path, animation, operation);
   }, [api, path]);
 }
-const absent = { loaded: false, enabled: false, error: null };
+const absent = { loaded: false, enabled: false, chosen: true, error: null };
 const noopSubscribe = () => () => {};
 const absentPreference = () => absent;
 export function useBuddyPreference() {
   const api = useBuddyApi();
   const value = useSyncExternalStore(api?.preference.subscribe ?? noopSubscribe, api?.preference.get ?? absentPreference, absentPreference);
   return { ...value, setEnabled: (enabled: boolean) => { void api?.preference.setEnabled(enabled); } };
+}
+// First use only: offered once while no on/off choice is stored. Guide me turns Buddy on and opens
+// the existing three-step tour (the actor opens help when it mounts with a tour step set).
+export function useBuddyIntro() {
+  const api = useBuddyApi();
+  const value = useSyncExternalStore(api?.preference.subscribe ?? noopSubscribe, api?.preference.get ?? absentPreference, absentPreference);
+  return {
+    visible: !!api && value.loaded && !value.chosen,
+    guide: () => { if (!api) return; api.store.setTour(0); void api.preference.setEnabled(true); },
+    skip: () => { void api?.preference.setEnabled(false); },
+  };
 }
 // Registration never subscribes to animation state. Latest callbacks are committed before publication.
 export function useBuddyScreen(state: BuddyScreen, actions?: { addMemory?: () => void }) {

@@ -83,11 +83,20 @@ test('Buddy preference starts hidden, ignores old key/invalid data, and survives
   const values = new Map([['travel-companion-enabled', 'true']]), reads = [];
   const storage = { getItem: async key => { reads.push(key); return values.get(key) ?? null; }, setItem: async (key, value) => values.set(key, value) };
   const preference = createBuddyPreference(storage);
-  assert.deepEqual(preference.get(), { enabled: false, loaded: false, error: null });
+  assert.deepEqual(preference.get(), { enabled: false, loaded: false, chosen: false, error: null });
   await preference.load(); assert.equal(preference.get().enabled, false); assert.deepEqual(reads, [BUDDY_PREFERENCE_KEY]);
-  await preference.setEnabled(true);
-  const reopened = createBuddyPreference(storage); await reopened.load(); assert.equal(reopened.get().enabled, true);
+  assert.equal(preference.get().chosen, false, 'A fresh install has made no Buddy choice yet');
+  await preference.setEnabled(true); assert.equal(preference.get().chosen, true);
+  const reopened = createBuddyPreference(storage); await reopened.load(); assert.equal(reopened.get().enabled, true); assert.equal(reopened.get().chosen, true);
   values.set(BUDDY_PREFERENCE_KEY, 'garbage'); const invalid = createBuddyPreference(storage); await invalid.load(); assert.equal(invalid.get().enabled, false);
+});
+test('first-use choice: a stored off keeps Buddy hidden and counts as chosen; a failed read never prompts', async () => {
+  const values = new Map(), storage = { getItem: async key => values.get(key) ?? null, setItem: async (key, value) => values.set(key, value) };
+  const fresh = createBuddyPreference(storage); await fresh.load(); assert.equal(fresh.get().chosen, false);
+  await fresh.setEnabled(false); assert.deepEqual(fresh.get(), { loaded: true, enabled: false, chosen: true, error: null });
+  const reopened = createBuddyPreference(storage); await reopened.load(); assert.equal(reopened.get().chosen, true, 'Explore myself is remembered');
+  const broken = createBuddyPreference({ getItem: async () => { throw Error('read'); }, setItem: async () => {} }); await broken.load();
+  assert.equal(broken.get().chosen, true); assert.equal(broken.get().enabled, false);
 });
 test('late preference hydration cannot revive a newer toggle; writes are serialized in last-choice order', async () => {
   const read = deferred(), first = deferred(), calls = [];
@@ -883,4 +892,34 @@ test('Home ambient animation still yields to own drag, help, reduced motion, suc
   h.native.AppState.currentState = 'active'; h.path('/account'); tree = h.renderActor(); assert.equal(all(tree, 'BuddySprite')[0].props.animate, false, 'Old Home actor cannot keep ambient animation after navigation');
   h.actorHooks.dispose(); h.hostHooks.dispose();
   const other = await hostHarness(true); tree = settleActor(other); await tick(); tree = settleActor(other); other.api.store.interaction(true); tree = settleActor(other); assert.equal(all(tree, 'BuddySprite')[0].props.animate, false, 'Non-Home touch behavior remains unchanged'); other.actorHooks.dispose(); other.hostHooks.dispose();
+});
+test('first-use intro: offered once on a fresh install; Guide me turns Buddy on with tour step 1, Explore myself keeps it hidden', async () => {
+  const x = await integrationHarness(); let intro;
+  const render = () => x.h.render(() => { intro = x.module.useBuddyIntro(); return null; });
+  render(); assert.equal(intro.visible, true, 'No stored choice: offer the introduction');
+  intro.guide(); render();
+  assert.equal(intro.visible, false); assert.equal(x.api.preference.get().enabled, true); assert.equal(x.api.store.getTour(), 0, 'Guide me starts the existing three-step tour');
+  const y = await integrationHarness(); let other; y.h.render(() => { other = y.module.useBuddyIntro(); return null; });
+  other.skip(); y.h.render(() => { other = y.module.useBuddyIntro(); return null; });
+  assert.equal(other.visible, false); assert.equal(y.api.preference.get().enabled, false); assert.equal(y.api.store.getTour(), null);
+  const stored = { store: createBuddyStore(), preference: createBuddyPreference({ getItem: async () => 'false', setItem: async () => {} }) };
+  const z = await integrationHarness(stored); let returning; z.h.render(() => { returning = z.module.useBuddyIntro(); return null; });
+  assert.equal(returning.visible, false, 'A remembered choice never repeats the introduction');
+});
+test('first-use intro card waits for Home, offers both choices with labels matching their text, and Back means Explore myself', () => {
+  const calls = []; let visible = true;
+  const { BuddyIntro } = load('src/components/buddy/buddy-intro.tsx', { 'react/jsx-runtime': runtime,
+    'react-native': { Modal: 'Modal', Pressable: 'Pressable', Text: 'Text', View: 'View', StyleSheet: { create: x => x } },
+    'react-native-safe-area-context': { SafeAreaView: 'SafeAreaView' }, '@/theme/mobile-theme': { primaryControl: {} }, '@/components/discovery/ui': { colors: {} },
+    '@/hooks/use-journey-buddy': { useBuddyIntro: () => ({ visible, guide: () => calls.push('guide'), skip: () => calls.push('skip') }) }, './buddy-sprite': { BuddySprite: 'BuddySprite' } });
+  assert.equal(BuddyIntro({ ready: false }), null, 'Never over the startup loader');
+  const tree = BuddyIntro({ ready: true }), nodes = all(tree);
+  const press = label => nodes.find(n => n.type === 'Pressable' && n.props.accessibilityLabel === label);
+  const texts = nodes.filter(n => n.type === 'Text').map(n => n.props.children);
+  assert.ok(texts.includes('Guide me') && texts.includes('Explore myself'));
+  assert.ok(texts.some(t => /anytime in Account/.test(t)), 'Explains where to change it later');
+  press('Guide me').props.onPress(); press('Explore myself').props.onPress(); tree.props.onRequestClose();
+  assert.deepEqual(calls, ['guide', 'skip', 'skip']);
+  assert.equal(nodes.find(n => n.type === 'BuddySprite').props.animate, false, 'Static sprite: no motion in the introduction');
+  visible = false; assert.equal(BuddyIntro({ ready: true }), null);
 });

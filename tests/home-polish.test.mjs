@@ -46,7 +46,7 @@ function load(file, dependencies, state = null, hookOverrides = {}) {
     if(name==='@/hooks/use-discovery-viewer' && !(name in dependencies))return {useDiscoveryViewer:()=>({pending:false,id:null})};
     if(name==='expo-router')return {Stack:{Screen:'StackScreen'},useFocusEffect:()=>{},useGlobalSearchParams:()=>({}),...dependencies[name]};
     if (name in dependencies) return name==='@/lib/discovery/map'?{worldCamera:{centerCoordinate:[35,18]},...dependencies[name]}:dependencies[name];
-    if(name==='@/components/branded-loading')return {BrandedLoading:'BrandedLoading'};throw Error(name);
+    if(name==='@/components/branded-loading')return {BrandedLoading:'BrandedLoading'};if(name==='@/components/buddy/buddy-intro')return {BuddyIntro:'BuddyIntro'};throw Error(name);
   }, exports);
   return exports;
 }
@@ -133,7 +133,7 @@ test('Home embeds place search; Account and navigation retain existing routes an
   const tree = home.default();
   const all = nodes(tree);
   assert.ok(!all.some(n => n.props?.accessibilityLabel === 'Journey Creator logo'));
-  const header = tree.props.children.props.children[1];
+  const page = [tree.props.children].flat()[0], header = page.props.children[1];
   assert.equal(header.props.style[0].flexDirection, 'row');
   // Search is the only header control; the inactive notification bell was removed (backlog U6).
   const search = header.props.children;
@@ -416,7 +416,8 @@ test('Home retains navigation and its live globe through loading, refreshing and
     '@/lib/discovery/map':{discoveryPoints:()=>({features:[]})},'@/lib/discovery/travel':{discoveryRoute:()=>null},
     '@/lib/discovery/presentation':{spaceColor:'#080F1E'},'@/lib/discovery/queries':{loadPublicJourney:()=>{},loadDiscoveryEntries:()=>{}},
   });
-  const tree = home.default(), all = nodes(tree), children = tree.props.children.props.children;
+  const tree = home.default(), all = nodes(tree), page = [tree.props.children].flat()[0], children = page.props.children;
+  assert.equal([tree.props.children].flat().filter(Boolean).map(n => n.type).join(), "View,BuddyIntro", "Only the modal first-use intro sits beside the page");
   assert.equal(children.filter(Boolean).length, 6, 'Buddy floating overlay adds no Home layout node');
   assert.equal(children[2].type, 'View');
   assert.equal(children[5].type, 'Navigation');

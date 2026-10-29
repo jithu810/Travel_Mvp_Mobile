@@ -18,6 +18,7 @@ import { hideViewerJourneys, onlyViewerJourneysCopy } from '@/lib/discovery/mode
 import { discoveryRoute } from '@/lib/discovery/travel';
 import { spaceColor } from '@/lib/discovery/presentation';
 import { invalidatePublicJourneys, loadDiscoveryEntries, loadPublicJourney } from '@/lib/discovery/queries';
+import { BuddyIntro } from '@/components/buddy/buddy-intro';
 
 export default function DiscoverScreen() {
   const router = useRouter();
@@ -108,6 +109,8 @@ export default function DiscoverScreen() {
       <FloatingNavigation active="explore" onHeight={setNavHeight} />
       {initialLoading && <BrandedLoading overlay message="Exploring the world…" />}
     </View>
+    {/* A Modal: outside the page so it adds no Home layout node. */}
+    <BuddyIntro ready={!initialLoading} />
   </SafeAreaView>;
 }
 const s = StyleSheet.create({
