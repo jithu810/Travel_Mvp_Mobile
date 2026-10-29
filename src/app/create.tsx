@@ -43,8 +43,9 @@ import { loadEditableDraft, saveNewJourney } from '@/lib/create/queries';
 import { createStoryBuddyPlayback } from '@/lib/journey/story-buddy-playback';
 
 export function RemixDraftMap({ geometry, selectedId, onSelect, active, topInset }: { geometry: string; selectedId: string | null; onSelect: (id: string) => void; active: boolean; topInset: number }) {
+  const router = useRouter();
   const [expanded, setExpanded] = useState(false);
-  const expandProtection = useBuddyProtectedBounds();
+  const expandProtection = useBuddyProtectedBounds(), backProtection = useBuddyProtectedBounds();
   if (expanded && !active) setExpanded(false);
   const stops = useMemo(() => previewStops(JSON.parse(geometry) as StopInput[]), [geometry]);
   const playback = useMemo(() => createStoryBuddyPlayback(stops), [stops]);
@@ -54,7 +55,8 @@ export function RemixDraftMap({ geometry, selectedId, onSelect, active, topInset
   return <View style={{ flex: 1 }}>
     {!expanded && <>
       <JourneyMap stops={stops} presentation="expanded" selectedId={selectedId} onSelect={onSelect} controlTopInset={topInset} onExpand={() => setExpanded(true)} storyBuddy={active ? playback : undefined} storyBuddyMotion="run" storyBuddySize={36} />
-      <Pressable {...expandProtection} accessibilityRole="button" accessibilityLabel="Expand remix journey map" onPress={() => setExpanded(true)} style={{ position: 'absolute', top: topInset + 4, right: 6, minHeight: 44, minWidth: 44, paddingHorizontal: 8, borderRadius: 22, backgroundColor: colors.paper, alignItems: 'center', justifyContent: 'center' }}><JourneyActionIcon name="expand" /></Pressable>
+      <Pressable {...backProtection} accessibilityRole="button" accessibilityLabel="Go back" accessibilityHint="Return to the previous screen." onPress={() => router.canGoBack() ? router.back() : router.replace('/discover')} style={[createStyles.remixMapControl, { top: topInset + 4, left: 6 }]}><View style={createStyles.remixMapControlFace}><Text accessible={false} style={createStyles.remixMapBackGlyph}>{'\u2039'}</Text></View></Pressable>
+      <Pressable {...expandProtection} accessibilityRole="button" accessibilityLabel="Expand remix journey map" onPress={() => setExpanded(true)} style={[createStyles.remixMapControl, { top: topInset + 4, right: 6 }]}><View style={createStyles.remixMapControlFace}><View style={createStyles.remixMapControlIcon}><JourneyActionIcon name="expand" /></View></View></Pressable>
     </>}
     {expanded && <StorySheet visible title="Your draft map" subtitle="Explore your remix route" scrollable={false} suppressBuddy={false} onClose={() => setExpanded(false)}>
       <JourneyMap stops={stops} presentation="expanded" selectedId={selectedId} onSelect={onSelect} storyBuddy={active ? playback : undefined} storyBuddyMotion="run" storyBuddySize={64} />
@@ -353,6 +355,10 @@ export default function CreateScreen() {
 }
 
 const createStyles = StyleSheet.create({
+  remixMapControl: { position: 'absolute', width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
+  remixMapControlFace: { width: 34, height: 34, borderRadius: 17, backgroundColor: colors.paper, alignItems: 'center', justifyContent: 'center' },
+  remixMapControlIcon: { transform: [{ scale: 0.75 }] },
+  remixMapBackGlyph: { color: colors.ink, fontSize: 28, lineHeight: 32 },
   adventureTitle: { color: '#FFFFFF', fontSize: 19, lineHeight: 26, fontWeight: '600', textAlign: 'left', alignSelf: 'flex-start', maxWidth: '85%' }, adventureNote: { color: '#C7D5EC', fontSize: 12, lineHeight: 18, textAlign: 'left', maxWidth: '85%' },
   firstStopCard: { padding: 20, gap: 12, borderRadius: 24, borderWidth: 1, borderColor: '#FFFFFF', backgroundColor: theme.surface }, firstStopTitle: { color: theme.text, fontSize: 22, lineHeight: 29, fontWeight: '700' }, firstStopNote: { color: theme.muted, fontSize: 13, lineHeight: 20 },
   firstStopButton: { ...primaryControl, minHeight: 52, paddingHorizontal: 16, paddingVertical: 12, alignItems: 'center', justifyContent: 'center' }, firstStopLabel: { color: '#FFFFFF', fontSize: 15, lineHeight: 22, fontWeight: '700' },

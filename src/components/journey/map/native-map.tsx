@@ -69,7 +69,8 @@ export const NativeJourneyMap = memo(function NativeJourneyMap({ data, stops, re
   const { setFrame: setPinFrame } = pins;
   const validCurrentPosition = !!currentPosition && Number.isFinite(currentPosition.latitude) && Math.abs(currentPosition.latitude) <= 90 && Number.isFinite(currentPosition.longitude) && Math.abs(currentPosition.longitude) <= 180;
   const liveCoordinates = validCurrentPosition ? [[currentPosition!.longitude, currentPosition!.latitude], ...pinCoordinates] : [];
-  const liveControls = [...journeyBuddyControls({ x: 0, y: 0, ...viewport }, navigationMode, bottom, controlTopInset, presentation !== 'preview'),
+  const compactControls = presentation === 'expanded' && !!onExpand && !navigationMode;
+  const liveControls = [...journeyBuddyControls({ x: 0, y: 0, ...viewport }, navigationMode, bottom, controlTopInset + (compactControls ? 44 : 0), presentation !== 'preview'),
     { x: 0, y: 0, width: viewport.width, height: navigationPadding?.top ?? 80 },
     { x: 0, y: viewport.height - bottom, width: viewport.width, height: bottom },
     { x: 12, y: viewport.height - bottom - 80, width: 120, height: 44 },
@@ -82,7 +83,7 @@ export const NativeJourneyMap = memo(function NativeJourneyMap({ data, stops, re
   const { mapRef: pinMapRef } = pins, { mapRef: safetyMapRef } = liveSafety;
   const mapRef = useCallback((node: Parameters<typeof pinMapRef>[0]) => { pinMapRef(node); safetyMapRef(node); }, [pinMapRef, safetyMapRef]);
   const buddyHelpProtection = useBuddyProtectedBounds(), buddyRetryProtection = useBuddyProtectedBounds();
-  const projectControls = useCallback((rect: { x: number; y: number; width: number; height: number }) => { setPinFrame(rect); return journeyBuddyControls(rect, navigationMode, bottom, controlTopInset, presentation !== 'preview'); }, [setPinFrame, navigationMode, bottom, controlTopInset, presentation]);
+  const projectControls = useCallback((rect: { x: number; y: number; width: number; height: number }) => { setPinFrame(rect); return journeyBuddyControls(rect, navigationMode, bottom, controlTopInset + (compactControls ? 44 : 0), presentation !== 'preview'); }, [setPinFrame, navigationMode, bottom, controlTopInset, presentation, compactControls]);
   const controlsProtection = useBuddyProtectedBounds(projectControls);
   const selected = data.markers.find(marker => marker.id === selectedId);
   const frame = useMemo(() => frameJourneyMap(stops, viewport, navigationMode
@@ -204,7 +205,7 @@ export const NativeJourneyMap = memo(function NativeJourneyMap({ data, stops, re
       {frame && <Mapbox.MapView key={style} ref={mapRef} style={styles.map} projection={navigationMode ? 'mercator' : frame.projection} styleURL={navigationMode ? Mapbox.StyleURL.Street : style === 'satellite' ? Mapbox.StyleURL.SatelliteStreet : Mapbox.StyleURL.Outdoors}
         onPress={presentation === 'preview' ? () => { if (mounted.current) onExpand?.(); } : undefined}
         scrollEnabled={presentation !== 'preview'} zoomEnabled={presentation !== 'preview'} rotateEnabled={presentation !== 'preview'} pitchEnabled={false} surfaceView={false} requestDisallowInterceptTouchEvent
-        compassEnabled={presentation !== 'preview'} compassPosition={navigationMode ? { bottom: (navigationPadding?.bottom ?? 220) + 36, right: 12 } : { top: 12 + Math.max(0, controlTopInset), right: 12, ...(onExpand ? { top: 64 + Math.max(0, controlTopInset) } : {}) }} scaleBarEnabled={false} logoEnabled attributionEnabled
+        compassEnabled={presentation !== 'preview'} compassPosition={navigationMode ? { bottom: (navigationPadding?.bottom ?? 220) + 36, right: 12 } : { top: 12 + Math.max(0, controlTopInset), right: 12, ...(onExpand ? { top: (compactControls ? 56 : 64) + Math.max(0, controlTopInset) } : {}) }} scaleBarEnabled={false} logoEnabled attributionEnabled
         logoPosition={navigationMode ? { bottom: (navigationPadding?.bottom ?? 220) + 8, left: 12 } : undefined}
         attributionPosition={navigationMode ? { bottom: (navigationPadding?.bottom ?? 220) + 8, right: 12 } : undefined}
         onCameraChanged={state => {
@@ -271,8 +272,8 @@ export const NativeJourneyMap = memo(function NativeJourneyMap({ data, stops, re
       </View>}
       {!ready && <View style={styles.loading} pointerEvents="none" accessibilityLabel="Loading journey map" accessibilityRole="progressbar"><ActivityIndicator color={colors.green} /><Text style={styles.note}>Loading map…</Text></View>}
       {presentation !== 'preview' && <Pressable {...fitProtection} accessibilityRole="button" accessibilityLabel="Fit journey and reset map orientation"
-        accessibilityState={{ disabled: !ready || !frame }} disabled={!ready || !frame} onPress={() => { if (navigationMode) follow.explore(); fit(); }} style={[styles.fit, { top: 12 + Math.max(0, controlTopInset) }, !navigationMode && { width: 44, paddingHorizontal: 10, borderRadius: 22 }, navigationMode && { top: undefined, bottom: (navigationPadding?.bottom ?? 220) + 36 }]}>
-        {navigationMode ? <Text style={styles.fitLabel}>↗ Fit journey</Text> : <JourneyActionIcon name="fit" />}
+        accessibilityState={{ disabled: !ready || !frame }} disabled={!ready || !frame} onPress={() => { if (navigationMode) follow.explore(); fit(); }} style={[styles.fit, { top: 12 + Math.max(0, controlTopInset) }, !navigationMode && { width: 44, paddingHorizontal: 10, borderRadius: 22 }, navigationMode && { top: undefined, bottom: (navigationPadding?.bottom ?? 220) + 36 }, compactControls && { left: undefined, right: 54, top: Math.max(0, controlTopInset) + 4, paddingHorizontal: 0, backgroundColor: 'transparent', alignItems: 'center' }]}>
+        {navigationMode ? <Text style={styles.fitLabel}>↗ Fit journey</Text> : compactControls ? <View style={styles.compactControlFace}><View style={styles.compactControlIcon}><JourneyActionIcon name="fit" /></View></View> : <JourneyActionIcon name="fit" />}
       </Pressable>}
       {navigationMode && travelCamera && <View pointerEvents="box-none" style={[styles.locationControls, { bottom: (navigationPadding?.bottom ?? 220) + 36 }]}>
         <Pressable {...locationProtection} accessibilityRole="button" accessibilityLabel="My Location, recenter map" accessibilityHint="Centers on accurate foreground GPS and resumes following. Does not start the trip."
@@ -300,6 +301,8 @@ const styles = StyleSheet.create({
   loading: { position: 'absolute', top: 0, bottom: 0, left: 0, right: 0, backgroundColor: colors.pale, alignItems: 'center', justifyContent: 'center', gap: 10 },
   fit: { position: 'absolute', top: 12, left: 12, minHeight: 44, justifyContent: 'center', paddingHorizontal: 13, backgroundColor: colors.paper, borderRadius: 14 },
   fitLabel: { fontSize: 12, color: colors.green, fontWeight: '600' },
+  compactControlFace: { width: 34, height: 34, borderRadius: 17, backgroundColor: colors.paper, alignItems: 'center', justifyContent: 'center' },
+  compactControlIcon: { transform: [{ scale: 0.75 }] },
   locationControls: { position: 'absolute', right: 62, alignItems: 'flex-end', maxWidth: 170, gap: 6 },
   recenter: { minHeight: 48, paddingHorizontal: 12, borderRadius: 16, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.paper, justifyContent: 'center', elevation: 3 },
   overviewNote: { color: colors.muted, fontSize: 11, lineHeight: 17, paddingHorizontal: 10, paddingVertical: 6 },

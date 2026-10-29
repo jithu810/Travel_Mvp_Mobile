@@ -88,9 +88,9 @@ export function JourneyStoryContent({ journey, refresh, refreshing, error, saveF
     <ScrollView {...scroll} contentContainerStyle={[styles.content, canOpenTravelMode(journey) && { paddingBottom: swipeFooterHeight + 16 }]} keyboardShouldPersistTaps="handled" nestedScrollEnabled>
       <View style={[styles.preview, { height: Math.max(180, Math.min(310, window.height * 0.33)) }]}>
         {focused && panel === null && <JourneyMap stops={journey.stops} memoryPhotos={memoryPhotos} storyBuddy={storyBuddy} storyBuddySize={36} storyBuddyMotion={temporary ? 'run' : 'walk'} animateMemoryRoute={false} selectedId={selectedId} onSelect={select} presentation="expanded" controlTopInset={insets.top} onExpand={openMap} />}
-        <Pressable {...expandProtection} accessibilityRole="button" accessibilityLabel="Expand journey map" onPress={openMap} style={[styles.expand, { top: insets.top + 4 }]}><JourneyActionIcon name="expand" /></Pressable>
+        <Pressable {...backProtection} accessibilityRole="button" accessibilityLabel={temporary ? 'Back to magic cards' : 'Go back'} accessibilityHint={temporary ? 'Return to your choices. Use Undo to choose stops again.' : 'Return to the previous screen.'} onPress={temporary ? temporary.onBack : () => { if (router.canGoBack()) router.back(); else router.replace('/discover'); }} style={[styles.mapBack, { top: insets.top + 4 }]}><View style={styles.mapControlFace}><Text style={styles.mapBackGlyph}>{'\u2039'}</Text></View></Pressable>
+        <Pressable {...expandProtection} accessibilityRole="button" accessibilityLabel="Expand journey map" onPress={openMap} style={[styles.expand, { top: insets.top + 4 }]}><View style={styles.mapControlFace}><View style={styles.mapControlIcon}><JourneyActionIcon name="expand" /></View></View></Pressable>
       </View>
-      {temporary && <Pressable {...backProtection} accessibilityRole="button" accessibilityLabel="Back to magic cards" accessibilityHint="Return to your choices. Use Undo to choose stops again." onPress={temporary.onBack} style={styles.backToCards}><Text style={styles.link}>{'\u2039'} Back to cards</Text></Pressable>}
       <StopTimeline horizontal stacked creator={<StoryCreator journey={journey} />} active={focused && panel === null} stops={journey.stops} selectedId={selectedId} onSelect={select} onDetails={showStop} photoActions={temporary ? <Pressable accessibilityRole="button" accessibilityLabel={'Remove ' + (selected?.name || 'stop') + ' from this trip'} accessibilityHint="Only removes this stop from your temporary selection." disabled={temporary.editingBlocked || journey.stops.length <= 1} accessibilityState={{ disabled: temporary.editingBlocked || journey.stops.length <= 1 }} onPress={() => { if (focused && panel === null && selectedId && !temporary.editingBlocked && journey.stops.length > 1) temporary.onRemove(selectedId); }} style={[styles.removeStop, (temporary.editingBlocked || journey.stops.length <= 1) && { opacity: 0.45 }]}><Text style={styles.removeLabel}>Remove</Text></Pressable> : <SocialActions selectedMemoryId={selectedId} key={'social-' + journey.id} journey={journey} layout="rail" saveFirst={saveFirst} />} optionsActions={temporary ? <Pressable accessibilityRole="button" accessibilityLabel="About your selected journey" onPress={() => setPanel('about')} style={styles.textAction}><Text style={styles.link}>About</Text></Pressable> : <JourneyOptions key={journey.id} id={journey.id} onUse={openTravel} presentation="rail" onAbout={() => setPanel('about')} />} />
       {!temporary && journey.sourceId && <SourceAttribution key={'source-' + journey.sourceId} id={journey.sourceId} variant="published" />}
       {temporary && <View style={styles.selectionNote}><Text style={styles.note}>{journey.stops.length} selected {journey.stops.length === 1 ? 'stop' : 'stops'} for this trip. {temporary.editingBlocked ? 'Finish your current trip before removing stops.' : journey.stops.length <= 1 ? 'Keep at least one stop to start your journey.' : 'Remove a place using its card.'}</Text>{temporary.error && <Text accessibilityRole="alert" style={styles.note}>{temporary.error}</Text>}</View>}
@@ -132,7 +132,10 @@ export function JourneyStoryContent({ journey, refresh, refreshing, error, saveF
   </View>;
 }
 const styles = StyleSheet.create({
-  backToCards: { minHeight: 44, alignSelf: 'flex-start', paddingHorizontal: 12, borderRadius: 22, backgroundColor: colors.paper, justifyContent: 'center' },
+  mapBack: { position: 'absolute', left: 6, width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
+  mapControlFace: { width: 34, height: 34, borderRadius: 17, backgroundColor: colors.paper, alignItems: 'center', justifyContent: 'center' },
+  mapControlIcon: { transform: [{ scale: 0.75 }] },
+  mapBackGlyph: { color: colors.ink, fontSize: 28, lineHeight: 32 },
   removeStop: { minHeight: 44, minWidth: 60, paddingHorizontal: 8, justifyContent: 'center', alignItems: 'center', borderRadius: 16, backgroundColor: colors.paper },
   removeLabel: { fontSize: 12, color: colors.ink, fontWeight: '600' },
   selectionNote: { paddingHorizontal: 8, gap: 6 },
@@ -151,7 +154,7 @@ const styles = StyleSheet.create({
   creator: { width: '34%', minWidth: 0 },
   preview: { marginHorizontal: -16, borderBottomLeftRadius: 28, borderBottomRightRadius: 28, overflow: 'hidden', backgroundColor: '#080F1E' },
   mapOptions: { position: 'absolute', top: 58, right: 8, minHeight: 44, minWidth: 44, borderRadius: 22, backgroundColor: colors.paper, alignItems: 'center', justifyContent: 'center' },
-  expand: { position: 'absolute', top: 4, right: 6, minHeight: 44, minWidth: 44, paddingHorizontal: 8, backgroundColor: colors.paper, borderRadius: 22, justifyContent: 'center', alignItems: 'center' },
+  expand: { position: 'absolute', top: 4, right: 6, height: 44, width: 44, justifyContent: 'center', alignItems: 'center' },
   expandLabel: { color: colors.ink, fontWeight: '700', fontSize: 12 },
   mapCaption: { paddingTop: 6, flexShrink: 0 }, selectedStop: { minHeight: 48, justifyContent: 'center', gap: 2 },
   routeNote: { color: colors.muted, fontSize: 10, lineHeight: 14, paddingTop: 6, flexShrink: 0 },

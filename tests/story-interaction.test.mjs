@@ -157,11 +157,13 @@ test('Story preserves map browsing while Use opens Travel directly and Remix rem
   const h = harness();
   const journey = { id: journeyId, title: 'Public journey', stops: [{ ...stop('first'), sequence: 0 }, { ...stop('second'), sequence: 1 }], description: '' };
   const routes = []; let focus, buddyState;
+  let canGoBack = true, backCount = 0;
+  const replacements = [];
   let buddyAuth = { loading: false, session: null, error: null };
   const { JourneyStoryContent: Screen } = load('src/app/journey/[id].tsx', {
     '@/hooks/session-context': { useSessionState: () => buddyAuth },
     '@/hooks/use-journey-buddy': { useBuddyScreen: value => { buddyState = value; } },
-    'expo-router': { useRouter: () => ({ push: route => routes.push(route) }), useFocusEffect: callback => { focus = callback; } }, 'react-native': native,
+    'expo-router': { useRouter: () => ({ push: route => routes.push(route), canGoBack: () => canGoBack, back: () => { backCount++; }, replace: route => replacements.push(route) }), useFocusEffect: callback => { focus = callback; } }, 'react-native': native,
     'react-native-safe-area-context': { SafeAreaView: 'SafeAreaView' }, '@/components/discovery/ui': ui,
     '@/components/journey/stop-story-viewer': { StopStoryViewer: 'StopStoryViewer' },
     '@/components/journey/journey-options': { JourneyOptions: 'JourneyOptions' },
@@ -179,6 +181,14 @@ test('Story preserves map browsing while Use opens Travel directly and Remix rem
   }, h.hooks);
   const props = { journey, refresh: () => {}, refreshing: false, error: null };
   let tree = h.render(Screen, props);
+  const back = all(tree, 'Pressable').find(item => item.props.accessibilityLabel === 'Go back');
+  assert.ok(back, 'Regular Journey Story exposes a back button');
+  back.props.onPress();
+  assert.equal(backCount, 1);
+  canGoBack = false;
+  back.props.onPress();
+  assert.deepEqual(replacements, ['/discover'], 'Direct entry falls back to Discover');
+  assert.equal(backCount, 1);
   assert.equal(buddyState.ownStory, undefined, 'Anonymous viewer never owns an unidentified story');
   buddyAuth = { loading: false, session: { user: { id: journeyId } }, error: null };
   h.render(Screen, { ...props, journey: { ...journey, creatorId: journeyId } });
@@ -1793,6 +1803,14 @@ test('edge-to-edge preview moves Fit and compass below inset without changing Tr
  let tree=h.measure();assert.equal(find(tree,'MapView').props.compassPosition.top,12);
  let fit=all(tree,'Pressable').find(n=>n.props.accessibilityLabel==='Fit journey and reset map orientation');assert.equal(fit.props.style[1].top,12);
  h.props.controlTopInset=36;tree=h.render();assert.equal(find(tree,'MapView').props.compassPosition.top,48);fit=all(tree,'Pressable').find(n=>n.props.accessibilityLabel==='Fit journey and reset map orientation');assert.equal(fit.props.style[1].top,48);
+ h.props.presentation='expanded';h.props.onExpand=()=>{};tree=h.render();
+ fit=all(tree,'Pressable').find(n=>n.props.accessibilityLabel==='Fit journey and reset map orientation');
+ assert.equal(fit.props.style.at(-1).right,54,'Compact Fit leaves top-left clear for Back');
+ assert.equal(fit.props.style.at(-1).left,undefined);
+ assert.equal(fit.props.style.at(-1).top,40,'Compact controls align below the safe area');
+ assert.equal(find(tree,'MapView').props.compassPosition.top,92,'Compass stays below compact controls');
+ h.props.onExpand=undefined;tree=h.render();
+ assert.equal(find(tree,'MapView').props.compassPosition.top,48,'Expanded map retains original controls');
  h.props.navigationMode=true;h.props.navigationPadding={top:90,bottom:200};tree=h.render();assert.equal(find(tree,'MapView').props.compassPosition.bottom,236);h.dispose();
 });
 

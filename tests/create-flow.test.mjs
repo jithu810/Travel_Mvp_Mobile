@@ -830,6 +830,10 @@ test('actual remix map shares card and pin selection, runs only its selected rou
   const h=screenHarness(),selected=[];
   const props={geometry:JSON.stringify([memoryRow(sid,'First',{latitude:8,longitude:76}),memoryRow(uid,'Second',{latitude:9,longitude:77})]),selectedId:sid,onSelect:id=>selected.push(id),active:true,topInset:24};
   let tree=h.renderRemixMap(props),map=all(tree,'JourneyMap')[0],playback=map.props.storyBuddy;
+  const back=all(tree,'Pressable').find(node=>node.props.accessibilityLabel==='Go back');
+  assert.ok(back,'Remix map exposes Back');back.props.onPress();assert.deepEqual(h.routes,['back']);
+  h.setCanGoBack(false);back.props.onPress();assert.deepEqual(h.routes,['back','/discover']);
+  assert.equal(h.writes.length,0,'Back never saves or copies a journey');
   assert.equal(map.props.presentation,'expanded');assert.equal(map.props.storyBuddyMotion,'run');assert.equal(map.props.storyBuddySize,36);assert.equal(map.props.memoryPhotos,undefined);assert.equal(map.props.animateMemoryRoute,undefined);assert.equal(map.props.controlTopInset,24);
   map.props.onExpand(); tree=h.renderRemixMap(props);
   assert.equal(all(tree,'StorySheet').length,1);assert.equal(all(tree,'JourneyMap').length,1);
