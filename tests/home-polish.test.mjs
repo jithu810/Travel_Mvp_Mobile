@@ -135,8 +135,8 @@ test('Home embeds place search; Account and navigation retain existing routes an
   assert.ok(!all.some(n => n.props?.accessibilityLabel === 'Journey Creator logo'));
   const header = tree.props.children.props.children[1];
   assert.equal(header.props.style[0].flexDirection, 'row');
-  assert.equal(header.props.children.length, 2);
-  const search = header.props.children[0];
+  // Search is the only header control; the inactive notification bell was removed (backlog U6).
+  const search = header.props.children;
   assert.equal(search.props.style.flex, 1);
   assert.equal(search.props.style.minWidth, 0);
   assert.equal(search.props.style.minHeight, 44);
@@ -154,16 +154,8 @@ test('Home embeds place search; Account and navigation retain existing routes an
   const shade=all.find(n=>n.props?.testID==='home-status-shade');assert.equal(shade.props.pointerEvents,'none');
   assert.equal(all.find(n=>n.type==='Globe').props.headerInset,68);
   assert.equal(all.find(n=>n.type==='Panel').props.topClearance,68);
-  for (const control of header.props.children.slice(1)) {
-    assert.equal(control.props.style.width, 44);
-    assert.equal(control.props.style.minHeight, 44);
-    assert.equal(control.props.style.flexShrink, 0);
-    const icon = control.props.children;
-    assert.equal(icon.props.style.width, 34);
-    assert.equal(icon.props.style.height, 34);
-  }
   for (const width of [320, 360, 412]) {
-    const reserved = 2 * header.props.style[0].paddingHorizontal + 44 + header.props.style[0].gap;
+    const reserved = 2 * header.props.style[0].paddingHorizontal;
     assert.ok(width - reserved >= 150, 'Remaining Search width on common narrow phones');
   }
   assert.deepEqual(tree.props.edges, ['left', 'right']);
@@ -172,9 +164,7 @@ test('Home embeds place search; Account and navigation retain existing routes an
     all.find(n => n.props?.accessibilityLabel === label).props.onPress();
     assert.equal(pushed.at(-1), route);
   }
-  const bell = all.find(n => n.props?.accessibilityLabel === 'Notifications, coming soon');
-  assert.equal(bell.props.onPress, undefined);
-  assert.equal(bell.props.accessibilityRole, 'image');
+  assert.ok(!all.some(n => /notification/i.test(n.props?.accessibilityLabel ?? '')), 'No inactive notification affordance');
   assert.ok(all.some(n => n.type === 'Globe'));
   assert.ok(all.some(n => n.type === 'Panel'));all.find(n=>n.type==='Panel').props.onRefresh();assert.deepEqual(refreshOrder,['invalidate','refresh']);
   const explore = all.find(n => n.props?.accessibilityLabel === 'Explore');
