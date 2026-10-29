@@ -1757,17 +1757,18 @@ test('Story walker map omits the separate Buddy help button', () => {
   assert.equal(all(tree, 'Pressable').some(node => node.props.accessibilityLabel === 'Journey Buddy help'), false);
   assert.ok(find(tree, 'StoryWalkingBuddy')); h.dispose();
 });
-test('rail JourneyOptions preserves anonymous Remix, existing private copy, blocked feedback and About/customize routes', async () => {
-  for (const mode of ['anonymous', 'signed-in', 'existing', 'blocked']) {
+test('rail JourneyOptions explains Customize vs Remix in one choice sheet and preserves anonymous, resumed, existing and blocked Remix', async () => {
+  for (const mode of ['anonymous', 'signed-in', 'existing', 'blocked', 'resume']) {
     const h = harness();
-    const routes = [], intents = [], copies = [];
+    const routes = [], intents = [], copies = [], consumed = [];
     let uses = 0, about = 0;
     const state = { busy: false, copyId: mode === 'existing' ? 'private-copy' : null, blocked: mode === 'blocked', error: mode === 'blocked' ? 'Check your drafts' : null };
+    const pending = mode === 'resume' ? { journeyId, action: 'remix', token: 'intent-token' } : null;
     const component = load('src/components/journey/journey-options.tsx', {
       'expo-router': { useRouter: () => ({ push: route => routes.push(route) }) }, 'react-native': native,
       '../discovery/ui': { ...ui, Action: 'Action' },
       '@/hooks/session-context': { useSessionState: () => ({ loading: false, session: mode === 'anonymous' ? null : { user: { id: 'owner' } } }) },
-      '@/hooks/action-intent': { useActionIntent: () => ({ pending: null, begin: (id, action) => { intents.push([id, action]); return true; } }) },
+      '@/hooks/action-intent': { useActionIntent: () => ({ pending, begin: (id, action) => { intents.push([id, action]); return true; }, consume: token => { consumed.push(token); return true; } }) },
       '@/lib/remix/model': { remixStore: { get: () => state, subscribe: () => () => {}, run: async (_key, task) => task() } },
       '@/lib/remix/queries': { remixJourney: async (id, user) => { copies.push([id, user]); return 'new-copy'; } },
       './story-sheet': { StorySheet: 'StorySheet' },
@@ -1776,22 +1777,34 @@ test('rail JourneyOptions preserves anonymous Remix, existing private copy, bloc
     const props = { id: journeyId, onUse: () => uses++, presentation:'rail', onAbout:()=>about++ };
     const sheet = (t, title) => all(t,'StorySheet').find(n => n.props.title === title);
     const button = (t, label) => all(t,'Pressable').find(n => n.props.accessibilityLabel === label);
+    const sheetButtons = t => all(t,'StorySheet').flatMap(n => all(n,'Pressable'));
+    const railLabels = t => all(t,'Pressable').filter(n => !sheetButtons(t).includes(n)).map(n => n.props.accessibilityLabel);
     let tree = h.render(component.JourneyOptions, props);
-    button(tree,'About this journey').props.onPress();assert.equal(about,1);
+    if (mode === 'resume') {
+      // Returning from sign-in consumes the deferred Remix intent once and opens the new copy.
+      await new Promise(resolve => setImmediate(resolve));
+      assert.deepEqual(consumed, ['intent-token']); assert.deepEqual(copies, [[journeyId, 'owner']]);
+      assert.deepEqual(routes.at(-1), { pathname: '/create', params: { draft: 'new-copy' } }); continue;
+    }
     // Remix and Customize are no longer separate rail buttons: one choice sheet explains both.
+    assert.deepEqual(railLabels(tree), ['Make it yours', 'About this journey', ...(mode === 'blocked' ? ['Check your drafts'] : [])]);
+    button(tree,'About this journey').props.onPress();assert.equal(about,1);
     assert.equal(sheet(tree,'Make this journey yours').props.visible,false);
-    assert.equal(all(tree,'Pressable').filter(n => /^(Remix This Journey|Open private copy|Customize stops)$/.test(n.props.accessibilityLabel)).every(n => all(sheet(tree,'Make this journey yours'),'Pressable').includes(n)),true,'Customize and Remix live only inside the choice sheet');
     button(tree,'Make it yours').props.onPress();tree=h.render(component.JourneyOptions, props);
     const choice = sheet(tree,'Make this journey yours');assert.equal(choice.props.visible,true);
-    const inChoice = label => all(choice,'Pressable').find(n => n.props.accessibilityLabel === label);
-    assert.match(JSON.stringify(all(choice,'Text').map(n => n.props.children)),/Nothing is saved/,'Customize explains it is temporary');
-    assert.match(JSON.stringify(all(choice,'Text').map(n => n.props.children)),mode === 'existing' ? /already have a private draft/ : /private draft in your account/,'Remix explains it saves a draft');
-    inChoice('Customize stops').props.onPress();assert.deepEqual(routes.pop(),{pathname:'/customize/[id]',params:{id:journeyId}});
+    const copyText = JSON.stringify(all(choice,'Text').map(n => n.props.children));
+    assert.match(copyText,/Nothing is saved/,'Customize explains it is temporary');
+    assert.match(copyText,mode === 'existing' ? /already have a private draft/ : /private draft in your account/,'Remix explains it saves a draft');
+    assert.equal(/Requires sign-in/.test(copyText), mode === 'anonymous','Sign-in is mentioned only to signed-out viewers');
+    // Screen-reader labels match the visible titles (label in name).
+    all(choice,'Pressable').find(n => n.props.accessibilityLabel === 'Pick stops for this trip').props.onPress();assert.deepEqual(routes.pop(),{pathname:'/customize/[id]',params:{id:journeyId}});
     tree=h.render(component.JourneyOptions, props);assert.equal(sheet(tree,'Make this journey yours').props.visible,false,'Choosing closes the sheet');
     button(tree,'Make it yours').props.onPress();tree=h.render(component.JourneyOptions, props);
-    const remix = all(sheet(tree,'Make this journey yours'),'Pressable').find(n => n.props.accessibilityLabel === (mode === 'existing' ? 'Open private copy' : 'Remix This Journey'));
+    const remix = all(sheet(tree,'Make this journey yours'),'Pressable').find(n => n.props.accessibilityLabel === (mode === 'existing' ? 'Open my editable copy' : 'Save an editable copy'));
+    assert.equal(remix.props.accessibilityHint.startsWith('Requires sign-in'), mode === 'anonymous');
     if (mode === 'blocked') {
-      assert.equal(remix.props.disabled, true);
+      assert.equal(remix.props.disabled, true); assert.equal(remix.props.accessibilityState.disabled, true);
+      all(sheet(tree,'Make this journey yours'),'Action')[0].props.onPress();assert.equal(routes.at(-1), '/account','In-sheet recovery opens Account drafts');
       button(tree,'Check your drafts').props.onPress();tree=h.render(component.JourneyOptions,props);assert.equal(sheet(tree,'Remix journey').props.visible,true);
       all(sheet(tree,'Remix journey'),'Action')[0].props.onPress();
       assert.equal(routes.at(-1), '/account');
@@ -1804,6 +1817,22 @@ test('rail JourneyOptions preserves anonymous Remix, existing private copy, bloc
       assert.equal(sheet(tree,'Make this journey yours').props.visible,false);assert.equal(sheet(tree,'Remix journey').props.visible,false);
     }
   }
+});
+test('rail Make it yours announces a copy in progress and disables the copy choice while busy', () => {
+  const h = harness();
+  const state = { busy: true, copyId: null, blocked: false, error: null };
+  const component = load('src/components/journey/journey-options.tsx', {
+    'expo-router': { useRouter: () => ({ push() {} }) }, 'react-native': native, '../discovery/ui': { ...ui, Action: 'Action' },
+    '@/hooks/session-context': { useSessionState: () => ({ loading: false, session: { user: { id: 'owner' } } }) },
+    '@/hooks/action-intent': { useActionIntent: () => ({ pending: null, begin: () => true }) },
+    '@/lib/remix/model': { remixStore: { get: () => state, subscribe: () => () => {}, run: async () => null } },
+    '@/lib/remix/queries': { remixJourney: async () => 'x' }, './story-sheet': { StorySheet: 'StorySheet' }, 'react-native-safe-area-context': { SafeAreaView: 'SafeAreaView' },
+  }, h.hooks);
+  const tree = h.render(component.JourneyOptions, { id: journeyId, onUse() {}, presentation: 'rail', onAbout() {} });
+  const rail = all(tree,'Pressable').find(n => n.props.accessibilityLabel === 'Make it yours');
+  assert.equal(rail.props.accessibilityState.busy, true); assert.ok(all(rail,'ActivityIndicator').length);
+  const save = all(tree,'Pressable').find(n => n.props.accessibilityLabel === 'Save an editable copy');
+  assert.equal(save.props.disabled, true); assert.equal(save.props.accessibilityState.busy, true);
 });
 test('StorySheet owns dark status icons only while visible and releases ownership when closed',()=>{
  const {StorySheet}=load('src/components/journey/story-sheet.tsx',{'react-native':native,'react-native-safe-area-context':{SafeAreaView:'SafeAreaView'},'@/components/discovery/ui':ui});
