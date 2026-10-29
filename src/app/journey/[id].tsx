@@ -123,7 +123,7 @@ export function JourneyStoryContent({ journey, refresh, refreshing, error, saveF
         <StorySnapshot journey={journey} />
         {hasStory(journey) && <Text selectable style={ui.body}>{journey.description}</Text>}
         {temporary ? <Text style={ui.body}>Travel through your selected stops in their original order. This selection is temporary and the original journey stays unchanged. Begin Trip enables location tracking.</Text> : <><Text style={ui.body}>Start Journey travels the original route. Customize chooses stops for this trip without creating a draft. Remix requires sign-in and creates your own editable private draft.</Text>
-        <Text style={ui.body}>Like and Save require sign-in. Share is available without an account. Open the journey map for Travel Mode with a local session timer. No GPS tracking.</Text>
+        <Text style={ui.body}>Like and Save require sign-in. Share is available without an account. Begin Trip starts the timer and GPS updates after location permission is allowed. GPS updates stop when you pause or finish, leave Travel Mode, or put the app in the background. Returning to an active trip resumes GPS updates.</Text>
         {error && <Text accessibilityRole="alert" style={ui.body}>Couldn’t refresh: {error}</Text>}
         <Pressable accessibilityRole="button" accessibilityLabel="Refresh journey" disabled={refreshing} accessibilityState={{ disabled: refreshing }} onPress={refresh} style={styles.textAction}>{refreshing ? <ActivityIndicator color={colors.ink} /> : <Text style={styles.link}>Refresh journey ↻</Text>}</Pressable></>}
       </> : null}
