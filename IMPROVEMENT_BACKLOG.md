@@ -77,3 +77,27 @@ Add under the completed item:
 For partial work use:
 
 `In progress YYYY-MM-DD — bounded scope; completed portion; pending outcome/check; next owner.`
+
+## 5. Next session plan (created 2026-10-29)
+
+Order for the next session. Items stay unticked until their stated outcome is complete. Phone accessibility testing (TalkBack) is deferred by owner decision: it switched the owner's phone into TalkBack mode, so do not test with TalkBack on the owner's phone. Push code only; accessibility checks move to a later session.
+
+1. **Decisions first (owner):**
+   - U4: choose the Explore, Search and Story wording, or merge screens.
+   - U2: decide whether search should lead the Home hierarchy.
+   - U5: approve a new test account (name the email) for the Saved empty state, or accept that state as code-checked only.
+   - R2 and R3: choose how unsaved and interrupted work is kept on the device.
+   - B2: choose where travel preferences are stored (device or account).
+   - R6: approve any hosted example content before it is created.
+2. **B5 (greetings):** rerun the once-per-install check cleanly on the emulator (fresh install, greet once, restart, confirm no repeat). Then verify the Account reset control. The dev-client button covers the settings gear on the phone, so use the emulator for this.
+3. **B3 (unfinished work):** build recoverable trips and the deleted or unavailable draft handling. Then add tests and an emulator check.
+4. **B6 (Buddy voice):** explain why a suggestion fits, and keep Buddy's language to what is retained. Then add tests and an emulator check.
+5. **U4 and U2 (after step 1 decisions):** implement the chosen labels or Home order. Then add tests and an emulator check.
+6. **U8 (first useful outcome):** build after U2 and U4 are settled.
+7. **R2 and R3 (after storage decision):** recovery design, then tests for failed saves, restart and discard.
+8. **B2 (after storage decision):** preferences with view, edit and forget controls.
+9. **B4 (after R2/R3 and B3):** post-trip reflection, based only on confirmed progress.
+10. **R4 and R5 (phone, deferred):** real-device reliability, accessibility and performance checks, including the U1 TalkBack check. Code only in this session; no TalkBack on the owner's phone.
+11. **E1 to E4 (later):** return paths, usability pilot, success measures and reprioritisation, after the phone and user work is possible.
+
+Each item: write the change, run the affected tests, typecheck and lint, check it on the emulator where it's visible, then update its checkbox note and push the branch when the owner asks.
