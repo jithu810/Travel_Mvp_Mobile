@@ -105,7 +105,7 @@ export default function DiscoverScreen() {
       </View>
       <Pressable {...bannerProtection} accessibilityRole="button" accessibilityLabel="Create Journey from Home" onPress={() => router.push('/create')}
         onLayout={event => { bannerProtection.onLayout(); setBannerHeight(event.nativeEvent.layout.height); }} style={[s.banner, { bottom: navClearance }]}>
-        <View style={s.bannerCopy}><Text style={s.bannerTitle}>Start your own journey</Text><Text style={s.bannerSubtitle}>Make memories into stories</Text></View>
+        <View style={s.bannerCopy}><Text style={s.bannerTitle}>Start your own journey</Text></View>
         <View style={s.bannerAction}><Text style={s.bannerActionText}>Create Journey ↗</Text></View>
       </Pressable>
       <View pointerEvents="none" testID="home-status-shade" style={[s.statusShade, { height: headerTop + 12 }]} />
@@ -122,7 +122,7 @@ const s = StyleSheet.create({
   page: { flex: 1, width: '100%', maxWidth: 900, alignSelf: 'center' },
   header: { position: 'absolute', left: 0, right: 0, elevation: 10, minHeight: 52, paddingHorizontal: 18, paddingVertical: 6, flexDirection: 'row', alignItems: 'center', gap: 8, zIndex: 10 },
   search: { flex: 1, minWidth: 0, minHeight: 44, justifyContent: 'center' },
-  banner: { position: 'absolute', left: 16, right: 16, zIndex: 3, minHeight: 54, borderRadius: 20, paddingHorizontal: 12, paddingVertical: 4,
+  banner: { position: 'absolute', left: 16, right: 16, zIndex: 3, minHeight: 48, borderRadius: 20, paddingHorizontal: 12, paddingVertical: 4,
     flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 6, backgroundColor: theme.surface, borderWidth: 1, borderColor: theme.border },
   bannerCopy: { flexGrow: 1, flexShrink: 1, flexBasis: 130, gap: 2 },
   bannerTitle: { color: theme.text, fontSize: 12, fontWeight: '600' },
