@@ -56,9 +56,13 @@ test('Explore tile navigates with source marker and falls back to journey art af
   const {ExploreTile}=load('src/components/discovery/explore-tile.tsx',{'react/jsx-runtime':runtime,react:{useState:()=>[failed,x=>{failed=x;}]},'expo-router':{useRouter:()=>({push:x=>routes.push(x)})},'react-native':native,'./journey-photo':{JourneyPhoto:'JourneyPhoto'},...artModules});
   const journey={id:'a',title:'Coast',destination:'Kerala',creatorName:'Owner',cover:'https://example.test/a.jpg',stops:[{id:'s'}]};
   const render=()=>ExploreTile({journey});let tree=render();tree.props.onPress();assert.deepEqual(routes[0],{pathname:'/journey/[id]',params:{id:'a',source:'search'}});assert.match(tree.props.accessibilityLabel,/Coast.*Kerala.*Owner/);
-  tree.props.children.props.onError();tree=render();const art=tree.props.children;assert.equal(art.type,'JourneyArt');assert.equal(art.props.accessibilityLabel,undefined,'Decorative inside the labelled tile');
-  assert.equal(art.props.seed,'seed:a:1');assert.equal(art.props.destination,'Kerala');assert.equal(art.props.showDestination,true,'Image-only tiles print the destination on the art');assert.equal(art.props.compact,true);
-  journey.cover='https://example.test/b.jpg';assert.equal(render().props.children.type,'JourneyPhoto');journey.cover=null;assert.equal(render().props.children.type,'JourneyArt');
+  const media=t=>t.props.children[0], caption=t=>all(t.props.children[1]).filter(n=>n.type==='Text').map(n=>n.props.children);
+  assert.deepEqual(caption(tree),['Coast','Kerala'],'Photo tiles show title and destination');
+  media(tree).props.onError();tree=render();const art=media(tree);assert.equal(art.type,'JourneyArt');assert.equal(art.props.accessibilityLabel,undefined,'Decorative inside the labelled tile');
+  assert.equal(art.props.seed,'seed:a:1');assert.equal(art.props.destination,'Kerala');assert.equal(art.props.showDestination,undefined,'The shared caption replaces the art destination label');assert.equal(art.props.compact,true);
+  assert.deepEqual(caption(tree),['Coast','Kerala'],'Art tiles share the same caption');assert.equal(tree.props.children[1].props.importantForAccessibility,'no-hide-descendants','The tile label already announces the caption');
+  journey.cover='https://example.test/b.jpg';assert.equal(media(render()).type,'JourneyPhoto');journey.cover=null;assert.equal(media(render()).type,'JourneyArt');
+  journey.title='  ';tree=render();assert.deepEqual(caption(tree),['Kerala'],'A blank title leaves only the destination');
 });
 test('Search source reaches the single existing social action owner',()=>{
   const source=readFileSync('src/app/journey/[id].tsx','utf8');assert.match(source,/saveFirst=\{params.source === 'search'\}/);assert.match(source,/<SocialActions[^>]*saveFirst=\{saveFirst\}/);assert.equal((source.match(/<SocialActions /g)||[]).length,1);
