@@ -10,6 +10,8 @@ const lines: Readonly<Record<string, BuddyContextLine>> = {
 };
 const routeKey = (path: string) => ['/', '/index'].includes(path) ? '/discover' : path;
 export function buddyContextLine(path: string): BuddyContextLine | undefined { return lines[routeKey(path)]; }
+// Installed-greeting memory key: Home's two routes share one greeting.
+export const buddyGreetingKey = (path: string) => routeKey(path);
 // Process-local only. Store identity makes the once-per-route limit survive actor
 // remounts and navigation while allowing a fresh app session to greet again.
 const spoken = new WeakMap<object, Set<string>>();

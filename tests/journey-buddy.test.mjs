@@ -16,6 +16,7 @@ const model = load('src/lib/buddy/model.ts');
 const geometry = load('src/lib/buddy/geometry.ts', { './model': model });
 const { createBuddyStore } = load('src/lib/buddy/store.ts', { './model': model });
 const { createBuddyPositionCapture } = load('src/lib/buddy/position.ts');
+const { createBuddyGreetings } = load('src/lib/buddy/greetings.ts');
 const { createBuddyPreference, BUDDY_PREFERENCE_KEY } = load('src/lib/buddy/preference.ts');
 const animations = load('src/lib/buddy/animations.ts');
 const tick = () => new Promise(setImmediate);
@@ -339,8 +340,8 @@ async function hostHarness(openSpace = false, contextual = false) {
   const hostHooks = hooks(); let actorHooks = hooks(); const timers = clock(); let currentHooks = hostHooks;
   const react = Object.fromEntries(Object.keys(hostHooks.react).map(name => [name, (...args) => currentHooks.react[name](...args)]));
   react.useSyncExternalStore = (_, get) => get();
-  const api = { store: createBuddyStore(), preference: createBuddyPreference({ getItem: async () => null, setItem: async () => {} }) };
-  await api.preference.load(); await api.preference.setEnabled(true);
+  const api = { store: createBuddyStore(), preference: createBuddyPreference({ getItem: async () => null, setItem: async () => {} }), greetings: createBuddyGreetings({ getItem: async () => null, setItem: async () => {}, removeItem: async () => {} }) };
+  await api.preference.load(); await api.greetings.load(); await api.preference.setEnabled(true);
   let path = '/create'; api.store.environment(path, true);
   const owner = {}, region = {}; let adds = 0;
   api.store.screen(owner, { path, state: { floating: true, canAddMemory: true }, act: () => adds++ });
@@ -522,8 +523,8 @@ test('actual actor helper actions reject stale route, disabled preference and re
 });
 
 async function integrationHarness(sharedApi = null) {
-  const h = hooks(), timers = clock(), api = sharedApi ?? { store: createBuddyStore(), preference: createBuddyPreference({ getItem: async () => null, setItem: async () => {} }) };
-  await api.preference.load(); let path = '/create';
+  const h = hooks(), timers = clock(), api = sharedApi ?? { store: createBuddyStore(), preference: createBuddyPreference({ getItem: async () => null, setItem: async () => {} }), greetings: createBuddyGreetings({ getItem: async () => null, setItem: async () => {}, removeItem: async () => {} }) };
+  await api.preference.load(); await api.greetings.load(); let path = '/create';
   const appListeners = new Set(), keyboard = new Map();
   const native = { View: 'View',
     AppState: { currentState: 'active', addEventListener: (_, fn) => { appListeners.add(fn); return { remove: () => appListeners.delete(fn) }; } },
@@ -533,7 +534,7 @@ async function integrationHarness(sharedApi = null) {
   const module = load('src/hooks/use-journey-buddy.tsx', { react, 'react/jsx-runtime': runtime, 'react-native': native,
     '@react-native-async-storage/async-storage': { getItem: async () => null, setItem: async () => {} },
     'expo-router': { usePathname: () => path, useFocusEffect: fn => h.react.useEffect(fn, [fn]) },
-    '@/lib/buddy/store': { createBuddyStore }, '@/lib/buddy/preference': { createBuddyPreference } }, timers);
+    '@/lib/buddy/store': { createBuddyStore }, '@/lib/buddy/preference': { createBuddyPreference }, '@/lib/buddy/greetings': { createBuddyGreetings } }, timers);
   return { h, timers, api, module, native, appListeners, keyboard, path: value => { path = value; } };
 }
 test('actual touch boundary initializes keyboard suppression, never captures responders, and cancels all cooldowns when disabled/backgrounded/unmounted', async () => {
@@ -903,7 +904,7 @@ test('first-use intro: offered once on a fresh install; Guide me turns Buddy on 
   const y = await integrationHarness(); let other; y.h.render(() => { other = y.module.useBuddyIntro(); return null; });
   other.skip(); y.h.render(() => { other = y.module.useBuddyIntro(); return null; });
   assert.equal(other.visible, false); assert.equal(y.api.preference.get().enabled, false); assert.equal(y.api.store.getTour(), null);
-  const stored = { store: createBuddyStore(), preference: createBuddyPreference({ getItem: async () => 'false', setItem: async () => {} }) };
+  const stored = { store: createBuddyStore(), preference: createBuddyPreference({ getItem: async () => 'false', setItem: async () => {} }), greetings: createBuddyGreetings({ getItem: async () => null, setItem: async () => {}, removeItem: async () => {} }) };
   const z = await integrationHarness(stored); let returning; z.h.render(() => { returning = z.module.useBuddyIntro(); return null; });
   assert.equal(returning.visible, false, 'A remembered choice never repeats the introduction');
 });
@@ -933,7 +934,7 @@ test('turning Buddy off, including a failed save after Guide me, drops the pendi
     'react-native': { View: 'View', AppState: { currentState: 'active', addEventListener: () => ({ remove() {} }) }, Keyboard: { isVisible: () => false, addListener: () => ({ remove() {} }) } },
     '@react-native-async-storage/async-storage': { getItem: async () => null, setItem: async () => { if (fail) throw Error('disk full'); } },
     'expo-router': { usePathname: () => '/discover', useFocusEffect: fn => h.react.useEffect(fn, [fn]) },
-    '@/lib/buddy/store': { createBuddyStore: () => store }, '@/lib/buddy/preference': { createBuddyPreference: storage => (api = { store, preference: createBuddyPreference(storage) }).preference } });
+    '@/lib/buddy/store': { createBuddyStore: () => store }, '@/lib/buddy/preference': { createBuddyPreference: storage => (api = { store, preference: createBuddyPreference(storage), greetings: createBuddyGreetings({ getItem: async () => null, setItem: async () => {}, removeItem: async () => {} }) }).preference }, '@/lib/buddy/greetings': { createBuddyGreetings } });
   h.render(module.JourneyBuddyProvider, { children: null }); await tick(); await tick();
   let intro; h.render(() => { intro = module.useBuddyIntro(); return null; }); assert.equal(intro.visible, true);
   intro.guide(); assert.equal(store.getTour(), 0); await tick(); await tick();
@@ -980,4 +981,16 @@ test('B1a: actual host offers Account a Create action through the guarded naviga
   await a.api.preference.setEnabled(false); help.props.primary.onPress(); assert.deepEqual(a.routes, [], 'Disabled Buddy cannot navigate');
   await a.api.preference.setEnabled(true); help.props.primary.onPress(); assert.deepEqual(a.routes, ['/create']);
   a.actorHooks.dispose(); a.hostHooks.dispose();
+});
+test('greetings: once per screen per install, persisted on the device, reset on request, and nothing shows if the stored list cannot be read', async () => {
+  const values = new Map(); let fail = false;
+  const storage = { getItem: async key => { if (fail) throw Error('read'); return values.get(key) ?? null; }, setItem: async (key, value) => values.set(key, value), removeItem: async key => values.delete(key) };
+  const greetings = createBuddyGreetings(storage);
+  assert.equal(greetings.isLoaded(), false, 'Nothing greets before the stored list loads');
+  await greetings.load(); assert.equal(greetings.isLoaded(), true); assert.equal(greetings.has('/discover'), false);
+  greetings.mark('/discover'); greetings.mark('/discover'); await tick(); assert.equal(greetings.has('/discover'), true);
+  assert.deepEqual(JSON.parse(values.get('journey-buddy:v1:greeted')), ['/discover'], 'Recorded once, not duplicated');
+  const reopened = createBuddyGreetings(storage); await reopened.load(); assert.equal(reopened.has('/discover'), true, 'Survives a restart');
+  reopened.reset(); await tick(); assert.equal(reopened.has('/discover'), false); assert.equal(values.has('journey-buddy:v1:greeted'), false);
+  fail = true; const broken = createBuddyGreetings(storage); await broken.load(); assert.equal(broken.isLoaded(), false, 'A failed read keeps greetings off');
 });

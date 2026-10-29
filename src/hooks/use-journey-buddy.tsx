@@ -4,9 +4,10 @@ import { useFocusEffect, usePathname } from 'expo-router';
 import { AppState, Keyboard, View, type GestureResponderEvent } from 'react-native';
 import { createBuddyPreference } from '@/lib/buddy/preference';
 import { createBuddyStore } from '@/lib/buddy/store';
+import { createBuddyGreetings } from '@/lib/buddy/greetings';
 import type { BuddyAction, BuddyCelebrationName, BuddyScreen } from '@/lib/buddy/model';
 
-function createApi() { return { store: createBuddyStore(), preference: createBuddyPreference(AsyncStorage) }; }
+function createApi() { return { store: createBuddyStore(), preference: createBuddyPreference(AsyncStorage), greetings: createBuddyGreetings(AsyncStorage) }; }
 type BuddyApi = ReturnType<typeof createApi>;
 const BuddyContext = createContext<BuddyApi | null>(null);
 export function JourneyBuddyProvider({ children }: { children: ReactNode }) {
@@ -14,6 +15,7 @@ export function JourneyBuddyProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     // Off (by the user or a failed save) also drops any pending tour, so it can't reopen later.
     const stop = api.preference.subscribe(() => { if (api.preference.get().enabled) api.store.requestMeasurements(); else { api.store.clearCelebration(); api.store.closeMapHelp(); api.store.setTour(null); } });
+    void api.greetings.load();
     void api.preference.load(); return stop;
   }, [api]);
   return <BuddyContext.Provider value={api}>{children}</BuddyContext.Provider>;
@@ -34,6 +36,11 @@ export function useBuddyPreference() {
   const api = useBuddyApi();
   const value = useSyncExternalStore(api?.preference.subscribe ?? noopSubscribe, api?.preference.get ?? absentPreference, absentPreference);
   return { ...value, setEnabled: (enabled: boolean) => { void api?.preference.setEnabled(enabled); } };
+}
+// Clears the on-device record of greetings so each screen may greet once again.
+export function useBuddyGreetingsReset() {
+  const api = useBuddyApi();
+  return useCallback(() => { api?.greetings.reset(); }, [api]);
 }
 // First use only: offered once while no on/off choice is stored. Guide me turns Buddy on and opens
 // the existing three-step tour (the actor opens help when it mounts with a tour step set).

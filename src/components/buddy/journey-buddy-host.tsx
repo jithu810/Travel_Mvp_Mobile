@@ -10,7 +10,7 @@ import { BuddySprite } from './buddy-sprite';
 import { BuddyHelpSheet } from './buddy-help-sheet';
 import { createBuddyPositionCapture } from '@/lib/buddy/position';
 import { buddyCelebrationDuration } from '@/lib/buddy/animations';
-import { buddyContextLine, claimBuddyContext, BUDDY_CONTEXT_DELAY, BUDDY_CONTEXT_DURATION, type BuddyContextLine } from '@/lib/buddy/contextual-lines';
+import { buddyContextLine, buddyGreetingKey, claimBuddyContext, BUDDY_CONTEXT_DELAY, BUDDY_CONTEXT_DURATION, type BuddyContextLine } from '@/lib/buddy/contextual-lines';
 import { MapBuddyHelp } from './map-buddy-help';
 import { buddyHelpLine, buddyHelpPrimary } from '@/lib/buddy/help-actions';
 
@@ -201,7 +201,9 @@ function BuddyActor({ api, path, geometry, screen, interacting }: { api: Api; pa
     let active = true, expiry: ReturnType<typeof setTimeout> | undefined;
     const allowed = () => active && alive.current && api.preference.get().enabled && api.store.get().path === path
       && AppState.currentState === 'active' && !api.store.current().suppressed && !api.store.current().interacting
-      && !api.store.current().state?.travel && !api.store.getCelebration() && !api.store.getMapHelp() && api.store.getTour() === null;
+      && !api.store.current().state?.travel && !api.store.getCelebration() && !api.store.getMapHelp() && api.store.getTour() === null
+      // Once per screen per install; checked at display time so a late-loading list still counts.
+      && api.greetings.isLoaded() && !api.greetings.has(buddyGreetingKey(path));
     const timer = setTimeout(() => {
       if (!allowed()) return;
       capture.read(value => {
@@ -209,6 +211,7 @@ function BuddyActor({ api, path, geometry, screen, interacting }: { api: Api; pa
         const safe = nearestBuddyPosition(value, geometry);
         if (!safe || !placeBuddyBubble(safe, geometry, Math.min(252, corridor.width), minimumBubbleHeight)
           || !claimBuddyContext(api.store, path)) return;
+        api.greetings.mark(buddyGreetingKey(path));
         point.current = safe; position.setValue(safe); setWalking(false); setAnchor(safe); setBubbleHeight(0);
         setContextual(line);
         expiry = setTimeout(() => { if (active && alive.current) setContextual(null); }, BUDDY_CONTEXT_DURATION);

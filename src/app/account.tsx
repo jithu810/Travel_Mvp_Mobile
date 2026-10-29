@@ -2,7 +2,7 @@ import { BrandedLoading } from '@/components/branded-loading';
 import { useCallback, useRef, useState } from 'react';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { ActivityIndicator, FlatList, Modal, Pressable, RefreshControl, ScrollView, Switch, Text, useWindowDimensions, View } from 'react-native';
-import { useBuddyPreference, useBuddyScreen } from '@/hooks/use-journey-buddy';
+import { useBuddyGreetingsReset, useBuddyPreference, useBuddyScreen } from '@/hooks/use-journey-buddy';
 import { useBuddyProtectedBounds, useBuddyScroll } from '@/hooks/use-buddy-geometry';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Action, colors, Message, ui } from '@/components/discovery/ui';
@@ -41,6 +41,7 @@ export default function AccountScreen() {
   const [deleteMessage, setDeleteMessage] = useState('');
   const [error, setError] = useState<string | null>(null);
   const buddy = useBuddyPreference();
+  const resetBuddyGreetings = useBuddyGreetingsReset();
   const window = useWindowDimensions();
   const buddyGridProtection = useBuddyProtectedBounds(useCallback(rect => [
     { x: 0, y: 0, width: window.width, height: Math.max(0, rect.y - 8) },
@@ -94,6 +95,7 @@ export default function AccountScreen() {
         <View style={s.settingsRow}><Text accessibilityRole="header" style={s.heading}>Account settings</Text><Pressable accessibilityRole="button" accessibilityLabel="Close account settings" disabled={busy} onPress={() => setSettings(false)} style={s.close}><Text style={s.heading}>×</Text></Pressable></View>
         <View style={[s.settingsRow, { gap: 12, marginBottom: 12 }]}><View style={{ flex: 1 }}><Text style={s.heading}>Journey Buddy</Text><Text style={ui.body}>A tiny explorer for your adventures. Saved on this device.</Text></View>
           <Switch accessibilityLabel="Journey Buddy" accessibilityHint="Show or hide your little journey helper" disabled={!buddy.loaded} value={buddy.enabled} onValueChange={buddy.setEnabled} /></View>
+        <Action label="Show Buddy greetings again" secondary onPress={resetBuddyGreetings} />
         {buddy.error && <Text accessibilityRole="alert" style={ui.body}>{buddy.error}</Text>}
         {auth.session ? <View style={{ gap: 12 }}><Text selectable style={ui.body}>{auth.session.user.email}</Text>
           <Action label="Create Journey" onPress={() => { setSettings(false); router.push('/create'); }} />
