@@ -26,7 +26,7 @@ export function BuddyHelpSheet({ canAddMemory, travel, onAddMemory, onCreate, on
   const step = tour !== null ? buddyTour[tour] : undefined;
   const text = reaction ?? step?.text ?? (travel
     ? buddyTravelCopy(travel) + ' GPS updates stop when you pause or finish, leave Travel Mode, or put the app in the background. Returning to an active trip resumes updates.' + (canAddMemory ? '' : ' Capture moments in a private draft.')
-    : contextualLine ?? (canAddMemory ? 'A moment worth keeping? Let’s tuck it into your story.' : 'Tiny backpack, big adventures! Shall we explore?'));
+    : contextualLine ?? (canAddMemory ? 'A moment worth keeping? Let’s tuck it into your story.' : 'Need a place to start? Find a journey, or make your own.'));
   const shown = fallback || !!placement;
   const content = <View testID="buddy-speech-bubble" accessibilityViewIsModal={fallback} pointerEvents={shown ? 'auto' : 'none'} accessibilityElementsHidden={!shown} importantForAccessibility={shown ? 'auto' : 'no-hide-descendants'} onTouchStart={event => event.stopPropagation()}
     onLayout={fallback ? undefined : event => onMeasure?.(event.nativeEvent.layout.height)}

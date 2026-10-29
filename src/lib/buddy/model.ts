@@ -44,7 +44,7 @@ export function buddyTravelCopy(travel: BuddyTravel): string {
   if (travel.status === 'completed') return 'We did it! Every stop has its own little story.';
   if (travel.status === 'finished') return 'Adventure tucked away. Take a little rest!';
   if (travel.status === 'paused') return 'A little breather! Resume your trip when you’re ready.';
-  if (travel.status === 'ready') return 'Ready, explorer? Begin Trip when you’re ready for GPS guidance.';
+  if (travel.status === 'ready') return 'Ready when you are. Begin Trip turns on GPS guidance.';
   if (travel.arrival) return 'We might be here! Check the arrival prompt above.';
   if (!travel.gpsAvailable) return 'Waiting for a clearer GPS signal. Your map has the latest status.';
   return travel.nextStop ? 'Next little adventure: ' + travel.nextStop + '. Follow the map’s guidance.' : 'One little step at a time. Follow the map’s guidance.';

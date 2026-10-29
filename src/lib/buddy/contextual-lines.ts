@@ -1,7 +1,7 @@
 export type BuddyContextLine = Readonly<{ text: string; animation: 'wave' | 'curious' }>;
 export const BUDDY_CONTEXT_DELAY = 8000;
 export const BUDDY_CONTEXT_DURATION = 5000;
-const explore = { text: 'Hello, explorer! A new story could be one journey away.', animation: 'wave' } as const;
+const explore = { text: 'A new story could be one journey away. Browse a few to start.', animation: 'wave' } as const;
 const lines: Readonly<Record<string, BuddyContextLine>> = {
   '/discover': explore,
   '/search': { text: 'Somewhere in mind? Search for a place or a journey to explore.', animation: 'curious' },

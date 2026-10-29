@@ -804,7 +804,7 @@ test('contextual bubbles animate once, dismiss after five seconds, preserve slee
 test('Explore greets with Wave and manual Account help keeps contextual copy plus normal actions', async () => {
   const h = await hostHarness(true, true); h.path('/discover'); h.api.store.screen(h.owner, { path: '/discover', state: { floating: true }, act() {} });
   let tree = settleActor(h); await tick(); tree = settleActor(h); fireDelay(h, 8000); tree = settleActor(h);
-  assert.equal(all(tree, 'BuddySprite')[0].props.animation, 'wave'); assert.match(all(tree, 'BuddyHelpSheet')[0].props.reaction, /Hello, explorer/);
+  assert.equal(all(tree, 'BuddySprite')[0].props.animation, 'wave'); assert.match(all(tree, 'BuddyHelpSheet')[0].props.reaction, /A new story could be one journey away/);
   h.actorHooks.dispose(); h.path('/account'); h.api.store.screen(h.owner, { path: '/account', state: { floating: true }, act() {} }); h.renderHost(); tree = h.remountActor(); await tick(); tree = settleActor(h);
   all(tree, 'View').find(node => node.props.onAccessibilityTap).props.onAccessibilityTap(); tree = settleActor(h);
   const bubble = all(tree, 'BuddyHelpSheet')[0]; assert.match(bubble.props.contextualLine, /stories, all together/); assert.equal(bubble.props.reaction, undefined);
