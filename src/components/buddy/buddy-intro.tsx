@@ -3,14 +3,16 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { primaryControl } from '@/theme/mobile-theme';
 import { colors } from '@/components/discovery/ui';
 import { useBuddyIntro } from '@/hooks/use-journey-buddy';
+import { useSessionState } from '@/hooks/session-context';
 import { BuddySprite } from './buddy-sprite';
 
 // One short, skippable introduction on a fresh install. Either choice is stored, so it never repeats;
 // Back counts as Explore myself. Account keeps the on/off switch for later changes.
+// ready: Home is focused and loaded. It also waits for session restore, which keeps the startup loader up.
 export function BuddyIntro({ ready }: { ready: boolean }) {
-  const intro = useBuddyIntro();
-  if (!ready || !intro.visible) return null;
-  return <Modal transparent visible animationType="fade" onRequestClose={intro.skip}>
+  const intro = useBuddyIntro(), auth = useSessionState();
+  if (!ready || auth.loading || !intro.visible) return null;
+  return <Modal transparent statusBarTranslucent visible animationType="fade" onRequestClose={intro.skip}>
     <SafeAreaView style={s.scrim}>
       <View accessibilityViewIsModal style={s.card}>
         <View style={s.heading}>

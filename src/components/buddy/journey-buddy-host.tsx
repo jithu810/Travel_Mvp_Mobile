@@ -12,6 +12,7 @@ import { createBuddyPositionCapture } from '@/lib/buddy/position';
 import { buddyCelebrationDuration } from '@/lib/buddy/animations';
 import { buddyContextLine, claimBuddyContext, BUDDY_CONTEXT_DELAY, BUDDY_CONTEXT_DURATION, type BuddyContextLine } from '@/lib/buddy/contextual-lines';
 import { MapBuddyHelp } from './map-buddy-help';
+import { buddyHelpLine, buddyHelpPrimary } from '@/lib/buddy/help-actions';
 
 type Api = NonNullable<ReturnType<typeof useBuddyApi>>;
 export function JourneyBuddyHost() {
@@ -280,7 +281,7 @@ function BuddyActor({ api, path, geometry, screen, interacting }: { api: Api; pa
     onPanResponderTerminationRequest: () => true,
     onPanResponderTerminate: () => { wakeGesture.current = false; gestureState.current.generation++; gestureState.current.active = false; capture.cancel(); if (alive.current) { setDragging(false); setParked(true); } },
   }), [position, shouldStart, api, path, capture, poseOwner, stopTravelBurst, wakeBuddy]);
-  const navigate = (route: '/discover' | '/create' | '/account') => {
+  const navigate = (route: '/discover' | '/search' | '/create' | '/account') => {
     if (!alive.current) return;
     if (!api.preference.get().enabled || path !== api.store.get().path || AppState.currentState !== 'active' || api.store.current().suppressed) { setHelp(null); return; }
     if (route !== path) setHelp(null); router.navigate(route);
@@ -323,6 +324,7 @@ function BuddyActor({ api, path, geometry, screen, interacting }: { api: Api; pa
   const manualFallback = !!help && (!bubbleFit.fits || helpMeasurementFailed);
   const closeBubble = () => { setHelp(null); setReaction(null); setContextual(null); api.store.setTour(null); };
   const tour = api.store.getTour();
+  const helpPrimary = buddyHelpPrimary(path);
   return <>
     <Animated.View pointerEvents="box-none" style={[s.character, { transform: position.getTranslateTransform() }]}>
       <View {...gesture.panHandlers} collapsable={false} pointerEvents="box-only" accessible focusable
@@ -343,9 +345,10 @@ function BuddyActor({ api, path, geometry, screen, interacting }: { api: Api; pa
         setBubbleHeight(old => old === height ? old : height);
       }}
       placement={placement ? { ...placement.rect, above: placement.above, tailX: placement.tailX } : undefined}
-      contextualLine={buddyContextLine(path)?.text} reaction={contextualVisible ? contextual.text : !help && reactionVisible ? reaction?.text : undefined} tour={help ? tour : null}
+      contextualLine={buddyContextLine(path)?.text ?? buddyHelpLine(path)} reaction={contextualVisible ? contextual.text : !help && reactionVisible ? reaction?.text : undefined} tour={help ? tour : null}
       onTour={() => { if (!canAct()) return; if (tour === null) { api.store.setTour(0); } else navigate((['/discover', '/create', '/account'] as const)[tour]); }}
       onNext={() => { if (!canAct()) return; if (tour === 2) closeBubble(); else { api.store.setTour((tour ?? -1) + 1); } }}
+      primary={helpPrimary ? { label: helpPrimary.label, onPress: () => { api.store.setTour(null); navigate(helpPrimary.route); } } : undefined}
       onClose={closeBubble} onCreate={() => navigate('/create')} onDrafts={() => { api.store.setTour(null); navigate('/account'); }}
       onAddMemory={() => { if (!alive.current || !api.preference.get().enabled || !help) return; const captured = help; setHelp(null); api.store.act(captured.owner, path, 'addMemory'); }} />}
   </>;

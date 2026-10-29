@@ -30,6 +30,9 @@ export default function DiscoverScreen() {
   const reloadPublic = state.refresh;
   const refreshPublic = () => { invalidatePublicJourneys(); state.refresh(); };
   useFocusEffect(useCallback(() => { reloadPublic(); }, [reloadPublic]));
+  // The first-use intro belongs to the visible Home only, never over a screen pushed above it.
+  const [focused, setFocused] = useState(false);
+  useFocusEffect(useCallback(() => { setFocused(true); return () => setFocused(false); }, []));
   useEffect(() => {
     const listener = AppState.addEventListener('change', next => { if (next === 'active') reloadPublic(); });
     return () => listener.remove();
@@ -110,7 +113,7 @@ export default function DiscoverScreen() {
       {initialLoading && <BrandedLoading overlay message="Exploring the world…" />}
     </View>
     {/* A Modal: outside the page so it adds no Home layout node. */}
-    <BuddyIntro ready={!initialLoading} />
+    <BuddyIntro ready={focused && !initialLoading} />
   </SafeAreaView>;
 }
 const s = StyleSheet.create({

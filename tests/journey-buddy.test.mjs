@@ -370,6 +370,7 @@ async function hostHarness(openSpace = false, contextual = false) {
       placeBuddyBubble(...args) { placementCalls++; return geometry.placeBuddyBubble(...args); } },
     '@/lib/buddy/animations': animations,
     '@/lib/buddy/contextual-lines': { ...load('src/lib/buddy/contextual-lines.ts'), ...(!contextual ? { buddyContextLine: () => undefined } : {}) },
+    '@/lib/buddy/help-actions': load('src/lib/buddy/help-actions.ts'),
     './buddy-sprite': { BuddySprite: 'BuddySprite' }, './buddy-help-sheet': { BuddyHelpSheet: 'BuddyHelpSheet' },
     './map-buddy-help': { MapBuddyHelp: 'MapBuddyHelp' },
   }, timers);
@@ -906,13 +907,16 @@ test('first-use intro: offered once on a fresh install; Guide me turns Buddy on 
   const z = await integrationHarness(stored); let returning; z.h.render(() => { returning = z.module.useBuddyIntro(); return null; });
   assert.equal(returning.visible, false, 'A remembered choice never repeats the introduction');
 });
-test('first-use intro card waits for Home, offers both choices with labels matching their text, and Back means Explore myself', () => {
-  const calls = []; let visible = true;
+test('first-use intro card waits for a focused, loaded Home and session restore, offers both choices with labels matching their text, and Back means Explore myself', () => {
+  const calls = []; let visible = true, sessionLoading = true;
   const { BuddyIntro } = load('src/components/buddy/buddy-intro.tsx', { 'react/jsx-runtime': runtime,
     'react-native': { Modal: 'Modal', Pressable: 'Pressable', Text: 'Text', View: 'View', StyleSheet: { create: x => x } },
     'react-native-safe-area-context': { SafeAreaView: 'SafeAreaView' }, '@/theme/mobile-theme': { primaryControl: {} }, '@/components/discovery/ui': { colors: {} },
-    '@/hooks/use-journey-buddy': { useBuddyIntro: () => ({ visible, guide: () => calls.push('guide'), skip: () => calls.push('skip') }) }, './buddy-sprite': { BuddySprite: 'BuddySprite' } });
-  assert.equal(BuddyIntro({ ready: false }), null, 'Never over the startup loader');
+    '@/hooks/use-journey-buddy': { useBuddyIntro: () => ({ visible, guide: () => calls.push('guide'), skip: () => calls.push('skip') }) }, './buddy-sprite': { BuddySprite: 'BuddySprite' },
+    '@/hooks/session-context': { useSessionState: () => ({ loading: sessionLoading }) } });
+  assert.equal(BuddyIntro({ ready: false }), null, 'Never before Home is focused and loaded');
+  assert.equal(BuddyIntro({ ready: true }), null, 'Never while session restore keeps the startup loader up');
+  sessionLoading = false;
   const tree = BuddyIntro({ ready: true }), nodes = all(tree);
   const press = label => nodes.find(n => n.type === 'Pressable' && n.props.accessibilityLabel === label);
   const texts = nodes.filter(n => n.type === 'Text').map(n => n.props.children);
@@ -922,4 +926,58 @@ test('first-use intro card waits for Home, offers both choices with labels match
   assert.deepEqual(calls, ['guide', 'skip', 'skip']);
   assert.equal(nodes.find(n => n.type === 'BuddySprite').props.animate, false, 'Static sprite: no motion in the introduction');
   visible = false; assert.equal(BuddyIntro({ ready: true }), null);
+});
+test('turning Buddy off, including a failed save after Guide me, drops the pending tour so it cannot reopen later', async () => {
+  let api = null, fail = true; const store = createBuddyStore(); const h = hooks();
+  const module = load('src/hooks/use-journey-buddy.tsx', { react: { ...h.react, createContext: () => ({}), useContext: () => api, useSyncExternalStore: (_, get) => get() }, 'react/jsx-runtime': runtime,
+    'react-native': { View: 'View', AppState: { currentState: 'active', addEventListener: () => ({ remove() {} }) }, Keyboard: { isVisible: () => false, addListener: () => ({ remove() {} }) } },
+    '@react-native-async-storage/async-storage': { getItem: async () => null, setItem: async () => { if (fail) throw Error('disk full'); } },
+    'expo-router': { usePathname: () => '/discover', useFocusEffect: fn => h.react.useEffect(fn, [fn]) },
+    '@/lib/buddy/store': { createBuddyStore: () => store }, '@/lib/buddy/preference': { createBuddyPreference: storage => (api = { store, preference: createBuddyPreference(storage) }).preference } });
+  h.render(module.JourneyBuddyProvider, { children: null }); await tick(); await tick();
+  let intro; h.render(() => { intro = module.useBuddyIntro(); return null; }); assert.equal(intro.visible, true);
+  intro.guide(); assert.equal(store.getTour(), 0); await tick(); await tick();
+  assert.equal(api.preference.get().enabled, false, 'The failed save reverts Buddy to off'); assert.ok(api.preference.get().error);
+  assert.equal(store.getTour(), null, 'No stale tour waits for a later Account switch-on');
+  fail = false; store.setTour(1); await api.preference.setEnabled(true); assert.equal(store.getTour(), 1); await api.preference.setEnabled(false); assert.equal(store.getTour(), null, 'Switching off mid-tour ends the tour');
+  h.dispose();
+});
+test('B1a: task-specific help actions lead to another relevant screen and never act on the current one', () => {
+  const { buddyHelpPrimary, buddyHelpLine } = load('src/lib/buddy/help-actions.ts');
+  for (const path of ['/', '/index', '/discover']) assert.deepEqual(buddyHelpPrimary(path), { label: 'Find a journey', route: '/search' });
+  assert.deepEqual(buddyHelpPrimary('/search'), { label: 'Start my own journey', route: '/create' });
+  assert.deepEqual(buddyHelpPrimary('/account'), { label: 'Start a new journey', route: '/create' }, 'Account no longer offers drafts, which it already shows');
+  for (const path of ['/create', '/journey/a', '/customized/a', '/travel/a', '/profile/someone']) assert.equal(buddyHelpPrimary(path), null, path + ' keeps its existing action');
+  for (const path of ['/', '/discover', '/search', '/account']) assert.notEqual(buddyHelpPrimary(path).route, path === '/' ? '/discover' : path);
+  assert.match(buddyHelpLine('/journey/a'), /Swipe to start uses every stop.*Make it yours/);
+  assert.match(buddyHelpLine('/customized/a'), /Nothing is saved/); assert.doesNotMatch(buddyHelpLine('/customized/a'), /saved to|in your account/);
+  assert.equal(buddyHelpLine('/journey/a/extra'), undefined); assert.equal(buddyHelpLine('/account'), undefined);
+});
+test('B1a: the bubble uses a screen-specific first action only when there is no memory to capture', () => {
+  const h = hooks(); let drafts = 0, primary = 0, adds = 0;
+  const { BuddyHelpSheet } = load('src/components/buddy/buddy-help-sheet.tsx', { react: h.react, 'react/jsx-runtime': runtime, 'react-native': { BackHandler: { addEventListener: () => ({ remove() {} }) }, Modal: 'Modal', Pressable: 'Pressable', ScrollView: 'ScrollView', Text: 'Text', View: 'View', StyleSheet: { create: v => v } }, 'react-native-safe-area-context': { SafeAreaView: 'SafeAreaView' }, '@/lib/buddy/model': model });
+  const props = { canAddMemory: false, onAddMemory: () => adds++, onCreate() {}, onDrafts: () => drafts++, onClose() {}, primary: { label: 'Start a new journey', onPress: () => primary++ } };
+  const action = (tree, label) => all(tree, undefined).find(n => n.props?.label === label);
+  let tree = h.render(BuddyHelpSheet, props); assert.equal(action(tree, 'Open my drafts'), undefined);
+  action(tree, 'Start a new journey').props.onPress(); assert.equal(primary, 1); assert.equal(drafts, 0); assert.ok(action(tree, 'Show me around'));
+  tree = h.render(BuddyHelpSheet, { ...props, canAddMemory: true }); assert.equal(action(tree, 'Start a new journey'), undefined); action(tree, 'Capture a moment').props.onPress(); assert.equal(adds, 1);
+  tree = h.render(BuddyHelpSheet, { ...props, tour: 0 }); assert.equal(action(tree, 'Start a new journey'), undefined, 'The tour keeps its own steps');
+  tree = h.render(BuddyHelpSheet, { ...props, contextualLine: 'Swipe to start uses every stop.' }); assert.match(JSON.stringify(all(tree, 'Text').map(n => n.props.children)), /Swipe to start/);
+  h.dispose();
+});
+test('B1a: actual host offers Account a Create action through the guarded navigate and keeps Create unchanged', async () => {
+  const h = await hostHarness(); h.renderHost(); let tree = h.renderActor(); await tick(); h.renderActor();
+  all(tree, 'View').find(n => n.props.accessibilityLabel === 'Journey Buddy').props.onAccessibilityTap(); tree = h.renderActor();
+  assert.equal(all(tree, 'BuddyHelpSheet')[0].props.primary, undefined, 'Create keeps Capture a moment / Open my drafts');
+  h.actorHooks.dispose(); h.hostHooks.dispose();
+  const a = await hostHarness(); a.path('/account');
+  a.api.store.screen({}, { path: '/account', state: { floating: true }, act() {} });
+  a.api.store.protect(a.region, '/account', [{ x: 0, y: 0, width: 360, height: 592 }, { x: 0, y: 680, width: 360, height: 120 }]);
+  a.renderHost();
+  tree = a.renderActor(); await tick(); tree = settleActor(a);
+  all(tree, 'View').find(n => n.props.accessibilityLabel === 'Journey Buddy').props.onAccessibilityTap(); tree = a.renderActor();
+  const help = all(tree, 'BuddyHelpSheet')[0]; assert.equal(help.props.primary.label, 'Start a new journey');
+  await a.api.preference.setEnabled(false); help.props.primary.onPress(); assert.deepEqual(a.routes, [], 'Disabled Buddy cannot navigate');
+  await a.api.preference.setEnabled(true); help.props.primary.onPress(); assert.deepEqual(a.routes, ['/create']);
+  a.actorHooks.dispose(); a.hostHooks.dispose();
 });

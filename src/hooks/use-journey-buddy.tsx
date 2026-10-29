@@ -12,7 +12,8 @@ const BuddyContext = createContext<BuddyApi | null>(null);
 export function JourneyBuddyProvider({ children }: { children: ReactNode }) {
   const [api] = useState(createApi);
   useEffect(() => {
-    const stop = api.preference.subscribe(() => { if (api.preference.get().enabled) api.store.requestMeasurements(); else { api.store.clearCelebration(); api.store.closeMapHelp(); } });
+    // Off (by the user or a failed save) also drops any pending tour, so it can't reopen later.
+    const stop = api.preference.subscribe(() => { if (api.preference.get().enabled) api.store.requestMeasurements(); else { api.store.clearCelebration(); api.store.closeMapHelp(); api.store.setTour(null); } });
     void api.preference.load(); return stop;
   }, [api]);
   return <BuddyContext.Provider value={api}>{children}</BuddyContext.Provider>;

@@ -11,8 +11,10 @@ export const buddyTour = [
 
 // Historical module name; this is an anchored bubble, not a modal or bottom sheet.
 export function BuddyHelpSheet({ canAddMemory, travel, onAddMemory, onCreate, onDrafts, onClose, onTour, onNext,
-  tour = null, reaction, contextualLine, placement, fallback = false, width = 252, maxHeight = 320, onMeasure }: {
+  tour = null, reaction, contextualLine, placement, fallback = false, width = 252, maxHeight = 320, onMeasure, primary }: {
   canAddMemory: boolean; travel?: BuddyTravel; onAddMemory: () => void; onCreate: () => void; onDrafts: () => void; onClose: () => void;
+  /** Screen-specific first action when there is no memory to capture; defaults to Open my drafts. */
+  primary?: { label: string; onPress: () => void };
   onTour?: () => void; onNext?: () => void; tour?: number | null; reaction?: string; contextualLine?: string;
   placement?: { x: number; y: number; above: boolean; tailX: number }; width?: number; maxHeight?: number; onMeasure?: (height: number) => void;
   fallback?: boolean;
@@ -40,7 +42,7 @@ export function BuddyHelpSheet({ canAddMemory, travel, onAddMemory, onCreate, on
         <HelpAction label={step.label} onPress={onTour ?? onCreate} />
         <HelpAction secondary label={tour === 2 ? 'Finish tour' : 'Next'} onPress={onNext ?? onClose} />
       </> : <>
-        <HelpAction label={canAddMemory ? 'Capture a moment' : 'Open my drafts'} onPress={canAddMemory ? onAddMemory : onDrafts} />
+        {canAddMemory ? <HelpAction label="Capture a moment" onPress={onAddMemory} /> : <HelpAction label={primary?.label ?? 'Open my drafts'} onPress={primary?.onPress ?? onDrafts} />}
         <HelpAction secondary label="Show me around" onPress={onTour ?? onCreate} />
       </>}
     </View>}
