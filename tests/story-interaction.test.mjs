@@ -1773,23 +1773,36 @@ test('rail JourneyOptions preserves anonymous Remix, existing private copy, bloc
       './story-sheet': { StorySheet: 'StorySheet' },
       'react-native-safe-area-context': { SafeAreaView: 'SafeAreaView' },
     }, h.hooks);
-    let tree = h.render(component.JourneyOptions, { id: journeyId, onUse: () => uses++, presentation:'rail', onAbout:()=>about++ });
-    all(tree,'Pressable').find(n=>n.props.accessibilityLabel==='About this journey').props.onPress();assert.equal(about,1);
-    all(tree,'Pressable').find(n=>n.props.accessibilityLabel==='Customize stops').props.onPress();assert.deepEqual(routes.pop(),{pathname:'/customize/[id]',params:{id:journeyId}});
-    assert.equal(all(tree,'JourneyActionIcon').length,3);
-    const remix = all(tree, 'Pressable').find(n => n.props.accessibilityLabel === (mode === 'existing' ? 'Open private copy' : 'Remix This Journey'));
+    const props = { id: journeyId, onUse: () => uses++, presentation:'rail', onAbout:()=>about++ };
+    const sheet = (t, title) => all(t,'StorySheet').find(n => n.props.title === title);
+    const button = (t, label) => all(t,'Pressable').find(n => n.props.accessibilityLabel === label);
+    let tree = h.render(component.JourneyOptions, props);
+    button(tree,'About this journey').props.onPress();assert.equal(about,1);
+    // Remix and Customize are no longer separate rail buttons: one choice sheet explains both.
+    assert.equal(sheet(tree,'Make this journey yours').props.visible,false);
+    assert.equal(all(tree,'Pressable').filter(n => /^(Remix This Journey|Open private copy|Customize stops)$/.test(n.props.accessibilityLabel)).every(n => all(sheet(tree,'Make this journey yours'),'Pressable').includes(n)),true,'Customize and Remix live only inside the choice sheet');
+    button(tree,'Make it yours').props.onPress();tree=h.render(component.JourneyOptions, props);
+    const choice = sheet(tree,'Make this journey yours');assert.equal(choice.props.visible,true);
+    const inChoice = label => all(choice,'Pressable').find(n => n.props.accessibilityLabel === label);
+    assert.match(JSON.stringify(all(choice,'Text').map(n => n.props.children)),/Nothing is saved/,'Customize explains it is temporary');
+    assert.match(JSON.stringify(all(choice,'Text').map(n => n.props.children)),mode === 'existing' ? /already have a private draft/ : /private draft in your account/,'Remix explains it saves a draft');
+    inChoice('Customize stops').props.onPress();assert.deepEqual(routes.pop(),{pathname:'/customize/[id]',params:{id:journeyId}});
+    tree=h.render(component.JourneyOptions, props);assert.equal(sheet(tree,'Make this journey yours').props.visible,false,'Choosing closes the sheet');
+    button(tree,'Make it yours').props.onPress();tree=h.render(component.JourneyOptions, props);
+    const remix = all(sheet(tree,'Make this journey yours'),'Pressable').find(n => n.props.accessibilityLabel === (mode === 'existing' ? 'Open private copy' : 'Remix This Journey'));
     if (mode === 'blocked') {
       assert.equal(remix.props.disabled, true);
-      all(tree,'Pressable').find(n=>n.props.accessibilityLabel==='Check your drafts').props.onPress();tree=h.render(component.JourneyOptions,{id:journeyId,onUse:()=>{},presentation:'rail'});assert.equal(find(tree,'StorySheet').props.visible,true);
-      find(tree, 'Action').props.onPress();
+      button(tree,'Check your drafts').props.onPress();tree=h.render(component.JourneyOptions,props);assert.equal(sheet(tree,'Remix journey').props.visible,true);
+      all(sheet(tree,'Remix journey'),'Action')[0].props.onPress();
       assert.equal(routes.at(-1), '/account');
     } else {
       remix.props.onPress(); await new Promise(resolve => setImmediate(resolve));
       if (mode === 'anonymous') { assert.deepEqual(intents, [[journeyId, 'remix']]); assert.equal(routes.at(-1), '/auth'); }
       else assert.deepEqual(routes.at(-1), { pathname: '/create', params: { draft: mode === 'existing' ? 'private-copy' : 'new-copy' } });
       assert.equal(copies.length, mode === 'signed-in' ? 1 : 0);
+      tree=h.render(component.JourneyOptions, props);
+      assert.equal(sheet(tree,'Make this journey yours').props.visible,false);assert.equal(sheet(tree,'Remix journey').props.visible,false);
     }
-    if(mode!=='blocked')assert.equal(find(tree,'StorySheet').props.visible,false);
   }
 });
 test('StorySheet owns dark status icons only while visible and releases ownership when closed',()=>{

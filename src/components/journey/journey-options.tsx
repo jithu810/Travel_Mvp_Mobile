@@ -13,6 +13,7 @@ import { remixJourney } from '@/lib/remix/queries';
 export function JourneyOptions({ id, onUse, inlineFeedback = false, menu, presentation, onAbout }: { id: string; onUse: () => void; inlineFeedback?: boolean; presentation?: 'rail'; onAbout?: () => void; menu?: { visible: boolean; onClose: () => void; onAbout: () => void } }) {
   const router = useRouter();
   const [feedbackOpen, setFeedbackOpen] = useState(false);
+  const [choiceOpen, setChoiceOpen] = useState(false);
   const focus = useRef({ active: false, generation: 0, userId: null as string | null });
   const auth = useSessionState();
   const intent = useActionIntent();
@@ -37,11 +38,25 @@ export function JourneyOptions({ id, onUse, inlineFeedback = false, menu, presen
       if (intent.consume(intent.pending.token)) void copy();
     }
   }, [userId, auth.loading, id, intent, copy]));
+  const remixDisabled = auth.loading || state.busy || (state.blocked && !state.copyId);
+  // One entry point explains the choice: a temporary stop selection versus a saved private draft.
   if (presentation === 'rail') return <View style={styles.rail}>
-    <Pressable accessibilityRole="button" accessibilityLabel={state.copyId ? 'Open private copy' : 'Remix This Journey'} accessibilityHint="Requires sign-in. Creates or opens your private draft." disabled={auth.loading || state.busy || (state.blocked && !state.copyId)} accessibilityState={{ disabled: auth.loading || state.busy || (state.blocked && !state.copyId) }} onPress={() => { if (state.copyId) router.push({ pathname: '/create', params: { draft: state.copyId } }); else void copy(); }} style={[styles.railButton, (auth.loading || state.busy || (state.blocked && !state.copyId)) && { opacity: 0.6 }]}>{state.busy ? <ActivityIndicator color={colors.ink} /> : <JourneyActionIcon name="remix" />}<Text style={styles.railLabel}>{state.copyId ? 'My draft' : 'Remix'}</Text></Pressable>
-    <Pressable accessibilityRole="button" accessibilityLabel="Customize stops" accessibilityHint="Choose stops for this trip. No draft is created." onPress={() => router.push({ pathname: '/customize/[id]', params: { id } })} style={styles.railButton}><JourneyActionIcon name="route" /><Text style={styles.railLabel}>Customize</Text></Pressable>
+    <Pressable accessibilityRole="button" accessibilityLabel="Make it yours" accessibilityHint="Choose stops for this trip or save an editable copy." onPress={() => setChoiceOpen(true)} style={styles.railButton}>{state.busy ? <ActivityIndicator color={colors.ink} /> : <JourneyActionIcon name="remix" />}<Text style={styles.railLabel}>Make it yours</Text></Pressable>
     <Pressable accessibilityRole="button" accessibilityLabel="About this journey" onPress={onAbout} style={styles.railButton}><JourneyActionIcon name="info" /><Text style={styles.railLabel}>About</Text></Pressable>
     {(state.error || state.blocked) && <Pressable accessibilityRole="button" accessibilityLabel={state.error || 'Check your Account drafts before retrying Remix'} onPress={() => setFeedbackOpen(true)} style={styles.railFeedback}><Text accessibilityLiveRegion="polite" style={styles.remixLabel}>!</Text></Pressable>}
+    <StorySheet visible={choiceOpen} title="Make this journey yours" onClose={() => setChoiceOpen(false)}>
+      <Pressable accessibilityRole="button" accessibilityLabel="Customize stops" accessibilityHint="Choose stops for this trip. No draft is created." onPress={() => { setChoiceOpen(false); router.push({ pathname: '/customize/[id]', params: { id } }); }} style={({ pressed }) => [styles.choice, pressed && { opacity: 0.7 }]}>
+        <JourneyActionIcon name="route" />
+        <View style={styles.choiceText}><Text style={styles.choiceTitle}>Pick stops for this trip</Text><Text style={ui.body}>Choose which stops to visit now. Nothing is saved; your selection lasts for this trip.</Text></View>
+      </Pressable>
+      <Pressable accessibilityRole="button" accessibilityLabel={state.copyId ? 'Open private copy' : 'Remix This Journey'} accessibilityHint="Requires sign-in. Creates or opens your private draft." disabled={remixDisabled} accessibilityState={{ disabled: remixDisabled }}
+        onPress={() => { setChoiceOpen(false); if (state.copyId) router.push({ pathname: '/create', params: { draft: state.copyId } }); else void copy(); }} style={({ pressed }) => [styles.choice, (remixDisabled || pressed) && { opacity: 0.6 }]}>
+        {state.busy ? <ActivityIndicator color={colors.ink} /> : <JourneyActionIcon name="remix" />}
+        <View style={styles.choiceText}><Text style={styles.choiceTitle}>{state.copyId ? 'Open my editable copy' : 'Save an editable copy'}</Text><Text style={ui.body}>{state.copyId ? 'You already have a private draft of this journey. Open it to keep editing.' : 'Creates a private draft in your account that you can edit. Requires sign-in.'}</Text></View>
+      </Pressable>
+      {state.error && <Text accessibilityRole="alert" style={ui.body}>{state.error}</Text>}
+      {state.blocked && <Action label="Check Account drafts" onPress={() => { setChoiceOpen(false); router.push('/account'); }} />}
+    </StorySheet>
     <StorySheet visible={feedbackOpen} title="Remix journey" onClose={() => setFeedbackOpen(false)}>
       {state.error && <Text accessibilityRole="alert" style={ui.body}>{state.error}</Text>}
       {state.blocked && <Action label="Check Account drafts" onPress={() => { setFeedbackOpen(false); router.push('/account'); }} />}
@@ -85,6 +100,8 @@ export function JourneyOptions({ id, onUse, inlineFeedback = false, menu, presen
 
 const styles = StyleSheet.create({
   rail: { gap: 3, flexDirection: 'row' }, railLabel: { color: colors.ink, fontSize: 10, lineHeight: 14, fontWeight: '600', textAlign: 'center' }, railButton: { minWidth: 56, minHeight: 54, paddingHorizontal: 3, borderRadius: 14, backgroundColor: 'transparent', alignItems: 'center', justifyContent: 'center' }, railFeedback: { position: 'absolute', right: 48, top: 0, width: 44, minHeight: 44, borderRadius: 22, backgroundColor: colors.pale, alignItems: 'center', justifyContent: 'center' },
+  choice: { flexDirection: 'row', alignItems: 'flex-start', gap: 14, minHeight: 44, padding: 16, borderRadius: 20, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.white },
+  choiceText: { flex: 1, minWidth: 0, gap: 4 }, choiceTitle: { color: colors.ink, fontSize: 15, lineHeight: 21, fontWeight: '700' },
   menuOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.35)' },
   menuBackdrop: { position: 'absolute', top: 0, bottom: 0, left: 0, right: 0 },
   menuPanel: { maxHeight: '80%', backgroundColor: colors.paper, borderTopLeftRadius: 24, borderTopRightRadius: 24 },
