@@ -5,6 +5,7 @@ import { AppState, Keyboard, View, type GestureResponderEvent } from 'react-nati
 import { createBuddyPreference } from '@/lib/buddy/preference';
 import { createBuddyStore } from '@/lib/buddy/store';
 import { createBuddyGreetings } from '@/lib/buddy/greetings';
+import { resetBuddyContext } from '@/lib/buddy/contextual-lines';
 import type { BuddyAction, BuddyCelebrationName, BuddyScreen } from '@/lib/buddy/model';
 
 function createApi() { return { store: createBuddyStore(), preference: createBuddyPreference(AsyncStorage), greetings: createBuddyGreetings(AsyncStorage) }; }
@@ -40,7 +41,7 @@ export function useBuddyPreference() {
 // Clears the on-device record of greetings so each screen may greet once again.
 export function useBuddyGreetingsReset() {
   const api = useBuddyApi();
-  return useCallback(() => { api?.greetings.reset(); }, [api]);
+  return useCallback(() => { if (api) { resetBuddyContext(api.store); api.greetings.reset(); } }, [api]);
 }
 // First use only: offered once while no on/off choice is stored. Guide me turns Buddy on and opens
 // the existing three-step tour (the actor opens help when it mounts with a tour step set).

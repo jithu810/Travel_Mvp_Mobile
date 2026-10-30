@@ -9,6 +9,7 @@ export function createBuddyStore() {
   let pose: BuddyPose | null = null;
   let poseOwner: object | null = null;
   let tour: number | null = null, lastReaction = -Infinity;
+  let lastNonContextReaction = -Infinity;
   const reacted = new Set<string>();
   const celebrated = new WeakSet<object>();
   const mapPresentations = new Map<object, { path: string; visible: boolean }>();
@@ -87,7 +88,13 @@ export function createBuddyStore() {
     // Retained across actor remounts, reset only on an actual route visit.
     reactOnce(key: string, now = Date.now()) {
       if (reacted.has(key) || now - lastReaction < 30000) return false;
+      if (!key.startsWith('context:')) lastNonContextReaction = now;
       reacted.add(key); lastReaction = now; return true;
+    },
+    resetContextReactions() {
+      for (const key of reacted) if (key.startsWith('context:')) reacted.delete(key);
+      // Explicit greeting reset must not reset Story/Travel reaction guards.
+      lastReaction = lastNonContextReaction;
     },
     claimPose(path: string, owner: object) { if (path === snapshot.path) poseOwner = owner; },
     releasePose(path: string, owner: object) { if (path === snapshot.path && poseOwner === owner) poseOwner = null; },

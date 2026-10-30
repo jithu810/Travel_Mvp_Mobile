@@ -15,6 +15,10 @@ export const buddyGreetingKey = (path: string) => routeKey(path);
 // Process-local only. Store identity makes the once-per-route limit survive actor
 // remounts and navigation while allowing a fresh app session to greet again.
 const spoken = new WeakMap<object, Set<string>>();
+export function resetBuddyContext(store: { resetContextReactions: () => void }) {
+  spoken.delete(store);
+  store.resetContextReactions();
+}
 export function claimBuddyContext(store: { reactOnce: (key: string) => boolean }, path: string) {
   const route = routeKey(path);
   if (!buddyContextLine(route) || spoken.get(store)?.has(route) || !store.reactOnce('context:' + route)) return false;

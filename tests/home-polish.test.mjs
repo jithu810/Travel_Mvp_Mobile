@@ -461,22 +461,6 @@ test('Home image lists expose data only in active layout and More keeps every jo
   if(size<61){active.props.ListFooterComponent.props.onPress();expanded=!expanded;}
  }
 });
-test('U2: Home panel offers a Find a journey button only when given, and it opens journey search', () => {
-  const component = load('src/components/discovery/discovery-panel.tsx', {
-    'react-native': { Animated: { View: 'AnimatedView', add: (a, b) => a + b }, FlatList: 'FlatList' },
-    '@/lib/discovery/presentation': { discoveryCardWidth: () => 300 },
-    '@/hooks/use-discovery-sheet': { useDiscoverySheet: () => ({ height: 44, expanded: false, offset: { current: 0 }, responders: { handle: {}, content: {} } }) },
-    './home-journey-card': { HomeJourneyCard: 'Card' }, './ui': { colors },
-  });
-  const props = { journeys: [], availableHeight: 720, availableWidth: 360, onHeight() {} };
-  const find = tree => nodes(tree).find(n => n.type === 'Pressable' && n.props.accessibilityLabel === 'Find a journey');
-  assert.equal(find(component.DiscoveryPanel(props)), undefined, 'No button unless Home provides the action');
-  let opened = 0; const button = find(component.DiscoveryPanel({ ...props, onFindJourney: () => opened++ }));
-  assert.ok(button); button.props.onPress(); assert.equal(opened, 1);
-  assert.equal(nodes(button).find(n => n.type === 'Text').props.children, 'Find a journey', 'Label matches the visible text');
-  assert.ok(readFileSync('src/app/discover.tsx', 'utf8').includes("onFindJourney={() => router.navigate('/search?view=search')}"), 'Home opens the same journey search as the Search tab');
-});
-
 test('R2: Home shows "Unfinished trip" with Resume for the signed-in user copy and keeps the panel clear',()=>{
   const routes=[];let trip=null;
   const home=load('src/app/discover.tsx',{

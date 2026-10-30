@@ -17,6 +17,7 @@ const geometry = load('src/lib/buddy/geometry.ts', { './model': model });
 const { createBuddyStore } = load('src/lib/buddy/store.ts', { './model': model });
 const { createBuddyPositionCapture } = load('src/lib/buddy/position.ts');
 const { createBuddyGreetings } = load('src/lib/buddy/greetings.ts');
+const contextualLines = load('src/lib/buddy/contextual-lines.ts');
 const { createBuddyPreference, BUDDY_PREFERENCE_KEY } = load('src/lib/buddy/preference.ts');
 const animations = load('src/lib/buddy/animations.ts');
 const tick = () => new Promise(setImmediate);
@@ -370,7 +371,7 @@ async function hostHarness(openSpace = false, contextual = false) {
     '@/lib/buddy/position': { createBuddyPositionCapture }, '@/lib/buddy/geometry': { ...geometry,
       placeBuddyBubble(...args) { placementCalls++; return geometry.placeBuddyBubble(...args); } },
     '@/lib/buddy/animations': animations,
-    '@/lib/buddy/contextual-lines': { ...load('src/lib/buddy/contextual-lines.ts'), ...(!contextual ? { buddyContextLine: () => undefined } : {}) },
+    '@/lib/buddy/contextual-lines': { ...contextualLines, ...(!contextual ? { buddyContextLine: () => undefined } : {}) },
     '@/lib/buddy/help-actions': load('src/lib/buddy/help-actions.ts'),
     './buddy-sprite': { BuddySprite: 'BuddySprite' }, './buddy-help-sheet': { BuddyHelpSheet: 'BuddyHelpSheet' },
     './map-buddy-help': { MapBuddyHelp: 'MapBuddyHelp' },
@@ -534,7 +535,7 @@ async function integrationHarness(sharedApi = null) {
   const module = load('src/hooks/use-journey-buddy.tsx', { react, 'react/jsx-runtime': runtime, 'react-native': native,
     '@react-native-async-storage/async-storage': { getItem: async () => null, setItem: async () => {} },
     'expo-router': { usePathname: () => path, useFocusEffect: fn => h.react.useEffect(fn, [fn]) },
-    '@/lib/buddy/store': { createBuddyStore }, '@/lib/buddy/preference': { createBuddyPreference }, '@/lib/buddy/greetings': { createBuddyGreetings } }, timers);
+    '@/lib/buddy/store': { createBuddyStore }, '@/lib/buddy/preference': { createBuddyPreference }, '@/lib/buddy/greetings': { createBuddyGreetings }, '@/lib/buddy/contextual-lines': contextualLines }, timers);
   return { h, timers, api, module, native, appListeners, keyboard, path: value => { path = value; } };
 }
 test('actual touch boundary initializes keyboard suppression, never captures responders, and cancels all cooldowns when disabled/backgrounded/unmounted', async () => {
@@ -802,6 +803,40 @@ test('contextual bubbles animate once, dismiss after five seconds, preserve slee
   h.actorHooks.dispose(); h.hostHooks.dispose(); assert.equal(h.timers.jobs.size, 0);
 });
 
+test('Account reset permits one Home greeting after eight seconds within the old cooldown, sharing all Home aliases', async () => {
+  const h = await hostHarness(true, true);
+  const visit = async path => {
+    h.path(path); h.api.store.screen(h.owner, { path, state: { floating: true }, act() {} });
+    h.renderHost(); h.remountActor(); await tick(); return settleActor(h);
+  };
+  await visit('/'); fireDelay(h, 8000);
+  assert.equal(all(settleActor(h), 'BuddyHelpSheet').length, 1);
+  await visit('/account');
+  const x = await integrationHarness(h.api);
+  x.h.render(x.module.useBuddyGreetingsReset, {})();
+  let tree = await visit('/index');
+  assert.equal(all(tree, 'BuddyHelpSheet').length, 0, 'Reset does not greet immediately');
+  assert.ok([...h.timers.jobs.values()].some(job => job.ms === 8000));
+  fireDelay(h, 8000); tree = settleActor(h);
+  assert.match(all(tree, 'BuddyHelpSheet')[0].props.reaction, /A new story/);
+  fireDelay(h, 5000); settleActor(h);
+  for (const path of ['/discover', '/', '/index']) {
+    await visit(path); fireDelay(h, 8000);
+    assert.equal(all(settleActor(h), 'BuddyHelpSheet').length, 0, 'Alias/revisit cannot greet again');
+  }
+  x.h.dispose(); h.actorHooks.dispose(); h.hostHooks.dispose();
+});
+
+test('greeting reset retains unrelated reaction keys and cooldowns', () => {
+  const store = createBuddyStore();
+  assert.equal(store.reactOnce('story:a', 0), true);
+  assert.equal(store.reactOnce('context:/discover', 30000), true);
+  contextualLines.resetBuddyContext(store);
+  assert.equal(store.reactOnce('travel:a', 29000), false, 'Story cooldown survives reset');
+  assert.equal(store.reactOnce('story:a', 60000), false, 'Story once-per-visit guard survives reset');
+  assert.equal(store.reactOnce('context:/discover', 30000), true, 'Only context cooldown and key cleared');
+});
+
 test('Explore greets with Wave and manual Account help keeps contextual copy plus normal actions', async () => {
   const h = await hostHarness(true, true); h.path('/discover'); h.api.store.screen(h.owner, { path: '/discover', state: { floating: true }, act() {} });
   let tree = settleActor(h); await tick(); tree = settleActor(h); fireDelay(h, 8000); tree = settleActor(h);
@@ -934,7 +969,7 @@ test('turning Buddy off, including a failed save after Guide me, drops the pendi
     'react-native': { View: 'View', AppState: { currentState: 'active', addEventListener: () => ({ remove() {} }) }, Keyboard: { isVisible: () => false, addListener: () => ({ remove() {} }) } },
     '@react-native-async-storage/async-storage': { getItem: async () => null, setItem: async () => { if (fail) throw Error('disk full'); } },
     'expo-router': { usePathname: () => '/discover', useFocusEffect: fn => h.react.useEffect(fn, [fn]) },
-    '@/lib/buddy/store': { createBuddyStore: () => store }, '@/lib/buddy/preference': { createBuddyPreference: storage => (api = { store, preference: createBuddyPreference(storage), greetings: createBuddyGreetings({ getItem: async () => null, setItem: async () => {}, removeItem: async () => {} }) }).preference }, '@/lib/buddy/greetings': { createBuddyGreetings } });
+    '@/lib/buddy/store': { createBuddyStore: () => store }, '@/lib/buddy/preference': { createBuddyPreference: storage => (api = { store, preference: createBuddyPreference(storage), greetings: createBuddyGreetings({ getItem: async () => null, setItem: async () => {}, removeItem: async () => {} }) }).preference }, '@/lib/buddy/greetings': { createBuddyGreetings }, '@/lib/buddy/contextual-lines': contextualLines });
   h.render(module.JourneyBuddyProvider, { children: null }); await tick(); await tick();
   let intro; h.render(() => { intro = module.useBuddyIntro(); return null; }); assert.equal(intro.visible, true);
   intro.guide(); assert.equal(store.getTour(), 0); await tick(); await tick();

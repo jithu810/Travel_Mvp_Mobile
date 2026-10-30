@@ -1,3 +1,9 @@
+## Phone backlog verification - 2026-10-30
+- [x] B5 greeting reset, automatic expiry, revisit suppression and cold-relaunch suppression verified on CPH2813 / Android 16. Existing 69 tests/static checks and independent review pass. Overall 9/24 complete; publication authorized on feature/backlog-phase1, merge not authorized.
+- [x] U5 Saved/draft/recoverable-work paths closed under the owner's accepted code-checked scope; phone Search and Account paths inspected. Status update local/unpublished.
+- [x] U2 owner-directed removal of duplicate Find a journey button; phone reload confirms more globe space, bottom Search retained; 17 Home tests and static checks pass. Local/unpublished.
+- [ ] U1 review passed, cold relaunch still pending. R2/R3 and broader R4/R5 checks remain pending. See IMPROVEMENT_BACKLOG.md.
+
 ## Improvement backlog phase 1 - 2026-10-30
 - Implemented on feature/backlog-phase1 (published, not merged): Search tile captions, Make it yours, first-use Buddy card, task-specific Buddy actions and reasons, once-per-install greetings, Home Find a journey, on-device recovery of unsaved Create edits and unfinished trips.
 - Tested: full suite, independent review and emulator checks; selected phone checks. See PROJECT_STATUS.md and IMPROVEMENT_BACKLOG.md.
