@@ -33,6 +33,9 @@ test('first incomplete stop follows creator order and never skips missing coordi
   const missing = stop({ latitude: null }); const stops = [stop({ id: 'later', sequence: 2 }), missing];
   assert.equal(firstNavigationStop(stops), missing); assert.equal(stops[0].id, 'later');
   assert.match(navigationBlock(input({ destination: missing }), now), /coordinates/);
+  assert.equal(navigationBlock(input({ position: null, settingsOff: true }), now), 'Location Accuracy is off · Guidance is paused until you turn it on', 'A decline never promises automatic recovery');
+  assert.match(navigationBlock(input({ position: null }), now), /resumes automatically/, 'Other GPS gaps keep the recovery message');
+  assert.match(navigationBlock(input({ status: 'paused', settingsOff: true }), now), /paused/, 'Pause still takes priority');
   assert.equal(firstNavigationStop([]), undefined);
 });
 test('route parser validates bounded GeoJSON, distance and optional duration without coercion', () => {

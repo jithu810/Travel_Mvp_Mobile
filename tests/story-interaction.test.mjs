@@ -519,6 +519,9 @@ test('Travel renders permission, weak-fix and unavailable states honestly withou
   assert.equal(store.get(journeyId).status, 'ready', 'Permission Retry does not begin the trip');
   store.transition(journey, 'begin', store.get(journeyId)); gps = { status: 'unavailable', canAskAgain: true, position: null }; tree = render();
   assert.match(text(tree), /Stop 1 of 2/); assert.match(text(tree), /GPS temporarily unavailable/); button(tree, 'Retry location').props.onPress(); assert.equal(retries, 2);
+  gps = { status: 'unavailable', reason: 'settings-declined', canAskAgain: true, position: null }; tree = render();
+  assert.match(text(find(tree, 'ItinerarySheet').props.footer), /Location settings need attention\. Turn on Location Accuracy, then tap Retry location\./); assert.doesNotMatch(text(tree), /Retrying automatically/);
+  assert.ok(button(tree, 'Pause')); assert.ok(button(tree, 'Finish')); button(tree, 'Retry location').props.onPress(); assert.equal(retries, 3);
   find(tree, 'MapItinerary').props.onSelect('second');
   gps = { status: 'weak', canAskAgain: true, position: { latitude: 8, longitude: 76, accuracy: 250, timestamp: 100 } }; tree = render();
   assert.match(text(tree), /signal weak/); assert.match(text(tree), /250 m/);

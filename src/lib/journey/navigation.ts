@@ -12,7 +12,7 @@ export type RoadGeometry = { type: 'LineString'; coordinates: [number, number][]
 export type RoadRoute = { geometry: RoadGeometry; distance: number; duration: number | null; steps?: RouteStep[] | null };
 export type Destination = Pick<JourneyStop, 'id' | 'name' | 'latitude' | 'longitude'>;
 type Point = { latitude: number; longitude: number };
-export type NavigationInput = { status: TripStatus; foreground: boolean; focused: boolean; position: Position | null; destination: Destination | undefined; session?: object };
+export type NavigationInput = { status: TripStatus; foreground: boolean; focused: boolean; position: Position | null; destination: Destination | undefined; session?: object; settingsOff?: boolean };
 export type RerouteState = { phase: 'confirming' | 'cooldown' | 'loading' | 'failed'; message: string; retryAt?: number };
 export type NavigationState = { session?: object; key: string; status: 'idle' | 'loading' | 'ready' | 'error'; message: string; route: RoadRoute | null; guidance?: Guidance | null; routeOutdated?: boolean; reroute?: RerouteState | null; retryAvailable?: boolean; gpsHeld?: boolean };
 export function coordinates(point: { latitude: unknown; longitude: unknown } | null | undefined): point is Point {
@@ -32,6 +32,8 @@ export function navigationBlock(input: NavigationInput, now = Date.now()) {
   if (!input.focused || !input.foreground) return 'Navigation stopped while away';
   if (input.status !== 'active') return input.status === 'paused' ? 'Navigation paused' : input.status === 'finished' || input.status === 'completed' ? 'Navigation stopped' : 'Begin Trip to calculate a driving route';
   if (!destinationKey(input.destination)) return 'Route unavailable: destination stop has no valid map coordinates';
+  // Nothing reconnects by itself after a Location Accuracy decline, so never promise automatic recovery.
+  if (input.settingsOff) return 'Location Accuracy is off · Guidance is paused until you turn it on';
   if (!navigationFix(input.position, now)) return 'GPS signal weak or delayed · Guidance resumes automatically when GPS recovers';
   return '';
 }
