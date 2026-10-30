@@ -18,11 +18,13 @@ import { hideViewerJourneys, onlyViewerJourneysCopy } from '@/lib/discovery/mode
 import { discoveryRoute } from '@/lib/discovery/travel';
 import { spaceColor } from '@/lib/discovery/presentation';
 import { invalidatePublicJourneys, loadDiscoveryEntries, loadPublicJourney } from '@/lib/discovery/queries';
+import { firstOutcomeRoute } from '@/lib/first-outcome';
 import { BuddyIntro } from '@/components/buddy/buddy-intro';
 import { useUnfinishedTrip } from '@/hooks/use-trip-recovery';
 
 export default function DiscoverScreen() {
   const router = useRouter();
+  const [choosingOutcome, setChoosingOutcome] = useState(false);
   const headerProtection = useBuddyProtectedBounds(), bannerProtection = useBuddyProtectedBounds(), tripProtection = useBuddyProtectedBounds();
   const insets = useSafeAreaInsets();
   // The public load never waits for authentication; only the viewer filter does.
@@ -96,6 +98,7 @@ export default function DiscoverScreen() {
       <View {...headerProtection} style={[s.header, { top: headerTop }]} onLayout={event => { headerProtection.onLayout(); setHeaderHeight(event.nativeEvent.layout.height); }}>
         <View style={s.search}><PlacePicker label="Search places" homeSearch compact embeddedSuggestions autoSuggest disabled={false}
           dismissVersion={dismissVersion} proximity={userProximity || mapProximity} onSelect={selectPlace} /></View>
+        <Pressable accessibilityRole="button" accessibilityLabel="Choose a starting point" onPress={() => { dismissSearch(); setChoosingOutcome(true); }} style={s.help}><Text style={s.helpText}>?</Text></Pressable>
       </View>
       <View style={s.exploration} onTouchStart={dismissSearch} onLayout={event => {
         const { width, height } = event.nativeEvent.layout;
@@ -121,7 +124,7 @@ export default function DiscoverScreen() {
       {initialLoading && <BrandedLoading overlay message="Exploring the world…" />}
     </View>
     {/* A Modal: outside the page so it adds no Home layout node. */}
-    <BuddyIntro ready={focused && !initialLoading} />
+    <BuddyIntro ready={focused && !initialLoading} choosing={choosingOutcome} onGuide={() => setChoosingOutcome(true)} onClose={() => setChoosingOutcome(false)} onChoose={goal => { setChoosingOutcome(false); router.push(firstOutcomeRoute(goal)); }} />
   </SafeAreaView>;
 }
 const s = StyleSheet.create({
@@ -129,6 +132,8 @@ const s = StyleSheet.create({
   safe: { flex: 1, backgroundColor: theme.background },
   page: { flex: 1, width: '100%', maxWidth: 900, alignSelf: 'center' },
   header: { position: 'absolute', left: 0, right: 0, elevation: 10, minHeight: 52, paddingHorizontal: 18, paddingVertical: 6, flexDirection: 'row', alignItems: 'center', gap: 8, zIndex: 10 },
+  help: { minWidth: 44, minHeight: 44, borderRadius: 22, backgroundColor: theme.surface, justifyContent: 'center', alignItems: 'center' },
+  helpText: { color: theme.text, fontSize: 20, fontWeight: '700' },
   search: { flex: 1, minWidth: 0, minHeight: 44, justifyContent: 'center' },
   banner: { position: 'absolute', left: 16, right: 16, zIndex: 3, minHeight: 48, borderRadius: 20, paddingHorizontal: 12, paddingVertical: 4,
     flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 6, backgroundColor: theme.surface, borderWidth: 1, borderColor: theme.border },

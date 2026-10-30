@@ -1,3 +1,24 @@
+## Completed local update set reviewed - 2026-10-30
+- B2 preferences, B3 Saved continuation, U8 first-outcome guidance and completed R5/R6 UI slices reviewed together. 225/225 affected tests, TypeScript, scoped ESLint and whitespace checks pass; independent Code Reviewer found no actionable issues in the stable combined snapshot.
+- Prepared for local commit only; no GitHub push, merge, deployment or hosted write. Pilot documents already committed as c1ed4d5. Overall 16/24 complete, 8 open; E2 prepared but deferred for lack of participants, broader R4/R5/R6 and B4/E1/U4/E4 remain open. Existing phone evidence and limits are in docs/qa; full suite not repeated for this bounded combined review.
+
+## E3 success measures agreed - 2026-10-30
+- Owner accepted observable success definitions and the proposed 4-of-5 core-task pilot target. Manual observation only; no analytics, runtime or backend change. Documentation self-review and whitespace check; no device or application tests needed.
+- E3 COMPLETE: 16/24 backlog items complete, 8 open. R5 preferences and R6 empty-state slices are complete; their broader items remain open. E2 pilot preparation is next. See docs/success-measures.md. Local/unpublished; earlier entries are historical.
+
+## B2 device-only travel preferences completed - 2026-10-30
+- LOCAL, UNPUBLISHED: Account settings now offer optional Nature/Food/Culture interests and Relaxed/Packed pace, with edit/cancel/save/forget. Each signed-in account has a separate record on this phone; retained after signout with disclosure, hidden from guests/others, never synced. Manual Home/Search Buddy tips use explicit choices; search results/routes and authoritative continuation actions remain unchanged.
+- VERIFIED: read-only live backend preflight found no backend changes needed. QA independently passed 85 affected tests plus 4 additional storage/isolation scenarios. TypeScript, scoped ESLint and diff checks pass; independent review has no actionable findings. CPH2813 Android16/Codex8081 verified save, cold-relaunch persistence, edit cancellation, Forget and neutral state after second relaunch; temporary choices forgotten. No hosted writes. Physical account-switch/failure injection/manual tip capture and broad accessibility were not performed; automated evidence and R5 limitations recorded.
+- B2 COMPLETE under mixed phone/automated scope: 15/24 complete, 9 remaining. See docs/qa/b2-device-preferences-2026-10-30.md, b2-backend-preflight-2026-10-30.md and b2-qa-2026-10-30.md. Earlier entries are historical.
+
+## U8 first useful outcome completed - 2026-10-30
+- LOCAL, UNPUBLISHED: first-use Guide me now offers Find a journey / Keep a memory. Home ? provides optional replay; Search/Create guidance is dismissible and route-local. Confirmed private creation carries guidance into Add a stop; existing authentication, permission and data behavior retained.
+- VERIFIED: 160 initial affected tests, final focused regressions, TypeScript/scoped ESLint and diff checks pass. QA and independent review have no remaining actionable findings. CPH2813 / Android 16 / Codex Metro 8081: chooser, both destination screens and final Close/dismissal verified; modal stretching and unreadable glyph fixed. No hosted writes. Live sign-in/save, first-install and broad accessibility are not phone-verified; automated coverage and R5 limits documented.
+- U8 COMPLETE under mixed evidence scope: 14/24 complete, 10 remaining. B2 needs preference/storage decisions; R4/R5 remain device-check work and U4 awaits E2 pilot. See docs/qa/u8-first-outcome-2026-10-30.md and u8-qa-2026-10-30.md. Earlier entries are historical.
+
+## B3 saved-journey prompt completed - 2026-10-30
+- LOCAL, UNPUBLISHED: Buddy in Search's Saved view names a settled visible saved journey and offers Open saved journey using the existing Story route. Prompt clears under loading/refresh/error/account uncertainty/empty results; stale actions recheck current state. Existing draft and recoverable-trip paths retained. UI-only; no new backend reads, writes or persistence.
+- VERIFIED: 89 affected tests, TypeScript, scoped ESLint and diff check pass. Independent review: no actionable findings. CPH2813 / Android 16 / Codex Metro 8081: actual saved title and action visible; action opens matching Story. Error/account/stale cases automated-only; no live writes. B3 COMPLETE, overall 13/24 complete and 11 remaining. U8 next; other pending decisions/checks unchanged. See docs/qa/b3-saved-journey-2026-10-30.md. Earlier status entries below are historical.
 ## Create retry button visibility - 2026-10-30
 - LOCAL, UNPUBLISHED: error and Create/Save Changes button now share the form scroller, preventing an unreachable footer. Phone error/keyboard/retry check and 87 focused tests pass; independent review has no actionable findings. No backend behavior or live writes changed. Specific R5 finding resolved; broader R5 remains open. B3/U8 not started.
 

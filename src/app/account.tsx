@@ -1,3 +1,4 @@
+import { TravelPreferencesSettings } from '@/components/buddy/travel-preferences-settings';
 import { BrandedLoading } from '@/components/branded-loading';
 import { useCallback, useRef, useState } from 'react';
 import { useFocusEffect, useRouter } from 'expo-router';
@@ -91,7 +92,7 @@ export default function AccountScreen() {
           {collectionError && rows.length > 0 && <Message title="Couldn’t refresh journeys" body={collectionError} retry={retry} />}
         </View>}
         ListEmptyComponent={loading ? <ActivityIndicator accessibilityLabel={tab === 'drafts' ? 'Loading private drafts' : 'Loading published journeys'} /> : collectionError ? <Message title={tab === 'drafts' ? 'Couldn’t load drafts' : 'Couldn’t load journeys'} body={collectionError} retry={retry} />
-          : <Message title={tab === 'drafts' ? 'No private drafts yet' : 'No public journeys yet'} body={tab === 'drafts' ? 'Remix a public journey or start your own story.' : 'Your published journeys will appear here.'} retry={() => router.push('/create')} action="Create Journey" />}
+          : <Message title={tab === 'drafts' ? 'No private drafts yet' : 'No public journeys yet'} body={tab === 'drafts' ? 'Start with a place and a title, then save your journey privately. You can return here to add stops and memories before publishing.' : 'Journeys you choose to publish will appear here. You can start a private draft and share it when you are ready.'} retry={() => router.push('/create')} action="Start a journey" />}
         ListFooterComponent={<Pressable {...footerProtection} accessibilityRole="button" accessibilityLabel={tab === 'drafts' ? 'Refresh drafts' : 'Refresh published journeys'} onPress={refresh} style={s.close}><Text style={ui.body}>↻ Refresh {tab === 'drafts' ? 'drafts' : 'journeys'}</Text></Pressable>} />}
     </View>
     <Modal visible={settings} transparent animationType="none" onRequestClose={() => { if (!busy) setSettings(false); }}>
@@ -101,6 +102,7 @@ export default function AccountScreen() {
           <Switch accessibilityLabel="Journey Buddy" accessibilityHint="Show or hide your little journey helper" disabled={!buddy.loaded} value={buddy.enabled} onValueChange={buddy.setEnabled} /></View>
         <Action label="Show Buddy greetings again" secondary onPress={resetBuddyGreetings} />
         {buddy.error && <Text accessibilityRole="alert" style={ui.body}>{buddy.error}</Text>}
+        <TravelPreferencesSettings />
         {auth.session ? <View style={{ gap: 12 }}><Text selectable style={ui.body}>{auth.session.user.email}</Text>
           <Action label="Create Journey" onPress={() => { setSettings(false); router.push('/create'); }} />
           <Action label="Refresh drafts" secondary onPress={() => { refreshDrafts(); setTab('drafts'); setSettings(false); }} />

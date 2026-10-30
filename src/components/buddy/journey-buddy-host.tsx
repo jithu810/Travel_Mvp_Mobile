@@ -1,3 +1,5 @@
+import { useTravelPreferences } from '@/hooks/use-travel-preferences';
+import { travelPreferenceTip } from '@/lib/buddy/travel-preferences';
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { AccessibilityInfo, Animated, AppState, PanResponder, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { usePathname, useRouter } from 'expo-router';
@@ -12,7 +14,7 @@ import { createBuddyPositionCapture } from '@/lib/buddy/position';
 import { buddyCelebrationDuration } from '@/lib/buddy/animations';
 import { buddyContextLine, buddyGreetingKey, claimBuddyContext, BUDDY_CONTEXT_DELAY, BUDDY_CONTEXT_DURATION, type BuddyContextLine } from '@/lib/buddy/contextual-lines';
 import { MapBuddyHelp } from './map-buddy-help';
-import { buddyHelpLine, buddyHelpPrimary, buddyResumeReason } from '@/lib/buddy/help-actions';
+import { buddyHelpLine, buddyHelpPrimary, buddyResumeReason, buddySavedReason } from '@/lib/buddy/help-actions';
 
 type Api = NonNullable<ReturnType<typeof useBuddyApi>>;
 export function JourneyBuddyHost() {
@@ -326,10 +328,20 @@ function BuddyActor({ api, path, geometry, screen, interacting }: { api: Api; pa
     const timer = setTimeout(() => { if (alive.current && api.store.get().path === path) setHelpMeasurementFailed(true); }, 500);
     return () => clearTimeout(timer);
   }, [api, path, help, bubbleFit.fits, placement, helpMeasurementFailed]);
+  const travelPreferences = useTravelPreferences();
+  const preferenceTip = help && !screen?.travel && !screen?.resume && !screen?.savedJourney && !screen?.canAddMemory && travelPreferences.loaded && !travelPreferences.error
+    ? travelPreferenceTip(path, travelPreferences.value) : undefined;
   const manualFallback = !!help && (!bubbleFit.fits || helpMeasurementFailed);
   const closeBubble = () => { setHelp(null); setReaction(null); setContextual(null); api.store.setTour(null); };
   const tour = api.store.getTour();
-  const helpPrimary = screen?.resume ? { label: 'Continue editing', onPress: () => { api.store.setTour(null); if (path === '/account' && api.preference.get().enabled) router.push({ pathname: '/create', params: { draft: screen.resume!.id } }); } } : undefined;
+  const helpPrimary = screen?.resume ? { label: 'Continue editing', onPress: () => { api.store.setTour(null); if (path === '/account' && api.preference.get().enabled) router.push({ pathname: '/create', params: { draft: screen.resume!.id } }); } } : screen?.savedJourney && path === '/search' ? { label: 'Open saved journey', onPress: () => openSavedJourney() } : undefined;
+  function openSavedJourney() {
+    if (!canAct()) return;
+    const current = api.store.current().state?.savedJourney;
+    if (!current || current.id !== screen?.savedJourney?.id) return;
+    api.store.setTour(null); setHelp(null);
+    router.push({ pathname: '/journey/[id]', params: { id: current.id, source: 'search' } });
+  }
   return <>
     <Animated.View pointerEvents="box-none" style={[s.character, { transform: position.getTranslateTransform() }]}>
       <View {...gesture.panHandlers} collapsable={false} pointerEvents="box-only" accessible focusable
@@ -350,7 +362,7 @@ function BuddyActor({ api, path, geometry, screen, interacting }: { api: Api; pa
         setBubbleHeight(old => old === height ? old : height);
       }}
       placement={placement ? { ...placement.rect, above: placement.above, tailX: placement.tailX } : undefined}
-      contextualLine={(screen?.resume ? buddyResumeReason(screen.resume.title) : buddyHelpPrimary(path)?.reason) ?? buddyContextLine(path)?.text ?? buddyHelpLine(path)} reaction={contextualVisible ? contextual.text : !help && reactionVisible ? reaction?.text : undefined} tour={help ? tour : null}
+      contextualLine={(screen?.resume ? buddyResumeReason(screen.resume.title) : screen?.savedJourney && path === '/search' ? buddySavedReason(screen.savedJourney.title) : preferenceTip ?? buddyHelpPrimary(path)?.reason) ?? buddyContextLine(path)?.text ?? buddyHelpLine(path)} reaction={contextualVisible ? contextual.text : !help && reactionVisible ? reaction?.text : undefined} tour={help ? tour : null}
       onTour={() => { if (!canAct()) return; if (tour === null) { api.store.setTour(0); } else navigate((['/discover', '/create', '/account'] as const)[tour]); }}
       onNext={() => { if (!canAct()) return; if (tour === 2) closeBubble(); else { api.store.setTour((tour ?? -1) + 1); } }}
       primary={helpPrimary ? { label: helpPrimary.label, onPress: helpPrimary.onPress } : buddyHelpPrimary(path) ? { label: buddyHelpPrimary(path)!.label, onPress: () => { api.store.setTour(null); navigate(buddyHelpPrimary(path)!.route); } } : undefined}

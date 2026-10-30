@@ -48,7 +48,7 @@ export function FloatingNavigation({ active, onHeight }: { active: Destination; 
       accessibilityState={{ selected: active === item.key }} onPress={() => { if (active !== item.key) router.navigate(item.route); }}
       style={({ pressed }) => [styles.item, active === item.key && styles.selected, pressed && styles.pressed]}>
       <View accessible={false} importantForAccessibility="no-hide-descendants" style={styles.iconSlot}><NavigationIcon name={item.key} /></View>
-      <Text style={[styles.label, active === item.key && styles.active]}>{item.label}</Text>
+      <Text numberOfLines={1} maxFontSizeMultiplier={1.2} adjustsFontSizeToFit minimumFontScale={0.85} style={[styles.label, active === item.key && styles.active]}>{item.label}</Text>
     </Pressable>)}
   </View>;
 }
@@ -73,7 +73,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'stretch', gap: 3, padding: 4, borderRadius: 32,
     backgroundColor: 'rgba(242, 246, 255, 0.97)', borderWidth: 1, borderColor: '#DCE6F5',
     shadowColor: '#14251F', shadowOpacity: 0.12, shadowRadius: 8, shadowOffset: { width: 0, height: 3 } },
-  item: { flex: 1, minWidth: 0, minHeight: 46, borderRadius: 26, paddingHorizontal: 4, paddingVertical: 4,
+  item: { flex: 1, minWidth: 0, minHeight: 48, borderRadius: 26, paddingHorizontal: 4, paddingVertical: 4,
     alignItems: 'center', justifyContent: 'center', gap: 0 },
   selected: { backgroundColor: '#C9DFFF' }, pressed: { opacity: 0.65 },
   iconSlot: { height: 26, width: 28, alignItems: 'center', justifyContent: 'center' },

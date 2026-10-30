@@ -16,7 +16,11 @@ function load(file, dependencies, state = null, hookOverrides = {}) {
   const rn = { StyleSheet: { create: value => value }, Platform: { OS: 'web' }, StatusBar: {} };
   for (const name of ['View', 'Text', 'Pressable', 'Image', 'TextInput']) rn[name] = name;
   const source = ts.transpileModule(readFileSync(file, 'utf8'), { compilerOptions: { jsx: ts.JsxEmit.ReactJSX, module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
-  new Function('require', 'exports', source)(name => { if (name === '@/theme/mobile-theme') return mobileTheme;
+  new Function('require', 'exports', source)(name => { if(name==='@/components/first-outcome-hint')return {FirstOutcomeHint:'FirstOutcomeHint'};
+    if(name==='@/lib/first-outcome')return load('src/lib/first-outcome.ts',{});
+    if(name==='@/components/first-outcome-hint')return {FirstOutcomeHint:'FirstOutcomeHint'};
+    if(name==='@/lib/first-outcome')return load('src/lib/first-outcome.ts',{});
+    if (name === '@/theme/mobile-theme') return mobileTheme;
     if(name==='@/hooks/use-journey-buddy')return {useBuddyScreen(){}};
     if(name==='@/hooks/use-buddy-map-pins')return buddyMapPinsStub;
     if(name==='@/lib/buddy/map-controls')return load('src/lib/buddy/map-controls.ts',{'../discovery/globe-style':load('src/lib/discovery/globe-style.ts',{})});
@@ -135,8 +139,9 @@ test('Home embeds place search; Account and navigation retain existing routes an
   assert.ok(!all.some(n => n.props?.accessibilityLabel === 'Journey Creator logo'));
   const page = [tree.props.children].flat()[0], header = page.props.children[1];
   assert.equal(header.props.style[0].flexDirection, 'row');
-  // Search is the only header control; the inactive notification bell was removed (backlog U6).
-  const search = header.props.children;
+  // Search and a compact optional guidance entry; notification bell remains removed.
+  const search = header.props.children[0];
+  assert.equal(header.props.children[1].props.accessibilityLabel, 'Choose a starting point');
   assert.equal(search.props.style.flex, 1);
   assert.equal(search.props.style.minWidth, 0);
   assert.equal(search.props.style.minHeight, 44);
@@ -184,7 +189,7 @@ test('Home embeds place search; Account and navigation retain existing routes an
   assert.ok(!nodes(panel).includes(nav));
   for (const child of nav.props.children.slice(1)) {
     assert.equal(child.props.style({ pressed: false })[0].flex, 1);
-    assert.equal(child.props.style({ pressed: false })[0].minHeight, 46);
+    assert.equal(child.props.style({ pressed: false })[0].minHeight, 48);
   }
   }
 });

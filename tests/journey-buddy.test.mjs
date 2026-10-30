@@ -4,6 +4,7 @@ import { test } from 'node:test';
 import ts from 'typescript';
 
 function load(file, modules = {}, clock = globalThis) {
+  modules = { '@/hooks/use-travel-preferences': { useTravelPreferences: () => ({loaded:false,value:{interests:[],pace:null}}) }, '@/lib/buddy/travel-preferences': { travelPreferenceTip: () => undefined }, ...modules };
   const exports = {};
   const code = ts.transpileModule(readFileSync(file, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true } }).outputText;
   new Function('require', 'exports', 'setTimeout', 'clearTimeout', 'setInterval', 'clearInterval', code)(name => {
@@ -337,7 +338,7 @@ test('manual help dialog is visible without measurement, retains actions and dis
   h.dispose();
 });
 
-async function hostHarness(openSpace = false, contextual = false) {
+async function hostHarness(openSpace = false, contextual = false, travelPreferences = {loaded:false,value:{interests:[],pace:null}}) {
   const hostHooks = hooks(); let actorHooks = hooks(); const timers = clock(); let currentHooks = hostHooks;
   const react = Object.fromEntries(Object.keys(hostHooks.react).map(name => [name, (...args) => currentHooks.react[name](...args)]));
   react.useSyncExternalStore = (_, get) => get();
@@ -363,8 +364,9 @@ async function hostHarness(openSpace = false, contextual = false) {
   };
   const routes = []; let placementCalls = 0;
   const module = load('src/components/buddy/journey-buddy-host.tsx', {
+    '@/hooks/use-travel-preferences': {useTravelPreferences:()=>travelPreferences}, '@/lib/buddy/travel-preferences':load('src/lib/buddy/travel-preferences.ts'),
     react, 'react/jsx-runtime': runtime, 'react-native': native,
-    'expo-router': { usePathname: () => path, useRouter: () => ({ navigate: route => routes.push(route) }) },
+    'expo-router': { usePathname: () => path, useRouter: () => ({ navigate: route => routes.push(route), push: route => routes.push(route) }) },
     'react-native-safe-area-context': { useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 4, right: 4 }) },
     '@/hooks/use-journey-buddy': { useBuddyApi: () => api }, '@/lib/buddy/model': model,
     '@/hooks/use-buddy-sleep': load('src/hooks/use-buddy-sleep.ts', { react, 'react-native': native }, timers),
@@ -946,7 +948,7 @@ test('first-use intro: offered once on a fresh install; Guide me turns Buddy on 
 test('first-use intro card waits for a focused, loaded Home and session restore, offers both choices with labels matching their text, and Back means Explore myself', () => {
   const calls = []; let visible = true, sessionLoading = true;
   const { BuddyIntro } = load('src/components/buddy/buddy-intro.tsx', { 'react/jsx-runtime': runtime,
-    'react-native': { Modal: 'Modal', Pressable: 'Pressable', Text: 'Text', View: 'View', StyleSheet: { create: x => x } },
+    'react-native': { Modal: 'Modal', ScrollView: 'ScrollView', Pressable: 'Pressable', Text: 'Text', View: 'View', StyleSheet: { create: x => x } },
     'react-native-safe-area-context': { SafeAreaView: 'SafeAreaView' }, '@/theme/mobile-theme': { primaryControl: {} }, '@/components/discovery/ui': { colors: {} },
     '@/hooks/use-journey-buddy': { useBuddyIntro: () => ({ visible, guide: () => calls.push('guide'), skip: () => calls.push('skip') }) }, './buddy-sprite': { BuddySprite: 'BuddySprite' },
     '@/hooks/session-context': { useSessionState: () => ({ loading: sessionLoading }) } });
@@ -1039,4 +1041,30 @@ test('B6: each help action explains why it fits, claims only what is known, and 
   assert.equal(buddyResumeReason('  Goa journey  '), 'Your draft “Goa journey” is saved privately. Pick up where you left off.');
   assert.equal(buddyResumeReason('   '), 'Your draft is saved privately. Pick up where you left off.', 'A blank title falls back to plain wording');
   for (const path of ['/', '/search', '/account']) assert.doesNotMatch(buddyHelpPrimary(path).reason, /explorer|miss you|don’t forget/i, 'No nicknames or guilt-based nudges');
+});
+
+
+test('B3 actual host opens a loaded saved Story and rejects obsolete help callbacks', async()=>{
+ const a=await hostHarness();a.path('/search');const owner={};
+ const state={floating:true,savedJourney:{id:'saved',title:'Coast trip'}};
+ a.api.store.screen(owner,{path:'/search',state,act(){}});
+ a.api.store.protect(a.region,'/search',[{x:0,y:0,width:360,height:592},{x:0,y:680,width:360,height:120}]);
+ a.renderHost();a.renderActor();await tick();let tree=settleActor(a);
+ all(tree,'View').find(n=>n.props.accessibilityLabel==='Journey Buddy').props.onAccessibilityTap();tree=a.renderActor();
+ const help=all(tree,'BuddyHelpSheet')[0];assert.equal(help.props.primary.label,'Open saved journey');assert.match(help.props.contextualLine,/Coast trip.*saved|saved.*Coast trip/i);
+ a.api.store.screen(owner,{path:'/search',state:{floating:true},act(){}});help.props.primary.onPress();assert.deepEqual(a.routes,[]);
+ a.api.store.screen(owner,{path:'/search',state,act(){}});help.props.primary.onPress();assert.deepEqual(a.routes,[{pathname:'/journey/[id]',params:{id:'saved',source:'search'}}]);
+ a.actorHooks.dispose();a.hostHooks.dispose();
+});
+
+test('B2 actual manual help uses explicit tips but keeps Saved and draft continuation ahead of preferences', async () => {
+ const preferences={loaded:true,error:null,value:{interests:['Nature'],pace:'Relaxed'}};
+ const a=await hostHarness(true,false,preferences);a.path('/search');
+ a.api.store.screen(a.owner,{path:'/search',state:{floating:true},act(){}});
+ a.renderHost();a.renderActor();await tick();let tree=settleActor(a);
+ all(tree,'View').find(n=>n.props.accessibilityLabel==='Journey Buddy').props.onAccessibilityTap();tree=a.renderActor();
+ let help=all(tree,'BuddyHelpSheet')[0];assert.match(help.props.contextualLine,/Nature.*tips only/);assert.equal(help.props.primary.label,'Start my own journey');
+ a.api.store.screen(a.owner,{path:'/search',state:{floating:true,savedJourney:{id:'saved',title:'Actual save'}},act(){}});a.renderHost();tree=a.renderActor();help=all(tree,'BuddyHelpSheet')[0];assert.match(help.props.contextualLine,/Actual save/);assert.doesNotMatch(help.props.contextualLine,/Nature/);assert.equal(help.props.primary.label,'Open saved journey');
+ preferences.loaded=false;a.api.store.screen(a.owner,{path:'/search',state:{floating:true},act(){}});a.renderHost();tree=a.renderActor();help=all(tree,'BuddyHelpSheet')[0];assert.doesNotMatch(help.props.contextualLine,/Nature/);
+ a.actorHooks.dispose();a.hostHooks.dispose();
 });

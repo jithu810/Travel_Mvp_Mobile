@@ -25,7 +25,11 @@ function load(file, modules, hooks=harness().hooks, timers=globalThis) {
   modules={'@/components/journey/story-sheet':{StorySheet:'StorySheet'},'@/components/journey/journey-action-icon':{JourneyActionIcon:'JourneyActionIcon'},'@/hooks/use-buddy-geometry':buddyGeometryStub,'@/components/art/journey-art':{StopArt:'StopArt'},'@/lib/art/journey-art':{artSeed:(_id,stops)=>'stop:'+stops[0]?.id},...modules};
   const exports={}; const jsx=(type,props)=>({type,props});
   const code=ts.transpileModule(readFileSync(file,'utf8'), {compilerOptions:{module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX,target:ts.ScriptTarget.ES2022}}).outputText;
-  new Function('require','exports','setTimeout','clearTimeout',code)(name=>{ if (name === '@/theme/mobile-theme') return mobileTheme;
+  new Function('require','exports','setTimeout','clearTimeout',code)(name=>{ if(name==='@/components/first-outcome-hint')return {FirstOutcomeHint:'FirstOutcomeHint'};
+    if(name==='@/lib/first-outcome')return load('src/lib/first-outcome.ts',{});
+    if(name==='@/components/first-outcome-hint')return {FirstOutcomeHint:'FirstOutcomeHint'};
+    if(name==='@/lib/first-outcome')return load('src/lib/first-outcome.ts',{});
+    if (name === '@/theme/mobile-theme') return mobileTheme;
     if(name==='@/hooks/use-journey-buddy')return {useBuddyCelebration:()=>()=>{},useBuddyScreen(){},...modules[name]};
     if(name==='@/hooks/use-buddy-map-pins')return buddyMapPinsStub;
     if(name==='@/hooks/use-creation-recovery')return modules[name]||{useCreationRecovery:()=>()=>{}};
@@ -59,7 +63,7 @@ const photoSave=load('src/lib/create/photo-save.ts', {'./model':model,'../discov
 const memory=load('src/lib/create/memory.ts', {'./model':model});
 const editor=load('src/lib/create/editor-model.ts', {'../discovery/model':{},'./model':model});
 const place={name:'Varkala',label:'Varkala, Kerala',latitude:8.7,longitude:76.7,mapboxId:'place'};
-function screenHarness(initial, photoState = {}, buddyEvents = [], recoveryStorage = null) {
+function screenHarness(initial, photoState = {}, buddyEvents = [], recoveryStorage = null, guide = undefined) {
   photoState.candidates ??= {}; photoState.errors ??= {};
   photoState.candidates=Object.fromEntries(Object.entries(photoState.candidates).map(([key,p])=>[key,{width:800,height:600,size:1000,mime:'image/png',...p}]));
   const h=harness(), writes=[],routes=[],alerts=[],uploads=[],celebrations=[];let fail=false, uncertain=true, pending=null, prevented=null, canGoBack=true, focusCleanup=null; const dispatches=[];
@@ -74,7 +78,7 @@ function screenHarness(initial, photoState = {}, buddyEvents = [], recoveryStora
     'expo-router/react-navigation':{usePreventRemove:(enabled,callback)=>{prevented={enabled,callback};}},
     '@/lib/discovery/model':{safePhoto:path=>path.startsWith('https:')?path:null},
     '@/lib/create/memory':memory,'@/components/create/memory-row':{MemoryRow:'MemoryRow'},'@/components/create/memory-editor-sheet':{MemoryEditorSheet:'MemoryEditorSheet'},
-    'expo-router':{useLocalSearchParams:()=>({draft:initial?.id}),useNavigation:()=>({dispatch:action=>dispatches.push(action)}),useRouter:()=>({canGoBack:()=>canGoBack,back:()=>routes.push('back'),push:route=>routes.push(route),replace:route=>routes.push(route)}),useFocusEffect:fn=>h.hooks.useEffect(()=>{const cleanup=fn();focusCleanup=cleanup;return cleanup;},[fn])},
+    'expo-router':{useLocalSearchParams:()=>({draft:initial?.id,guide}),useNavigation:()=>({dispatch:action=>dispatches.push(action)}),useRouter:()=>({canGoBack:()=>canGoBack,back:()=>routes.push('back'),push:route=>routes.push(route),replace:route=>routes.push(route)}),useFocusEffect:fn=>h.hooks.useEffect(()=>{const cleanup=fn();focusCleanup=cleanup;return cleanup;},[fn])},
     'react-native':{Alert:{alert:(...args)=>alerts.push(args)}},'react-native-safe-area-context':{SafeAreaView:'SafeAreaView'},
     '@/components/discovery/ui':ui,'@/components/create/place-picker':{PlacePicker:'PlacePicker',formStyles:{}},
     '@/components/create/quick-journey-setup':{QuickJourneySetup:'QuickJourneySetup'},'@/lib/create/editor-model':editor,
@@ -626,12 +630,14 @@ test('static horizontal history keeps a centered heading, every draft, and no sh
 
 
 test('embedded Create suggestions stay below an editable icon input and outside dismissal cancels stale autocomplete',async()=>{
-  const h=harness(),timers=new Map(),requests=[],selected=[];let timerId=0,dismissed=0;
-  const {PlacePicker}=load('src/components/create/place-picker.tsx',{'../discovery/ui':ui,'react-native':{Keyboard:{dismiss(){dismissed++;}}},'@/lib/create/places':{searchPlaces:(query,destination,proximity,signal)=>new Promise(resolve=>requests.push({query,signal,resolve}))}},h.hooks,{setTimeout:fn=>{const key=++timerId;timers.set(key,fn);return key;},clearTimeout:key=>timers.delete(key)});
+  const h=harness(),timers=new Map(),requests=[],selected=[];let timerId=0,dismissed=0,fontScale=1;
+  const {PlacePicker}=load('src/components/create/place-picker.tsx',{'../discovery/ui':ui,'react-native':{useWindowDimensions:()=>({width:360,height:780,fontScale}),Keyboard:{dismiss(){dismissed++;}}},'@/lib/create/places':{searchPlaces:(query,destination,proximity,signal)=>new Promise(resolve=>requests.push({query,signal,resolve}))}},h.hooks,{setTimeout:fn=>{const key=++timerId;timers.set(key,fn);return key;},clearTimeout:key=>timers.delete(key)});
   let props={label:'Destination',compact:true,embeddedSuggestions:true,autoSuggest:true,destinationOnly:true,disabled:false,dismissVersion:0,onSelect:p=>selected.push(p)};
   let tree=h.render(PlacePicker,props);all(tree,'TextInput')[0].props.onChangeText('Kochi');tree=h.render(PlacePicker,props);timers.forEach(fn=>fn());timers.clear();
   requests[0].resolve([{...place,name:'Kochi',label:'Kochi'}]);await tick();tree=h.render(PlacePicker,props);
   assert.equal(all(tree,'Modal').length,0);assert.equal(all(tree,'TextInput')[0].props.value,'Kochi');assert.equal(all(tree,'TextInput')[0].props.editable,true);assert.equal(dismissed,0,'Autocomplete does not close keyboard');
+  assert.equal(all(tree,'TextInput')[0].props.placeholder,'Search destinations');fontScale=2;tree=h.render(PlacePicker,props);
+  assert.equal(all(tree,'TextInput')[0].props.placeholder,'Destination');assert.equal(all(tree,'TextInput')[0].props.value,'Kochi','Resizing preserves the query');assert.equal(all(tree,'ScrollView').length,1,'Resizing preserves available results');assert.equal(requests.length,1,'Resizing does not trigger another search');
   const input=all(tree,'TextInput')[0],list=all(tree,'ScrollView')[0];assert.equal(input.props.style.at(-1).paddingLeft,36);assert.equal(list.props.nestedScrollEnabled,true);assert.equal(list.props.style.maxHeight,132);
   assert.equal(tree.props.children[1].type,'View');assert.equal(tree.props.children[3].type,'View','Suggestions follow the search row in normal flow');
   let stopped=false;tree.props.onTouchStart({stopPropagation(){stopped=true;}});assert.equal(stopped,true,'Search touches do not count as outside taps');
@@ -974,4 +980,24 @@ test('R3: Restore is ignored while a photo is preparing; the recovery copy stays
   const photoState={},h=screenHarness(initial,photoState,[],storage);h.render();await new Promise(setImmediate);await new Promise(setImmediate);h.render();
   photoState.busyKey='cover';h.alerts.find(a=>a[0]==='Restore unsaved changes?')[2].find(b=>b.text==='Restore').onPress();const tree=h.render();
   assert.equal(all(tree,'MemoryDeck')[0].props.title,'Saved');assert.equal(h.writes.length,0);assert.ok(data.has(key));
+});
+
+test('U8 memory intent continues into the private draft after explicit quick-start save', async () => {
+  const h = screenHarness(undefined, {}, [], null, 'memory');
+  let setup = all(h.render(), 'QuickJourneySetup')[0];
+  setup.props.onDestination(place); setup = all(h.render(), 'QuickJourneySetup')[0];
+  setup.props.onChange({traveler:'solo'}); setup = all(h.render(), 'QuickJourneySetup')[0];
+  assert.equal(h.writes.length, 0, 'Guidance itself never saves');
+  setup.props.onStart(); await new Promise(setImmediate);
+  assert.equal(h.writes.length, 1);
+  assert.deepEqual(h.routes.at(-1), {pathname:'/create',params:{draft:id,guide:'memory'}});
+});
+
+test('U8 saved-draft guidance describes adding a stop without inventing an Add memory control', () => {
+  const h = screenHarness(privateForm(), {}, [], null, 'memory');
+  const hint = all(h.renderEntry(), 'FirstOutcomeHint')[0];
+  assert.equal(hint.props.title, 'Add your first memory');
+  assert.match(hint.props.children, /^Add a stop to your journey\./);
+  assert.doesNotMatch(hint.props.children, /Open Add memory/);
+  assert.equal(h.writes.length, 0);
 });

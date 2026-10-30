@@ -50,7 +50,7 @@ export function useBuddyIntro() {
   const value = useSyncExternalStore(api?.preference.subscribe ?? noopSubscribe, api?.preference.get ?? absentPreference, absentPreference);
   return {
     visible: !!api && value.loaded && !value.chosen,
-    guide: () => { if (!api) return; api.store.setTour(0); void api.preference.setEnabled(true); },
+    guide: (tour = true) => { if (!api) return; api.store.setTour(tour ? 0 : null); void api.preference.setEnabled(true); },
     skip: () => { void api?.preference.setEnabled(false); },
   };
 }

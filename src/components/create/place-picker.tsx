@@ -1,13 +1,15 @@
 import { CompactSearchInput } from '@/components/discovery/compact-search-input';
 import { theme } from '@/theme/mobile-theme';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Keyboard, Modal, ScrollView, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Keyboard, Modal, ScrollView, Pressable, StyleSheet, Text, TextInput, useWindowDimensions, View } from 'react-native';
 import { colors, ui } from '../discovery/ui';
 import { searchPlaces } from '@/lib/create/places';
 import type { Place } from '@/lib/create/model';
 export function PlacePicker({ label, memorySheet = false, premium = false, homeSearch = false, destinationOnly = false, autoSuggest = false, compact = false, embeddedSuggestions = false, dismissVersion = 0, inlineSearch = false, proximity = null, disabled, onSelect }: { label: string; memorySheet?: boolean; premium?: boolean; homeSearch?: boolean; destinationOnly?: boolean; autoSuggest?: boolean; compact?: boolean; embeddedSuggestions?: boolean; dismissVersion?: number; inlineSearch?: boolean; proximity?: Place | null; disabled: boolean; onSelect: (place: Place) => void }) {
   const input = useRef<TextInput>(null);
   const dense = compact || inlineSearch;
+  const { fontScale } = useWindowDimensions();
+  const largeDestination = compact && embeddedSuggestions && fontScale > 1.3;
   const [query, setQuery] = useState(''), [results, setResults] = useState<Place[]>([]), [busy, setBusy] = useState(false), [error, setError] = useState<string | null>(null);
   const [focusEpoch, setFocusEpoch] = useState(-1), [resultEpoch, setResultEpoch] = useState(dismissVersion);
   const visibleResults = !embeddedSuggestions || resultEpoch === dismissVersion ? results : [];
@@ -55,10 +57,10 @@ export function PlacePicker({ label, memorySheet = false, premium = false, homeS
   </View>;
   return <View onTouchStart={embeddedSuggestions ? event => event.stopPropagation() : undefined} style={{ gap: dense ? 4 : 10 }}>
     {!dense && <Text style={styles.label}>{label}</Text>}
-    <View style={dense ? styles.searchRow : styles.searchStack}>
-    {embeddedSuggestions ? <View style={[styles.inputWrap, premium && styles.raisedInput]}>
+    <View style={dense && !largeDestination ? styles.searchRow : styles.searchStack}>
+    {embeddedSuggestions ? <View style={[styles.inputWrap, premium && styles.raisedInput, largeDestination && styles.fullInputRow]}>
       <View pointerEvents="none" accessible={false} style={styles.searchIcon}><Text style={styles.searchGlyph}>⌕</Text></View>
-      <TextInput accessibilityLabel={label} editable={!disabled} value={query} onChangeText={change} onFocus={() => setFocusEpoch(dismissVersion)} maxLength={200} placeholder={compact ? 'Search destinations' : destinationOnly ? 'Search a town, region or country' : 'Search a town, street or address'} style={[styles.input, dense && styles.compactInput, premium && styles.premiumInput, memorySheet && styles.memoryInput, styles.embeddedInput]} returnKeyType="search" onSubmitEditing={() => { void search(); }} />
+      <TextInput accessibilityLabel={label} editable={!disabled} value={query} onChangeText={change} onFocus={() => setFocusEpoch(dismissVersion)} maxLength={200} placeholder={largeDestination ? 'Destination' : compact ? 'Search destinations' : destinationOnly ? 'Search a town, region or country' : 'Search a town, street or address'} style={[styles.input, dense && styles.compactInput, premium && styles.premiumInput, memorySheet && styles.memoryInput, styles.embeddedInput]} returnKeyType="search" onSubmitEditing={() => { void search(); }} />
     </View> : <TextInput accessibilityLabel={label} editable={!disabled} value={query} onChangeText={change} maxLength={200} placeholder={compact ? 'Search destinations' : destinationOnly ? 'Search a town, region or country' : 'Search a town, street or address'} style={[styles.input, dense && styles.compactInput, memorySheet && styles.memoryInput]} returnKeyType="search" onSubmitEditing={() => { void search(); }} />}
     <Pressable accessibilityRole="button" accessibilityLabel={'Search ' + label.toLowerCase()} disabled={disabled || visibleBusy} accessibilityState={{ disabled: disabled || visibleBusy }} onPress={() => { void search(); }} style={[styles.search, dense && styles.compactSearch, premium && styles.premiumSearch, memorySheet && styles.memorySearch, premium && disabled && { opacity: 0.5 }]}>
       {visibleBusy ? <ActivityIndicator color={memorySheet ? '#FFFFFF' : undefined} /> : <Text style={[styles.label, memorySheet && styles.memorySearchLabel]}>{dense ? 'Search' : 'Search places'}</Text>}
@@ -99,6 +101,7 @@ const styles = StyleSheet.create({ ...formStyles,
   homeWrap: { minHeight: 44, justifyContent: 'center' },
   homeResults: { position: 'absolute', top: '100%', left: 0, right: 0, padding: 6, borderRadius: 16, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.paper, zIndex: 20, elevation: 12 },
   inputWrap: { flexGrow: 1, flexShrink: 1, flexBasis: 120, minWidth: 0 },
+  fullInputRow: { flexBasis: 'auto', flexGrow: 0, flexShrink: 0, width: '100%' },
   embeddedInput: { width: '100%', flexGrow: 0, flexShrink: 0, flexBasis: 'auto', paddingLeft: 36 },
   searchIcon: { position: 'absolute', zIndex: 1, left: 12, top: 0, bottom: 0, justifyContent: 'center' },
   searchGlyph: { color: colors.ink, fontSize: 23 },

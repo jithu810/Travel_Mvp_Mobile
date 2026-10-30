@@ -1,3 +1,4 @@
+import { FirstOutcomeHint } from '@/components/first-outcome-hint';
 import { CompactSearchInput } from '@/components/discovery/compact-search-input';
 import { useBuddyScreen } from '@/hooks/use-journey-buddy';
 import { useBuddyProtectedBounds, useBuddyScroll } from '@/hooks/use-buddy-geometry';
@@ -20,9 +21,8 @@ import { invalidatePublicJourneys, loadDiscoveryEntries } from '@/lib/discovery/
 export default function SearchScreen() {
   const state = useLoad(loadDiscoveryEntries);
   const controlsProtection = useBuddyProtectedBounds(), resultsProtection = useBuddyProtectedBounds(), scroll = useBuddyScroll();
-  useBuddyScreen({ floating: true, suppressed: state.loading && !state.data });
   const refreshPublic = () => { invalidatePublicJourneys(); state.refresh(); };
-  const { view } = useLocalSearchParams<{ view?: string }>();
+  const { view, guide } = useLocalSearchParams<{ view?: string; guide?: string }>();
   // Story opens the existing public collection without inheriting a Search filter.
   // Keep the Search query intact when returning from the Story entry point.
   const [searchQuery, setQuery] = useState('');
@@ -56,6 +56,9 @@ export default function SearchScreen() {
   const viewer = useDiscoveryViewer();
   const holding = !showSaved && viewer.pending;
   const results = useMemo(() => holding ? [] : searchJourneys(showSaved ? saved.data || [] : discoveryJourneys(state.data || [], viewer.id, query), query), [holding, showSaved, saved.data, state.data, viewer.id, query]);
+  // Only a settled, visible Saved result supports a saved-journey claim.
+  const savedJourney = showSaved && canLoadSaved && token && !saved.loading && !saved.refreshing && !saved.error ? results[0] : undefined;
+  useBuddyScreen({ floating: true, suppressed: state.loading && !state.data, savedJourney: savedJourney ? { id: savedJourney.id, title: savedJourney.title } : undefined });
   const places = useMemo(() => holding ? [] : [...new Set(hideViewerJourneys(state.data || [], viewer.id).map(j => j.destination))].slice(0, 5), [holding, state.data, viewer.id]);
   // Browsing with every loaded journey hidden as the viewer's own.
   const onlyOwn = !showSaved && !holding && !query.trim() && !results.length && Boolean(state.data?.length);
@@ -87,6 +90,7 @@ export default function SearchScreen() {
         contentContainerStyle={explore ? styles.grid : ui.list} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag" showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={collection.refreshing} onRefresh={showSaved ? saved.refresh : refreshPublic} tintColor={colors.ink} />}
         ListHeaderComponent={<View {...resultsProtection} style={[styles.resultsHeader, explore && styles.exploreResults]}>
+          {guide === 'find' && <FirstOutcomeHint visible={!showSaved} title="Find a place you would like to explore">Search a destination above or open a journey tile to see its story and stops. Browsing does not need an account.</FirstOutcomeHint>}
           {!explore && !query.trim() && places.length > 0 && <View style={styles.places}>{places.map(place => <Pressable key={place} accessibilityRole="button" accessibilityLabel={'Search ' + place} onPress={() => changeQuery(place)} style={styles.chip}><Text style={styles.chipText}>{place}</Text></Pressable>)}</View>}
           {!collection.loading && !holding && (!explore || Boolean(query.trim()) || showSaved) && <Text accessibilityLiveRegion="polite" style={ui.body}>{query.trim() ? results.length + (results.length === 1 ? ' journey found' : ' journeys found') : showSaved ? 'Saved journeys' : 'Explore recent journeys'}</Text>}
           {collection.error && results.length > 0 && <Message title="Couldn’t refresh results" body={collection.error} retry={showSaved ? saved.refresh : refreshPublic} />}
@@ -95,9 +99,10 @@ export default function SearchScreen() {
           body={auth.loading ? 'Please wait while your session is restored.' : auth.error ? 'Your session could not be restored. Reopen the app to retry.' : 'Sign in to browse journeys you have saved.'}
           retry={!auth.loading && !auth.error ? () => router.push('/auth') : undefined} action="Sign in" /> : collection.loading || holding ? <LoadingCards /> : collection.error
           ? <Message title="Search took a detour" body={collection.error} retry={showSaved ? saved.retry : refreshPublic} />
-          : query.trim() ? <Message title="No journeys found" body={'Try a different place, stop, journey title or creator. ' + (showSaved ? 'Search covers your saved public journeys.' : 'Search covers the latest 100 public journeys.')} retry={() => changeQuery('')} action="Clear search" />
-          : onlyOwn ? <Message title="Only your journeys so far" body="Search to find them." />
-          : <Message title={showSaved ? 'No saved journeys yet' : 'More stories are on their way'} body={showSaved ? 'Save a public journey using its bookmark to find it here. Unavailable journeys are omitted.' : 'There are no public journeys to explore yet.'} retry={showSaved ? saved.refresh : refreshPublic} action="Refresh journeys" />}</View>}
+          : query.trim() ? <Message title={showSaved ? 'No saved journeys match' : 'No journeys match your search'} body={'Try another destination, stop, title or creator, or clear your search. ' + (showSaved ? 'This search only includes your saved public journeys that are still available.' : 'This search covers the latest 100 public journeys, so a place may not appear yet.')} retry={() => changeQuery('')} action="Clear search" />
+          : onlyOwn ? <Message title="Only your journeys so far" body="Search by title or destination to find your journeys, or open Account to see your published journeys and private drafts." retry={() => router.push('/account')} action="View my journeys" />
+          : showSaved ? <Message title="No saved journeys yet" body="Find a journey you would like to revisit. Open its story and tap the bookmark to save it here. Only public journeys that are still available appear here." retry={() => setSavedOnly(false)} action="Browse journeys" />
+          : <Message title="No public journeys yet" body="Start your own journey with a place and a title. It stays private until you choose to publish it." retry={() => router.push('/create')} action="Start a journey" />}</View>}
       />
     </KeyboardAvoidingView>
   </SafeAreaView>;

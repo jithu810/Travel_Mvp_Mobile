@@ -4,6 +4,8 @@ import { test } from 'node:test';
 import { readFileSync } from 'node:fs';
 import ts from 'typescript';
 function load(path, modules) {
+  modules={'@/components/first-outcome-hint':{FirstOutcomeHint:'FirstOutcomeHint'},...modules};
+  modules={'@/components/first-outcome-hint':{FirstOutcomeHint:'FirstOutcomeHint'},...modules};
   modules={'@/hooks/use-buddy-geometry':buddyGeometryStub,...modules};
   modules={'@/hooks/use-journey-buddy':{useBuddyScreen(){}},...modules};
   const exports = {};
@@ -15,22 +17,23 @@ const runtime = {jsx, jsxs: jsx};
 const native = Object.fromEntries(['View','Text','Pressable','FlatList','TextInput','KeyboardAvoidingView','RefreshControl','Image'].map(x => [x,x]));
 native.StyleSheet = {create: x => x}; native.Platform = {OS:'android'};
 const all = tree => !tree || typeof tree !== 'object' ? [] : [tree, ...[tree.props?.children].flat(Infinity).flatMap(all)];
-function screen() {
+function screen({ signedIn = false } = {}) {
   let view, cursor = 0;
+  const routes = [];
   const slots = [];
   const rows = Array.from({length:19}, (_,i) => ({journey:{id:String(i),destination:i%2 ? 'Coast':'Hill'},creatorId:null}));
   let state = {data:rows, loading:false, refreshing:false, refresh(){},retry(){}};
   const component = load('src/app/search.tsx', {
-    react: {useCallback:fn=>fn,useEffect(){},useRef:()=>({current:null}),useMemo:fn=>fn(),useState:initial=>{const i=cursor++;if(!(i in slots))slots[i]=initial;return [slots[i],x=>{slots[i]=x;}];}},
-    '@/components/discovery/compact-search-input':{CompactSearchInput:'TextInput'},'@/components/journey/journey-action-icon':{JourneyActionIcon:'Icon'},'@/hooks/session-context':{useSessionState:()=>({session:null,loading:false})},'@/lib/social/saved-queries':{loadSavedJourneys:async()=>[]},
+    react: {useCallback:fn=>fn,useEffect(){},useRef:()=>({current:null}),useMemo:fn=>fn(),useState:initial=>{const i=cursor++;if(!(i in slots))slots[i]=initial;return [slots[i],x=>{slots[i]=typeof x==='function'?x(slots[i]):x;}];}},
+    '@/components/discovery/compact-search-input':{CompactSearchInput:'TextInput'},'@/components/journey/journey-action-icon':{JourneyActionIcon:'Icon'},'@/hooks/session-context':{useSessionState:()=>({session:signedIn?{user:{id:'owner'},access_token:'token'}:null,loading:false})},'@/lib/social/saved-queries':{loadSavedJourneys:async()=>[]},
     'react/jsx-runtime':runtime,'react-native':native,'react-native-safe-area-context':{SafeAreaView:'SafeAreaView'},
-    'expo-router':{useLocalSearchParams:()=>({view}),useRouter:()=>({}),useFocusEffect(){}},'@/components/branded-loading':{BrandedLoading:'BrandedLoading'},
+    'expo-router':{useLocalSearchParams:()=>({view}),useRouter:()=>({push:route=>routes.push(route)}),useFocusEffect(){}},'@/components/branded-loading':{BrandedLoading:'BrandedLoading'},
     '@/components/discovery/explore-tile':{ExploreTile:'ExploreTile'},'@/components/discovery/journey-card':{JourneyCard:'JourneyCard'},
     '@/components/discovery/ui':{colors:{},ui:{},ScreenHeader:'ScreenHeader',Message:'Message',LoadingCards:'LoadingCards'},
     '@/hooks/use-load':{useLoad:()=>state},'@/lib/discovery/queries':{invalidatePublicJourneys(){},loadDiscoveryEntries(){}},'@/hooks/use-discovery-viewer':{useDiscoveryViewer:()=>({pending:false,id:null})},
     '@/lib/discovery/model':{hideViewerJourneys:rows=>rows.map(r=>r.journey),discoveryJourneys:rows=>rows.map(r=>r.journey),searchJourneys:(rows,q)=>rows.filter(x=>x.destination.includes(q))},
   }).default;
-  return {render(){cursor=0;return all(component());},view(v){view=v;},state(s){state={...state,...s};}};
+  return {routes,render(){cursor=0;return all(component());},view(v){view=v;},state(s){state={...state,...s};}};
 }
 test('Search uses three columns, all 19 results, no title/back/place chips; Story retains its independent list',()=>{
   const s=screen();let tree=s.render();let list=tree.find(n=>n.type==='FlatList');
@@ -47,8 +50,21 @@ test('Search preserves refresh, stale-result error, retry and empty/clear-search
   const s=screen();let list=s.render().find(n=>n.type==='FlatList');assert.equal(list.props.refreshControl.type,'RefreshControl');
   s.state({error:'Offline'});list=s.render().find(n=>n.type==='FlatList');assert.ok(all(list.props.ListHeaderComponent).some(n=>n.props.title==='Couldn’t refresh results'));
   s.state({data:[]});list=s.render().find(n=>n.type==='FlatList');assert.equal(list.props.ListEmptyComponent.props.children.props.title,'Search took a detour');assert.equal(typeof list.props.ListEmptyComponent.props.children.props.retry,'function');
-  s.state({error:null});let tree=s.render();assert.equal(tree.find(n=>n.type==='FlatList').props.ListEmptyComponent.props.children.props.title,'More stories are on their way');
-  tree.find(n=>n.type==='TextInput').props.onChangeText('Unknown');list=s.render().find(n=>n.type==='FlatList');assert.equal(list.props.ListEmptyComponent.props.children.props.title,'No journeys found');list.props.ListEmptyComponent.props.children.props.retry();assert.equal(s.render().find(n=>n.type==='TextInput').props.value,'');
+  s.state({error:null});let tree=s.render();const empty=tree.find(n=>n.type==='FlatList').props.ListEmptyComponent.props.children;assert.equal(empty.props.title,'No public journeys yet');empty.props.retry();assert.deepEqual(s.routes,['/create']);
+  tree.find(n=>n.type==='TextInput').props.onChangeText('Unknown');list=s.render().find(n=>n.type==='FlatList');assert.equal(list.props.ListEmptyComponent.props.children.props.title,'No journeys match your search');list.props.ListEmptyComponent.props.children.props.retry();assert.equal(s.render().find(n=>n.type==='TextInput').props.value,'');
+});
+
+test('R6 empty Saved offers browsing; saved no-match clears only the query and retains Saved',()=>{
+ const s=screen({signedIn:true});s.state({data:[]});let tree=s.render();
+ tree.find(n=>n.props.accessibilityLabel==='Show saved journeys').props.onPress();
+ const empty=()=>s.render().find(n=>n.type==='FlatList').props.ListEmptyComponent.props.children.props;
+ assert.equal(empty().title,'No saved journeys yet');assert.equal(empty().action,'Browse journeys');
+ tree=s.render();tree.find(n=>n.type==='TextInput').props.onChangeText('Missing');
+ assert.equal(empty().title,'No saved journeys match');assert.match(empty().body,/only includes your saved public journeys/);
+ empty().retry();assert.equal(s.render().find(n=>n.type==='TextInput').props.value,'');
+ assert.ok(s.render().some(n=>n.props.accessibilityLabel==='Show all public journeys'));
+ empty().retry();assert.ok(s.render().some(n=>n.props.accessibilityLabel==='Show saved journeys'));
+ assert.deepEqual(s.routes,[],'Browsing is a local filter change, with no save or route write');
 });
 const artModules={'@/components/art/journey-art':{JourneyArt:'JourneyArt',StopArt:'StopArt'},'@/lib/art/journey-art':{artSeed:(id,stops)=>'seed:'+id+':'+(stops||[]).length}};
 test('Explore tile navigates with source marker and falls back to journey art after image failure, recovering for a changed cover',()=>{
@@ -127,4 +143,29 @@ test('Home and Explore prefer thumbnails, retry original once on failure then de
   let tree=render();assert.equal(uri(remote(tree)),journey.coverThumbnail);remote(tree).props.onError();tree=render();assert.equal(uri(remote(tree)),journey.cover);remote(tree).props.onError();tree=render();assert.equal(remote(tree),undefined);assert.equal(tree.filter(n=>n.type==='JourneyArt').length,1,'Both variants failed: journey art, never the stock photo');assert.equal(journey.cover,'https://example.test/full.jpg');
   journey.coverThumbnail='https://example.test/new-thumb.jpg';tree=render();assert.equal(uri(remote(tree)),journey.coverThumbnail);remote(tree).props.onError();journey.cover='https://example.test/new-full.jpg';tree=render();assert.equal(uri(remote(tree)),journey.cover);h.dispose();
  }
+});
+
+
+test('B3 saved prompt uses only settled visible Saved results and clears on uncertainty',()=>{
+ const h=stateHarness();let buddy,auth={session:{user:{id:'a'},access_token:'token'},loading:false,error:null};
+ const row={id:'saved',title:'Coast trip',destination:'Coast'};
+ let saved={data:[row],loading:false,refreshing:false,error:null};
+ const publicLoader=()=>{};
+ const component=load('src/app/search.tsx',{
+  react:h.hooks,'react/jsx-runtime':runtime,'react-native':{...native,AppState:{addEventListener:()=>({remove(){}})}},
+  'react-native-safe-area-context':{SafeAreaView:'SafeAreaView'},'expo-router':{useRouter:()=>({}),useLocalSearchParams:()=>({}),useFocusEffect(){}},
+  '@/hooks/use-journey-buddy':{useBuddyScreen:s=>{buddy=s;}},'@/hooks/session-context':{useSessionState:()=>auth},
+  '@/hooks/use-load':{useLoad:loader=>loader===publicLoader?{data:[],loading:false}:saved},'@/lib/social/saved-queries':{loadSavedJourneys(){}},
+  '@/components/discovery/compact-search-input':{CompactSearchInput:'TextInput'},'@/components/journey/journey-action-icon':{JourneyActionIcon:'Icon'},'@/components/branded-loading':{BrandedLoading:'BrandedLoading'},'@/components/discovery/explore-tile':{ExploreTile:'ExploreTile'},'@/components/discovery/journey-card':{JourneyCard:'JourneyCard'},
+  '@/components/discovery/ui':{colors:{},ui:{},Message:'Message'},'@/lib/discovery/queries':{loadDiscoveryEntries:publicLoader},'@/hooks/use-discovery-viewer':{useDiscoveryViewer:()=>({pending:false,id:null})},
+  '@/lib/discovery/model':{hideViewerJourneys:()=>[],discoveryJourneys:()=>[],searchJourneys:(rows,q)=>rows.filter(r=>r.destination.includes(q))},
+ }).default;
+ const render=()=>h.render(component);
+ try {
+  let tree=render();assert.equal(buddy.savedJourney,undefined);
+  tree.find(n=>n.props.accessibilityLabel==='Show saved journeys').props.onPress();tree=render();assert.deepEqual(buddy.savedJourney,{id:'saved',title:'Coast trip'});
+  for(const patch of [{loading:true},{refreshing:true},{error:'Offline'},{data:[]}]){const before=saved;saved={...saved,...patch};render();assert.equal(buddy.savedJourney,undefined);saved=before;}
+  for(const patch of [{loading:true},{error:'Unavailable'},{session:null}]){const before=auth;auth={...auth,...patch};render();assert.equal(buddy.savedJourney,undefined);auth=before;}
+  tree=render();tree.find(n=>n.type==='TextInput').props.onChangeText('Missing');render();assert.equal(buddy.savedJourney,undefined);
+ } finally {h.dispose();}
 });

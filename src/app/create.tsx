@@ -1,3 +1,4 @@
+import { FirstOutcomeHint } from '@/components/first-outcome-hint';
 import { StorySheet } from '@/components/journey/story-sheet';
 import { JourneyActionIcon } from '@/components/journey/journey-action-icon';
 import { StopArt } from '@/components/art/journey-art';
@@ -76,6 +77,7 @@ const DraftMap = memo(function DraftMap({ geometry, photos, thumbnails, selected
 });
 export function NewJourneyEditor({ ownerId, initial, onReload, onDestinationFocus, dismissSearchVersion = 0, keyboardOpen = false }: { ownerId: string; initial?: CreateForm; onReload?: () => void; onDestinationFocus?: (place: Place | null) => void; dismissSearchVersion?: number; keyboardOpen?: boolean }) {
   const router = useRouter(), navigation = useNavigation();
+  const guidedMemory = useLocalSearchParams<{ guide?: string }>().guide === 'memory';
   const celebrate = useBuddyCelebration();
   const scroll = useBuddyScroll(), footerProtection = useBuddyProtectedBounds();
   const insets = useSafeAreaInsets(), window = useWindowDimensions();
@@ -198,7 +200,7 @@ export function NewJourneyEditor({ ownerId, initial, onReload, onDestinationFocu
       setMessage(Object.keys(pendingPhotos).length ? (result.saved.status === 'published' ? 'Journey and photos published.' : 'Journey and photos saved privately.') : savingMemory ? 'Memory saved privately.' : result.saved.status === 'draft' ? 'Draft saved. Only you can open it.' : 'Your journey is published.');
       if (focus.current.active && focus.current.generation === generation) {
         if (result.saved.status === 'published') { allowExit.current = true; router.push({ pathname: '/journey/[id]', params: { id: result.saved.id } }); }
-        else if (!snapshot.updatedAt) { allowExit.current = true; router.replace({ pathname: '/create', params: { draft: result.saved.id } }); }
+        else if (!snapshot.updatedAt) { allowExit.current = true; router.replace({ pathname: '/create', params: { draft: result.saved.id, ...(guidedMemory ? { guide: 'memory' } : {}) } }); }
       }
     }
   }
@@ -352,12 +354,13 @@ export default function CreateScreen() {
     const show = Keyboard.addListener('keyboardDidShow', () => setKeyboardOpen(true)), hide = Keyboard.addListener('keyboardDidHide', () => setKeyboardOpen(false));
     return () => { show.remove(); hide.remove(); };
   }, []);
-  const params = useLocalSearchParams<{ draft?: string | string[] }>();
+  const params = useLocalSearchParams<{ draft?: string | string[]; guide?: string }>();
   const draftId = typeof params.draft === 'string' ? params.draft : params.draft ? 'invalid' : null;
   useFocusEffect(useCallback(() => {
     if (!auth.loading && !auth.session && !prompted.current) { prompted.current = true; router.push({ pathname: '/auth', params: { context: 'create' } }); }
   }, [auth.loading, auth.session, router]));
   return <SafeAreaView edges={['left', 'right', 'bottom']} style={ui.safe}><Stack.Screen options={{ statusBarStyle: draftId ? 'dark' : 'light' }} /><View style={ui.page} onTouchStart={!draftId ? () => setDismissSearchVersion(n => n + 1) : undefined}>{draftId ? (!auth.session || auth.loading) && <SafeAreaView edges={['top']}><ScreenHeader title="Your journey" back compact /></SafeAreaView> : <CreateJourneyHeader destination={focus?.ownerId === userId ? focus?.place : null} destinationVersion={focus?.version} keyboardOpen={keyboardOpen} />}
+    {params.guide === 'memory' && !auth.loading && auth.session && <FirstOutcomeHint key={draftId ?? 'new'} title={draftId ? 'Add your first memory' : 'Start with the journey behind your memory'}>{draftId ? 'Add a stop to your journey. Give the moment a name or note, then save your changes when ready. A photo and location are optional.' : 'Choose a destination and title, then create a private journey. You can add your first memory next. Photos are optional; nothing is saved until you choose to save.'}</FirstOutcomeHint>}
     {auth.loading ? <ActivityIndicator /> : !auth.session ? <View style={ui.list}><Message title="Make your next chapter" body="Sign in to create a journey. Nothing is created until you save or publish." retry={() => router.push({ pathname: '/auth', params: { context: 'create' } })} action="Sign in to create" /></View>
       : draftId ? <DraftEditorEntry key={auth.session.user.id + ':' + draftId} id={draftId} ownerId={auth.session.user.id} keyboardOpen={keyboardOpen} />
         : !idsAvailable ? <View style={ui.list}><Message title="An app update is needed" body="Update this development client before creating journeys." /></View> : <NewJourneyEditor key={auth.session.user.id} ownerId={auth.session.user.id} onDestinationFocus={focusDestination} dismissSearchVersion={dismissSearchVersion} keyboardOpen={keyboardOpen} />}

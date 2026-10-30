@@ -11,7 +11,7 @@ export type BuddyTravel = Readonly<{
   arrival: boolean;
   completed: number;
 }>;
-export type BuddyScreen = Readonly<{ floating?: boolean; geometryMoving?: boolean; suppressed?: boolean; interacting?: boolean; canAddMemory?: boolean; travel?: BuddyTravel; ownStory?: { id: string; title: string }; resume?: { id: string; title: string } }>;
+export type BuddyScreen = Readonly<{ floating?: boolean; geometryMoving?: boolean; suppressed?: boolean; interacting?: boolean; canAddMemory?: boolean; travel?: BuddyTravel; ownStory?: { id: string; title: string }; resume?: { id: string; title: string }; savedJourney?: { id: string; title: string } }>;
 export type BuddyAction = 'addMemory';
 export type BuddyCelebrationName = 'jump' | 'run';
 export type BuddyCelebration = Readonly<{ id: number; path: string; animation: BuddyCelebrationName; expiresAt: number; claimed: boolean }>;

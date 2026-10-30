@@ -26,3 +26,9 @@ export function buddyHelpLine(path: string): string | undefined {
   if (/^\/customized\/[^/]+$/.test(path)) return 'These are the stops you picked for this trip. Nothing is saved; swipe when you’re ready to go.';
   return undefined;
 }
+
+// Describes the loaded Saved collection, never unfinished trip progress.
+export function buddySavedReason(title: string): string {
+  const name = title.trim();
+  return (name ? 'Your saved journey "' + name + '" is ready to revisit.' : 'Your saved journey is ready to revisit.') + ' Open its story to plan your next steps.';
+}
