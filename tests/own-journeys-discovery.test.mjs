@@ -211,7 +211,7 @@ function homeScreen(h, getAuth, publicLoader, timers) {
     ...shared, react: h.hooks,
     'react-native-safe-area-context': { SafeAreaView: 'SafeAreaView', useSafeAreaInsets: () => ({ top: 0, bottom: 0 }) },
     'expo-router': { Stack: { Screen: 'StackScreen' }, useRouter: () => ({ push() {} }), useFocusEffect() {} },
-    '@/theme/mobile-theme': { theme: {}, primaryControl: {} }, '@/components/branded-loading': { BrandedLoading: 'BrandedLoading' },
+    '@/theme/mobile-theme': { theme: {}, primaryControl: {} }, '@/components/branded-loading': { BrandedLoading: 'BrandedLoading' }, '@/components/buddy/buddy-intro': { BuddyIntro: 'BuddyIntro' },
     '@/components/create/place-picker': { PlacePicker: 'PlacePicker' }, '@/components/floating-navigation': { FloatingNavigation: 'Navigation' },
     '@/components/discovery/globe/discovery-globe': { DiscoveryGlobe: 'Globe' }, '@/components/discovery/discovery-panel': { DiscoveryPanel: 'Panel' },
     '@/hooks/use-discovery-viewer': viewerHook(h, getAuth, timers), '@/hooks/use-load': { useLoad: load('src/hooks/use-load.ts', { react: h.hooks }).useLoad },
@@ -232,7 +232,7 @@ test('Search/Explore and Story list hide own journeys per viewer without refetch
     render(); await tick(); let tree = render();
     assert.ok(!tree.some(n => n.type === 'BrandedLoading'), 'session restore keeps the screen mounted');
     assert.ok(input(tree), 'search field stays mounted while the viewer is pending');
-    assert.deepEqual(data(tree), [], 'own cards never flash'); assert.equal(list(tree).props.ListEmptyComponent.type, 'LoadingCards');
+    assert.deepEqual(data(tree), [], 'own cards never flash'); assert.equal(list(tree).props.ListEmptyComponent.props.children.type, 'LoadingCards');
     input(tree).props.onChangeText('kerala'); tree = render(); assert.deepEqual(data(tree), [], 'public results area is held even for a typed query');
     input(tree).props.onChangeText(''); auth = signedIn(U); tree = render();
     assert.deepEqual(data(tree), [jid(2), jid(3)]);
@@ -256,7 +256,7 @@ test('Search/Explore and Story list hide own journeys per viewer without refetch
 test('Search browse shows the only-own empty copy, otherwise the existing copy', async () => {
   const h = stateHarness(); let auth = signedIn(U), rows = ownOnly();
   const component = searchScreen(h, () => auth, () => undefined, async () => rows);
-  const render = () => h.render(component), empty = t => list(t).props.ListEmptyComponent;
+  const render = () => h.render(component), empty = t => list(t).props.ListEmptyComponent.props.children;
   try {
     render(); await tick(); let tree = render();
     assert.deepEqual(data(tree), []);

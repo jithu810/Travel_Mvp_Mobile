@@ -19,7 +19,7 @@ function hooks(){let slots=[],cursor=0,effects=[];return {
 };}
 function load(path,modules={},react=hooks().react){
   modules={'@/hooks/use-buddy-geometry':buddyGeometryStub,...modules};const exports={};const code=ts.transpileModule(readFileSync(path,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX}}).outputText;
-  modules={'@/hooks/use-journey-buddy':{useBuddyScreen(){},useBuddyPreference:()=>({loaded:true,enabled:false,error:null,setEnabled(){}})},...modules};
+  modules={'@/hooks/use-journey-buddy':{useBuddyScreen(state){buddyScreens.push(state);},useBuddyGreetingsReset:()=>()=>{},useBuddyPreference:()=>({loaded:true,enabled:false,error:null,setEnabled(){}})},...modules};
   new Function('require','exports',code)(name=>name==='@/theme/mobile-theme'?mobileTheme:name==='@/components/discovery/thumbnail-photo'?{ThumbnailPhoto:'JourneyPhoto'}:name==='./profile-styles'?load('src/components/profile/profile-styles.ts',{'@/components/discovery/ui':ui}):name==='react'?react:name==='@/components/delete-draft-action'?{DeleteDraftAction:'DeleteDraftAction'}:name==='@/lib/remix/model'?{draftRemixCredit:source=>source===undefined?'Remix of another journey':source===null?'Remixed from an original journey that is currently unavailable.':'Remix of '+source.title+' · by '+source.creatorName}:name==='@/components/branded-loading'?{BrandedLoading:'BrandedLoading'}:name==='@/components/art/journey-art'?{JourneyArt:'JourneyArt',StopArt:'StopArt'}:name==='@/lib/art/journey-art'?{artSeed:(id,stops)=>'seed:'+id+':'+(stops||[]).length}:name==='react/jsx-runtime'?{jsx,jsxs:jsx,Fragment:'Fragment'}:name==='react-native'?native:name.endsWith('.png')?1:name in modules?modules[name]:(()=>{throw Error(name);})(),exports);return exports;}
 function all(tree,type){if(!tree||typeof tree!=='object')return [];return [...(tree.type===type?[tree]:[]),...[tree.props?.children].flat(Infinity).flatMap(t=>all(t,type))];}
 const uid='22222222-2222-4222-8222-222222222222';const journey={id:'real',title:'Hill journey',destination:'Ponmudi',cover:'https://test/cover.jpg',durationDays:1,stops:[{},{}]};
@@ -50,6 +50,7 @@ test('profile journey and draft cards retain their routes, truthful facts and ph
   assert.equal(all(header,'Pressable').length,2,'Header only exposes working back and settings actions');
 });
 
+const buddyScreens=[];
 function accountHarness(){const h=hooks(),routes=[],loaders=[];let auth={loading:false,session:{user:{id:uid,email:'private@example.test',user_metadata:{display_name:'Real owner'}}}},finish,fail=false,calls=0,cancels=0;
   let draftRefreshes=0;const draftState={data:[{id:'draft',title:'Actual draft'}],refresh(){draftRefreshes++;},retry(){},loading:false};const publishedState={data:{profile:null,journeys:[journey]},refresh(){},retry(){},loading:false};
   const components=Object.fromEntries(['ProfileHeader','ProfileIdentity','ProfileCollections','ProfileDraftCard','ProfileJourneyCard','ProfileTabs'].map(n=>[n,n]));components.profileStyles={};
@@ -125,4 +126,10 @@ test('long biography is bounded until explicitly expanded and full name remains 
   const title=all(tree,'Text').find(n=>n.props.accessibilityRole==='header');assert.equal(title.props.accessibilityLabel,name);assert.equal(title.props.numberOfLines,2);
   all(tree,'Pressable')[0].props.onPress();tree=render();assert.equal(all(tree,'Text').find(n=>n.props.children===bio).props.numberOfLines,undefined);
   all(tree,'Pressable')[0].props.onPress();assert.equal(all(render(),'Text').find(n=>n.props.children===bio).props.numberOfLines,2);
+});
+test('B3: Buddy offers Continue editing only for a draft from a successful load, never a stale one after a failed refresh',()=>{
+  const h=accountHarness();const draft=h.draftState.data[0];assert.ok(draft&&draft.id);
+  buddyScreens.length=0;h.render();assert.deepEqual(buddyScreens.at(-1).resume,{id:draft.id,title:draft.title});
+  h.draftState.error='Offline';buddyScreens.length=0;h.render();assert.equal(buddyScreens.at(-1).resume,undefined,'A failed refresh never offers the last-known draft');
+  h.draftState.error=null;h.draftState.data=[];buddyScreens.length=0;h.render();assert.equal(buddyScreens.at(-1).resume,undefined,'No drafts: Buddy offers Start a new journey instead');
 });
