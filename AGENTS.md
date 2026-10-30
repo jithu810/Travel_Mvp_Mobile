@@ -12,7 +12,7 @@
 - src/components holds native UI; src/hooks owns lifecycle/state integration; src/lib holds domain logic, queries and platform adapters; src/types holds shared models. Use the @/ alias for src. Keep native implementations in .native.ts/.native.tsx and retain web fallbacks; do not introduce Next.js, WebViews or a monorepo.
 - Native Mapbox powers Home and journey maps. Preserve gesture/camera ownership, cancellation, accessibility/reduced-motion behavior, selected stops and coordinate validation. Planned connections and decorative Home playback are not navigation or evidence of travel.
 - src/lib/supabase/client.ts persists authenticated sessions (native AsyncStorage); public.ts provides isolated anonymous reads without the saved user token. Preserve public gating, ownership checks, request cancellation/timeouts and ambiguous-write safeguards.
-- Travel Mode uses an in-memory per-journey trip store and foreground-only expo-location adapter. No persistent trip/GPS history or backend travel writes. Preserve synchronous GPS cleanup on Pause/Finish, blur and background.
+- Travel Mode uses a per-journey trip store and foreground-only expo-location adapter. Active/paused trips are copied to on-device storage per signed-in user for recovery; no GPS fixes or route history are stored, and there are no backend travel writes. Preserve synchronous GPS cleanup on Pause/Finish, blur and background.
 - tests/*.test.mjs uses Node's built-in runner and TypeScript compilation/transpilation with fixtures/mocks. Follow existing test patterns; do not equate mocks or exports with physical-device verification.
 
 ## Validation and handoff
