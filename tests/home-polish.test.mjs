@@ -9,7 +9,7 @@ new Function('exports', ts.transpileModule(readFileSync('src/theme/mobile-theme.
 
 
 function load(file, dependencies, state = null, hookOverrides = {}) {
-  dependencies={'@/hooks/use-buddy-geometry':buddyGeometryStub,...dependencies};
+  dependencies={'@/hooks/use-buddy-geometry':buddyGeometryStub,'@/hooks/use-trip-recovery':{useTripRecovery:()=>({checking:false,notice:null}),useUnfinishedTrip:()=>null},...dependencies};
   const exports = {};
   const jsx = (type, props) => ({ type, props });
   const react = { useRef:()=>({current:null}),useEffect:()=>{}, memo: fn => fn, useState: initial => typeof state === 'function' ? state(initial) : [state ?? initial, () => {}], useMemo: fn => fn(), useCallback: fn => fn, ...hookOverrides };
@@ -475,4 +475,30 @@ test('U2: Home panel offers a Find a journey button only when given, and it open
   assert.ok(button); button.props.onPress(); assert.equal(opened, 1);
   assert.equal(nodes(button).find(n => n.type === 'Text').props.children, 'Find a journey', 'Label matches the visible text');
   assert.ok(readFileSync('src/app/discover.tsx', 'utf8').includes("onFindJourney={() => router.navigate('/search?view=search')}"), 'Home opens the same journey search as the Search tab');
+});
+
+test('R2: Home shows "Unfinished trip" with Resume for the signed-in user copy and keeps the panel clear',()=>{
+  const routes=[];let trip=null;
+  const home=load('src/app/discover.tsx',{
+    '@/components/floating-navigation':{FloatingNavigation:'Navigation'},
+    'expo-router':{useRouter:()=>({push:route=>routes.push(route)}),useFocusEffect:()=>{}},
+    'react-native-safe-area-context':{SafeAreaView:'SafeAreaView',useSafeAreaInsets:()=>({bottom:24})},
+    '@/components/discovery/globe/discovery-globe':{DiscoveryGlobe:'Globe'},'@/components/discovery/discovery-panel':{DiscoveryPanel:'Panel'},
+    '@/hooks/use-load':{useLoad:()=>({refresh(){},data:[],loading:false})},
+    '@/lib/discovery/map':{discoveryPoints:()=>({features:[]})},'@/lib/discovery/travel':{discoveryRoute:()=>null},
+    '@/lib/discovery/presentation':{spaceColor:'#080F1E'},'@/lib/discovery/queries':{loadPublicJourney:()=>{},loadDiscoveryEntries:()=>{}},
+    '@/hooks/use-trip-recovery':{useUnfinishedTrip:()=>trip},
+  });
+  let all=nodes(home.default());const clearance=all.find(n=>n.type==='Panel').props.bottomClearance;
+  assert.equal(all.some(n=>n.props?.testID==='home-unfinished-trip'),false,'No copy: no card');
+  trip={journeyId:'11111111-1111-4111-8111-111111111111',customized:false,title:'Coast trip'};all=nodes(home.default());
+  const card=all.find(n=>n.props?.testID==='home-unfinished-trip');assert.ok(card);
+  assert.ok(nodes(card).some(n=>n.type==='Text'&&[n.props.children].flat().join('')==='Unfinished trip: Coast trip'));
+  assert.ok(typeof card.props.onLayout==='function','Measured for Buddy protected bounds');
+  assert.ok(all.find(n=>n.type==='Panel').props.bottomClearance>clearance,'The panel keeps clear of the card');
+  nodes(card).find(n=>n.props?.accessibilityLabel==='Resume unfinished trip: Coast trip').props.onPress();
+  assert.deepEqual(routes.at(-1),{pathname:'/travel/[id]',params:{id:trip.journeyId}});
+  trip={...trip,journeyId:'55555555-5555-4555-8555-555555555555',customized:true};
+  nodes(nodes(home.default()).find(n=>n.props?.testID==='home-unfinished-trip')).find(n=>n.props?.accessibilityRole==='button').props.onPress();
+  assert.deepEqual(routes.at(-1),{pathname:'/travel/[id]',params:{id:trip.journeyId,customized:'1'}});
 });

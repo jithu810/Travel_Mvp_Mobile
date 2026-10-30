@@ -17,6 +17,7 @@ import { loadOwnProfile } from '@/lib/profile/edit-queries';
 import { safePhoto } from '@/lib/discovery/model';
 import { signOutAccount } from '@/lib/auth/queries';
 import { creationRecovery } from '@/lib/create/recovery-store';
+import { tripPersistence } from '@/lib/journey/trip-recovery-store';
 import type { PublicJourney } from '@/types/journey';
 
 type Row = { kind: 'draft'; draft: PrivateDraftSummary } | { kind: 'published'; journey: PublicJourney };
@@ -59,8 +60,8 @@ export default function AccountScreen() {
     if (signOutLock.current) return;
     signOutLock.current = true;
     setBusy(true); setError(null); intent.cancel();
-    // Unsaved Create work kept on this device belongs to the signed-out account only.
-    try { await signOutAccount(); if (userId) void creationRecovery.clearUser(userId); setSettings(false); } catch { setError('Couldn’t sign out. Please retry.'); } finally { signOutLock.current = false; setBusy(false); }
+    // Unsaved Create work and unfinished-trip copies on this device belong to the signed-out account only.
+    try { await signOutAccount(); if (userId) { void creationRecovery.clearUser(userId); void tripPersistence.clearUser(userId); } setSettings(false); } catch { setError('Couldn’t sign out. Please retry.'); } finally { signOutLock.current = false; setBusy(false); }
   }
   const profile = published.data?.profile;
   const name = profile?.displayName || (typeof metadata?.display_name === 'string' && metadata.display_name.trim() ? metadata.display_name.trim() : 'Traveler');

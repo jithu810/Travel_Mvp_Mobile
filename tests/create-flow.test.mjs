@@ -29,6 +29,7 @@ function load(file, modules, hooks=harness().hooks, timers=globalThis) {
     if(name==='@/hooks/use-journey-buddy')return {useBuddyCelebration:()=>()=>{},useBuddyScreen(){},...modules[name]};
     if(name==='@/hooks/use-buddy-map-pins')return buddyMapPinsStub;
     if(name==='@/hooks/use-creation-recovery')return modules[name]||{useCreationRecovery:()=>()=>{}};
+    if(name==='@/hooks/use-trip-recovery')return modules[name]||{useTripRecovery:()=>({checking:false,notice:null}),useUnfinishedTrip:()=>null};
     if(name==='@/lib/buddy/map-controls')return load('src/lib/buddy/map-controls.ts',{'../discovery/globe-style':load('src/lib/discovery/globe-style.ts',{})});
     if(name==='@/lib/buddy/model')return load('src/lib/buddy/model.ts',{});
     if(name==='@/components/buddy/buddy-space')return {BuddySpace:'BuddySpace'};

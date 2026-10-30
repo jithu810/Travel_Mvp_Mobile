@@ -38,7 +38,7 @@ function harness(runEffects = true) {
   };
 }
 function load(path, modules, hooks = harness(false).hooks, timers = globalThis) {
-  modules={'@/lib/journey/customized-travel':{customizedTravel:()=>null},'@/hooks/use-buddy-geometry':buddyGeometryStub,...modules};
+  modules={'@/lib/journey/customized-travel':{customizedTravel:()=>null},'@/hooks/use-buddy-geometry':buddyGeometryStub,'@/hooks/use-trip-recovery':{useTripRecovery:()=>({checking:false,notice:null}),useUnfinishedTrip:()=>null},...modules};
   const source = ts.transpileModule(readFileSync(path, 'utf8'), {
     compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true },
   }).outputText;
@@ -1929,4 +1929,49 @@ test('stop story viewer shows stop art for photo-less or failed photos with one 
   assert.equal(find(tree, 'CircleMap'), null, 'The notes sheet would cover the credit, so the circle hides');
   assert.equal(stopArt(tree).props.inset.right, 0);
   } finally { if (previousToken === undefined) delete process.env.EXPO_PUBLIC_MAPBOX_TOKEN; else process.env.EXPO_PUBLIC_MAPBOX_TOKEN = previousToken; }
+});
+
+test('R2: Travel Mode shows loading while a recovered temporary route is offered and the unavailable message after a discard', () => {
+  const h = harness(); let recovery = { checking: true, notice: null }, ids = [];
+  const store = sessionModel.createTripStore();
+  const { default: Screen } = load('src/app/travel/[id].tsx', {
+    ...sessionMocks(store),
+    '@/hooks/use-trip-recovery': { useTripRecovery: (routeId, id) => { ids.push([routeId, id]); return recovery; } },
+    'expo-router': { useRouter: () => ({ canGoBack: () => true, back() {}, replace() {} }), useLocalSearchParams: () => ({ id: journeyId, customized: '1' }), useFocusEffect: callback => h.hooks.useEffect(callback, [callback]) },
+    'react-native': { ...native, ScrollView: 'ScrollView', BackHandler: { addEventListener: () => ({ remove() {} }) } },
+    'react-native-safe-area-context': { SafeAreaView: 'SafeAreaView' }, '@/components/discovery/ui': ui,
+    '@/components/journey/map/journey-map': { JourneyMap: 'JourneyMap' }, '@/components/journey/map-itinerary': { MapItinerary: 'MapItinerary' },
+    '@/hooks/use-load': { useLoad: () => ({ data: null, loading: false, error: null, retry() {} }) },
+    '@/lib/discovery/queries': { loadPublicJourney: async () => null },
+    '@/lib/discovery/model': { isJourneyId: value => value === journeyId }, '@/lib/journey/map-data': mapData,
+    '@/lib/journey/story-layout': layout, '@/lib/journey/travel-preview': eligibility,
+  }, h.hooks);
+  let tree = h.render(Screen, {});
+  assert.ok(find(tree, 'BrandedLoading')); assert.deepEqual(ids.at(-1), [journeyId, null]);
+  recovery = { checking: false, notice: 'This journey is no longer available.' }; tree = h.render(Screen, {});
+  assert.equal(find(tree, 'Message').props.body, 'This journey is no longer available.');
+});
+
+test('R2: Begin Trip waits while a saved trip is checked; texts say how long progress is kept', () => {
+  const h = harness(), requesting = []; const store = sessionModel.createTripStore();
+  const { TravelModeContent } = load('src/app/travel/[id].tsx', {
+    ...sessionMocks(store),
+    'expo-router': {}, 'react-native': { ...native, ScrollView: 'ScrollView' },
+    'react-native-safe-area-context': {}, '@/components/discovery/ui': ui,
+    '@/components/journey/map/journey-map': { JourneyMap: 'JourneyMap' }, '@/components/journey/map-itinerary': { MapItinerary: 'MapItinerary' },
+    '@/hooks/use-load': {}, '@/lib/discovery/queries': {}, '@/lib/discovery/model': {}, '@/lib/journey/map-data': mapData,
+    '@/lib/journey/story-layout': layout, '@/lib/journey/travel-preview': eligibility,
+  }, h.hooks);
+  const journey = { id: journeyId, title: 'Coastal trip', stops: [{ ...stop('first'), sequence: 0, latitude: 8, longitude: 76 }] };
+  const text = tree => all(tree, 'Text').map(item => [item.props.children].flat(Infinity).join('')).join(' ');
+  let tree = h.render(TravelModeContent, { journey, onExit() {}, resumeChecking: true, signedIn: true, onLocationRequesting: value => requesting.push(value) });
+  let begin = all(tree, 'Pressable').find(n => n.props.accessibilityLabel === 'Begin Trip');
+  assert.equal(begin.props.disabled, true); assert.match(text(tree), /Checking for a saved trip/);
+  begin.props.onPress(); assert.equal(store.get(journeyId).status, 'ready', 'No trip starts during the check');
+  assert.match(text(tree), /Progress kept on this phone for up to 7 days · No travel verification or location history/);
+  assert.equal(requesting.at(-1), false, 'Reports permission activity for the resume prompt');
+  tree = h.render(TravelModeContent, { journey, onExit() {}, resumeChecking: false, signedIn: false });
+  begin = all(tree, 'Pressable').find(n => n.props.accessibilityLabel === 'Begin Trip');
+  assert.equal(begin.props.disabled, false); assert.match(text(tree), /Progress kept until the app closes/);
+  assert.doesNotMatch(text(tree), /GPS (history|stored)/);
 });

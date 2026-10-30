@@ -163,7 +163,7 @@ native.StyleSheet = { create: x => x }; native.Platform = { OS: 'android' }; nat
 native.AppState = { addEventListener: () => ({ remove() {} }) };
 const all = tree => !tree || typeof tree !== 'object' ? [] : [tree, ...[tree.props?.children].flat(Infinity).flatMap(all)];
 function load(path, modules, timers = globalThis) {
-  modules={'@/hooks/use-buddy-geometry':buddyGeometryStub,...modules};
+  modules={'@/hooks/use-buddy-geometry':buddyGeometryStub,'@/hooks/use-trip-recovery':{useTripRecovery:()=>({checking:false,notice:null}),useUnfinishedTrip:()=>null},...modules};
   modules = {'@/hooks/use-journey-buddy':{useBuddyScreen(){}},'@/components/buddy/buddy-space':{BuddySpace:'BuddySpace'},...modules};
   if(path!=='src/lib/buddy/model.ts' && !('@/lib/buddy/model' in modules))modules['@/lib/buddy/model']=load('src/lib/buddy/model.ts',{});
   const exports = {};

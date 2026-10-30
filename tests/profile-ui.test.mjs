@@ -18,7 +18,7 @@ function hooks(){let slots=[],cursor=0,effects=[];return {
   render(fn){cursor=0;effects=[];const tree=fn();effects.forEach(f=>f());return tree;},
 };}
 function load(path,modules={},react=hooks().react){
-  modules={'@/hooks/use-buddy-geometry':buddyGeometryStub,...modules};const exports={};const code=ts.transpileModule(readFileSync(path,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX}}).outputText;
+  modules={'@/hooks/use-buddy-geometry':buddyGeometryStub,'@/lib/journey/trip-recovery-store':{tripPersistence:{clearUser:async()=>{}}},...modules};const exports={};const code=ts.transpileModule(readFileSync(path,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX}}).outputText;
   modules={'@/hooks/use-journey-buddy':{useBuddyScreen(state){buddyScreens.push(state);},useBuddyGreetingsReset:()=>()=>{},useBuddyPreference:()=>({loaded:true,enabled:false,error:null,setEnabled(){}})},...modules};
   new Function('require','exports',code)(name=>name==='@/theme/mobile-theme'?mobileTheme:name==='@/components/discovery/thumbnail-photo'?{ThumbnailPhoto:'JourneyPhoto'}:name==='./profile-styles'?load('src/components/profile/profile-styles.ts',{'@/components/discovery/ui':ui}):name==='react'?react:name==='@/components/delete-draft-action'?{DeleteDraftAction:'DeleteDraftAction'}:name==='@/lib/remix/model'?{draftRemixCredit:source=>source===undefined?'Remix of another journey':source===null?'Remixed from an original journey that is currently unavailable.':'Remix of '+source.title+' · by '+source.creatorName}:name==='@/components/branded-loading'?{BrandedLoading:'BrandedLoading'}:name==='@/components/art/journey-art'?{JourneyArt:'JourneyArt',StopArt:'StopArt'}:name==='@/lib/art/journey-art'?{artSeed:(id,stops)=>'seed:'+id+':'+(stops||[]).length}:name==='react/jsx-runtime'?{jsx,jsxs:jsx,Fragment:'Fragment'}:name==='react-native'?native:name.endsWith('.png')?1:name in modules?modules[name]:(()=>{throw Error(name);})(),exports);return exports;}
 function all(tree,type){if(!tree||typeof tree!=='object')return [];return [...(tree.type===type?[tree]:[]),...[tree.props?.children].flat(Infinity).flatMap(t=>all(t,type))];}
@@ -51,7 +51,7 @@ test('profile journey and draft cards retain their routes, truthful facts and ph
 });
 
 const buddyScreens=[];
-function accountHarness(){const h=hooks(),routes=[],loaders=[];let auth={loading:false,session:{user:{id:uid,email:'private@example.test',user_metadata:{display_name:'Real owner'}}}},finish,fail=false,calls=0,cancels=0;const recoveryCleared=[];
+function accountHarness(){const h=hooks(),routes=[],loaders=[];let auth={loading:false,session:{user:{id:uid,email:'private@example.test',user_metadata:{display_name:'Real owner'}}}},finish,fail=false,calls=0,cancels=0;const recoveryCleared=[],tripsCleared=[];
   let draftRefreshes=0;const draftState={data:[{id:'draft',title:'Actual draft'}],refresh(){draftRefreshes++;},retry(){},loading:false};const publishedState={data:{profile:null,journeys:[journey]},refresh(){},retry(){},loading:false};
   const components=Object.fromEntries(['ProfileHeader','ProfileIdentity','ProfileCollections','ProfileDraftCard','ProfileJourneyCard','ProfileTabs'].map(n=>[n,n]));components.profileStyles={};
   const modules={'expo-router':{useRouter:()=>({push:r=>routes.push(r)}),useFocusEffect:()=>{}},'react-native-safe-area-context':{SafeAreaView:'SafeAreaView'},'@/components/discovery/ui':ui,'@/components/profile/profile-ui':components,
@@ -59,9 +59,10 @@ function accountHarness(){const h=hooks(),routes=[],loaders=[];let auth={loading
     '@/hooks/use-load':{useLoad:fn=>{loaders.push(fn);return loaders.length%2?draftState:publishedState;}},
     '@/lib/remix/queries':{loadPrivateDrafts:async()=>draftState.data,withDraftSources:(drafts,cards)=>drafts.map(d=>d.sourceId&&cards.has(d.sourceId)?{...d,source:cards.get(d.sourceId)}:d)},'@/hooks/use-draft-credits':{useDraftCredits:()=>new Map()},'@/lib/profile/queries':{loadPublicProfile:async()=>null,loadPublishedProfileJourneys:async()=>[journey]},
     '@/lib/profile/edit-queries':{loadOwnProfile:async()=>({id:uid,username:'real',displayName:'Real owner',bio:'',avatarPreview:null})},'@/lib/discovery/model':{safePhoto:()=>null},'@/lib/auth/queries':{signOutAccount:()=>{calls++;return new Promise((resolve,reject)=>{finish=()=>fail?reject(Error('failure')):resolve();});}},
-    '@/lib/create/recovery-store':{creationRecovery:{clearUser:async user=>{recoveryCleared.push(user);}}}};
+    '@/lib/create/recovery-store':{creationRecovery:{clearUser:async user=>{recoveryCleared.push(user);}}},
+    '@/lib/journey/trip-recovery-store':{tripPersistence:{clearUser:async user=>{tripsCleared.push(user);}}}};
   const {default:Screen}=load('src/app/account.tsx',modules,h.react);
-  return {render:()=>h.render(Screen),routes,loaders,draftState,publishedState,setAuth:v=>auth=v,setFail:v=>fail=v,finish:()=>finish(),calls:()=>calls,cancels:()=>cancels,draftRefreshes:()=>draftRefreshes,recoveryCleared};
+  return {render:()=>h.render(Screen),routes,loaders,draftState,publishedState,setAuth:v=>auth=v,setFail:v=>fail=v,finish:()=>finish(),calls:()=>calls,cancels:()=>cancels,draftRefreshes:()=>draftRefreshes,recoveryCleared,tripsCleared};
 }
 test('Account tabs preserve private draft entry, published cards, settings actions and guarded sign-out failure',async()=>{
   const h=accountHarness();let tree=h.render(),list=all(tree,'FlatList')[0];assert.equal(list.props.data[0].kind,'draft');
@@ -71,9 +72,10 @@ test('Account tabs preserve private draft entry, published cards, settings actio
   all(tree,'ProfileHeader')[0].props.onSettings();tree=h.render();assert.equal(all(tree,'Modal')[0].props.visible,true);
   const signOut=all(tree,'Action').find(n=>n.props.label==='Sign out');h.setFail(true);signOut.props.onPress();signOut.props.onPress();assert.equal(h.calls(),1);assert.equal(h.cancels(),1);
   tree=h.render();assert.equal(all(tree,'Action').find(n=>n.props.label==='Signing out…').props.disabled,true);h.finish();await new Promise(setImmediate);tree=h.render();assert.ok(all(tree,'Text').some(n=>n.props.accessibilityRole==='alert'));
-  assert.deepEqual(h.recoveryCleared,[],'A failed sign-out keeps unsaved Create recovery');
+  assert.deepEqual(h.recoveryCleared,[],'A failed sign-out keeps unsaved Create recovery');assert.deepEqual(h.tripsCleared,[],'and the unfinished trip copy');
   h.setFail(false);all(tree,'Action').find(n=>n.props.label==='Sign out').props.onPress();h.finish();await new Promise(setImmediate);assert.equal(all(h.render(),'Modal')[0].props.visible,false);
   assert.deepEqual(h.recoveryCleared,[uid],'Sign-out clears only the signed-out user recovery copies');
+  assert.deepEqual(h.tripsCleared,[uid],'Sign-out clears the signed-out user unfinished trip copy');
 });
 test('Account gates private content while signed out/loading and preserves draft failure/empty recovery',()=>{
   const h=accountHarness();h.setAuth({loading:true,session:null});assert.equal(all(h.render(),'FlatList').length,0);

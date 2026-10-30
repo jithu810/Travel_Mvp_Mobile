@@ -71,6 +71,23 @@ export function createTripStore(source?: () => number) {
       listeners.forEach(listener => listener());
       return true;
     },
+    // Sign-out: every in-memory trip returns to ready (location follows via subscribers).
+    clearAll() {
+      if (!sessions.size) return;
+      sessions.clear();
+      listeners.forEach(listener => listener());
+    },
+    // Brings back a recovered trip as PAUSED, only over a ready (not live) session. Location
+    // starts only when the user later taps Resume.
+    restore(journey: PublicJourney, recovered: { elapsedMs: number; completedStopIds: readonly string[]; destinationId: string }) {
+      if (!canOpenTravelMode(journey) || get(journey.id).status !== 'ready') return false;
+      const stops = orderedTripStops(journey), done = recovered.completedStopIds;
+      if (done.length >= stops.length || done.some((stopId, index) => stops[index].id !== stopId) || stops[done.length].id !== recovered.destinationId) return false;
+      sessions.set(journey.id, Object.freeze({ status: 'paused', elapsedMs: Math.max(0, recovered.elapsedMs), activeSince: null, title: journey.title, plannedStops: journey.stops.length,
+        completedStopIds: Object.freeze([...done]), destinationId: recovered.destinationId, journey: { ...journey, stops: journey.stops.map(stop => ({ ...stop })) } }));
+      listeners.forEach(listener => listener());
+      return true;
+    },
     completeStop(id: string, stopId: string, expected: TripSession) {
       const current = get(id);
       if (current !== expected || current.status !== 'active' || !current.journey || current.destinationId !== stopId
@@ -88,7 +105,8 @@ export function createTripStore(source?: () => number) {
     },
   };
 }
-// Process memory only. Never writes to AsyncStorage or a backend.
+// Process memory only. Never writes to AsyncStorage or a backend itself; trip-recovery-store
+// separately keeps a location-free copy of an unfinished trip on the device.
 export const tripStore = createTripStore();
 
 type AppStatePort = { currentState: string | null; addEventListener: (event: 'change', listener: (state: string) => void) => { remove: () => void } };

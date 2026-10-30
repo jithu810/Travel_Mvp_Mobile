@@ -19,10 +19,11 @@ import { discoveryRoute } from '@/lib/discovery/travel';
 import { spaceColor } from '@/lib/discovery/presentation';
 import { invalidatePublicJourneys, loadDiscoveryEntries, loadPublicJourney } from '@/lib/discovery/queries';
 import { BuddyIntro } from '@/components/buddy/buddy-intro';
+import { useUnfinishedTrip } from '@/hooks/use-trip-recovery';
 
 export default function DiscoverScreen() {
   const router = useRouter();
-  const headerProtection = useBuddyProtectedBounds(), bannerProtection = useBuddyProtectedBounds();
+  const headerProtection = useBuddyProtectedBounds(), bannerProtection = useBuddyProtectedBounds(), tripProtection = useBuddyProtectedBounds();
   const insets = useSafeAreaInsets();
   // The public load never waits for authentication; only the viewer filter does.
   const state = useLoad(loadDiscoveryEntries);
@@ -64,6 +65,9 @@ export default function DiscoverScreen() {
   const navBottom = Math.max(0, insets.bottom) + 8;
   const navClearance = navBottom + navHeight + 12;
   const [bannerHeight, setBannerHeight] = useState(54);
+  // A device-only copy of the signed-in user's unfinished trip; Resume opens its Travel Mode.
+  const trip = useUnfinishedTrip(viewer.pending ? null : viewer.id);
+  const [tripHeight, setTripHeight] = useState(52);
   const [railHeight, setRailHeight] = useState(260);
   const [layout, setLayout] = useState({ height: 0, width: 360 });
   const [locateVersion, setLocateVersion] = useState(0);
@@ -101,7 +105,7 @@ export default function DiscoverScreen() {
         <DiscoveryPanel journeys={journeys} selectedId={selectedId} onLocate={locate} onOpen={open}
           notice={notice} onClear={() => setSelectedId(null)} onRetrySelection={selection.error ? selection.retry : undefined}
           loading={state.loading || (viewer.pending && !state.error)} emptyText={onlyOwn ? onlyViewerJourneysCopy : undefined} refreshing={state.refreshing} error={state.error} onRefresh={refreshPublic}
-          onInteraction={setSheetInteracting} onFindJourney={() => router.navigate('/search?view=search')} onHeight={setRailHeight} availableHeight={layout.height} availableWidth={layout.width} bottomClearance={navClearance + bannerHeight + 12} topClearance={headerClearance} />
+          onInteraction={setSheetInteracting} onFindJourney={() => router.navigate('/search?view=search')} onHeight={setRailHeight} availableHeight={layout.height} availableWidth={layout.width} bottomClearance={navClearance + bannerHeight + 12 + (trip ? tripHeight + 8 : 0)} topClearance={headerClearance} />
       </View>
       <Pressable {...bannerProtection} accessibilityRole="button" accessibilityLabel="Create Journey from Home" onPress={() => router.push('/create')}
         onLayout={event => { bannerProtection.onLayout(); setBannerHeight(event.nativeEvent.layout.height); }} style={[s.banner, { bottom: navClearance }]}>
@@ -110,6 +114,10 @@ export default function DiscoverScreen() {
       </Pressable>
       <View pointerEvents="none" testID="home-status-shade" style={[s.statusShade, { height: headerTop + 12 }]} />
       <FloatingNavigation active="explore" onHeight={setNavHeight} />
+      {trip && <View {...tripProtection} testID="home-unfinished-trip" onLayout={event => { tripProtection.onLayout(); setTripHeight(event.nativeEvent.layout.height); }} style={[s.banner, { bottom: navClearance + bannerHeight + 8 }]}>
+        <View style={s.bannerCopy}><Text numberOfLines={1} style={s.bannerTitle}>Unfinished trip: {trip.title}</Text></View>
+        <Pressable accessibilityRole="button" accessibilityLabel={'Resume unfinished trip: ' + trip.title} onPress={() => router.push({ pathname: '/travel/[id]', params: trip.customized ? { id: trip.journeyId, customized: '1' } : { id: trip.journeyId } })} style={s.bannerAction}><Text style={s.bannerActionText}>Resume</Text></Pressable>
+      </View>}
       {initialLoading && <BrandedLoading overlay message="Exploring the world…" />}
     </View>
     {/* A Modal: outside the page so it adds no Home layout node. */}
