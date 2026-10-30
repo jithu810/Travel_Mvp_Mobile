@@ -27,7 +27,9 @@ import { safePhoto } from '@/lib/discovery/model';
 import { usePreventRemove } from 'expo-router/react-navigation';
 import { CreateJourneyHeader } from '@/components/create/create-journey-header';
 import { QuickJourneySetup } from '@/components/create/quick-journey-setup';
-import { selectDestination } from '@/lib/create/editor-model';
+import { selectDestination, suggestedTitle } from '@/lib/create/editor-model';
+import { useCreationRecovery } from '@/hooks/use-creation-recovery';
+import type { Recovery } from '@/lib/create/recovery';
 import { useLoad } from '@/hooks/use-load';
 import { loadPrivateDrafts } from '@/lib/remix/queries';
 import { randomUUID, idsAvailable } from '@/lib/create/id';
@@ -122,6 +124,14 @@ export function NewJourneyEditor({ ownerId, initial, onReload, onDestinationFocu
   useBuddyScreen({ floating: true, suppressed: !editorFocused || disabled || settingsOpen || coverOpen || !!memoryEdit || keyboardOpen,
     canAddMemory: !!form.updatedAt && !publishedId && !disabled && form.stops.length < 50 }, { addMemory });
   useEffect(() => { latest.current = { form, memoryEdit, candidates: localPhotos.candidates, disabled, settingsOpen, coverOpen }; }, [form, memoryEdit, localPhotos.candidates, disabled, settingsOpen, coverOpen]);
+  // Restore only refills the editor; the user still saves explicitly through the usual flow.
+  function restoreRecovery(recovery: Recovery) {
+    if (lock.current || localPhotos.isBusy()) return false;
+    titleEdited.current = !recovery.form.destination || recovery.form.title !== suggestedTitle(recovery.form.destination);
+    setForm(recovery.form); setMemoryEdit(recovery.memoryEdit); setError(null); setMessage(null); setDirty(true);
+    return true;
+  }
+  const clearRecovery = useCreationRecovery({ userId: ownerId, form, memoryEdit, dirty, hasLocalPhotos, onRestore: restoreRecovery });
   usePreventRemove(dirty || memoryChanged(memoryEdit) || busy || hasLocalPhotos || photoBusy, ({ data }) => {
     if (allowExit.current) { navigation.dispatch(data.action); return; }
     if (localPhotos.isBusy()) { Alert.alert('Preparing photo', 'Wait for photo preparation to finish before leaving.'); return; }
@@ -129,7 +139,7 @@ export function NewJourneyEditor({ ownerId, initial, onReload, onDestinationFocu
     const current = latest.current, generation = focus.current.generation;
     Alert.alert('Discard unsaved changes?', form.updatedAt ? 'Your last saved journey stays private. Unsaved changes and local photo previews will be lost.' : 'This journey has not been saved. Your setup changes will be lost.', [
       { text: 'Keep editing', style: 'cancel' }, { text: 'Discard', style: 'destructive', onPress: () => {
-        if (!lock.current && !localPhotos.isBusy() && latest.current === current && focus.current.active && focus.current.generation === generation) navigation.dispatch(data.action);
+        if (!lock.current && !localPhotos.isBusy() && latest.current === current && focus.current.active && focus.current.generation === generation) { clearRecovery(); navigation.dispatch(data.action); }
       } },
     ]);
   });
@@ -138,7 +148,7 @@ export function NewJourneyEditor({ ownerId, initial, onReload, onDestinationFocu
     const current = latest.current, generation = focus.current.generation;
     Alert.alert('Reload saved draft?', 'This discards unsaved journey and memory changes and loads the current saved version.', [
       { text: 'Cancel', style: 'cancel' }, { text: 'Reload', onPress: () => {
-        if (!lock.current && !localPhotos.isBusy() && latest.current === current && focus.current.active && focus.current.generation === generation) onReload();
+        if (!lock.current && !localPhotos.isBusy() && latest.current === current && focus.current.active && focus.current.generation === generation) { clearRecovery(); onReload(); }
       } },
     ]);
   }
@@ -169,7 +179,7 @@ export function NewJourneyEditor({ ownerId, initial, onReload, onDestinationFocu
       phase => { if (!lifetime.current.signal.aborted) setSavePhase(phase); },
       checkpoint => {
         if (lifetime.current.signal.aborted) return;
-        setForm(checkpoint); setDirty(false);
+        setForm(checkpoint); setDirty(false); clearRecovery(checkpoint.id);
         setMemoryEdit(current => {
           const savedStop = checkpoint.stops.find(stop => stop.id === current?.value.id);
           return current && savedStop ? { ...current, isNew: false, baseline: { ...savedStop } } : current;
@@ -180,7 +190,7 @@ export function NewJourneyEditor({ ownerId, initial, onReload, onDestinationFocu
     setBusy(false);
     if (result.kind === 'error') { setError(result.message); setUncertain(Boolean(result.uncertain)); }
     if (result.kind === 'saved') {
-      setForm(result.form); setDirty(false); localPhotos.acceptSaved(pendingPhotos);
+      setForm(result.form); setDirty(false); clearRecovery(result.form.id); localPhotos.acceptSaved(pendingPhotos);
       if (savingMemory) setMemoryEdit(null);
       if (savingMemory && focus.current.active && focus.current.generation === generation) celebrate('jump', result);
       if (savingSettings) setSettingsOpen(false);

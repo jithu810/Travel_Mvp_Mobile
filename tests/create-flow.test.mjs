@@ -28,6 +28,7 @@ function load(file, modules, hooks=harness().hooks, timers=globalThis) {
   new Function('require','exports','setTimeout','clearTimeout',code)(name=>{ if (name === '@/theme/mobile-theme') return mobileTheme;
     if(name==='@/hooks/use-journey-buddy')return {useBuddyCelebration:()=>()=>{},useBuddyScreen(){},...modules[name]};
     if(name==='@/hooks/use-buddy-map-pins')return buddyMapPinsStub;
+    if(name==='@/hooks/use-creation-recovery')return modules[name]||{useCreationRecovery:()=>()=>{}};
     if(name==='@/lib/buddy/map-controls')return load('src/lib/buddy/map-controls.ts',{'../discovery/globe-style':load('src/lib/discovery/globe-style.ts',{})});
     if(name==='@/lib/buddy/model')return load('src/lib/buddy/model.ts',{});
     if(name==='@/components/buddy/buddy-space')return {BuddySpace:'BuddySpace'};
@@ -57,7 +58,7 @@ const photoSave=load('src/lib/create/photo-save.ts', {'./model':model,'../discov
 const memory=load('src/lib/create/memory.ts', {'./model':model});
 const editor=load('src/lib/create/editor-model.ts', {'../discovery/model':{},'./model':model});
 const place={name:'Varkala',label:'Varkala, Kerala',latitude:8.7,longitude:76.7,mapboxId:'place'};
-function screenHarness(initial, photoState = {}, buddyEvents = []) {
+function screenHarness(initial, photoState = {}, buddyEvents = [], recoveryStorage = null) {
   photoState.candidates ??= {}; photoState.errors ??= {};
   photoState.candidates=Object.fromEntries(Object.entries(photoState.candidates).map(([key,p])=>[key,{width:800,height:600,size:1000,mime:'image/png',...p}]));
   const h=harness(), writes=[],routes=[],alerts=[],uploads=[],celebrations=[];let fail=false, uncertain=true, pending=null, prevented=null, canGoBack=true, focusCleanup=null; const dispatches=[];
@@ -79,6 +80,8 @@ function screenHarness(initial, photoState = {}, buddyEvents = []) {
     '@/components/journey/map/journey-map':{JourneyMap:'JourneyMap'},'@/hooks/session-context':{useSessionState:()=>({loading:false,session:{user:{id:uid}}})},'@/hooks/use-load':{useLoad:()=>({data:{'journey-media/raw/stop.png':'https://signed.test/stop'},error:null})},'@/lib/remix/queries':{},
     '@/lib/create/model':model,'@/lib/create/queries':{saveNewJourney:async payload=>{writes.push(payload);if(pending)await pending;if(fail)throw new model.SaveFailure('This journey changed. Reload saved draft.',uncertain);return {id,status:payload.status,updated_at:'2026-10-14T12:00:00Z'};}},
   };
+  // Optional: wire the real on-device recovery hook to a synthetic storage port.
+  if(recoveryStorage){const recovery=load('src/lib/create/recovery.ts',{});modules['@/hooks/use-creation-recovery']=load('src/hooks/use-creation-recovery.ts',{...modules,'@/lib/create/recovery':recovery,'@/lib/create/recovery-store':{creationRecovery:recovery.createCreationRecovery(recoveryStorage)}},h.hooks,{setTimeout:()=>0,clearTimeout(){}});}
   const {NewJourneyEditor,RemixDraftMap,default:CreateScreen}=load('src/app/create.tsx',modules,h.hooks);
   let reloads=0;
   return {celebrations,blur:()=>focusCleanup?.(),mountChild:node=>{h.reset();return h.render(node.type,node.props);},renderRemixMap:props=>h.render(RemixDraftMap,props),renderEntry:()=>h.render(CreateScreen,{}),setCanGoBack:value=>{canGoBack=value;},render:(props={})=>h.render(NewJourneyEditor,{ownerId:uid,initial,onReload:()=>reloads++,...props}),writes,routes,alerts,uploads,setFailure:(value=true,ambiguous=true)=>{fail=value;uncertain=ambiguous;},setPending:value=>{pending=value;},prevented:()=>prevented,dispatches,reloads:()=>reloads};
@@ -934,4 +937,40 @@ test('Journey Buddy uses the actual guarded memory buffer, never writes on openi
  const setup=[];screenHarness(undefined,{},setup).render();assert.equal(setup.at(-1).state.canAddMemory,false,'Quick Start must save a draft explicitly first');
  const photos={busyKey:'cover'},busy=[];const pending=screenHarness(privateForm(),photos,busy);pending.render();
  assert.equal(busy.at(-1).state.suppressed,true);busy.at(-1).actions.addMemory();assert.equal(all(pending.render(),'MemoryEditorSheet').length,0);
+});
+test('R3: editor offers device-only recovery; Restore refills unsaved edits without saving and a save clears the copy',async()=>{
+  const recovery=load('src/lib/create/recovery.ts',{}),key=recovery.recoveryKey(uid,id);
+  const initial={...model.newForm(id),title:'Saved',destination:place,traveler:'solo',updatedAt:'2026-10-14T10:00:00Z',stops:[{id:sid,name:'Beach',description:'',latitude:1,longitude:1,mapboxId:null,photoPath:null,day:'',rating:''}]};
+  const data=new Map([[key,JSON.stringify(recovery.buildSnapshot(uid,{...initial,title:'Recovered title',stops:[{...initial.stops[0],description:'Unsaved words'}]},null,true,Date.now()))]]);
+  const storage={getItem:async k=>data.get(k)??null,setItem:async(k,v)=>{data.set(k,v);},removeItem:async k=>{data.delete(k);},getAllKeys:async()=>[...data.keys()]};
+  const h=screenHarness(initial,{},[],storage);let tree=h.render();await new Promise(setImmediate);await new Promise(setImmediate);tree=h.render();
+  const prompt=h.alerts.find(a=>a[0]==='Restore unsaved changes?');assert.ok(prompt);assert.match(prompt[1],/New photos that weren’t saved can’t be restored/);
+  tree=h.render();assert.equal(all(tree,'MemoryDeck')[0].props.title,'Saved','Nothing restored until the user chooses');
+  prompt[2].find(b=>b.text==='Restore').onPress();tree=h.render();
+  assert.equal(all(tree,'MemoryDeck')[0].props.title,'Recovered title');assert.equal(all(tree,'MemoryDeck')[0].props.stops[0].description,'Unsaved words');
+  assert.equal(all(tree,'MemoryDeck')[0].props.status,'Unsaved changes');assert.equal(h.writes.length,0,'Restore never saves');
+  assert.ok(data.has(key));
+  all(tree,'Pressable').find(n=>n.props.accessibilityLabel==='Save Draft').props.onPress();await new Promise(setImmediate);await new Promise(setImmediate);
+  assert.equal(h.writes.length,1);assert.equal(h.writes[0].title,'Recovered title');assert.equal(h.writes[0].updated_at,initial.updatedAt);
+  assert.equal(data.has(key),false,'A successful save removes the recovery copy');
+});
+test('R3: Discard in the leave alert also removes the recovery copy',async()=>{
+  const recovery=load('src/lib/create/recovery.ts',{}),key=recovery.recoveryKey(uid,id);
+  const initial={...model.newForm(id),title:'Saved',destination:place,traveler:'solo',updatedAt:'2026-10-14T10:00:00Z',stops:[]};
+  const data=new Map([[key,JSON.stringify(recovery.buildSnapshot(uid,{...initial,title:'Recovered'},null,false,Date.now()))]]);
+  const storage={getItem:async k=>data.get(k)??null,setItem:async(k,v)=>{data.set(k,v);},removeItem:async k=>{data.delete(k);},getAllKeys:async()=>[...data.keys()]};
+  const h=screenHarness(initial,{},[],storage);h.render();await new Promise(setImmediate);await new Promise(setImmediate);h.render();
+  h.alerts.find(a=>a[0]==='Restore unsaved changes?')[2].find(b=>b.text==='Restore').onPress();h.render();h.render();
+  assert.equal(h.prevented().enabled,true);h.prevented().callback({data:{action:'leave'}});
+  h.alerts.find(a=>a[0]==='Discard unsaved changes?')[2].find(b=>b.text==='Discard').onPress();await new Promise(setImmediate);
+  assert.deepEqual(h.dispatches,['leave']);assert.equal(data.has(key),false);assert.equal(h.writes.length,0);
+});
+test('R3: Restore is ignored while a photo is preparing; the recovery copy stays',async()=>{
+  const recovery=load('src/lib/create/recovery.ts',{}),key=recovery.recoveryKey(uid,id);
+  const initial={...model.newForm(id),title:'Saved',destination:place,traveler:'solo',updatedAt:'2026-10-14T10:00:00Z',stops:[]};
+  const data=new Map([[key,JSON.stringify(recovery.buildSnapshot(uid,{...initial,title:'Recovered'},null,false,Date.now()))]]);
+  const storage={getItem:async k=>data.get(k)??null,setItem:async(k,v)=>{data.set(k,v);},removeItem:async k=>{data.delete(k);},getAllKeys:async()=>[...data.keys()]};
+  const photoState={},h=screenHarness(initial,photoState,[],storage);h.render();await new Promise(setImmediate);await new Promise(setImmediate);h.render();
+  photoState.busyKey='cover';h.alerts.find(a=>a[0]==='Restore unsaved changes?')[2].find(b=>b.text==='Restore').onPress();const tree=h.render();
+  assert.equal(all(tree,'MemoryDeck')[0].props.title,'Saved');assert.equal(h.writes.length,0);assert.ok(data.has(key));
 });

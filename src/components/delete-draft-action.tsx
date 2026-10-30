@@ -4,6 +4,7 @@ import { colors, ui } from '@/components/discovery/ui';
 import { useSessionState } from '@/hooks/session-context';
 import { supabase } from '@/lib/supabase/client';
 import { deleteOwnedDraft } from '@/lib/remix/delete-draft';
+import { creationRecovery } from '@/lib/create/recovery-store';
 
 export function DeleteDraftAction({ draft, onDeleted }: { draft: { id: string; title: string }; onDeleted: () => void }) {
   const auth = useSessionState(), ownerId = auth.session?.user.id;
@@ -14,6 +15,8 @@ export function DeleteDraftAction({ draft, onDeleted }: { draft: { id: string; t
     lock.current = true; setBusy(true); setMessage('');
     try {
       await deleteOwnedDraft(supabase, draft.id, ownerId || '');
+      // A deleted draft's unsaved on-device copy can never be restored, so drop it too.
+      if (ownerId) void creationRecovery.clear(ownerId, draft.id);
       setConfirm(false); onDeleted();
     } catch (error) { setMessage(error instanceof Error ? error.message : 'Deletion could not be confirmed. Refresh drafts before retrying.'); }
     finally { lock.current = false; setBusy(false); }

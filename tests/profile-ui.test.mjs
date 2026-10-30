@@ -51,16 +51,17 @@ test('profile journey and draft cards retain their routes, truthful facts and ph
 });
 
 const buddyScreens=[];
-function accountHarness(){const h=hooks(),routes=[],loaders=[];let auth={loading:false,session:{user:{id:uid,email:'private@example.test',user_metadata:{display_name:'Real owner'}}}},finish,fail=false,calls=0,cancels=0;
+function accountHarness(){const h=hooks(),routes=[],loaders=[];let auth={loading:false,session:{user:{id:uid,email:'private@example.test',user_metadata:{display_name:'Real owner'}}}},finish,fail=false,calls=0,cancels=0;const recoveryCleared=[];
   let draftRefreshes=0;const draftState={data:[{id:'draft',title:'Actual draft'}],refresh(){draftRefreshes++;},retry(){},loading:false};const publishedState={data:{profile:null,journeys:[journey]},refresh(){},retry(){},loading:false};
   const components=Object.fromEntries(['ProfileHeader','ProfileIdentity','ProfileCollections','ProfileDraftCard','ProfileJourneyCard','ProfileTabs'].map(n=>[n,n]));components.profileStyles={};
   const modules={'expo-router':{useRouter:()=>({push:r=>routes.push(r)}),useFocusEffect:()=>{}},'react-native-safe-area-context':{SafeAreaView:'SafeAreaView'},'@/components/discovery/ui':ui,'@/components/profile/profile-ui':components,
     '@/hooks/session-context':{useSessionState:()=>auth},'@/hooks/action-intent':{useActionIntent:()=>({cancel(){cancels++;}})},
     '@/hooks/use-load':{useLoad:fn=>{loaders.push(fn);return loaders.length%2?draftState:publishedState;}},
     '@/lib/remix/queries':{loadPrivateDrafts:async()=>draftState.data,withDraftSources:(drafts,cards)=>drafts.map(d=>d.sourceId&&cards.has(d.sourceId)?{...d,source:cards.get(d.sourceId)}:d)},'@/hooks/use-draft-credits':{useDraftCredits:()=>new Map()},'@/lib/profile/queries':{loadPublicProfile:async()=>null,loadPublishedProfileJourneys:async()=>[journey]},
-    '@/lib/profile/edit-queries':{loadOwnProfile:async()=>({id:uid,username:'real',displayName:'Real owner',bio:'',avatarPreview:null})},'@/lib/discovery/model':{safePhoto:()=>null},'@/lib/auth/queries':{signOutAccount:()=>{calls++;return new Promise((resolve,reject)=>{finish=()=>fail?reject(Error('failure')):resolve();});}}};
+    '@/lib/profile/edit-queries':{loadOwnProfile:async()=>({id:uid,username:'real',displayName:'Real owner',bio:'',avatarPreview:null})},'@/lib/discovery/model':{safePhoto:()=>null},'@/lib/auth/queries':{signOutAccount:()=>{calls++;return new Promise((resolve,reject)=>{finish=()=>fail?reject(Error('failure')):resolve();});}},
+    '@/lib/create/recovery-store':{creationRecovery:{clearUser:async user=>{recoveryCleared.push(user);}}}};
   const {default:Screen}=load('src/app/account.tsx',modules,h.react);
-  return {render:()=>h.render(Screen),routes,loaders,draftState,publishedState,setAuth:v=>auth=v,setFail:v=>fail=v,finish:()=>finish(),calls:()=>calls,cancels:()=>cancels,draftRefreshes:()=>draftRefreshes};
+  return {render:()=>h.render(Screen),routes,loaders,draftState,publishedState,setAuth:v=>auth=v,setFail:v=>fail=v,finish:()=>finish(),calls:()=>calls,cancels:()=>cancels,draftRefreshes:()=>draftRefreshes,recoveryCleared};
 }
 test('Account tabs preserve private draft entry, published cards, settings actions and guarded sign-out failure',async()=>{
   const h=accountHarness();let tree=h.render(),list=all(tree,'FlatList')[0];assert.equal(list.props.data[0].kind,'draft');
@@ -70,7 +71,9 @@ test('Account tabs preserve private draft entry, published cards, settings actio
   all(tree,'ProfileHeader')[0].props.onSettings();tree=h.render();assert.equal(all(tree,'Modal')[0].props.visible,true);
   const signOut=all(tree,'Action').find(n=>n.props.label==='Sign out');h.setFail(true);signOut.props.onPress();signOut.props.onPress();assert.equal(h.calls(),1);assert.equal(h.cancels(),1);
   tree=h.render();assert.equal(all(tree,'Action').find(n=>n.props.label==='Signing out…').props.disabled,true);h.finish();await new Promise(setImmediate);tree=h.render();assert.ok(all(tree,'Text').some(n=>n.props.accessibilityRole==='alert'));
+  assert.deepEqual(h.recoveryCleared,[],'A failed sign-out keeps unsaved Create recovery');
   h.setFail(false);all(tree,'Action').find(n=>n.props.label==='Sign out').props.onPress();h.finish();await new Promise(setImmediate);assert.equal(all(h.render(),'Modal')[0].props.visible,false);
+  assert.deepEqual(h.recoveryCleared,[uid],'Sign-out clears only the signed-out user recovery copies');
 });
 test('Account gates private content while signed out/loading and preserves draft failure/empty recovery',()=>{
   const h=accountHarness();h.setAuth({loading:true,session:null});assert.equal(all(h.render(),'FlatList').length,0);
