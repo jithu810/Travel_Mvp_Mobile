@@ -386,27 +386,27 @@ test('private history resumes actual drafts and keeps all-drafts, empty, loading
   const retry=()=>{};state={error:'Offline',retry};tree=DraftShortcuts({ownerId:uid});assert.equal(all(tree,'Message')[0].props.retry,retry);
 });
 
-test('compact creation keeps CTA outside the only controls scroller and history in a separate sibling', () => {
+test('compact creation scrolls feedback and retry together while history stays separate', () => {
   const h=screenHarness();const page=h.render().props.children;
   assert.equal(page.type,'View');assert.equal(page.props.style.flex,undefined);assert.equal(page.props.style.flexShrink,1);assert.equal(page.props.style.minHeight,0);
   assert.equal(h.render().props.style.flexShrink,1);assert.equal(h.render().props.style.flex,undefined,'Quick Start uses natural height so the globe receives slack');
   assert.deepEqual(page.props.children.map(n=>n.type?.name || n.type),['QuickJourneySetup','DraftShortcuts']);
   const {QuickJourneySetup}=load('src/components/create/quick-journey-setup.tsx',{'../discovery/ui':ui,'./place-picker':{PlacePicker:'PlacePicker',formStyles:{}}});
   const tree=QuickJourneySetup({form:model.newForm(id),disabled:false,onTitle(){},onDestination(){},onChange(){},onStart(){},feedback:{type:'Text',props:{children:'Check destination'}}});
-  const [controls,footer]=tree.props.children;
+  const controls=all(tree,'ScrollView')[0], footer=controls.props.children.at(-1);
   assert.equal(controls.type,'ScrollView');assert.equal(controls.props.style.flexShrink,1);
   assert.equal(all(controls,'ScrollView').length,1,'No nested main controls scroll');
-  assert.equal(all(controls,'Action').length,0,'Create is never inside scroll content');
+  assert.equal(all(controls,'Action').length,1,'Retry remains reachable by scrolling past feedback');
   assert.equal(footer.props.style.flexShrink,0);assert.equal(all(footer,'Action')[0].props.label,'Create my journey');
-  assert.ok(all(controls,'Text').some(n=>n.props.children==='Check destination'),'Errors scroll without displacing CTA');
+  assert.ok(all(controls,'Text').some(n=>n.props.children==='Check destination'),'Error stays in the same scroller as retry');
   assert.equal(tree.props.style.flexShrink,1);
 });
 
-test('reference form keeps compact controls and leaves a protected CTA when globe header reduces available height', () => {
+test('reference form keeps compact controls and a scrollable CTA when globe header reduces available height', () => {
   const shared=load('src/components/discovery/ui.tsx',{'expo-router':{useRouter:()=>({})}});
   const setup=load('src/components/create/quick-journey-setup.tsx',{'../discovery/ui':shared,'./place-picker':{PlacePicker:'PlacePicker',formStyles:{input:{},label:{fontSize:14}}}});
   const tree=setup.QuickJourneySetup({form:{...model.newForm(id),destination:place},disabled:false,onTitle(){},onDestination(){},onChange(){},onStart(){}});
-  const [controls,footer]=tree.props.children, [destination,details]=controls.props.children;
+  const controls=all(tree,'ScrollView')[0], footer=controls.props.children.at(-1), [destination,details]=controls.props.children;
   const [title,traveler,duration]=details.props.children;
   const inputStyle=all(title,'TextInput')[0].props.style.at(-1);
   const chips=all(traveler,'Pressable');assert.equal(chips.length,4);assert.ok(chips.every(n=>n.props.style[0].minHeight>=44));
@@ -421,7 +421,7 @@ test('reference form keeps compact controls and leaves a protected CTA when glob
     assert.ok(shared.ui.action.minHeight+2*tree.props.style.padding+2<available, width+'x'+height+' leaves space for CTA and shrinkable controls');
     if(width>=393)assert.ok(formHeight+2*tree.props.style.padding+2<=available,'Tall portrait accommodates normal-text form estimate');
   }
-  assert.equal(footer.props.style.flexShrink,0,'Short landscape, expanded text and errors retain CTA while controls can scroll');
+  assert.equal(footer.props.style.flexShrink,0,'CTA keeps its touch target inside scroll content');
   assert.equal(controls.props.style.flexShrink,1);assert.equal(shared.ui.compactBack.width,44);
   assert.equal(shared.ui.header.minHeight,76,'Other screen header default retained');
 });

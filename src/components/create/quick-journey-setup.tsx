@@ -42,10 +42,10 @@ export function QuickJourneySetup({ form, disabled, editing = false, saving = fa
       <TextInput accessibilityLabel="Journey description (optional)" value={form.description} editable={!disabled} multiline maxLength={5000} onChangeText={description => onChange({ description })} placeholder="What made this journey special?" style={[formStyles.input, s.editInput, s.description]} />
     </View>}
     {feedback}
-    </ScrollView>
     <View style={s.start}>
     <Action compact vibrant={!editing} memorySheet={editing} label={saving ? 'Saving…' : editing ? 'Save Changes' : 'Create my journey'} disabled={disabled} onPress={onStart} />
     </View>
+    </ScrollView>
   </View>;
 }
 const s = StyleSheet.create({

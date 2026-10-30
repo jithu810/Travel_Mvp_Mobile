@@ -1,3 +1,15 @@
+## Create retry button visibility - 2026-10-30
+- LOCAL, UNPUBLISHED: error and Create/Save Changes button now share the form scroller, preventing an unreachable footer. Phone error/keyboard/retry check and 87 focused tests pass; independent review has no actionable findings. No backend behavior or live writes changed. Specific R5 finding resolved; broader R5 remains open. B3/U8 not started.
+
+## R3 creation recovery verification - 2026-10-30
+- R3 COMPLETE under mixed phone/automated scope: 87 focused tests pass; phone unsaved restore, controlled rejection and pre-submission interruption retained edits. Approved live private test draft saved once; recovery cleared and saved draft reopened after restart without a prompt. One private test draft retained in Sreejith Gs account; no photos/publication. Ambiguous commits and interrupted uploads automated-only; physical network-loss remains R4. Error text can hide the Create button (R5 follow-up). No application code changes; prior review reused. Overall 12/24 complete, 12 remaining. Documentation local/unpublished. See docs/qa/r3-phone-recovery-2026-10-30.md; earlier counts below are historical.
+
+## R2 real-GPS recovery verification - 2026-10-30
+- R2 COMPLETE: CPH2813 / Android 16, Metro 8081. Active and paused trips recovered after force-stop; five-stop itinerary and one manual completion preserved. Restored paused with GPS off; explicit Resume restarted real GPS guidance. Finish cleared local recovery and GPS requests. No hosted writes/application changes. Existing independent review and automated evidence reused; moving-route reliability remains R4. Overall 11/24 complete, 13 remaining. R3 save/recovery scenarios next. Documentation local/unpublished. Details: docs/qa/r2-phone-recovery-2026-10-30.md. Earlier pending/count entries below are historical.
+
+## U1 phone verification - 2026-10-30
+- U1 COMPLETE: CPH2813 / Android 16, Codex Metro 8081. Approved single-key Buddy reset; Guide me opened tour 1/3; force-stop/relaunch retained Buddy enabled without repeating intro/tour. No app-data clear, hosted writes or application code changes. Previous independent review passed; existing automated evidence reused. TalkBack deferred to R5. Overall 10/24 complete, 14 remaining; R2 real GPS is next. Documentation local/unpublished. Earlier pending/count entries below are historical.
+
 ## Phone backlog verification - 2026-10-30
 - [x] B5 greeting reset, automatic expiry, revisit suppression and cold-relaunch suppression verified on CPH2813 / Android 16. Existing 69 tests/static checks and independent review pass. Overall 9/24 complete; publication authorized on feature/backlog-phase1, merge not authorized.
 - [x] U5 Saved/draft/recoverable-work paths closed under the owner's accepted code-checked scope; phone Search and Account paths inspected. Status update local/unpublished.
