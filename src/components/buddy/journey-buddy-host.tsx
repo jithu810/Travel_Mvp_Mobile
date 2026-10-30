@@ -208,8 +208,10 @@ function BuddyActor({ api, path, geometry, screen, interacting }: { api: Api; pa
       if (!allowed()) return;
       capture.read(value => {
         if (!allowed()) return;
-        const safe = nearestBuddyPosition(value, geometry);
-        if (!safe || !placeBuddyBubble(safe, geometry, Math.min(252, corridor.width), minimumBubbleHeight)
+        // Geometry is read at display time; as a dependency its frequent updates kept restarting this timer on Home.
+        const { geometry: now, corridor: area } = latest.current;
+        const safe = nearestBuddyPosition(value, now);
+        if (!safe || !placeBuddyBubble(safe, now, Math.min(252, area.width), minimumBubbleHeight)
           || !claimBuddyContext(api.store, path)) return;
         api.greetings.mark(buddyGreetingKey(path));
         point.current = safe; position.setValue(safe); setWalking(false); setAnchor(safe); setBubbleHeight(0);
@@ -218,7 +220,7 @@ function BuddyActor({ api, path, geometry, screen, interacting }: { api: Api; pa
       });
     }, BUDDY_CONTEXT_DELAY);
     return () => { active = false; clearTimeout(timer); clearTimeout(expiry); if (alive.current) setContextual(null); };
-  }, [api, path, screen?.travel, help, reaction, interacting, dragging, asleep, pendingCelebration, capture, geometry, corridor.width, minimumBubbleHeight, position]);
+  }, [api, path, screen?.travel, help, reaction, interacting, dragging, asleep, pendingCelebration, capture, minimumBubbleHeight, position]);
   const openHelp = () => {
     if (!alive.current || !api.preference.get().enabled || path !== api.store.get().path || api.store.current().suppressed || AppState.currentState !== 'active') return;
     if (api.store.current().state?.travel?.guidance || api.store.current().state?.travel?.arrival) return;

@@ -105,3 +105,10 @@ Each item: write the change, run the affected tests, typecheck and lint, check i
 ### Note 2026-10-30 — B5 emulator run (partial, not ticked)
 - Clean run on the emulator (1.5 GB, 3 cores), Metro on 8082: after restarting the app, Search crashed once with "Maximum update depth exceeded" (stack through the Search list's updates, VirtualizedList `_updateCellsToRender`). The next restart loaded Search cleanly. Cause not yet found; to investigate before B5 is ticked, using the Metro log and a repeatable reproduction.
 - The greeting itself was not confirmed in this run because the crash interrupted the first Search visit.
+
+### Note 2026-10-30 — B5 greeting fixed and verified on the emulator (still not ticked)
+- Cause found with temporary debug logging (removed): on Home the greeting effect listed Buddy geometry as a dependency, and Home's frequent geometry updates restarted its 8-second timer about 217 times in 90 seconds, so it never fired. Fixed by reading geometry at display time (src/components/buddy/journey-buddy-host.tsx).
+- Emulator (fresh install, Buddy on): Home showed its greeting once (seen on screen by the owner); the stored record became ["/discover"]. After a restart, no repeat greeting, and the record was unchanged.
+- Search on a full grid shows no greeting by design: every Explore tile is protected so Buddy never covers content, and no bubble-sized gap exists. The greeting is not marked as shown, so it can appear later if room exists.
+- Also fixed today: the restart crash ("Maximum update depth exceeded"), see commit 3c28d67.
+- Still pending before ticking B5: the Account "Show Buddy greetings again" control, which the dev-client tools button covers on both the emulator and the phone.
