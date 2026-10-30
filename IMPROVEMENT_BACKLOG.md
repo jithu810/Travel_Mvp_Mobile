@@ -118,3 +118,7 @@ Each item: write the change, run the affected tests, typecheck and lint, check i
 - Home's panel now has a full-width "Find a journey" button above "Recently shared" (src/components/discovery/discovery-panel.tsx, wired in src/app/discover.tsx). It opens the same journey search as the Search tab. The globe and its place search are unchanged, and the Create banner stays one line.
 - Verification: full suite 849/850 pass (0 fail, 1 skipped), tsc and ESLint, plus a new panel test; emulator showed the button and tapping it opened journey search.
 - Pending before ticking: the on-device comparison on the owner's phone.
+
+### Note 2026-10-30 — U4 browsing labels: deferred by owner decision (not ticked)
+- Owner chose to keep Explore, Search and Story unchanged until the usability pilot (E2) shows whether people confuse them, as the item asks ("choose clearer labels or consolidation based on findings").
+- Options considered: rename only (Map / Find / Stories); merge Search and Story into one Journeys tab with a grid/list switch; keep as is until E2. Home's new "Find a journey" button (U2) gives a clear entry to journey search in the meantime.
