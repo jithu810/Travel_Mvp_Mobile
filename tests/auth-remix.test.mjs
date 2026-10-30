@@ -120,10 +120,10 @@ test('uncertain copies block retries, known SQL failures permit retry, and known
   await store.run('known', async () => { throw new RemixFailure('Read failed', true, copyId); });
   assert.equal(store.get('known').copyId, copyId); assert.equal(store.get('known').error, 'Read failed');
 });
-const calls = []; let viewer = uid; let currentDraft = draftRow; let copyError = null; let confirmation = true; let authError = null;
+const calls = []; let viewer = uid; let currentDraft = draftRow; let copyError = null; let confirmation = true; let authError = null; let accountError = null;
 const client = {
   auth: {
-    getUser: async () => ({ data: { user: viewer ? { id: viewer } : null }, error: null }),
+    getUser: async () => ({ data: { user: viewer ? { id: viewer } : null }, error: accountError }),
     signInWithPassword: async args => { calls.push(['signin', args]); return { data: { session: authError ? null : { user: { id: uid } } }, error: authError }; },
     signUp: async args => { calls.push(['register', args]); return { data: { session: confirmation ? null : { user: { id: uid } } }, error: authError }; },
     signOut: async args => { calls.push(['signout', args]); return { error: authError }; },
@@ -195,4 +195,9 @@ test('Use targets existing Travel Mode; authenticated returns consume intents on
   const auth = readFileSync('src/app/auth.tsx', 'utf8');
   assert.ok(auth.includes('router.canGoBack()')); assert.ok(auth.includes('if (!finished.current) cancelIntent()'));
   assert.ok(auth.includes('You are not signed in yet.'));
+});
+test('an unreachable account check is not reported as signed out and reads no drafts', async () => {
+  calls.length = 0; viewer = uid; accountError = { name: 'AuthRetryableFetchError', status: 0 };
+  await assert.rejects(() => queries.loadPrivateDrafts(uid, new AbortController().signal), /Check your connection/); assert.equal(calls.length, 0);
+  accountError = { name: 'AuthSessionMissingError', status: 400 }; await assert.rejects(() => queries.loadPrivateDrafts(uid, new AbortController().signal), /Sign in again/); accountError = null;
 });

@@ -51,8 +51,8 @@ export default function AccountScreen() {
   ], [window.width, window.height]));
   const scroll = useBuddyScroll(), footerProtection = useBuddyProtectedBounds();
   // Only a loaded draft is offered; nothing is written and no copy is made from here.
-  // A failed refresh may leave a deleted draft in the last-known list, so offer only a successful load.
-  const resumeDraft = drafts.error ? undefined : drafts.data?.[0];
+  // A failed or running refresh may hold a deleted draft in the last-known list, so offer only a settled, successful load.
+  const resumeDraft = drafts.error || drafts.refreshing ? undefined : drafts.data?.[0];
   useBuddyScreen({ floating: true, suppressed: settings || busy || auth.loading, resume: resumeDraft ? { id: resumeDraft.id, title: resumeDraft.title } : undefined });
   const refreshDrafts = drafts.refresh, refreshPublished = published.refresh;
   useFocusEffect(useCallback(() => { refreshDrafts(); refreshPublished(); }, [refreshDrafts, refreshPublished]));

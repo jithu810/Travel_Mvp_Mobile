@@ -136,5 +136,6 @@ test('B3: Buddy offers Continue editing only for a draft from a successful load,
   const h=accountHarness();const draft=h.draftState.data[0];assert.ok(draft&&draft.id);
   buddyScreens.length=0;h.render();assert.deepEqual(buddyScreens.at(-1).resume,{id:draft.id,title:draft.title});
   h.draftState.error='Offline';buddyScreens.length=0;h.render();assert.equal(buddyScreens.at(-1).resume,undefined,'A failed refresh never offers the last-known draft');
-  h.draftState.error=null;h.draftState.data=[];buddyScreens.length=0;h.render();assert.equal(buddyScreens.at(-1).resume,undefined,'No drafts: Buddy offers Start a new journey instead');
+  h.draftState.error=null;h.draftState.refreshing=true;buddyScreens.length=0;h.render();assert.equal(buddyScreens.at(-1).resume,undefined,'A running refresh never offers the last-known draft');h.draftState.refreshing=false;
+  h.draftState.data=[];buddyScreens.length=0;h.render();assert.equal(buddyScreens.at(-1).resume,undefined,'No drafts: Buddy offers Start a new journey instead');
 });

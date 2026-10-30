@@ -66,8 +66,8 @@ test('validation, missing draft ownership, local path contamination and invalid 
  for(const patch of [{title:''},{coverPath:'file:///bad'}])assert.equal((await controller().save({...form(),...patch},{cover:photo()})).kind,'error');assert.equal((await controller().save(form(),{unknown:photo()})).kind,'error');
  for(const args of [['bad',id,'cover',other,'image/png'],[owner,id,'../bad',other,'image/png'],[owner,id,'cover',other,'image/heic']])assert.throws(()=>photoObjectName(...args));
 });
-let authOwner=owner,rows=[],readCalls=[],uploadCalls=[],uploadError=null,uploadedPath=null,readError=false;
-const client={auth:{getUser:async()=>({data:{user:authOwner?{id:authOwner}:null},error:null})},from:table=>{const entry={table,filters:[]};const query={select:c=>{entry.columns=c;return query;},eq:(k,v)=>{entry.filters.push([k,v]);return query;},abortSignal:signal=>{assert.equal(signal.aborted,false);return query;},maybeSingle:async()=>{readCalls.push(entry);return rows.shift();},then:(resolve,reject)=>{readCalls.push(entry);return Promise.resolve(rows.shift()).then(resolve,reject);}};return query;},storage:{from:bucket=>{assert.equal(bucket,'journey-media');return {upload:async(name,body,opts)=>{uploadCalls.push({name,body,opts});return {data:uploadError?null:{path:uploadedPath||name},error:uploadError};}};}}};
+let accountError=null,authOwner=owner,rows=[],readCalls=[],uploadCalls=[],uploadError=null,uploadedPath=null,readError=false;
+const client={auth:{getUser:async()=>({data:{user:authOwner?{id:authOwner}:null},error:accountError})},from:table=>{const entry={table,filters:[]};const query={select:c=>{entry.columns=c;return query;},eq:(k,v)=>{entry.filters.push([k,v]);return query;},abortSignal:signal=>{assert.equal(signal.aborted,false);return query;},maybeSingle:async()=>{readCalls.push(entry);return rows.shift();},then:(resolve,reject)=>{readCalls.push(entry);return Promise.resolve(rows.shift()).then(resolve,reject);}};return query;},storage:{from:bucket=>{assert.equal(bucket,'journey-media');return {upload:async(name,body,opts)=>{uploadCalls.push({name,body,opts});return {data:uploadError?null:{path:uploadedPath||name},error:uploadError};}};}}};
 require.cache[join(output,'lib/supabase/client.js')]={exports:{supabase:client}};
 require.cache[join(output,'lib/create/photo-device.js')]={exports:{readPreparedPhoto:async()=>{if(readError)throw Error('Local file missing');return new ArrayBuffer(4);}}};
 const {checkPhotoDraft,uploadJourneyPhoto}=require(join(output,'lib/create/photo-queries.js'));
@@ -127,4 +127,7 @@ test('thumbnail boundary rejects noninteger/oversized bytes or source alias with
  for(const patch of [{size:1024*1024+1},{size:4.5},{uri:photo().uri}]){
   const c=pairedController({patch});assert.equal((await c.run()).kind,'error');assert.equal(c.uploads.length,0);assert.equal(c.writes.length,0);assert.ok(!c.removed.includes(photo().uri));
  }
+});
+test('an unreachable account check blocks photo saving before any read or upload and is not uncertain',async()=>{
+ queue();uploadCalls=[];accountError={name:'AuthRetryableFetchError',status:0};await assert.rejects(checkPhotoDraft(form(),owner,new AbortController().signal),e=>e.uncertain!==true&&/Check your connection/.test(e.message));assert.equal(readCalls.length,0);assert.equal(uploadCalls.length,0);accountError=null;
 });

@@ -111,8 +111,8 @@ test('safe failures allow retry with unchanged IDs; ambiguous failures block rep
   let calls = 0; const uncertain = model.createSaveController(async () => { calls++; throw new model.SaveFailure('Unconfirmed', true); });
   await uncertain.save(form, 'published'); assert.equal((await uncertain.save(form, 'draft')).kind, 'blocked'); assert.equal(calls, 1);
 });
-const calls = []; let viewer = uid, failure = null, response = saved;
-const client = { auth: { getUser: async () => ({ data: { user: viewer ? { id: viewer } : null }, error: null }) },
+const calls = []; let viewer = uid, failure = null, response = saved, accountError = null;
+const client = { auth: { getUser: async () => ({ data: { user: viewer ? { id: viewer } : null }, error: accountError }) },
   rpc: (name, args) => ({ abortSignal: async signal => { assert.equal(signal.aborted, false); calls.push([name, args]); return { data: response, error: failure }; } }) };
 require.cache[join(output, 'lib/supabase/client.js')] = { exports: { supabase: client } };
 const { saveNewJourney } = require(join(output, 'lib/create/queries.js'));
@@ -248,4 +248,12 @@ test('private photo reads sign only existing storage objects, respect owner chec
   viewer=uid;assert.deepEqual(await loadEditorPhotos(raw,uid,new AbortController().signal),{[raw[0]]:'https://signed.test/a'});assert.deepEqual(signing,['owner/trip/stops/a.webp']);assert.equal(JSON.stringify(raw),before);
   viewer=null;signing=[];await assert.rejects(loadEditorPhotos(raw,uid,new AbortController().signal));assert.equal(signing.length,0);viewer=uid;
   const abort=new AbortController();abort.abort();await assert.rejects(loadEditorPhotos(raw,uid,abort.signal));
+});
+test('an unreachable account check blocks the save, sends nothing, is not uncertain, and can be retried', async () => {
+  calls.length = 0; accountError = { name: 'AuthRetryableFetchError', status: 0 }; const payload = model.savePayload(valid(), 'draft');
+  await assert.rejects(() => saveNewJourney(payload, uid), error => error.uncertain === false && /Check your connection/.test(error.message)); assert.equal(calls.length, 0);
+  accountError = { name: 'AuthSessionMissingError', status: 400 }; await assert.rejects(() => saveNewJourney(payload, uid), /Sign in again/);
+  accountError = { name: 'AuthRetryableFetchError', status: 0 }; const controller = model.createSaveController(next => saveNewJourney(next, uid));
+  const form = valid(); assert.equal((await controller.save(form, 'draft')).kind, 'error'); accountError = null;
+  assert.equal((await controller.save(form, 'draft')).kind, 'saved', 'Nothing was sent, so a retry is allowed'); assert.equal(calls.length, 1);
 });
