@@ -12,7 +12,7 @@ import { createBuddyPositionCapture } from '@/lib/buddy/position';
 import { buddyCelebrationDuration } from '@/lib/buddy/animations';
 import { buddyContextLine, buddyGreetingKey, claimBuddyContext, BUDDY_CONTEXT_DELAY, BUDDY_CONTEXT_DURATION, type BuddyContextLine } from '@/lib/buddy/contextual-lines';
 import { MapBuddyHelp } from './map-buddy-help';
-import { buddyHelpLine, buddyHelpPrimary } from '@/lib/buddy/help-actions';
+import { buddyHelpLine, buddyHelpPrimary, buddyResumeReason } from '@/lib/buddy/help-actions';
 
 type Api = NonNullable<ReturnType<typeof useBuddyApi>>;
 export function JourneyBuddyHost() {
@@ -350,7 +350,7 @@ function BuddyActor({ api, path, geometry, screen, interacting }: { api: Api; pa
         setBubbleHeight(old => old === height ? old : height);
       }}
       placement={placement ? { ...placement.rect, above: placement.above, tailX: placement.tailX } : undefined}
-      contextualLine={buddyContextLine(path)?.text ?? buddyHelpLine(path)} reaction={contextualVisible ? contextual.text : !help && reactionVisible ? reaction?.text : undefined} tour={help ? tour : null}
+      contextualLine={(screen?.resume ? buddyResumeReason(screen.resume.title) : buddyHelpPrimary(path)?.reason) ?? buddyContextLine(path)?.text ?? buddyHelpLine(path)} reaction={contextualVisible ? contextual.text : !help && reactionVisible ? reaction?.text : undefined} tour={help ? tour : null}
       onTour={() => { if (!canAct()) return; if (tour === null) { api.store.setTour(0); } else navigate((['/discover', '/create', '/account'] as const)[tour]); }}
       onNext={() => { if (!canAct()) return; if (tour === 2) closeBubble(); else { api.store.setTour((tour ?? -1) + 1); } }}
       primary={helpPrimary ? { label: helpPrimary.label, onPress: helpPrimary.onPress } : buddyHelpPrimary(path) ? { label: buddyHelpPrimary(path)!.label, onPress: () => { api.store.setTour(null); navigate(buddyHelpPrimary(path)!.route); } } : undefined}

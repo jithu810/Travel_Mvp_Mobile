@@ -808,7 +808,7 @@ test('Explore greets with Wave and manual Account help keeps contextual copy plu
   assert.equal(all(tree, 'BuddySprite')[0].props.animation, 'wave'); assert.match(all(tree, 'BuddyHelpSheet')[0].props.reaction, /A new story could be one journey away/);
   h.actorHooks.dispose(); h.path('/account'); h.api.store.screen(h.owner, { path: '/account', state: { floating: true }, act() {} }); h.renderHost(); tree = h.remountActor(); await tick(); tree = settleActor(h);
   all(tree, 'View').find(node => node.props.onAccessibilityTap).props.onAccessibilityTap(); tree = settleActor(h);
-  const bubble = all(tree, 'BuddyHelpSheet')[0]; assert.match(bubble.props.contextualLine, /stories, all together/); assert.equal(bubble.props.reaction, undefined);
+  const bubble = all(tree, 'BuddyHelpSheet')[0]; assert.match(bubble.props.contextualLine, /stays private until you publish/, 'Manual help explains why its action fits (B6)'); assert.equal(bubble.props.reaction, undefined);
   h.actorHooks.dispose(); h.hostHooks.dispose();
 });
 
@@ -945,9 +945,10 @@ test('turning Buddy off, including a failed save after Guide me, drops the pendi
 });
 test('B1a: task-specific help actions lead to another relevant screen and never act on the current one', () => {
   const { buddyHelpPrimary, buddyHelpLine } = load('src/lib/buddy/help-actions.ts');
-  for (const path of ['/', '/index', '/discover']) assert.deepEqual(buddyHelpPrimary(path), { label: 'Find a journey', route: '/search' });
-  assert.deepEqual(buddyHelpPrimary('/search'), { label: 'Start my own journey', route: '/create' });
-  assert.deepEqual(buddyHelpPrimary('/account'), { label: 'Start a new journey', route: '/create' }, 'Account no longer offers drafts, which it already shows');
+  const pick = value => value && { label: value.label, route: value.route };
+  for (const path of ['/', '/index', '/discover']) assert.deepEqual(pick(buddyHelpPrimary(path)), { label: 'Find a journey', route: '/search' });
+  assert.deepEqual(pick(buddyHelpPrimary('/search')), { label: 'Start my own journey', route: '/create' });
+  assert.deepEqual(pick(buddyHelpPrimary('/account')), { label: 'Start a new journey', route: '/create' }, 'Account no longer offers drafts, which it already shows');
   for (const path of ['/create', '/journey/a', '/customized/a', '/travel/a', '/profile/someone']) assert.equal(buddyHelpPrimary(path), null, path + ' keeps its existing action');
   for (const path of ['/', '/discover', '/search', '/account']) assert.notEqual(buddyHelpPrimary(path).route, path === '/' ? '/discover' : path);
   assert.match(buddyHelpLine('/journey/a'), /Swipe to start uses every stop.*Make it yours/);
@@ -993,4 +994,14 @@ test('greetings: once per screen per install, persisted on the device, reset on 
   const reopened = createBuddyGreetings(storage); await reopened.load(); assert.equal(reopened.has('/discover'), true, 'Survives a restart');
   reopened.reset(); await tick(); assert.equal(reopened.has('/discover'), false); assert.equal(values.has('journey-buddy:v1:greeted'), false);
   fail = true; const broken = createBuddyGreetings(storage); await broken.load(); assert.equal(broken.isLoaded(), false, 'A failed read keeps greetings off');
+});
+test('B6: each help action explains why it fits, claims only what is known, and the draft reason uses the real title', () => {
+  const { buddyHelpPrimary, buddyResumeReason } = load('src/lib/buddy/help-actions.ts');
+  assert.match(buddyHelpPrimary('/discover').reason, /latest public journeys/);
+  assert.match(buddyHelpPrimary('/search').reason, /private draft.*Nothing is public until you publish/);
+  const account = buddyHelpPrimary('/account').reason;
+  assert.match(account, /stays private until you publish/); assert.doesNotMatch(account, /no (private )?drafts/i, 'Account never claims there are no drafts');
+  assert.equal(buddyResumeReason('  Goa journey  '), 'Your draft “Goa journey” is saved privately. Pick up where you left off.');
+  assert.equal(buddyResumeReason('   '), 'Your draft is saved privately. Pick up where you left off.', 'A blank title falls back to plain wording');
+  for (const path of ['/', '/search', '/account']) assert.doesNotMatch(buddyHelpPrimary(path).reason, /explorer|miss you|don’t forget/i, 'No nicknames or guilt-based nudges');
 });
