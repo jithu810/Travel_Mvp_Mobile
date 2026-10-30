@@ -9,7 +9,7 @@ const full=`journey-media/${owner}/${other}/stops/${owner}/${other}.full-v1.png`
 function harness(options={}){
  const signed=[],events=[];let identity=owner,count=0,listener,unsubscribed=false;
  const client={auth:{async getUser(){count++;return {data:{user:{id:options.identity?.(count) ?? identity}},error:options.authError};},onAuthStateChange(fn){listener=fn;return {data:{subscription:{unsubscribe(){unsubscribed=true;}}}};}},storage:{from(bucket){assert.equal(bucket,'journey-media');return {async createSignedUrls(paths,ttl){signed.push(paths);assert.equal(ttl,3600);await options.beforeResult?.({switchTo(id){identity=id;listener('SIGNED_IN',{user:{id}});},events});return {data:paths.map(path=>options.failThumbnail&&path.endsWith('.thumb-512-v1.jpg')?{error:'missing'}:{signedUrl:'https://example.test/'+path}),error:options.signError};}};}}};
- const {loadEditorPhotos}=load('src/lib/create/queries.ts',{'./editor-model':{},'../supabase/client':{supabase:client},'../discovery/model':model,'./model':{},'../media/image-variants':variants});
+ const {loadEditorPhotos}=load('src/lib/create/queries.ts',{'../auth/model':{accountCheckMessage:(_,m)=>m},'./editor-model':{},'../supabase/client':{supabase:client},'../discovery/model':model,'./model':{},'../media/image-variants':variants});
  return {run:(paths=[full],signal=new AbortController().signal)=>loadEditorPhotos(paths,owner,signal),signed,unsubscribed:()=>unsubscribed};
 }
 test('authenticated editor exposes original and companion raw-path keys only for flagged markers, deduplicates and tolerates missing companion',async()=>{

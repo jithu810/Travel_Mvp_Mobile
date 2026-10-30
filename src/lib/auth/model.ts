@@ -8,6 +8,11 @@ export function validateAuth(values: AuthValues, mode: AuthMode): string | null 
   if (mode === 'register' && values.password.length < 8) return 'Choose a password with at least 8 characters.';
   return null;
 }
+// An unreachable auth server is not a signed-out user. The caller still blocks either way; only the message differs.
+export function accountCheckMessage(error: unknown, signedOut: string): string {
+  const name = error && typeof error === 'object' && 'name' in error ? error.name : '';
+  return name === 'AuthRetryableFetchError' ? 'Couldn’t reach the server. Check your connection and retry.' : signedOut;
+}
 export function authError(error: unknown, mode: AuthMode): string {
   const code = error && typeof error === 'object' && 'code' in error ? String(error.code) : '';
   if (code === 'invalid_credentials') return 'The email or password is incorrect. Please try again.';

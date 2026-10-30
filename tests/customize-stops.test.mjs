@@ -75,7 +75,7 @@ function queryHarness() {
   const discovery={isJourneyId:value=>typeof value==='string'&&/^[0-9a-f-]{36}$/i.test(value),object:value=>value&&typeof value==='object'?value:null,safePhoto:()=>null,normalizeStops:value=>value};
   const realModel=load('src/lib/remix/model.ts',{'../discovery/model':discovery});
   const supabase={auth:{getUser:async()=>({data:{user:{id:user}},error:null})},rpc:(name,args)=>{calls.push([name,args]);return {abortSignal:async()=>({data:name==='copy_journey_selected'?draftId:detail,error:name==='copy_journey_selected'?error:null})};}};
-  const query=load('src/lib/remix/queries.ts',{'../supabase/client':{supabase},'../discovery/model':discovery,'../discovery/queries':{},'./model':realModel});
+  const query=load('src/lib/remix/queries.ts',{'../supabase/client':{supabase},'../auth/model':{accountCheckMessage:(e,m)=>e?.name==='AuthRetryableFetchError'?'Couldn’t reach the server. Check your connection and retry.':m},'../discovery/model':discovery,'../discovery/queries':{},'./model':realModel});
   return {run:()=>query.remixSelectedJourney(sourceId,[stops[0].id,stops[2].id],draftId,userId),query,calls,user:value=>{user=value;},error:value=>{error=value;},detail:value=>{detail=value;}};
 }
 test('selected-copy RPC preserves attribution boundary and only submits selected IDs with stable draft ID',async()=>{

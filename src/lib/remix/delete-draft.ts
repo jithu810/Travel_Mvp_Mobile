@@ -1,10 +1,11 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { isJourneyId } from '../discovery/model';
+import { accountCheckMessage } from '../auth/model';
 
 export async function deleteOwnedDraft(client: SupabaseClient | null, id: string, ownerId: string) {
   if (!client || !isJourneyId(id) || !isJourneyId(ownerId)) throw new Error('Could not verify this draft or account.');
   const { data: auth, error: authError } = await client.auth.getUser();
-  if (authError || auth.user?.id !== ownerId) throw new Error('Sign in again before deleting your draft.');
+  if (authError || auth.user?.id !== ownerId) throw new Error(accountCheckMessage(authError, 'Sign in again before deleting your draft.'));
   // Atomic filters also protect a draft published after the confirmation opened.
   // Never remove Storage objects: independent copies can reference these paths.
   const { data, error } = await client.from('journeys').delete()

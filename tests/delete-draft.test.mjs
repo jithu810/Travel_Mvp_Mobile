@@ -9,7 +9,8 @@ function load(path, modules) {
   return module.exports;
 }
 const id = '11111111-1111-4111-8111-111111111111', uid = '22222222-2222-4222-8222-222222222222';
-const { deleteOwnedDraft } = load('src/lib/remix/delete-draft.ts', { '../discovery/model': { isJourneyId: x => /^[0-9a-f-]{36}$/.test(x) } });
+const { accountCheckMessage } = load('src/lib/auth/model.ts', {});
+const { deleteOwnedDraft } = load('src/lib/remix/delete-draft.ts', { '../auth/model': { accountCheckMessage }, '../discovery/model': { isJourneyId: x => /^[0-9a-f-]{36}$/.test(x) } });
 function client({ user = uid, error = null, rows = [{ id }], authError = null } = {}) {
   const calls = [];
   const query = { delete() { calls.push(['delete']); return this; }, eq(...args) { calls.push(args); return this; }, async select(value) { calls.push(['select',value]); return { data: rows, error }; } };
@@ -53,4 +54,11 @@ test('failure keeps confirmation and card state; never invokes success refresh',
   const h = harness(true); h.press('Delete draft: Trip'); h.press('Delete draft permanently'); await new Promise(setImmediate);
   assert.equal(h.deleted,0); assert.deepEqual(h.cleared,[],'Failed delete keeps the recovery copy'); assert.equal(nodes(h.render()).find(n => n.type === 'Modal').props.visible,true);
   assert.ok(nodes(h.render()).some(n => n.props?.accessibilityRole === 'alert' && n.props.children === 'Deletion failed'));
+});
+test('a network failure during the account check is not reported as signed out, and still blocks the delete', async () => {
+  const offline = client({ authError: { name: 'AuthRetryableFetchError', status: 0 } });
+  await assert.rejects(deleteOwnedDraft(offline, id, uid), /Check your connection/); assert.equal(offline.calls.length, 0, 'Nothing is sent');
+  await assert.rejects(deleteOwnedDraft(client({ authError: { name: 'AuthApiError', status: 401 } }), id, uid), /Sign in again/);
+  await assert.rejects(deleteOwnedDraft(client({ user: null }), id, uid), /Sign in again/);
+  assert.equal(accountCheckMessage(null, 'fallback'), 'fallback');
 });
