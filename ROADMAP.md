@@ -1,3 +1,8 @@
+## Improvement backlog phase 1 - 2026-10-30
+- Implemented on feature/backlog-phase1 (published, not merged): Search tile captions, Make it yours, first-use Buddy card, task-specific Buddy actions and reasons, once-per-install greetings, Home Find a journey, on-device recovery of unsaved Create edits and unfinished trips.
+- Tested: full suite, independent review and emulator checks; selected phone checks. See PROJECT_STATUS.md and IMPROVEMENT_BACKLOG.md.
+- Pending: real-GPS and reliability checks on the phone (R2, R4), accessibility and performance (R5), B2 preferences storage decision, B3 recoverable-trip prompts, U8, B4, R6, then the E1-E4 pilot work. U4 labels wait for pilot evidence.
+
 ## Buddy contextual text and gestures - 2026-10-28
 - [x] Matching Wave/Curious assets, preset local contextual messages, cooldown/expiry and interaction/sleep/Travel guards.58 focused checks, static checks and independent review pass.
 - [ ] Complete native automatic/manual speech/gesture capture and accessibility matrix. Local/unpublished; no AI or audio.
