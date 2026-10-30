@@ -101,3 +101,7 @@ Order for the next session. Items stay unticked until their stated outcome is co
 11. **E1 to E4 (later):** return paths, usability pilot, success measures and reprioritisation, after the phone and user work is possible.
 
 Each item: write the change, run the affected tests, typecheck and lint, check it on the emulator where it's visible, then update its checkbox note and push the branch when the owner asks.
+
+### Note 2026-10-30 — B5 emulator run (partial, not ticked)
+- Clean run on the emulator (1.5 GB, 3 cores), Metro on 8082: after restarting the app, Search crashed once with "Maximum update depth exceeded" (stack through the Search list's updates, VirtualizedList `_updateCellsToRender`). The next restart loaded Search cleanly. Cause not yet found; to investigate before B5 is ticked, using the Metro log and a repeatable reproduction.
+- The greeting itself was not confirmed in this run because the crash interrupted the first Search visit.
