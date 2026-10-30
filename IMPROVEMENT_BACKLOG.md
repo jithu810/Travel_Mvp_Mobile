@@ -113,3 +113,8 @@ Each item: write the change, run the affected tests, typecheck and lint, check i
 - Search on a full grid shows no greeting by design: every Explore tile is protected so Buddy never covers content, and no bubble-sized gap exists. The greeting is not marked as shown, so it can appear later if room exists.
 - Also fixed today: the restart crash ("Maximum update depth exceeded"), see commit 3c28d67.
 - Still pending before ticking B5: the Account "Show Buddy greetings again" control, which the dev-client tools button covers on both the emulator and the phone.
+
+### Note 2026-10-30 — U2 Home hierarchy (owner chose option 3; not ticked)
+- Home's panel now has a full-width "Find a journey" button above "Recently shared" (src/components/discovery/discovery-panel.tsx, wired in src/app/discover.tsx). It opens the same journey search as the Search tab. The globe and its place search are unchanged, and the Create banner stays one line.
+- Verification: full suite 849/850 pass (0 fail, 1 skipped), tsc and ESLint, plus a new panel test; emulator showed the button and tapping it opened journey search.
+- Pending before ticking: the on-device comparison on the owner's phone.

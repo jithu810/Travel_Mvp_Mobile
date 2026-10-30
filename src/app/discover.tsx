@@ -101,7 +101,7 @@ export default function DiscoverScreen() {
         <DiscoveryPanel journeys={journeys} selectedId={selectedId} onLocate={locate} onOpen={open}
           notice={notice} onClear={() => setSelectedId(null)} onRetrySelection={selection.error ? selection.retry : undefined}
           loading={state.loading || (viewer.pending && !state.error)} emptyText={onlyOwn ? onlyViewerJourneysCopy : undefined} refreshing={state.refreshing} error={state.error} onRefresh={refreshPublic}
-          onInteraction={setSheetInteracting} onHeight={setRailHeight} availableHeight={layout.height} availableWidth={layout.width} bottomClearance={navClearance + bannerHeight + 12} topClearance={headerClearance} />
+          onInteraction={setSheetInteracting} onFindJourney={() => router.navigate('/search?view=search')} onHeight={setRailHeight} availableHeight={layout.height} availableWidth={layout.width} bottomClearance={navClearance + bannerHeight + 12} topClearance={headerClearance} />
       </View>
       <Pressable {...bannerProtection} accessibilityRole="button" accessibilityLabel="Create Journey from Home" onPress={() => router.push('/create')}
         onLayout={event => { bannerProtection.onLayout(); setBannerHeight(event.nativeEvent.layout.height); }} style={[s.banner, { bottom: navClearance }]}>

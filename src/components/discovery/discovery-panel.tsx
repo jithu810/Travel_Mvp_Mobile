@@ -8,10 +8,12 @@ import { colors } from './ui';
 import { useBuddyProtectedBounds, useBuddyScroll } from '@/hooks/use-buddy-geometry';
 
 export function DiscoveryPanel({ journeys, selectedId, onLocate, onOpen, notice, onClear, onRetrySelection,
-  loading, refreshing, error, emptyText, onRefresh, onHeight, onInteraction, availableHeight, availableWidth, bottomClearance = 0, topClearance = 0 }: {
+  loading, refreshing, error, emptyText, onRefresh, onHeight, onInteraction, availableHeight, availableWidth, bottomClearance = 0, topClearance = 0, onFindJourney }: {
   journeys: PublicJourney[]; selectedId: string | null; onLocate: (id: string) => void; onOpen: (id: string) => void;
   notice: string; onClear: () => void; onRetrySelection?: () => void; loading: boolean; refreshing: boolean;
   error: string | null; emptyText?: string; onRefresh: () => void; onHeight: (height: number) => void; onInteraction: (active: boolean) => void; availableHeight: number; availableWidth: number; bottomClearance?: number; topClearance?: number;
+  /** Home's primary way to find a journey; opens journey search. */
+  onFindJourney?: () => void;
 }) {
   // Keep the peek handle and compact cards above the fixed pill. Expanded content
   // scrolls underneath it, with enough trailing space to expose the final actions.
@@ -41,6 +43,8 @@ export function DiscoveryPanel({ journeys, selectedId, onLocate, onOpen, notice,
       onPress={sheet.toggle} style={s.handleButton}>
       <View style={s.handle} /><Text style={s.toggle}>{expanded ? '⌄ Collapse' : '⌃ Explore journeys'}</Text>
     </Pressable></View>
+    {onFindJourney && <Pressable accessibilityRole="button" accessibilityLabel="Find a journey" accessibilityHint="Search public journeys by place, stop or creator." onPress={onFindJourney}
+      style={({ pressed }) => [s.find, pressed && { opacity: 0.75 }]}><Text style={s.findText}>Find a journey</Text></Pressable>}
     <View style={s.section}>
       <Text accessibilityRole="header" style={s.heading}>Recently shared</Text>
       <View style={s.tools}>
@@ -89,6 +93,8 @@ const s = StyleSheet.create({
   handle: { width: 32, height: 4, borderRadius: 3, backgroundColor: '#8496B3' },
   toggle: { fontSize: 9, fontWeight: '600', color: colors.muted },
   tools: { flexDirection: 'row', alignItems: 'center' },
+  find: { marginHorizontal: 18, marginBottom: 6, minHeight: 44, borderRadius: 22, borderWidth: 1, borderColor: '#C9D3E6', backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center' },
+  findText: { color: '#14243F', fontSize: 15, fontWeight: '700' },
   section: { minHeight: 36, paddingHorizontal: 18, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   heading: { flexShrink: 1, fontSize: 18, fontWeight: '700', color: '#14243F' },
   refresh: { minHeight: 44, paddingHorizontal: 8, justifyContent: 'center' },
