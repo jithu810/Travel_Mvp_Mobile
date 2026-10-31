@@ -24,9 +24,9 @@ const authModel = load('src/lib/auth/model.ts', {});
 const native = { StyleSheet: { create: x => x, absoluteFillObject: {} }, Platform: { OS: 'android' }, useWindowDimensions: () => ({ height: 640, width: 320, fontScale: 1.5 }) };
 for (const name of ['ActivityIndicator', 'Image', 'KeyboardAvoidingView', 'Pressable', 'ScrollView', 'Text', 'TextInput', 'View']) native[name] = name;
 const { signupStyles } = load('src/components/auth/signup-styles.ts', { 'react-native': native });
-function harness({ result = 'confirmation', canGoBack = true, pending = null, height = 640, width = 360, fontScale = 1, keyboard = false, platform = 'android', failure = null, context = undefined, emailExists = false, emailFailure = null } = {}) {
+function harness({ result = 'confirmation', canGoBack = true, pending = null, height = 640, width = 360, fontScale = 1, keyboard = false, platform = 'android', failure = null, context = undefined, emailExists = false, emailFailure = null, googleResult = { journeyId: null }, googleFailure = null, googleSupported = true } = {}) {
   const slots = []; let index = 0; const calls = [], navigation = [], effects = []; let keyboardVisible = keyboard;
-  const keyboardScrolls = [], resets = [], emailChecks = []; let cleanup, focused = false;
+  const keyboardScrolls = [], resets = [], emailChecks = [], googleCalls = [], googleContexts = [], cancellations = []; let cleanup, focused = false, googlePending = false;
   const scrollMock = { scrollResponderScrollNativeHandleToKeyboard: (...args) => keyboardScrolls.push(args), scrollTo: args => resets.push(args) };
   const hooks = {
     useState(initial) { const i = index++; if (!(i in slots)) slots[i] = typeof initial === 'function' ? initial() : initial; return [slots[i], value => { slots[i] = value; }]; },
@@ -36,18 +36,19 @@ function harness({ result = 'confirmation', canGoBack = true, pending = null, he
     useEffect(fn) { index++; effects.push(fn); },
   };
   const screen = load('src/app/auth.tsx', {
-    react: hooks, 'react/jsx-runtime': { jsx, jsxs: jsx }, 'react-native': { ...native, Platform: { OS: platform }, useWindowDimensions: () => ({ height, width, fontScale }), Keyboard: { isVisible: () => keyboardVisible } },
+    react: hooks, 'react/jsx-runtime': { jsx, jsxs: jsx }, 'react-native': { ...native, Platform: { OS: platform }, useWindowDimensions: () => ({ height, width, fontScale }), Keyboard: { isVisible: () => keyboardVisible, dismiss() { keyboardVisible = false; } } },
     'react-native-safe-area-context': { SafeAreaView: 'SafeAreaView', useSafeAreaInsets: () => ({ top: 24, bottom: 24, left: 0, right: 0 }) },
     'expo-status-bar': { StatusBar: 'StatusBar' },
     'expo-router': { useRouter: () => ({ canGoBack: () => canGoBack, back: () => navigation.push('back'), replace: route => navigation.push(route) }), useLocalSearchParams: () => ({ context }), useFocusEffect: fn => { if (!focused) { focused = true; cleanup = fn(); } } },
     '@/components/discovery/ui': { colors: { ink: '#153E35', white: '#FFFFFF' }, ScreenHeader: 'ScreenHeader', ui: {} },
     '@/components/auth/signup-styles': { signupStyles },
     '@/hooks/session-context': { useSessionState: () => ({ loading: false, session: null }) },
-    '@/hooks/action-intent': { useActionIntent: () => ({ pending, cancel() {} }) },
+    '@/hooks/action-intent': { useActionIntent: () => ({ pending, cancel() { cancellations.push(true); } }) },
     '@/lib/auth/model': authModel,
+    '@/lib/auth/google': { googleSignInSupported: googleSupported, isGoogleSignInPending: () => googlePending, signInWithGoogle: async (journeyId, returnTo) => { googleCalls.push(journeyId); googleContexts.push(returnTo); googlePending = true; try { if (googleFailure) throw googleFailure; return await googleResult; } finally { googlePending = false; } } },
     '@/lib/auth/queries': { checkRegistrationEmail: async email => { emailChecks.push(email); if (emailFailure) throw emailFailure; return emailExists; }, authenticate: async (mode, values) => { calls.push({ mode, values }); if (failure) throw failure; return result; } },
   }).default;
-  return { calls, emailChecks, navigation, keyboardScrolls, resets, blur() { cleanup?.(); }, refocus() { focused = false; }, setKeyboard(value) { keyboardVisible = value; }, render() {
+  return { calls, emailChecks, googleCalls, googleContexts, cancellations, navigation, keyboardScrolls, resets, blur() { cleanup?.(); }, refocus() { focused = false; }, setKeyboard(value) { keyboardVisible = value; }, render() {
     index = 0; effects.length = 0; const tree = screen();
     const scroll = nodes(tree).find(n => n.type === 'ScrollView');
     scroll.props.ref.current = scrollMock;
@@ -79,17 +80,64 @@ async function fill(h, password = 'password123') {
 }
 const settle = () => new Promise(resolve => setImmediate(resolve));
 
-test('Google is registration-only, disabled and has no authentication handler', async () => {
-  const h = harness();
-  assert.equal(button(h.render(), 'Continue with Google'), undefined);
-  const tree = register(h), google = button(tree, 'Continue with Google');
-  assert.equal(google.props.disabled, true);
-  assert.deepEqual(google.props.accessibilityState, { disabled: true });
-  assert.equal(google.props.onPress, undefined);
-  assert.match(google.props.accessibilityHint, /not available yet/);
-  assert.equal(h.calls.length, 0);
-  assert.ok(nodes(tree).some(n => n.type === 'Image' && n.props.source.endsWith('google-g.png')));
-  assert.equal(nodes(tree).find(n => n.type === 'ScrollView').props.keyboardShouldPersistTaps, 'handled');
+test('Google is available in both auth modes without email validation or registration lookup', async () => {
+  for (const registration of [false, true]) {
+    const h = harness();
+    const tree = registration ? register(h) : h.render();
+    const google = button(tree, 'Continue with Google');
+    assert.equal(google.props.disabled, false);
+    assert.match(google.props.accessibilityHint, /browser/);
+    google.props.onPress(); await settle();
+    assert.deepEqual(h.googleCalls, [null]);
+    assert.deepEqual(h.emailChecks, []); assert.deepEqual(h.calls, []);
+    assert.deepEqual(h.navigation, ['back']);
+    assert.ok(nodes(tree).some(n => n.type === 'Image' && n.props.source.endsWith('google-g.png')));
+  }
+});
+
+test('Google locks both methods, preserves pending journey on browser blur, and ignores stale navigation', async () => {
+  let resolve;
+  const googleResult = new Promise(done => { resolve = done; });
+  const journeyId = '11111111-1111-4111-8111-111111111111';
+  const h = harness({ googleResult, pending: { journeyId }, canGoBack: false });
+  const initial = h.render();
+  const emailButton = button(initial, 'Sign in with email');
+  const staleButton = button(initial, 'Continue with Google');
+  staleButton.props.onPress(); staleButton.props.onPress();
+  emailButton.props.onPress();
+  assert.deepEqual(h.googleCalls, [journeyId]); assert.deepEqual(h.calls, []);
+  assert.equal(button(h.render(), 'Continue with Google').props.disabled, true);
+  h.blur(); assert.deepEqual(h.cancellations, []);
+  resolve({ journeyId }); await settle();
+  assert.deepEqual(h.navigation, []);
+});
+
+test('Google from Create passes a trusted Create return for either mode and restores the warm route', async () => {
+  for (const registration of [false, true]) {
+    for (const canGoBack of [false, true]) {
+      const h = harness({ context: 'create', canGoBack, googleResult: { journeyId: null, returnTo: 'create' } });
+      const tree = registration ? register(h) : h.render();
+      button(tree, 'Continue with Google').props.onPress(); await settle();
+      assert.deepEqual(h.googleCalls, [null]); assert.deepEqual(h.googleContexts, ['create']);
+      assert.deepEqual(h.navigation, [canGoBack ? 'back' : '/create']);
+      assert.deepEqual(h.emailChecks, []); assert.deepEqual(h.calls, []);
+    }
+  }
+});
+
+test('Google cancellation and errors keep email sign-in usable, and web explains native availability', async () => {
+  const cancelled = harness({ googleResult: null });
+  button(cancelled.render(), 'Continue with Google').props.onPress(); await settle();
+  assert.deepEqual(cancelled.navigation, []);
+  assert.equal(button(cancelled.render(), 'Sign in with email').props.disabled, false);
+  const failed = harness({ googleFailure: new Error('private provider details') });
+  button(failed.render(), 'Continue with Google').props.onPress(); await settle();
+  assert.match(text(failed.render()), /could not complete Google/);
+  assert.doesNotMatch(text(failed.render()), /private provider/);
+  const web = harness({ googleSupported: false, platform: 'web' });
+  assert.equal(button(web.render(), 'Continue with Google').props.disabled, true);
+  assert.match(text(web.render()), /Available in the mobile app/);
+  assert.equal(button(web.render(), 'Sign in with email').props.disabled, false);
 });
 
 test('registration preserves validation, payload and confirmation-required sign-in navigation', async () => {
@@ -103,7 +151,7 @@ test('registration preserves validation, payload and confirmation-required sign-
   assert.match(text(tree), /You are not signed in yet/);
   assert.match(text(tree), /If this is a new email/);
   assert.match(text(tree), /Already registered\? Sign in with your existing password/);
-  assert.equal(button(tree, 'Continue with Google'), undefined);
+  assert.equal(button(tree, 'Continue with Google').props.disabled, false);
   assert.equal(field(tree, 'Password').props.value, '');
   assert.deepEqual(h.navigation, []);
 });
@@ -125,7 +173,7 @@ test('switching back to sign-in clears the password and retains the shared heade
   assert.ok(nodes(tree).some(n => n.type === 'Text' && text(n) === 'Sign in'));
   assert.ok(button(tree, 'Go back'));
   assert.match(text(tree), /Welcome back/);
-  assert.equal(button(tree, 'Continue with Google'), undefined);
+  assert.equal(button(tree, 'Continue with Google').props.disabled, false);
 });
 
 test('registration back button preserves discover fallback', async () => {
@@ -171,8 +219,7 @@ test('keyboard resize reveals the focused input with room for the primary action
     assert.equal(nodes(tree).find(n => n.type === 'ScrollView').props.scrollEnabled, true);
     assert.deepEqual(h.keyboardScrolls.at(-1), [42, 72, true]);
     assert.equal(button(tree, mode === 'register' ? 'Register with email' : 'Sign in with email').props.disabled, false);
-    if (mode === 'register') assert.equal(button(tree, 'Continue with Google').props.disabled, true);
-    else assert.equal(button(tree, 'Continue with Google'), undefined);
+    assert.equal(button(tree, 'Continue with Google').props.disabled, false);
     field(tree, 'Password').props.onBlur();
     const count = h.keyboardScrolls.length; h.render();
     assert.equal(h.keyboardScrolls.length, count);
@@ -206,7 +253,7 @@ test('sign-in error remains readable and never navigates or reports success', as
   assert.match(text(nodes(tree).find(n => n.props.accessibilityRole === 'alert')), /incorrect/);
   assert.deepEqual(h.navigation, []);
   assert.equal(button(tree, 'Sign in with email').props.disabled, false);
-  assert.equal(button(tree, 'Continue with Google'), undefined);
+  assert.equal(button(tree, 'Continue with Google').props.disabled, false);
 });
 
 test('sign-in keeps context copy, scenic assets and the bidirectional mode links', async () => {
@@ -222,7 +269,7 @@ test('sign-in keeps context copy, scenic assets and the bidirectional mode links
     tree = await details(h);
     assert.ok(field(tree, 'Display name'));
     assert.equal(field(tree, 'Password').props.autoComplete, 'new-password');
-    assert.equal(button(tree, 'Continue with Google').props.disabled, true);
+    assert.equal(button(tree, 'Continue with Google').props.disabled, false);
     button(tree, 'Already registered? Sign in').props.onPress();
     assert.match(text(h.render()), /Welcome back/);
   }

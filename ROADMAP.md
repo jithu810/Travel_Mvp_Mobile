@@ -1,3 +1,23 @@
+## Google and email authentication publication - 2026-10-31
+
+Owner authorized completed Google OAuth/report commit and branch push including existing email-first registration a8f0c74; update draft PR #29 on feature/backlog-phase1. Existing test/review evidence retained and owner reports branded login works. Broader device account-switch/link/cancel/restart checks remain scoped limitations. Earlier unpublished checkpoints are historical; publication status belongs to resulting GitHub revision/PR. No merge or further hosted changes authorized.
+
+## Branded Google login confirmed by owner - 2026-10-31
+
+Owner-reported Google login and branded consent now work on Journey Google Test/CPH2813 Android16 through Metro8081 following Google branding verification/publication. Owner called it travel buddy; configured brand Journey Buddy. Account switching/repeated chooser, same-email linking, cancellation and restart persistence still need specific evidence. Existing automated QA/review pass; no runtime change. Mobile implementation remains local/unpublished. See docs/qa/google-account-chooser-2026-10-31.md.
+
+## Google account selection follow-up - 2026-10-31
+
+Owner-reported initial Google login succeeds. Account chooser request added to login/registration to prevent silently reusing the browser account. Local checks pass; independent QA/review passed with no actionable findings; owner device retry pending. Browser flow retained; no new native build. Local/unpublished; docs/qa/google-account-chooser-2026-10-31.md.
+
+## Google test development app installed - 2026-10-31
+
+Separate Journey Google Test development build installed and launch/login UI verified on real CPH2813/Android16 through Metro8081; original apps preserved. Native browser module/artifact QA passes. Real Google sign-in and same-email linking remain pending owner-led testing with callback app selection. Local/unpublished; details docs/qa/google-dev-rebuild-2026-10-31.md.
+
+## Google sign-in local implementation - 2026-10-31
+
+Mobile Google OAuth implementation and automated QA complete; existing email/password retained. No backend changes required. Independent review completed after correcting Create return navigation; no remaining actionable findings. Native rebuild and real Google/device verification remain pending, including same-email linking. Local/unpublished. See docs/qa/google-oauth-task-2026-10-31.md.
+
 ## Registration backend activated - 2026-10-31
 
 Server secret configured after owner CLI login under existing approval. Live registration-email-check returns200/exists:true for the owner's existing email and200/exists:false for the synthetic new email; no-store verified. Database/function/secret activation complete. Only designed quota counters written; no accounts created or mail sent. Previous47tests/staticchecks and independent review cover unchanged source. Mobile source remains local/unpublished; phone verification and canonical migration reconciliation pending. See docs/qa/email-first-auth-function-rollout-2026-10-31.md. This supersedes earlier blocked-secret/503 notes.

@@ -7,6 +7,7 @@ import { useSessionState } from '@/hooks/session-context';
 import { useActionIntent } from '@/hooks/action-intent';
 import { createAuthController, validateEmail, type AuthMode } from '@/lib/auth/model';
 import { authenticate, checkRegistrationEmail } from '@/lib/auth/queries';
+import { googleSignInSupported, isGoogleSignInPending, signInWithGoogle } from '@/lib/auth/google';
 import { StatusBar } from 'expo-status-bar';
 import { signupStyles as authStyles } from '@/components/auth/signup-styles';
 
@@ -55,12 +56,13 @@ export default function AuthScreen() {
   useFocusEffect(useCallback(() => {
     mounted.current = true;
     setBusy(false);
-    return () => { mounted.current = false; requestVersion.current++; submitLock.current = false; if (!finished.current) cancelIntent(); };
+    return () => { mounted.current = false; requestVersion.current++; submitLock.current = false; if (!finished.current && !isGoogleSignInPending()) cancelIntent(); };
   }, [cancelIntent]));
   function backAfterAuth() {
     finished.current = true;
     if (router.canGoBack()) router.back();
     else if (returnJourney) router.replace({ pathname: '/journey/[id]', params: { id: returnJourney } });
+    else if (creating) router.replace('/create');
     else router.replace('/account');
   }
   function changeEmail() {
@@ -104,6 +106,21 @@ export default function AuthScreen() {
     if (result.kind === 'signed-in') backAfterAuth();
     else if (result.kind === 'confirmation') { setMode('signin'); setRegistrationStep('email'); setMessage('If this is a new email, check your inbox to confirm your account, then sign in. Already registered? Sign in with your existing password. You are not signed in yet.'); }
     else if (result.kind === 'error') setError(result.message);
+  }
+  async function googleSignIn() {
+    if (submitLock.current) return;
+    submitLock.current = true; setBusy(true); setError(null); setMessage(null);
+    Keyboard.dismiss();
+    const version = ++requestVersion.current;
+    try {
+      const result = await signInWithGoogle(returnJourney, creating ? 'create' : undefined);
+      if (!mounted.current || version !== requestVersion.current) return;
+      if (result) backAfterAuth();
+    } catch {
+      if (mounted.current && version === requestVersion.current) setError('We could not complete Google sign-in. Check your connection and try again. If you recently updated the app, install the latest build.');
+    } finally {
+      if (mounted.current && version === requestVersion.current) { submitLock.current = false; setBusy(false); }
+    }
   }
   return <View style={[ui.safe, authStyles.background]}>
     <>
@@ -157,15 +174,15 @@ export default function AuthScreen() {
             <Pressable accessibilityRole="button" disabled={busy} accessibilityState={{ disabled: busy }} onPress={() => { void submit(); }} style={[ui.action, authStyles.emailButton, busy && styles.disabled]}>
               {busy ? <ActivityIndicator color={colors.white} /> : <Text style={[ui.actionLabel, authStyles.emailLabel]}>{mode === 'signin' ? 'Sign in with email' : emailStep ? 'Continue' : 'Register with email'}</Text>}
             </Pressable>
-            {registration && <View style={authStyles.googleOption}>
-              <Pressable accessibilityRole="button" accessibilityLabel="Continue with Google" accessibilityHint="Google sign-up is not available yet." accessibilityState={{ disabled: true }} disabled style={authStyles.googleButton}>
+            <View style={authStyles.googleOption}>
+              <Pressable accessibilityRole="button" accessibilityLabel="Continue with Google" accessibilityHint={googleSignInSupported ? 'Opens Google sign-in in your browser.' : 'Available in the mobile app.'} accessibilityState={{ disabled: busy || !googleSignInSupported }} disabled={busy || !googleSignInSupported} onPress={() => { void googleSignIn(); }} style={[authStyles.googleButton, busy && styles.disabled]}>
                 <Image source={require('../../assets/auth/google-g.png')} accessible={false} style={authStyles.googleLogo} resizeMode="contain" />
                 <View style={authStyles.googleCopy}>
                   <Text style={authStyles.googleLabel}>Continue with Google</Text>
-                  <Text style={authStyles.googleHint}>Not available yet</Text>
+                  {!googleSignInSupported && <Text style={authStyles.googleHint}>Available in the mobile app</Text>}
                 </View>
               </Pressable>
-            </View>}
+            </View>
             <Pressable accessibilityRole="button" disabled={busy} onPress={() => { if (submitLock.current) return; setMode(mode === 'signin' ? 'register' : 'signin'); setRegistrationStep('email'); setPassword(''); setError(null); setMessage(null); }} style={[styles.switch, authStyles.switch]}>
               <Text style={[styles.label, authStyles.label]}>{mode === 'signin' ? 'New here? Create an account' : 'Already registered? Sign in'}</Text>
             </Pressable>

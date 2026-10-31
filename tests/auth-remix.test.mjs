@@ -201,7 +201,7 @@ test('Use targets existing Travel Mode; authenticated returns consume intents on
   assert.equal(options.includes("pathname: '/draft/[id]'"),false);
   assert.ok(options.includes('intent.consume(intent.pending.token)'));
   const auth = readFileSync('src/app/auth.tsx', 'utf8');
-  assert.ok(auth.includes('router.canGoBack()')); assert.ok(auth.includes('if (!finished.current) cancelIntent()'));
+  assert.ok(auth.includes('router.canGoBack()')); assert.ok(auth.includes('if (!finished.current && !isGoogleSignInPending()) cancelIntent()'));
   assert.ok(auth.includes('You are not signed in yet.'));
 });
 test('an unreachable account check is not reported as signed out and reads no drafts', async () => {

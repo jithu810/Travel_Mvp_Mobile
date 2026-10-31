@@ -1,3 +1,23 @@
+## Google and email authentication publication - 2026-10-31
+
+Owner authorized committing/pushing completed Google OAuth and reports together with existing email-first registration commit a8f0c74 on feature/backlog-phase1, updating draft PR #29. Google login/branding success is owner-reported on CPH2813/Android16 via Metro8081; automated QA/static checks and independent review pass. Account switching/repeated chooser, same-email linking, cancellation and restart persistence retain specific unverified limits. Earlier local/unpublished notes are historical checkpoints; resulting GitHub revision/PR is canonical publication evidence. Merge and further hosted changes remain unauthorized.
+
+## Branded Google login confirmed by owner - 2026-10-31
+
+Owner confirms branded Google sign-in works after Google branding verification/publication, describing the prompt as login with travel buddy (configured brand Journey Buddy). Physical-device owner report: Journey Google Test on CPH2813/Android16 via Metro8081. Agent confirmed app launch/Search only; no consent screenshot or live account action by agent. Prior owner report also confirmed initial Google login and sign-out. Specific repeated account chooser/account switching, same-email linking, cancellation and restart persistence remain unverified. Automated checks/review remain passing; no new tests for this documentation-only update. Mobile local/unpublished. See docs/qa/google-account-chooser-2026-10-31.md.
+
+## Google account selection follow-up - 2026-10-31
+
+Owner reports first Google consent/login succeeded on the test app, then sign-out and registration reused the browser account automatically. Shared native OAuth request now sends prompt=select_account on each attempt; no APK rebuild or hosted configuration change.39 affected tests/typecheck/scoped lint pass; targeted independent QA/review passed with no actionable findings. Actual chooser display awaits owner retry through Metro. Local/unpublished; docs/qa/google-account-chooser-2026-10-31.md.
+
+## Google test development app installed - 2026-10-31
+
+Owner-approved local ARM64 debug rebuild/install complete as separate Journey Google Test (original app signer differs; originals/data preserved). Installed APK hash verified; independent artifact QA passes and native browser module is packaged. CPH2813/Android16 runs canonical checkout through Metro8081, left on login with Google/email buttons visible. Actual Google login/linking/cancel/persistence pending owner test; select Journey Google Test in Android callback chooser. Local/unpublished. See docs/qa/google-dev-rebuild-2026-10-31.md.
+
+## Google sign-in local implementation - 2026-10-31
+
+Local Google OAuth now covers both mobile authentication modes alongside email/password. Read-only live backend preflight found no database/RPC/RLS/Storage changes required; hosted provider settings are owner-reported. Exact Expo-compatible browser dependency added with owner approval. 56 affected implementation tests and independent QA checks pass; independent review found a Create-return issue which was fixed and re-reviewed with no remaining actionable findings. Details: docs/qa/google-oauth-task-2026-10-31.md. Local/unpublished; native rebuild and actual Google sign-in/cancellation/persistence/same-email linking remain unverified. No live writes, build/install or publication performed.
+
 ## Registration backend activated - 2026-10-31
 
 Server secret configured after owner CLI login under existing approval. Live registration-email-check returns200/exists:true for the owner's existing email and200/exists:false for the synthetic new email; no-store verified. Database/function/secret activation complete. Only designed quota counters written; no accounts created or mail sent. Previous47tests/staticchecks and independent review cover unchanged source. Mobile source remains local/unpublished; phone verification and canonical migration reconciliation pending. See docs/qa/email-first-auth-function-rollout-2026-10-31.md. This supersedes earlier blocked-secret/503 notes.
