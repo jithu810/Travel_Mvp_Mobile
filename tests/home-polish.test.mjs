@@ -1,3 +1,4 @@
+import { appMobileTheme, lightPilotTheme } from './helpers/dark-pilot-harness.mjs';
 import { buddyGeometryStub, buddyMapPinsStub } from './helpers/buddy-geometry-stub.mjs';
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
@@ -16,11 +17,11 @@ function load(file, dependencies, state = null, hookOverrides = {}) {
   const rn = { StyleSheet: { create: value => value }, Platform: { OS: 'web' }, StatusBar: {} };
   for (const name of ['View', 'Text', 'Pressable', 'Image', 'TextInput']) rn[name] = name;
   const source = ts.transpileModule(readFileSync(file, 'utf8'), { compilerOptions: { jsx: ts.JsxEmit.ReactJSX, module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
-  new Function('require', 'exports', source)(name => { if(name==='@/components/first-outcome-hint')return {FirstOutcomeHint:'FirstOutcomeHint'};
+  new Function('require', 'exports', source)(name => { if (name === '@/theme/dark-pilot') return lightPilotTheme; if (name === '@/theme/mobile-theme') return appMobileTheme;  if(name==='@/components/first-outcome-hint')return {FirstOutcomeHint:'FirstOutcomeHint'};
     if(name==='@/lib/first-outcome')return load('src/lib/first-outcome.ts',{});
     if(name==='@/components/first-outcome-hint')return {FirstOutcomeHint:'FirstOutcomeHint'};
     if(name==='@/lib/first-outcome')return load('src/lib/first-outcome.ts',{});
-    if (name === '@/theme/mobile-theme') return mobileTheme;
+    if (name === '@/theme/dark-pilot') return lightPilotTheme; if (name === '@/theme/mobile-theme') return mobileTheme;
     if(name==='@/hooks/use-journey-buddy')return {useBuddyScreen(){}};
     if(name==='@/hooks/use-buddy-map-pins')return buddyMapPinsStub;
     if(name==='@/lib/buddy/map-controls')return load('src/lib/buddy/map-controls.ts',{'../discovery/globe-style':load('src/lib/discovery/globe-style.ts',{})});
@@ -175,7 +176,7 @@ test('Home embeds place search; Account and navigation retain existing routes an
   const explore = all.find(n => n.props?.accessibilityLabel === 'Explore');
   const count = pushed.length; explore.props.onPress(); assert.equal(pushed.length, count);
   assert.equal(explore.props.accessibilityState.selected, true);
-  assert.equal(explore.props.style({ pressed: false })[1].backgroundColor, '#C9DFFF');
+  assert.equal(explore.props.style({ pressed: false })[1].backgroundColor, '#263F65');
   const nav = all.find(n => [n.props?.children].flat(Infinity).includes(explore));
   assert.equal(nav.props.children.length, 5);
   assert.equal(nav.props.style[0].position, 'absolute');
@@ -296,13 +297,13 @@ test('Home image failure falls back, a new URI recovers and card measurement rem
     const glyph = nodes(icon).find(n => n.type === (label.startsWith('Locate') ? 'Ionicons' : 'MaterialCommunityIcons'));
     assert.equal(glyph.props.name, label.startsWith('Locate') ? 'locate-outline' : 'book-outline');
     assert.equal(glyph.props.size, 28);
-    assert.equal(glyph.props.color, label.startsWith('Locate') ? '#6555CF' : '#3873CE');
+    assert.equal(glyph.props.color, label.startsWith('Locate') ? '#C1ADFF' : '#91BEFF');
     const box = Object.assign({}, ...[icon.props.style].flat().filter(Boolean));
     assert.equal(box.width, 28); assert.equal(box.height, 28, 'Glyph space is reserved before the icon font loads');
     if (!label.startsWith('Locate')) assert.equal(action.props.accessibilityHint, 'Opens Journey Story');
   }
   const unselectedLocate = nodes(component.HomeJourneyCard({ ...props, selected: false })).find(n => n.props?.accessibilityLabel === 'Locate journey: Coastal weekend');
-  assert.equal(nodes(unselectedLocate).find(n => n.type === 'Ionicons').props.color, '#3873CE');
+  assert.equal(nodes(unselectedLocate).find(n => n.type === 'Ionicons').props.color, '#91BEFF');
   nodes(tree).find(n => n.type === 'Image').props.onError();
   assert.equal(failedUri, journey.cover);
   assert.ok(nodes(component.HomeJourneyCard(props)).some(n => n.type === 'JourneyArt'));
@@ -397,7 +398,7 @@ test('shared navigation selects each destination and frame includes only standar
       else assert.equal(routes.at(-1), ['/discover', '/search?view=search', '/create', '/search?view=stories', '/account'][i]);
     }
     assert.equal(tree.props.style[1].bottom, 32);
-    assert.equal(tree.props.style[0].backgroundColor, 'rgba(242, 246, 255, 0.97)');
+    assert.equal(tree.props.style[0].backgroundColor, 'rgba(21, 34, 56, 0.98)');
   }
   for (const path of ['/search', '/create', '/account', '/journey/a', '/profile/traveler', '/', '/discover', '/auth', '/draft/a', '/travel/a']) {
     const nav = load('src/components/floating-navigation.tsx', { 'expo-router': { usePathname: () => path }, 'react-native-safe-area-context': {} });
@@ -435,7 +436,7 @@ test('Home retains navigation and its live globe through loading, refreshing and
   collection={data:null,loading:false,error:'Offline'};assert.ok(!nodes(home.default()).some(n=>n.type==='BrandedLoading'));
 });
 
-test('Home assigns native-screen dark loading icons then light globe icons without a competing component owner',()=>{
+test('Home retains light native-screen status icons during dark loading and globe display',()=>{
  let cursor=0,collection={data:null,loading:true};const slots=[];
  const memo=(fn,deps)=>{const i=cursor++;if(!slots[i]||deps.some((v,j)=>v!==slots[i].deps[j]))slots[i]={deps,value:fn()};return slots[i].value;};
  const hooks={useState:initial=>{const i=cursor++;if(!(i in slots))slots[i]=initial;return [slots[i],v=>{slots[i]=typeof v==='function'?v(slots[i]):v;}];},useCallback:(fn,deps)=>memo(()=>fn,deps),useMemo:memo};
@@ -448,7 +449,7 @@ test('Home assigns native-screen dark loading icons then light globe icons witho
   '@/hooks/use-load':{useLoad:()=>({refresh(){},...collection})},'@/lib/discovery/map':{worldCamera:{centerCoordinate:[35,18]},discoveryPoints:()=>({features:[]})},'@/lib/discovery/travel':{discoveryRoute:()=>null},'@/lib/discovery/presentation':{spaceColor:'#080F1E'},'@/lib/discovery/queries':{loadDiscoveryEntries(){},loadPublicJourney(){}},
  },null,hooks).default;
  const render=()=>{cursor=0;return Home();};
- let tree=render();assert.ok(nodes(tree).some(n=>n.type==='BrandedLoading'));assert.equal(nodes(tree).find(n=>n.type==='StackScreen').props.options.statusBarStyle,'dark');
+ let tree=render();assert.ok(nodes(tree).some(n=>n.type==='BrandedLoading'));assert.equal(nodes(tree).find(n=>n.type==='StackScreen').props.options.statusBarStyle,'light');
  collection={data:[],loading:false};tree=render();assert.ok(!nodes(tree).some(n=>n.type==='BrandedLoading'));assert.equal(nodes(tree).find(n=>n.type==='StackScreen').props.options.statusBarStyle,'light');
  tree=render();assert.equal(nodes(tree).filter(n=>n.type==='StackScreen').length,1);
  assert.equal(nodes(tree).filter(n=>n.type==='StatusBar').length,0,'Native route owns transition style without a competing Expo status component');slots.forEach(s=>s?.cleanup?.());

@@ -1,3 +1,4 @@
+import { useDarkPilot, darkPilotStyles } from '@/theme/dark-pilot';
 import { theme, primaryControl } from '@/theme/mobile-theme';
 import { BrandedLoading } from '@/components/branded-loading';
 import { PlacePicker } from '@/components/create/place-picker';
@@ -23,6 +24,8 @@ import { BuddyIntro } from '@/components/buddy/buddy-intro';
 import { useUnfinishedTrip } from '@/hooks/use-trip-recovery';
 
 export default function DiscoverScreen() {
+  const s = lightStyles_s;
+  const dark = useDarkPilot();
   const router = useRouter();
   const [choosingOutcome, setChoosingOutcome] = useState(false);
   const headerProtection = useBuddyProtectedBounds(), bannerProtection = useBuddyProtectedBounds(), tripProtection = useBuddyProtectedBounds();
@@ -94,7 +97,7 @@ export default function DiscoverScreen() {
   useBuddyScreen({ floating: true, suppressed: initialLoading, interacting: sheetInteracting, geometryMoving: sheetInteracting });
   return <SafeAreaView edges={['left', 'right']} style={s.safe}>
     <View style={s.page}>
-      <Stack.Screen options={{ statusBarStyle: initialLoading ? 'dark' : 'light' }} />
+      <Stack.Screen options={{ statusBarStyle: initialLoading && !dark ? 'dark' : 'light' }} />
       <View {...headerProtection} style={[s.header, { top: headerTop }]} onLayout={event => { headerProtection.onLayout(); setHeaderHeight(event.nativeEvent.layout.height); }}>
         <View style={s.search}><PlacePicker label="Search places" homeSearch compact embeddedSuggestions autoSuggest disabled={false}
           dismissVersion={dismissVersion} proximity={userProximity || mapProximity} onSelect={selectPlace} /></View>
@@ -127,7 +130,7 @@ export default function DiscoverScreen() {
     <BuddyIntro ready={focused && !initialLoading} choosing={choosingOutcome} onGuide={() => setChoosingOutcome(true)} onClose={() => setChoosingOutcome(false)} onChoose={goal => { setChoosingOutcome(false); router.push(firstOutcomeRoute(goal)); }} />
   </SafeAreaView>;
 }
-const s = StyleSheet.create({
+const lightStyles_s = darkPilotStyles(StyleSheet.create({
   statusShade: { position: 'absolute', top: 0, left: 0, right: 0, experimental_backgroundImage: 'linear-gradient(180deg, rgba(5,15,30,0.78) 0%, rgba(5,15,30,0.55) 65%, rgba(5,15,30,0) 100%)' },
   safe: { flex: 1, backgroundColor: theme.background },
   page: { flex: 1, width: '100%', maxWidth: 900, alignSelf: 'center' },
@@ -144,4 +147,4 @@ const s = StyleSheet.create({
   bannerActionText: { color: theme.white, fontSize: 11, fontWeight: '700' },
   exploration: { flex: 1 },
   map: { position: 'absolute', top: 0, bottom: 0, left: 0, right: 0, backgroundColor: spaceColor },
-});
+}));

@@ -1,3 +1,4 @@
+import { appMobileTheme, lightPilotTheme } from './helpers/dark-pilot-harness.mjs';
 import { buddyGeometryStub } from './helpers/buddy-geometry-stub.mjs';
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
@@ -6,7 +7,7 @@ import ts from 'typescript';
 const jsx=(type,props)=>({type,props});const runtime={jsx,jsxs:jsx,Fragment:'Fragment'};
 const native={View:'View',Text:'Text',Image:'Image',Pressable:'Pressable',StyleSheet:{create:x=>x}};
 function load(path,modules){
-  modules={'@/hooks/use-buddy-geometry':buddyGeometryStub,...modules};const exports={};new Function('require','exports',ts.transpileModule(readFileSync(path,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX}}).outputText)(id=>{assert.ok(id in modules,id);return modules[id];},exports);return exports;}
+  modules={'@/hooks/use-buddy-geometry':buddyGeometryStub,...modules};const exports={};new Function('require','exports',ts.transpileModule(readFileSync(path,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX}}).outputText)(id => { if (id === '@/theme/dark-pilot') return lightPilotTheme; if (id === '@/theme/mobile-theme') return appMobileTheme;  if (id === '@/theme/dark-pilot') return lightPilotTheme;assert.ok(id in modules,id);return modules[id];},exports);return exports;}
 function harness(){let cursor=0,effects=[];const slots=[];return {react:{memo:fn=>fn,useMemo:fn=>fn(),useState:initial=>{const i=cursor++;if(!(i in slots))slots[i]=initial;return [slots[i],v=>{slots[i]=typeof v==='function'?v(slots[i]):v;}];},useRef:initial=>{const i=cursor++;return slots[i]??={current:initial};},useEffect:(fn,deps)=>{const i=cursor++;if(!slots[i]||deps.some((v,j)=>v!==slots[i].deps[j])){slots[i]={deps};effects.push(fn);}}},render(fn){cursor=0;effects=[];const tree=fn();effects.forEach(fn=>fn());return tree;}};}
 const artModules={'@/components/art/journey-art':{JourneyArt:'JourneyArt',StopArt:'StopArt'},'@/components/art/circle-map':{CircleMap:'CircleMap'},'@/lib/art/journey-art':{artSeed:(id,stops)=>'seed:'+id+':'+(stops||[]).length,validGeoPoint:p=>typeof p?.latitude==='number'&&typeof p?.longitude==='number'}};
 const nodes=tree=>!tree||typeof tree!=='object'?[]:[tree,...[tree.props?.children].flat(Infinity).flatMap(nodes)];

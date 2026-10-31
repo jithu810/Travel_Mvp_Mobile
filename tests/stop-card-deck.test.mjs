@@ -1,3 +1,4 @@
+import { lightPilotTheme } from './helpers/dark-pilot-harness.mjs';
 import { buddyGeometryStub } from './helpers/buddy-geometry-stub.mjs';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -44,7 +45,7 @@ function load(path, modules, hooks = harness(false).hooks, timers = globalThis) 
   }).outputText;
   const module = { exports: {} };
   const require = name => {
-    if (name === '@/theme/mobile-theme') return mobileTheme;
+    if (name === '@/theme/dark-pilot') return lightPilotTheme; if (name === '@/theme/mobile-theme') return mobileTheme;
     if(name==='@/lib/journey/nearby')return load('src/lib/journey/nearby.ts',{}); if(name.endsWith('/nearby-locations'))return {NearbyLocations:'NearbyLocations'}; if (name === 'react/jsx-runtime') return { jsx, jsxs: jsx };
     if (name === './stop-card-deck') return { StopCardDeck: 'StopCardDeck' };
     if (name === 'react') return hooks;

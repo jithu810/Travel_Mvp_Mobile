@@ -1,3 +1,4 @@
+import { darkPilotStyles } from '@/theme/dark-pilot';
 import { primaryControl, raisedSurface } from '@/theme/mobile-theme';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { colors } from '@/components/discovery/ui';
@@ -13,7 +14,7 @@ export function ArrivalPrompt({ prompt, onConfirm, onDismiss }: { prompt: Prompt
     </View>
   </View>;
 }
-const styles = StyleSheet.create({
+const styles = darkPilotStyles(StyleSheet.create({
   panel: { ...raisedSurface, padding: 12, gap: 6, borderRadius: 18, backgroundColor: colors.paper, borderColor: colors.green, borderWidth: 1 },
   title: { color: colors.ink, fontSize: 15, lineHeight: 21, fontWeight: '700' },
   note: { color: colors.muted, fontSize: 12, lineHeight: 17 },
@@ -22,4 +23,4 @@ const styles = StyleSheet.create({
   dismiss: { flex: 1, minHeight: 48, padding: 8, borderRadius: 12, backgroundColor: colors.pale, justifyContent: 'center', alignItems: 'center' },
   confirmText: { color: colors.white, fontSize: 12, lineHeight: 18, textAlign: 'center', fontWeight: '600' },
   dismissText: { color: colors.ink, fontSize: 12, lineHeight: 18, textAlign: 'center', fontWeight: '600' },
-});
+}));

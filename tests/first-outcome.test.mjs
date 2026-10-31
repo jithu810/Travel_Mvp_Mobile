@@ -1,3 +1,4 @@
+import { lightPilotTheme } from './helpers/dark-pilot-harness.mjs';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
@@ -6,7 +7,7 @@ const jsx = (type, props) => ({ type, props });
 const all = tree => !tree || typeof tree !== 'object' ? [] : [tree, ...[tree.props?.children].flat(Infinity).flatMap(all)];
 function load(file, modules = {}) {
   const exports = {};
-  new Function('require', 'exports', ts.transpileModule(readFileSync(file, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX } }).outputText)(name => { assert.ok(name in modules, name); return modules[name]; }, exports);
+  new Function('require', 'exports', ts.transpileModule(readFileSync(file, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX } }).outputText)(name => { if (name === '@/theme/dark-pilot') return lightPilotTheme; assert.ok(name in modules, name); return modules[name]; }, exports);
   return exports;
 }
 const native = Object.fromEntries(['Modal','ScrollView','Pressable','Text','View'].map(x => [x,x]));

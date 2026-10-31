@@ -1,3 +1,4 @@
+import { lightTheme } from '@/theme/mobile-theme';
 import { nearbyFocus, type NearbyPoint } from '@/lib/journey/nearby';
 import { NearbyLocations } from '@/components/journey/nearby-locations';
 import { destinationCamera, destinationMarker, type DestinationFocus } from '@/lib/discovery/destination-camera';
@@ -197,16 +198,16 @@ export const NativeGlobe = memo(function NativeGlobe({ points, route, onOpen, re
           textAllowOverlap: false, textIgnorePlacement: false }} />}
       <Mapbox.Camera ref={camera} defaultSettings={overview} minZoomLevel={0} maxZoomLevel={destinationMode && !homeSearch ? 14 : maxDiscoveryZoom} />
       {destinationMode && <Mapbox.ShapeSource id="create-destination" shape={marker}>
-        <Mapbox.CircleLayer id="create-destination-pin" style={{ circleRadius: 10, circleColor: colors.ink, circleStrokeColor: '#FFFFFF', circleStrokeWidth: 3 }} />
-        <Mapbox.SymbolLayer id="create-destination-name" style={{ textField: ['get', 'name'], textSize: 13, textColor: colors.ink, textHaloColor: '#FFFFFF', textHaloWidth: 2, textOffset: [0, 1.8] }} />
+        <Mapbox.CircleLayer id="create-destination-pin" style={{ circleRadius: 10, circleColor: lightTheme.text, circleStrokeColor: '#FFFFFF', circleStrokeWidth: 3 }} />
+        <Mapbox.SymbolLayer id="create-destination-name" style={{ textField: ['get', 'name'], textSize: 13, textColor: lightTheme.text, textHaloColor: '#FFFFFF', textHaloWidth: 2, textOffset: [0, 1.8] }} />
       </Mapbox.ShapeSource>}
       <Mapbox.ShapeSource id="discovery-stops" shape={points} hitbox={{ width: 44, height: 44 }}
         onPress={event => { motion.pause(); const feature = event.features[0]; const point = points.features.find(p => String(p.id) === String(feature?.id)) || points.features.find(p => p.properties.journeyId === selectedJourneyId(feature?.properties, points)); if (point) openPoint(String(point.id)); }}>
-        <Mapbox.CircleLayer id="discovery-pins" style={{ circleRadius: 8, circleColor: colors.ink, circleStrokeColor: '#FFFFFF', circleStrokeWidth: 3 }} />
+        <Mapbox.CircleLayer id="discovery-pins" style={{ circleRadius: 8, circleColor: lightTheme.text, circleStrokeColor: '#FFFFFF', circleStrokeWidth: 3 }} />
         <Mapbox.SymbolLayer id="discovery-labels" filter={['==', ['coalesce', ['get', 'photo'], ''], '']} style={{ textField: ['get', 'name'], textSize: 12,
-          textColor: colors.ink, textHaloColor: '#FFFFFF', textHaloWidth: 2, textOffset: [0, 1.7] }} />
+          textColor: lightTheme.text, textHaloColor: '#FFFFFF', textHaloWidth: 2, textOffset: [0, 1.7] }} />
         <Mapbox.SymbolLayer id="discovery-photo-labels" filter={['!=', ['coalesce', ['get', 'photo'], ''], '']}
-          style={{ textField: ['get', 'name'], textSize: 12, textColor: colors.ink,
+          style={{ textField: ['get', 'name'], textSize: 12, textColor: lightTheme.text,
             textHaloColor: '#FFFFFF', textHaloWidth: 2, textOffset: [0, 2.8] }} />
       </Mapbox.ShapeSource>
       {ready && points.features[0]?.properties.journeyId === selectionId && <JourneyOverlays
@@ -227,5 +228,5 @@ const s = StyleSheet.create({
   reset: { position: 'absolute', bottom: 38, left: 16, minHeight: 44, paddingHorizontal: 16, justifyContent: 'center', borderRadius: 24, backgroundColor: colors.white, elevation: 2 },
   compactReset: { width: 44, minHeight: 44, paddingHorizontal: 0, alignItems: 'center', backgroundColor: 'transparent', elevation: 0 },
   worldSurface: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.white, elevation: 2 },
-  resetText: { color: colors.ink, fontSize: 12, fontWeight: '600' },
+  resetText: { color: lightTheme.text, fontSize: 12, fontWeight: '600' },
 });

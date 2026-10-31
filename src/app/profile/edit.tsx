@@ -1,4 +1,6 @@
-import { theme } from '@/theme/mobile-theme';
+import { theme as appTheme , theme } from '@/theme/mobile-theme';
+import { darkPilotStyles } from '@/theme/dark-pilot';
+
 import { BrandedLoading } from '@/components/branded-loading';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useFocusEffect, useNavigation, useRouter } from 'expo-router';
@@ -16,7 +18,7 @@ import { loadOwnProfile, updateOwnProfile, uploadProfileAvatar } from '@/lib/pro
 function EditHeader({ onBack }: { onBack: () => void }) {
   useFocusEffect(useCallback(() => {
     if (Platform.OS === 'web') return;
-    const entry = StatusBar.pushStackEntry({ barStyle: 'dark-content' });
+    const entry = StatusBar.pushStackEntry({ barStyle: 'light-content' });
     return () => StatusBar.popStackEntry(entry);
   }, []));
   return <SafeAreaView edges={['top']} style={s.navy}><View style={s.header}>
@@ -92,10 +94,10 @@ export function ProfileEditor({ profile, ownerId, onReload }: { profile: OwnProf
           {photos.errors.avatar && <Text accessibilityRole="alert" style={s.error}>{photos.errors.avatar}</Text>}
         </View>
         <View style={s.form}>
-          <Text style={s.label}>Display name</Text><TextInput accessibilityLabel="Display name" value={form.displayName} editable={!disabled} maxLength={80} onChangeText={value => change('displayName', value)} placeholder="Your name" autoCapitalize="words" style={s.input} />
-          <Text style={s.label}>Username</Text><TextInput accessibilityLabel="Username" value={form.username} editable={!disabled} maxLength={30} onChangeText={value => change('username', value)} placeholder="your_username" autoCapitalize="none" autoCorrect={false} style={s.input} />
+          <Text style={s.label}>Display name</Text><TextInput placeholderTextColor={appTheme.muted} selectionColor={appTheme.accent} keyboardAppearance="dark" accessibilityLabel="Display name" value={form.displayName} editable={!disabled} maxLength={80} onChangeText={value => change('displayName', value)} placeholder="Your name" autoCapitalize="words" style={s.input} />
+          <Text style={s.label}>Username</Text><TextInput placeholderTextColor={appTheme.muted} selectionColor={appTheme.accent} keyboardAppearance="dark" accessibilityLabel="Username" value={form.username} editable={!disabled} maxLength={30} onChangeText={value => change('username', value)} placeholder="your_username" autoCapitalize="none" autoCorrect={false} style={s.input} />
           <Text style={s.hint}>3–30 letters, numbers or underscores. Your public profile link uses this name.</Text>
-          <Text style={s.label}>Bio</Text><TextInput accessibilityLabel="Bio" value={form.bio} editable={!disabled} maxLength={500} onChangeText={value => change('bio', value)} placeholder="A little about you and your travels" multiline textAlignVertical="top" style={[s.input, s.bio]} />
+          <Text style={s.label}>Bio</Text><TextInput placeholderTextColor={appTheme.muted} selectionColor={appTheme.accent} keyboardAppearance="dark" accessibilityLabel="Bio" value={form.bio} editable={!disabled} maxLength={500} onChangeText={value => change('bio', value)} placeholder="A little about you and your travels" multiline textAlignVertical="top" style={[s.input, s.bio]} />
           <Text style={s.counter}>{form.bio.length}/500</Text>
         </View>
         {error && <Text accessibilityRole="alert" style={s.error}>{error}</Text>}
@@ -122,14 +124,14 @@ export default function EditProfileScreen() {
   const auth = useSessionState(), router = useRouter();
   if (auth.session && !auth.loading) return <ProfileEntry key={auth.session.user.id} ownerId={auth.session.user.id} />;
   return <SafeAreaView edges={['left','right','bottom']} style={ui.safe}><View style={ui.page}><EditHeader onBack={() => router.canGoBack() ? router.back() : router.replace('/account')} /><View style={s.content}>
-    {auth.loading ? <ActivityIndicator accessibilityLabel="Loading account" /> : <Message title="Sign in to edit your profile" body="Your profile changes are saved to your existing account." retry={() => router.push('/auth')} action="Sign in" />}
+    {auth.loading ? <ActivityIndicator color={appTheme.accent} accessibilityLabel="Loading account" /> : <Message title="Sign in to edit your profile" body="Your profile changes are saved to your existing account." retry={() => router.push('/auth')} action="Sign in" />}
   </View></View></SafeAreaView>;
 }
-const s = StyleSheet.create({
+const s = darkPilotStyles(StyleSheet.create({
   grow: { flex: 1, minHeight: 0 }, navy: { backgroundColor: theme.background }, header: { minHeight: 60, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12 },
   back: { width: 48, minHeight: 48, alignItems: 'center', justifyContent: 'center' }, backText: { color: theme.accent, fontSize: 32, lineHeight: 36 }, heading: { flex: 1, color: theme.text, fontSize: 20, fontWeight: '700', textAlign: 'center' },
   content: { padding: 18, gap: 14 }, avatarArea: { alignItems: 'center', gap: 4 }, avatar: { width: 104, height: 104, borderRadius: 52, overflow: 'hidden', backgroundColor: colors.pale, alignItems: 'center', justifyContent: 'center', borderWidth: 3, borderColor: colors.white },
   initial: { color: colors.ink, fontSize: 36, fontWeight: '600' }, photoButton: { minHeight: 48, paddingHorizontal: 18, justifyContent: 'center', backgroundColor: theme.lavender, borderRadius: 22, marginTop: 8 }, photoLabel: { color: colors.ink, fontWeight: '600', fontSize: 14 }, remove: { minHeight: 48, justifyContent: 'center' },
   form: { gap: 8 }, label: { color: colors.ink, fontSize: 14, fontWeight: '600', marginTop: 4 }, input: { minHeight: 48, borderRadius: 16, borderWidth: 1, borderColor: colors.line, backgroundColor: theme.surface, paddingHorizontal: 14, paddingVertical: 10, color: colors.ink, fontSize: 15 }, bio: { minHeight: 88 },
   hint: { color: colors.muted, fontSize: 12, lineHeight: 18, textAlign: 'center' }, counter: { color: colors.muted, fontSize: 12, textAlign: 'right' }, error: { color: '#8B3933', fontSize: 14, lineHeight: 21 }, success: { color: colors.ink, fontSize: 14, lineHeight: 21, fontWeight: '600' }, footer: { paddingHorizontal: 18, paddingVertical: 10, gap: 8, backgroundColor: colors.paper },
-});
+}));

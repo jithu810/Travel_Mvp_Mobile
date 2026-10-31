@@ -1,3 +1,4 @@
+import { usePilotColor, darkPilotStyles } from '@/theme/dark-pilot';
 import { primaryControl } from '@/theme/mobile-theme';
 import { SwipeAction, SwipeJourneyStart } from '@/components/journey/swipe-journey-start';
 import { useBuddyScreen } from '@/hooks/use-journey-buddy';
@@ -6,11 +7,11 @@ import { useBuddyProtectedBounds, useBuddyScroll } from '@/hooks/use-buddy-geome
 import { JourneyActionIcon } from '@/components/journey/journey-action-icon';
 import { StatusBar } from 'expo-status-bar';
 import { BrandedLoading } from '@/components/branded-loading';
-import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
+import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { colors, Message, ScreenHeader, ui } from '@/components/discovery/ui';
+import { colors, Message, ScreenHeader, ui as lightUi } from '@/components/discovery/ui';
 import { StopStoryViewer } from '@/components/journey/stop-story-viewer';
 import { SocialActions } from '@/components/journey/social-actions';
 import { StoryCreator } from '@/components/journey/story-header';
@@ -33,11 +34,14 @@ import { selectedStopId } from '@/lib/journey/story-layout';
 import type { PublicJourney } from '@/types/journey';
 
 export default function JourneyStoryScreen() {
+  const styles = lightStyles_styles;
+  const ui = lightUi;
   const params = useLocalSearchParams<{ id: string | string[]; source?: string }>();
   const id = typeof params.id === 'string' ? params.id : '';
   const loader = useCallback((signal: AbortSignal) => loadPublicJourney(id, signal), [id]);
   const state = useLoad(loader);
   return <SafeAreaView style={ui.safe} edges={state.data ? ['left', 'right', 'bottom'] : ['top', 'left', 'right', 'bottom']}><View style={ui.page}>
+    <Stack.Screen options={{ statusBarStyle: 'light' }} />
     {state.data ? <JourneyStoryContent key={state.data.id} journey={state.data} saveFirst={params.source === 'search'} refresh={state.refresh} refreshing={state.refreshing} error={state.error} /> : <View style={styles.unavailable}>
       <ScreenHeader title="Journey Story" back />
       {state.loading ? <BrandedLoading message="Opening the journey…" />
@@ -48,6 +52,9 @@ export default function JourneyStoryScreen() {
 
 type TemporaryStory = { onRemove: (stopId: string) => void; onBack: () => void; editingBlocked: boolean; error: string | null };
 export function JourneyStoryContent({ journey, refresh, refreshing, error, saveFirst = false, temporary }: { journey: PublicJourney; saveFirst?: boolean; refresh: () => void; refreshing: boolean; error: string | null; temporary?: TemporaryStory }) {
+  const pilotColor = usePilotColor();
+  const styles = lightStyles_styles;
+  const ui = lightUi;
   const auth = useSessionState();
   const router = useRouter();
   const footerProtection = useBuddyProtectedBounds(), expandProtection = useBuddyProtectedBounds(), backProtection = useBuddyProtectedBounds(), scroll = useBuddyScroll();
@@ -126,13 +133,13 @@ export function JourneyStoryContent({ journey, refresh, refreshing, error, saveF
         {temporary ? <Text style={ui.body}>Travel through your selected stops in their original order. This selection is temporary and the original journey stays unchanged. Begin Trip enables location tracking.</Text> : <><Text style={ui.body}>Start Journey travels the original route. Customize chooses stops for this trip without creating a draft. Remix requires sign-in and creates your own editable private draft.</Text>
         <Text style={ui.body}>Like and Save require sign-in. Share is available without an account. Begin Trip starts the timer and GPS updates after location permission is allowed. GPS updates stop when you pause or finish, leave Travel Mode, or put the app in the background. Returning to an active trip resumes GPS updates.</Text>
         {error && <Text accessibilityRole="alert" style={ui.body}>Couldn’t refresh: {error}</Text>}
-        <Pressable accessibilityRole="button" accessibilityLabel="Refresh journey" disabled={refreshing} accessibilityState={{ disabled: refreshing }} onPress={refresh} style={styles.textAction}>{refreshing ? <ActivityIndicator color={colors.ink} /> : <Text style={styles.link}>Refresh journey ↻</Text>}</Pressable></>}
+        <Pressable accessibilityRole="button" accessibilityLabel="Refresh journey" disabled={refreshing} accessibilityState={{ disabled: refreshing }} onPress={refresh} style={styles.textAction}>{refreshing ? <ActivityIndicator color={pilotColor(colors.ink)} /> : <Text style={styles.link}>Refresh journey ↻</Text>}</Pressable></>}
       </> : null}
     </StorySheet>
     {(error || refreshing) && <Pressable accessibilityRole="button" accessibilityLabel={error ? 'Journey refresh failed. View details.' : 'Refreshing journey'} accessibilityLiveRegion="polite" onPress={() => setPanel('about')} style={[styles.refreshStatus, { top: insets.top + 14 }]}><Text style={styles.link}>{refreshing ? '↻' : '!'}</Text></Pressable>}
   </View>;
 }
-const styles = StyleSheet.create({
+const lightStyles_styles = darkPilotStyles(StyleSheet.create({
   mapBack: { position: 'absolute', left: 6, width: 48, height: 48, alignItems: 'center', justifyContent: 'center' },
   mapControlFace: { width: 34, height: 34, borderRadius: 17, backgroundColor: colors.paper, alignItems: 'center', justifyContent: 'center' },
   mapControlIcon: { transform: [{ scale: 0.75 }] },
@@ -168,4 +175,4 @@ const styles = StyleSheet.create({
   refreshStatus: { position: 'absolute', top: 14, right: 70, width: 48, height: 48, borderRadius: 22, backgroundColor: colors.paper, alignItems: 'center', justifyContent: 'center' },
   unavailable: { flex: 1 }, loading: { flex: 1, gap: 16, padding: 20 },
   coverPlaceholder: { flex: 1, maxHeight: 240, borderRadius: 24, backgroundColor: colors.line }, message: { paddingHorizontal: 22 },
-});
+}));

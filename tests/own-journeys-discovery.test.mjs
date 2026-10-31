@@ -1,3 +1,4 @@
+import { appMobileTheme, lightPilotTheme } from './helpers/dark-pilot-harness.mjs';
 import { buddyGeometryStub } from './helpers/buddy-geometry-stub.mjs';
 import assert from 'node:assert/strict';
 import { test, after } from 'node:test';
@@ -168,7 +169,7 @@ function load(path, modules, timers = globalThis) {
   modules = {'@/hooks/use-journey-buddy':{useBuddyScreen(){}},'@/components/buddy/buddy-space':{BuddySpace:'BuddySpace'},...modules};
   if(path!=='src/lib/buddy/model.ts' && !('@/lib/buddy/model' in modules))modules['@/lib/buddy/model']=load('src/lib/buddy/model.ts',{});
   const exports = {};
-  new Function('require', 'exports', 'setTimeout', 'clearTimeout', ts.transpileModule(readFileSync(path, 'utf8'), { compilerOptions: { jsx: ts.JsxEmit.ReactJSX, module: ts.ModuleKind.CommonJS } }).outputText)(id => { assert.ok(id in modules, id); return modules[id]; }, exports, timers.setTimeout, timers.clearTimeout);
+  new Function('require', 'exports', 'setTimeout', 'clearTimeout', ts.transpileModule(readFileSync(path, 'utf8'), { compilerOptions: { jsx: ts.JsxEmit.ReactJSX, module: ts.ModuleKind.CommonJS } }).outputText)(id => { if (id === '@/theme/dark-pilot') return lightPilotTheme; if (id === '@/theme/mobile-theme') return appMobileTheme;  if (id === '@/theme/dark-pilot') return lightPilotTheme; assert.ok(id in modules, id); return modules[id]; }, exports, timers.setTimeout, timers.clearTimeout);
   return exports;
 }
 function stateHarness() {

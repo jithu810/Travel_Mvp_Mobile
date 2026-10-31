@@ -1,3 +1,4 @@
+import { darkPilotStyles } from '@/theme/dark-pilot';
 import { primaryControl } from '@/theme/mobile-theme';
 import { useBuddyCelebration, useBuddyScreen } from '@/hooks/use-journey-buddy';
 import { useBuddyProtectedBounds } from '@/hooks/use-buddy-geometry';
@@ -205,7 +206,7 @@ export function TravelModeContent({ journey, onExit, refreshNotice, resumeChecki
   </View>;
 }
 
-const styles = StyleSheet.create({
+const styles = darkPilotStyles(StyleSheet.create({
   screen: { flex: 1, minHeight: 0, backgroundColor: colors.paper },
   mapArea: { position: 'absolute', top: 0, bottom: 0, left: 0, right: 0 },
   overlays: { position: 'absolute', top: 0, bottom: 0, left: 0, right: 0, paddingHorizontal: 12 },
@@ -235,4 +236,4 @@ const styles = StyleSheet.create({
   beginLabel: { color: colors.white, fontSize: 13, lineHeight: 18, fontWeight: '600', textAlign: 'center' },
   locationAction: { minHeight: 44, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 8 },
   unavailable: { flex: 1, justifyContent: 'center', padding: 16 },
-});
+}));

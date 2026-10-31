@@ -1,3 +1,4 @@
+import { darkPilotStyles } from '@/theme/dark-pilot';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { AccessibilityInfo, Animated, AppState, Image, PanResponder, Pressable, StyleSheet, Text, View } from 'react-native';
 import type { JourneyStop } from '@/types/journey';
@@ -11,6 +12,7 @@ import { useBuddyProtectedBounds } from '@/hooks/use-buddy-geometry';
 // clear for the photo action rail.
 // The card's Pressable carries the label, so the art stays hidden from accessibility.
 function StopPhoto({ stop, stops, index, failed, onError }: { stop: JourneyStop; stops: JourneyStop[]; index: number; failed: boolean; onError: (photo: string) => void }) {
+  const s = lightStyles_s;
   return <View style={s.photo}>{stop.photo && !failed
     ? <Image key={stop.photo} source={{ uri: stop.photo }} accessibilityLabel={stop.name + ' photo'} resizeMode="cover" style={s.image} onError={() => { if (stop.photo) onError(stop.photo); }} />
     : <StopArt seed={artSeed(null, stops)} stops={stops} index={index} name={stop.name} inset={{ right: 56 }} />}<View pointerEvents="none" style={s.photoShade} /></View>;
@@ -18,6 +20,7 @@ function StopPhoto({ stop, stops, index, failed, onError }: { stop: JourneyStop;
 const showsPhoto = (stop: JourneyStop, failed: readonly string[]) => Boolean(stop.photo && !failed.includes(stop.photo));
 
 export function StopCardDeck({ stops, selectedId, onSelect, onDetails, active = true, photoActions, optionsActions, creator }: { stops: JourneyStop[]; selectedId: string | null; onSelect: (id: string) => void; onDetails: (id: string) => void; active?: boolean; photoActions?: ReactNode; optionsActions?: ReactNode; creator?: ReactNode }) {
+  const s = lightStyles_s;
   const [reduceMotion, setReduceMotion] = useState(true);
   const [failedPhotos, setFailedPhotos] = useState<readonly string[]>([]);
   const photoFailed = useCallback((photo: string) => setFailedPhotos(previous => previous.includes(photo) ? previous : [...previous, photo]), []);
@@ -89,7 +92,7 @@ export function StopCardDeck({ stops, selectedId, onSelect, onDetails, active = 
 
   </View>;
 }
-const s = StyleSheet.create({
+const lightStyles_s = darkPilotStyles(StyleSheet.create({
   section: { gap: 0 }, progress: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8 },
   deck: { paddingTop: 14 }, rear: { position: 'absolute', borderRadius: 22, overflow: 'hidden', backgroundColor: theme.lavender }, active: { width: '100%' },
   card: { borderRadius: 22, overflow: 'hidden', backgroundColor: theme.surface, borderWidth: 1, borderColor: '#FFFFFF' },
@@ -101,4 +104,4 @@ const s = StyleSheet.create({
   caption: { paddingHorizontal: 14, paddingTop: 10, paddingBottom: 0, gap: 3 }, name: { fontSize: 22, lineHeight: 28, fontWeight: '700', color: theme.text }, note: { color: theme.muted, fontSize: 12, lineHeight: 18 },
   hint: { color: theme.muted, fontSize: 10, lineHeight: 16, flexShrink: 1 }, link: { color: theme.accent, fontSize: 12, lineHeight: 18, fontWeight: '600' },
   controls: { flexDirection: 'row', gap: 4 }, control: { minHeight: 48, minWidth: 48, paddingHorizontal: 8, borderRadius: 18, backgroundColor: 'transparent', alignItems: 'center', justifyContent: 'center' }, disabled: { opacity: 0.4 }, empty: { padding: 18, gap: 8 },
-});
+}));

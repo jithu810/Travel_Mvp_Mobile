@@ -1,3 +1,4 @@
+import { darkPilotStyles } from '@/theme/dark-pilot';
 import { theme, primaryControl, raisedSurface } from '@/theme/mobile-theme';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -14,7 +15,7 @@ export function TripConfirmation({ title, body, confirmLabel, onConfirm, onCance
     </View></SafeAreaView>
   </Modal>;
 }
-const styles = StyleSheet.create({
+const styles = darkPilotStyles(StyleSheet.create({
   overlay: { flex: 1, justifyContent: 'center', backgroundColor: '#081E19AA', paddingHorizontal: 20 },
   panel: { ...raisedSurface, backgroundColor: theme.surface, padding: 20, gap: 12, borderRadius: 24, width: '100%', maxWidth: 480, alignSelf: 'center' },
   title: { color: colors.ink, fontSize: 21, lineHeight: 27, fontWeight: '700' },
@@ -22,4 +23,4 @@ const styles = StyleSheet.create({
   confirm: { ...primaryControl, minHeight: 48, justifyContent: 'center', alignItems: 'center', borderRadius: 24, padding: 10 },
   confirmText: { color: colors.white, fontSize: 14, fontWeight: '700' },
   cancel: { minHeight: 44, justifyContent: 'center', alignItems: 'center' }, cancelText: { color: colors.ink, fontSize: 14, fontWeight: '600' },
-});
+}));

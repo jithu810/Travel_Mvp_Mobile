@@ -1,3 +1,4 @@
+import { usePilotColor, darkPilotStyles } from '@/theme/dark-pilot';
 import { JourneyActionIcon } from './journey-action-icon';
 import { JourneyShareSheet } from './journey-share-sheet';
 import { createShareArtwork, type ShareArtwork } from '@/lib/social/share-artwork';
@@ -12,6 +13,8 @@ import { useJourneySocial } from '@/hooks/use-journey-social';
 import { sharePublicJourney } from '@/lib/social/sharing';
 
 export function SocialActions({ journey, compact = false, selectedMemoryId, layout, saveFirst = false }: { journey: PublicJourney; compact?: boolean; selectedMemoryId?: string | null; layout?: 'rail'; saveFirst?: boolean }) {
+  const pilotColor = usePilotColor();
+  const styles = lightStyles_styles;
   const rail = layout === 'rail';
   const overlayFeedback = compact || rail;
   const social = useJourneySocial(journey.id, journey.likes);
@@ -57,7 +60,7 @@ export function SocialActions({ journey, compact = false, selectedMemoryId, layo
   const saveButton = <Pressable accessibilityRole="button" accessibilityLabel={social.state?.saved ? 'Remove journey from Saved' : 'Save journey'}
         accessibilityState={{ disabled, selected: social.state?.saved ?? false }} disabled={disabled}
         onPress={() => { act('save'); }} style={({ pressed }) => [styles.button, compact && styles.compactButton, social.state?.saved && styles.active, rail && styles.railButton, disabled && styles.disabled, pressed && styles.pressed]}>
-        {social.busy === 'save' ? <ActivityIndicator color={rail ? '#FFFFFF' : colors.ink} /> : rail ? <JourneyActionIcon name="bookmark" selected={social.state?.saved} color="#FFFFFF" /> : <Text style={[styles.label, compact && styles.compactLabel]}>{social.state?.saved ? (compact ? 'Saved' : 'Saved ✓') : 'Save'}</Text>}
+        {social.busy === 'save' ? <ActivityIndicator color={rail ? '#FFFFFF' : pilotColor(colors.ink)} /> : rail ? <JourneyActionIcon name="bookmark" selected={social.state?.saved} color="#FFFFFF" /> : <Text style={[styles.label, compact && styles.compactLabel]}>{social.state?.saved ? (compact ? 'Saved' : 'Saved ✓') : 'Save'}</Text>}
       </Pressable>;
   return <View style={[styles.section, compact && styles.compactSection, rail && styles.railSection]}>
     <View style={[styles.row, compact && styles.compactRow, rail && styles.railRow]}>
@@ -65,13 +68,13 @@ export function SocialActions({ journey, compact = false, selectedMemoryId, layo
       <Pressable accessibilityRole="button" accessibilityLabel={social.state?.liked ? 'Unlike journey' : 'Like journey'}
         accessibilityState={{ disabled, selected: social.state?.liked ?? false }} disabled={disabled}
         onPress={() => { act('like'); }} style={({ pressed }) => [styles.button, compact && styles.compactButton, social.state?.liked && styles.active, rail && styles.railButton, disabled && styles.disabled, pressed && styles.pressed]}>
-        {social.busy === 'like' ? <ActivityIndicator color={rail ? '#FFFFFF' : colors.ink} /> : rail ? <View style={styles.iconCount}><JourneyActionIcon name="heart" selected={social.state?.liked} />{likes !== null && likes !== undefined && <Text maxFontSizeMultiplier={1.2} numberOfLines={1} style={styles.count}>{likes}</Text>}</View> : <Text style={[styles.label, compact && styles.compactLabel]}>{(compact ? (social.state?.liked ? '♥ Like' : '♡ Like') : social.state?.liked ? '♥ Unlike' : '♡ Like') + (likes !== null && likes !== undefined ? ' · ' + likes : '')}</Text>}
+        {social.busy === 'like' ? <ActivityIndicator color={rail ? '#FFFFFF' : pilotColor(colors.ink)} /> : rail ? <View style={styles.iconCount}><JourneyActionIcon name="heart" selected={social.state?.liked} />{likes !== null && likes !== undefined && <Text maxFontSizeMultiplier={1.2} numberOfLines={1} style={styles.count}>{likes}</Text>}</View> : <Text style={[styles.label, compact && styles.compactLabel]}>{(compact ? (social.state?.liked ? '♥ Like' : '♡ Like') : social.state?.liked ? '♥ Unlike' : '♡ Like') + (likes !== null && likes !== undefined ? ' · ' + likes : '')}</Text>}
       </Pressable>
       {!saveFirst && saveButton}
       <Pressable ref={shareButton} accessibilityRole="button" accessibilityLabel="Share public journey"
         accessibilityState={{ disabled: sharing }} disabled={sharing} onPress={() => { const next = createShareArtwork(journey, selectedMemoryId, process.env.EXPO_PUBLIC_SITE_URL); if (next && selectedMemoryId !== undefined) setArtwork(next); else void shareLink(); }}
         style={({ pressed }) => [styles.button, compact && styles.compactButton, rail && styles.railButton, pressed && styles.pressed]}>
-        {sharing ? <ActivityIndicator color={rail ? '#FFFFFF' : colors.ink} /> : rail ? <JourneyActionIcon name="share" color="#FFFFFF" /> : <Text style={[styles.label, compact && styles.compactLabel]}>{compact ? 'Share' : 'Share ↗'}</Text>}
+        {sharing ? <ActivityIndicator color={rail ? '#FFFFFF' : pilotColor(colors.ink)} /> : rail ? <JourneyActionIcon name="share" color="#FFFFFF" /> : <Text style={[styles.label, compact && styles.compactLabel]}>{compact ? 'Share' : 'Share ↗'}</Text>}
       </Pressable>
       {overlayFeedback && (social.error || social.auth.error || social.message || shareMessage) && <Pressable accessibilityRole="button" accessibilityLiveRegion="polite" accessibilityLabel={'View journey action feedback: ' + (social.error || social.auth.error || social.message || shareMessage || '')} onPress={() => setFeedbackOpen(true)} style={[styles.status, rail && styles.railStatus]}><Text style={styles.label}>!</Text></Pressable>}
     </View>
@@ -79,7 +82,7 @@ export function SocialActions({ journey, compact = false, selectedMemoryId, layo
     {overlayFeedback ? <StorySheet visible={feedbackOpen} title="Journey actions" onClose={() => setFeedbackOpen(false)}>{feedback}</StorySheet> : feedback}
   </View>;
 }
-const styles = StyleSheet.create({
+const lightStyles_styles = darkPilotStyles(StyleSheet.create({
   iconCount: { alignItems: 'center' }, count: { color: '#FFFFFF', fontSize: 9, lineHeight: 11, fontWeight: '700' },
   railSection: { marginTop: 0, gap: 0 }, railRow: { flexDirection: 'column', flexWrap: 'nowrap', gap: 3, backgroundColor: '#101B2E', borderRadius: 14 },
   railButton: { width: 48, minWidth: 48, minHeight: 48, flexBasis: 'auto', flexGrow: 0, paddingHorizontal: 2, paddingVertical: 3, borderRadius: 14, backgroundColor: 'transparent', borderWidth: 0 },
@@ -98,4 +101,4 @@ const styles = StyleSheet.create({
   note: { color: colors.muted, fontSize: 12, lineHeight: 19, flexShrink: 1 },
   feedback: { gap: 8 },
   retry: { minHeight: 48, justifyContent: 'center', alignSelf: 'flex-start', paddingHorizontal: 12, borderRadius: 12, backgroundColor: colors.pale },
-});
+}));

@@ -1,3 +1,4 @@
+import { lightPilotTheme } from './helpers/dark-pilot-harness.mjs';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
@@ -5,7 +6,7 @@ import { test } from 'node:test';
 const ts = createRequire(import.meta.url)('typescript');
 function load(file, modules = {}, timers = globalThis) {
   const exports = {}, code = ts.transpileModule(readFileSync(file, 'utf8'), { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true } }).outputText;
-  new Function('require', 'exports', 'setTimeout', 'clearTimeout', 'setInterval', 'clearInterval', code)(name => { assert.ok(name in modules, name); return modules[name]; }, exports, timers.setTimeout, timers.clearTimeout, timers.setInterval, timers.clearInterval); return exports;
+  new Function('require', 'exports', 'setTimeout', 'clearTimeout', 'setInterval', 'clearInterval', code)(name => { if (name === '@/theme/dark-pilot') return lightPilotTheme; assert.ok(name in modules, name); return modules[name]; }, exports, timers.setTimeout, timers.clearTimeout, timers.setInterval, timers.clearInterval); return exports;
 }
 const map = load('src/lib/journey/map-data.ts'), travel = load('src/lib/discovery/travel.ts', { '../journey/map-data': map });
 const { createStoryBuddyPlayback } = load('src/lib/journey/story-buddy-playback.ts', { './map-data': map, '../discovery/travel': travel });
@@ -67,6 +68,7 @@ test('Story wires one shared controller into36dp compact and64dp expanded maps w
 test('actual StorySheet releases its blocker only for the explicitly opted-in expanded map', () => {
   const blocked = [], jsx = (type, props) => ({ type, props });
   const { StorySheet } = load('src/components/journey/story-sheet.tsx', {
+    react: { useState: initial => [initial, () => {}], useEffect() {} },
     'react/jsx-runtime': { jsx, jsxs: jsx }, 'expo-status-bar': { StatusBar: 'StatusBar' },
     '@/theme/mobile-theme': { theme: {} }, 'react-native': { Modal: 'Modal', Pressable: 'Pressable', ScrollView: 'ScrollView', View: 'View', Text: 'Text', StyleSheet: { create: value => value } },
     'react-native-safe-area-context': { SafeAreaView: 'SafeAreaView' }, '@/components/discovery/ui': { colors: {} },

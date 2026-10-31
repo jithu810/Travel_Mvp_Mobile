@@ -1,3 +1,4 @@
+import { darkPilotStyles } from '@/theme/dark-pilot';
 import { useRouter } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import type { PublicJourney } from '@/types/journey';
@@ -30,7 +31,7 @@ export function JourneyCard({ journey }: { journey: PublicJourney }) {
     </View>
   </Pressable>;
 }
-const styles = StyleSheet.create({
+const styles = darkPilotStyles(StyleSheet.create({
   card: { borderRadius: 22, backgroundColor: colors.white, marginBottom: 22, overflow: 'hidden', borderWidth: 1, borderColor: colors.line },
   cover: { position: 'relative' },
   badge: { position: 'absolute', left: 14, top: 14, borderRadius: 12, backgroundColor: colors.paper, paddingHorizontal: 12, paddingVertical: 7 },
@@ -42,4 +43,4 @@ const styles = StyleSheet.create({
   creatorRow: { flexDirection: 'row', gap: 12, borderTopWidth: 1, borderColor: colors.line, paddingTop: 12, marginTop: 5, alignItems: 'center' },
   creator: { flex: 1, color: colors.muted, fontSize: 12 },
   likes: { color: colors.ink, fontSize: 13 },
-});
+}));

@@ -1,3 +1,4 @@
+import { appMobileTheme, lightPilotTheme } from './helpers/dark-pilot-harness.mjs';
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { readFileSync } from 'node:fs';
@@ -5,7 +6,7 @@ import ts from 'typescript';
 function load(path, modules) {
   const module = { exports: {} };
   const code = ts.transpileModule(readFileSync(path, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX } }).outputText;
-  new Function('require','module','exports',code)(name => { assert.ok(name in modules, name); return modules[name]; },module,module.exports);
+  new Function('require','module','exports',code)(name => { if (name === '@/theme/dark-pilot') return lightPilotTheme; if (name === '@/theme/mobile-theme') return appMobileTheme;  assert.ok(name in modules, name); return modules[name]; },module,module.exports);
   return module.exports;
 }
 const id = '11111111-1111-4111-8111-111111111111', uid = '22222222-2222-4222-8222-222222222222';

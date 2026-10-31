@@ -1,9 +1,11 @@
+import { usePilotColor, darkPilotStyles } from '@/theme/dark-pilot';
 import { StyleSheet, View } from 'react-native';
 
 type IconName = 'heart' | 'bookmark' | 'share' | 'remix' | 'route' | 'info' | 'expand' | 'fit';
 // Decorative native geometry keeps icons independent of emoji/font rendering.
 export function JourneyActionIcon({ name, selected = false, color: customColor }: { name: IconName; selected?: boolean; color?: string }) {
-  const color = name === 'heart' ? '#EF3340' : customColor ?? (selected ? '#6555CF' : '#243E68');
+  const pilotColor = usePilotColor();
+  const color = name === 'heart' ? '#EF3340' : customColor ?? pilotColor(selected ? '#6555CF' : '#243E68');
   const line = { backgroundColor: color };
   return <View pointerEvents="none" accessible={false} accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={s.frame}>
     {(name === 'expand' || name === 'fit') && <><View style={[s.corner, { left: 2, top: 2, borderLeftWidth: 2, borderTopWidth: 2, borderColor: color }]} /><View style={[s.corner, { right: 2, bottom: 2, borderRightWidth: 2, borderBottomWidth: 2, borderColor: color }]} />{name === 'fit' && <View style={[s.fitCenter, { borderColor: color }]} />}</>}
@@ -15,7 +17,7 @@ export function JourneyActionIcon({ name, selected = false, color: customColor }
     {name === 'info' && <><View style={[s.infoCircle, { borderColor: color }]} /><View style={[s.infoDot, line]} /><View style={[s.infoStem, line]} /></>}
   </View>;
 }
-const s = StyleSheet.create({
+const s = darkPilotStyles(StyleSheet.create({
   heartOutlineTop: { position: 'absolute', top: -7, left: 0, width: 14, height: 8, borderTopLeftRadius: 7, borderTopRightRadius: 7, borderWidth: 2, borderBottomWidth: 0 }, heartOutlineRight: { position: 'absolute', top: 0, left: 13, width: 8, height: 14, borderTopRightRadius: 7, borderBottomRightRadius: 7, borderWidth: 2, borderLeftWidth: 0 },
   corner: { position: 'absolute', width: 8, height: 8 }, fitCenter: { position: 'absolute', top: 8, left: 8, width: 8, height: 8, borderWidth: 2, borderRadius: 4 },
   notchOutline: { position: 'absolute', left: 8, bottom: -1, width: 8, height: 8, borderLeftWidth: 2, borderTopWidth: 2, transform: [{ rotate: '45deg' }] },
@@ -25,4 +27,4 @@ const s = StyleSheet.create({
   remixTop: { position: 'absolute', left: 3, top: 4, width: 17, height: 7, borderLeftWidth: 2, borderTopWidth: 2, borderTopLeftRadius: 6 }, remixBottom: { position: 'absolute', right: 3, bottom: 4, width: 17, height: 7, borderRightWidth: 2, borderBottomWidth: 2, borderBottomRightRadius: 6 }, arrowTop: { position: 'absolute', right: 3, top: 1, width: 7, height: 7, borderTopWidth: 2, borderRightWidth: 2, transform: [{ rotate: '45deg' }] }, arrowBottom: { position: 'absolute', left: 3, bottom: 1, width: 7, height: 7, borderBottomWidth: 2, borderLeftWidth: 2, transform: [{ rotate: '45deg' }] },
   routeLine: { position: 'absolute', left: 6, top: 5, width: 13, height: 14, borderTopWidth: 2, borderRightWidth: 2, borderBottomWidth: 2, borderTopRightRadius: 6, borderBottomRightRadius: 6 }, routeStart: { position: 'absolute', left: 2, top: 2, width: 7, height: 7, borderWidth: 2, borderRadius: 4, backgroundColor: '#FFFFFF' }, routeEnd: { position: 'absolute', left: 2, bottom: 2, width: 7, height: 7, borderWidth: 2, borderRadius: 4, backgroundColor: '#FFFFFF' },
   infoCircle: { position: 'absolute', left: 2, top: 2, width: 20, height: 20, borderWidth: 2, borderRadius: 10 }, infoDot: { position: 'absolute', left: 11, top: 6, width: 2, height: 2, borderRadius: 1 }, infoStem: { position: 'absolute', left: 11, top: 10, width: 2, height: 8, borderRadius: 1 },
-});
+}));

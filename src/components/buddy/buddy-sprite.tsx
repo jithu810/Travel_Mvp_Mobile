@@ -22,7 +22,7 @@ export const BuddySprite = memo(function BuddySprite({ animation = 'idle', anima
   // original cells are180×189: clip their exact width so no adjacent frame leaks.
   const width = 64 * clip.frameWidth / clip.frameHeight;
   return <View accessible={false} pointerEvents="none" style={{ width, height: 64, alignSelf: 'center', overflow: 'hidden', transform: [{ scaleX: facing === clip.facing ? 1 : -1 }] }}>
-    {animation === 'sleep' && <Text accessible={false} style={{ position: 'absolute', top: 0, right: 0, zIndex: 1, color: '#536486', fontSize: 10, fontWeight: '700' }}>Zzz</Text>}
+    {animation === 'sleep' && <Text accessible={false} style={{ position: 'absolute', top: 0, right: 0, zIndex: 1, color: "#B5C3D8", fontSize: 10, fontWeight: '700' }}>Zzz</Text>}
     <Image source={clip.source} accessible={false} fadeDuration={0} resizeMethod="scale" resizeMode="stretch" style={{ position: 'absolute', ...spriteFrame(clip, animate ? frame : 0) }} onError={() => setFailed(true)} />
   </View>;
 });

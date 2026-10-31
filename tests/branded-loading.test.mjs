@@ -1,3 +1,4 @@
+import { lightPilotTheme } from './helpers/dark-pilot-harness.mjs';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
@@ -25,7 +26,7 @@ function harness() {
 function load(file,h,modules={}) {
   const exports={};const jsx=(type,props)=>({type,props});
   const code=ts.transpileModule(readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX,target:ts.ScriptTarget.ES2022}}).outputText;
-  new Function('require','exports','setTimeout','clearTimeout',code)(name=>{ if (name === '@/theme/mobile-theme') return mobileTheme;
+  new Function('require','exports','setTimeout','clearTimeout',code)(name=>{ if (name === '@/theme/dark-pilot') return lightPilotTheme; if (name === '@/theme/mobile-theme') return mobileTheme;
     if(name==='@/hooks/use-journey-buddy')return {useBuddySuppression(){}};
     if(name==='react')return h.react;if(name==='react/jsx-runtime')return {jsx,jsxs:jsx};if(name.endsWith('.png'))return name;
     if(name in modules)return modules[name];throw Error(name);

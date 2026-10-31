@@ -1,3 +1,4 @@
+import { useDarkPilot, darkPilotStyles } from '@/theme/dark-pilot';
 import { theme } from '@/theme/mobile-theme';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AccessibilityInfo, Modal, PanResponder, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
@@ -15,6 +16,8 @@ const circleTop = 12, circleBottomGap = 8;
 export function StopStoryViewer({ journey, selectedId, onSelect, onClose, onMap }: {
   journey: PublicJourney; selectedId: string | null; onSelect: (id: string) => void; onClose: () => void; onMap: () => void;
 }) {
+  const styles = lightStyles_styles;
+  const dark = useDarkPilot();
   const [reduceMotion, setReduceMotion] = useState(true);
   useEffect(() => {
     let active = true;
@@ -79,7 +82,7 @@ export function StopStoryViewer({ journey, selectedId, onSelect, onClose, onMap 
   }), [shouldSwipe, finishSwipe]);
   return <Modal visible animationType={reduceMotion ? 'none' : 'fade'} presentationStyle="fullScreen" onRequestClose={() => expanded ? setNotesId(null) : onClose()}>
     <View style={styles.screen} testID="stop-story-viewer">
-      <StatusBar style="dark" />
+      <StatusBar style={dark ? 'light' : 'dark'} />
       {stop && <View style={styles.photo}><JourneyPhoto uri={stop.photo} label={stop.name + ' photo'} fill onError={() => setFailedPhoto(stop.photo)}
         fallback={<StopArt seed={artSeed(journey.id, journey.stops)} stops={journey.stops} index={index} name={stop.name} inset={{ top: insets.top + headerHeight, bottom: insets.bottom + captionHeight, right: circle ? 112 : 0 }}
           accessibilityLabel={'Stop art. ' + (stop.photo ? 'Photo unavailable. ' : 'No photo yet. ') + stop.name} />} /></View>}
@@ -122,7 +125,7 @@ export function StopStoryViewer({ journey, selectedId, onSelect, onClose, onMap 
     </View>
   </Modal>;
 }
-const styles = StyleSheet.create({
+const lightStyles_styles = darkPilotStyles(StyleSheet.create({
   screen: { flex: 1, backgroundColor: theme.background }, photo: { position: 'absolute', top: 0, bottom: 0, left: 0, right: 0 },
   statusBarBacking: { position: 'absolute', top: 0, left: 0, right: 0, backgroundColor: theme.surface },
   safe: { flex: 1 }, header: { padding: 12, gap: 8, backgroundColor: theme.surface },
@@ -140,4 +143,4 @@ const styles = StyleSheet.create({
   notesHeader: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 12 }, notesTitle: { flex: 1, color: colors.ink, fontSize: 19, lineHeight: 25, fontWeight: '700' },
   notesClose: { minHeight: 48, paddingHorizontal: 14, justifyContent: 'center', backgroundColor: colors.pale, borderRadius: 22 }, notesCloseLabel: { color: colors.ink, fontSize: 13, fontWeight: '600' },
   notesContent: { paddingBottom: 12, gap: 14 }, fullDescription: { color: colors.ink, fontSize: 15, lineHeight: 25 },
-});
+}));

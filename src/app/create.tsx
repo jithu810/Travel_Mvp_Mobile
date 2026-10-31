@@ -1,3 +1,5 @@
+import { theme as appTheme , theme, primaryControl } from '@/theme/mobile-theme';
+import { darkPilotStyles } from '@/theme/dark-pilot';
 import { FirstOutcomeHint } from '@/components/first-outcome-hint';
 import { StorySheet } from '@/components/journey/story-sheet';
 import { JourneyActionIcon } from '@/components/journey/journey-action-icon';
@@ -11,7 +13,7 @@ import { SwipeAction } from '@/components/journey/swipe-journey-start';
 import { MemoryDeck } from '@/components/create/memory-deck';
 import { EditorActionIcon } from '@/components/create/editor-action-icon';
 import { thumbnailStoragePath } from '@/lib/media/image-variants';
-import { theme, primaryControl } from '@/theme/mobile-theme';
+
 import { BrandedLoading } from '@/components/branded-loading';
 import { createPhotoSaveController } from '@/lib/create/photo-save';
 import { checkPhotoDraft, uploadJourneyPhoto } from '@/lib/create/photo-queries';
@@ -334,7 +336,7 @@ export function DraftShortcuts({ ownerId, keyboardHidden = false }: { ownerId: s
       <Text accessibilityRole="header" style={createStyles.historyHeading}>Your drafts</Text>
       <Pressable accessibilityRole="button" accessibilityLabel="All private drafts" onPress={() => router.push('/account')} style={createStyles.allDrafts}><Text style={createStyles.allDraftsText}>View all →</Text></Pressable>
     </View>
-    {drafts.loading ? <ActivityIndicator accessibilityLabel="Loading private drafts" /> : drafts.error ? <Message title="Drafts unavailable" body={drafts.error} retry={drafts.retry} />
+    {drafts.loading ? <ActivityIndicator color={appTheme.accent} accessibilityLabel="Loading private drafts" /> : drafts.error ? <Message title="Drafts unavailable" body={drafts.error} retry={drafts.retry} />
       : drafts.data?.length ? <ScrollView {...scroll} horizontal accessibilityLabel="Private draft history" accessibilityHint="Swipe left or right to browse your drafts"
         style={createStyles.historyScroll} contentContainerStyle={createStyles.historyItems} showsHorizontalScrollIndicator={false} directionalLockEnabled keyboardShouldPersistTaps="handled">
         {drafts.data.map(draft => <Pressable key={draft.id} accessibilityRole="button" accessibilityLabel={'Continue: ' + draft.title}
@@ -372,15 +374,15 @@ export default function CreateScreen() {
   useFocusEffect(useCallback(() => {
     if (!auth.loading && !auth.session && !prompted.current) { prompted.current = true; router.push({ pathname: '/auth', params: { context: 'create' } }); }
   }, [auth.loading, auth.session, router]));
-  return <SafeAreaView edges={['left', 'right', 'bottom']} style={ui.safe}><Stack.Screen options={{ statusBarStyle: draftId ? 'dark' : 'light' }} /><View style={ui.page} onTouchStart={!draftId ? () => setDismissSearchVersion(n => n + 1) : undefined}>{draftId ? (!auth.session || auth.loading) && <SafeAreaView edges={['top']}><ScreenHeader title="Your journey" back compact /></SafeAreaView> : <CreateJourneyHeader destination={focus?.ownerId === userId ? focus?.place : null} destinationVersion={focus?.version} keyboardOpen={keyboardOpen} />}
+  return <SafeAreaView edges={['left', 'right', 'bottom']} style={ui.safe}><Stack.Screen options={{ statusBarStyle: 'light' }} /><View style={ui.page} onTouchStart={!draftId ? () => setDismissSearchVersion(n => n + 1) : undefined}>{draftId ? (!auth.session || auth.loading) && <SafeAreaView edges={['top']}><ScreenHeader title="Your journey" back compact /></SafeAreaView> : <CreateJourneyHeader destination={focus?.ownerId === userId ? focus?.place : null} destinationVersion={focus?.version} keyboardOpen={keyboardOpen} />}
     {params.guide === 'memory' && !auth.loading && auth.session && <FirstOutcomeHint key={draftId ?? 'new'} title={draftId ? 'Add your first memory' : 'Start with the journey behind your memory'}>{draftId ? 'Add a stop to your journey. Give the moment a name or note, then save your changes when ready. A photo and location are optional.' : 'Choose a destination and title, then create a private journey. You can add your first memory next. Photos are optional; nothing is saved until you choose to save.'}</FirstOutcomeHint>}
-    {auth.loading ? <ActivityIndicator /> : !auth.session ? <View style={ui.list}><Message title="Make your next chapter" body="Sign in to create a journey. Nothing is created until you save or publish." retry={() => router.push({ pathname: '/auth', params: { context: 'create' } })} action="Sign in to create" /></View>
+    {auth.loading ? <ActivityIndicator color={appTheme.accent} /> : !auth.session ? <View style={ui.list}><Message title="Make your next chapter" body="Sign in to create a journey. Nothing is created until you save or publish." retry={() => router.push({ pathname: '/auth', params: { context: 'create' } })} action="Sign in to create" /></View>
       : draftId ? <DraftEditorEntry key={auth.session.user.id + ':' + draftId} id={draftId} ownerId={auth.session.user.id} keyboardOpen={keyboardOpen} />
         : !idsAvailable ? <View style={ui.list}><Message title="An app update is needed" body="Update this development client before creating journeys." /></View> : <NewJourneyEditor key={auth.session.user.id} ownerId={auth.session.user.id} onDestinationFocus={focusDestination} dismissSearchVersion={dismissSearchVersion} keyboardOpen={keyboardOpen} />}
   </View></SafeAreaView>;
 }
 
-const createStyles = StyleSheet.create({
+const createStyles = darkPilotStyles(StyleSheet.create({
   remixMapControl: { position: 'absolute', width: 48, height: 48, alignItems: 'center', justifyContent: 'center' },
   remixMapControlFace: { width: 34, height: 34, borderRadius: 17, backgroundColor: colors.paper, alignItems: 'center', justifyContent: 'center' },
   remixMapControlIcon: { transform: [{ scale: 0.75 }] },
@@ -445,4 +447,4 @@ const createStyles = StyleSheet.create({
   draftArrow: { color: colors.ink, fontSize: 26 },
   allDrafts: { width: 88, minHeight: 48, justifyContent: 'center', alignItems: 'flex-end', paddingHorizontal: 4 },
   allDraftsText: { color: colors.ink, fontSize: 14, lineHeight: 20, fontWeight: '600' },
-});
+}));

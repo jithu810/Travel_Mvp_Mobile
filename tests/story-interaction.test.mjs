@@ -1,3 +1,4 @@
+import { appMobileTheme, lightPilotTheme } from './helpers/dark-pilot-harness.mjs';
 import { buddyGeometryStub, buddyMapPinsStub } from './helpers/buddy-geometry-stub.mjs';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -43,7 +44,7 @@ function load(path, modules, hooks = harness(false).hooks, timers = globalThis) 
     compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true },
   }).outputText;
   const module = { exports: {} };
-  const require = name => {
+  const require = name => { if (name === '@/theme/dark-pilot') return lightPilotTheme; if (name === '@/theme/mobile-theme') return appMobileTheme;
     if(name==='@/hooks/use-journey-buddy')return {useBuddyCelebration:()=>()=>{},useBuddyScreen(){},useBuddySuppression(){},...modules[name]};
     if(name==='@/hooks/use-map-buddy')return modules[name] || {useMapBuddy:()=>({enabled:false,visible:false,openHelp(){}})};
     if(name==='@/hooks/use-buddy-map-image')return modules[name] || {useBuddyMapImage:()=>({ready:true,failed:false,version:0,ref:{current:null},onLoad(){},onError(){},onLayout(){},retry(){}})};
@@ -57,7 +58,7 @@ function load(path, modules, hooks = harness(false).hooks, timers = globalThis) 
     if(name==='@/lib/buddy/map-controls')return load('src/lib/buddy/map-controls.ts',{'../discovery/globe-style':load('src/lib/discovery/globe-style.ts',{})});
     if(name==='@/lib/buddy/model')return load('src/lib/buddy/model.ts',{});
     if(name==='@/components/buddy/buddy-space')return {BuddySpace:'BuddySpace'};
-    if (name === '@/theme/mobile-theme') return mobileTheme;
+    if (name === '@/theme/dark-pilot') return lightPilotTheme; if (name === '@/theme/mobile-theme') return mobileTheme;
     if(name==='@/lib/journey/nearby')return load('src/lib/journey/nearby.ts',{}); if(name.endsWith('/nearby-locations'))return {NearbyLocations:'NearbyLocations'}; if (name === 'react/jsx-runtime') return { jsx, jsxs: jsx };
     if (name === '@/components/journey/swipe-journey-start') return { SwipeJourneyStart: 'SwipeJourneyStart', SwipeAction: 'SwipeAction' };
     if (name === '@/components/journey/journey-action-icon') return { JourneyActionIcon: 'JourneyActionIcon' };
@@ -1867,11 +1868,11 @@ test('StorySheet keeps motion disabled when the platform query fails', async () 
   h.dispose();
 });
 
-test('StorySheet owns dark status icons only while visible and releases ownership when closed',()=>{
+test('StorySheet owns light status icons only while visible and releases ownership when closed',()=>{
  const {StorySheet}=load('src/components/journey/story-sheet.tsx',{'react-native':native,'react-native-safe-area-context':{SafeAreaView:'SafeAreaView'},'@/components/discovery/ui':ui});
  const props={title:'Feedback',onClose(){},children:'Message'};
  assert.equal(find(StorySheet({...props,visible:false}),'StatusBar'),null);
- assert.equal(find(StorySheet({...props,visible:true}),'StatusBar').props.style,'dark');
+ assert.equal(find(StorySheet({...props,visible:true}),'StatusBar').props.style,'light');
 });
 test('edge-to-edge preview moves Fit and compass below inset without changing Travel defaults',()=>{
  const h=nativeMapHarness([mappedStop('a',0,76,8),mappedStop('b',1,77,9)]);
@@ -2007,4 +2008,27 @@ test('R2: Begin Trip waits while a saved trip is checked; texts say how long pro
   begin = all(tree, 'Pressable').find(n => n.props.accessibilityLabel === 'Begin Trip');
   assert.equal(begin.props.disabled, false); assert.match(text(tree), /Progress kept until the app closes/);
   assert.doesNotMatch(text(tree), /GPS (history|stored)/);
+});
+
+test('public Story owns light native status icons during loading, failure and unavailable states', () => {
+  let state = { data: null, loading: true, error: null, retry() {} };
+  const { default: Screen } = load('src/app/journey/[id].tsx', {
+    'expo-router': { Stack: { Screen: 'NativeStoryOptions' }, useLocalSearchParams: () => ({ id: 'public-story' }) },
+    'react-native': native, 'react-native-safe-area-context': { SafeAreaView: 'SafeAreaView' },
+    '@/components/discovery/ui': ui,
+    '@/hooks/session-context': {}, '@/components/journey/stop-story-viewer': {},
+    '@/components/journey/journey-options': {}, '@/components/journey/social-actions': {},
+    '@/components/journey/story-header': {}, '@/components/journey/stop-timeline': {},
+    '@/components/journey/story-extras': {}, '@/components/journey/story-sheet': {},
+    '@/components/journey/map/journey-map': {}, '@/components/journey/map-itinerary': {},
+    '@/lib/journey/travel-preview': {}, '@/hooks/use-load': { useLoad: () => state },
+    '@/lib/discovery/queries': {}, '@/lib/discovery/model': {}, '@/lib/journey/map-data': mapData,
+    '@/lib/journey/snapshot': {}, '@/lib/journey/story-layout': layout,
+  });
+  for (const status of [{ loading: true, error: null }, { loading: false, error: 'Offline' }, { loading: false, error: null }]) {
+    state = { ...state, ...status };
+    const tree = Screen();
+    assert.equal(find(tree, 'NativeStoryOptions').props.options.statusBarStyle, 'light');
+    assert.ok(status.loading ? find(tree, 'BrandedLoading') : find(tree, 'Message'));
+  }
 });

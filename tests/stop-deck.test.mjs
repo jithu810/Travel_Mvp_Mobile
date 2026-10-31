@@ -1,3 +1,4 @@
+import { lightPilotTheme } from './helpers/dark-pilot-harness.mjs';
 import { buddyGeometryStub } from './helpers/buddy-geometry-stub.mjs';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -31,7 +32,7 @@ function load(path, modules, hooks) {
   const source = ts.transpileModule(readFileSync(path, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true } }).outputText;
   const module = { exports: {} };
   const require = name => {
-    if (name === '@/theme/mobile-theme') return mobileTheme;
+    if (name === '@/theme/dark-pilot') return lightPilotTheme; if (name === '@/theme/mobile-theme') return mobileTheme;
     if (name === '@/hooks/use-buddy-geometry') return buddyGeometryStub;
     if (name === 'react/jsx-runtime') return { jsx, jsxs: jsx, Fragment: 'Fragment' };
     if (name === 'react') return hooks;

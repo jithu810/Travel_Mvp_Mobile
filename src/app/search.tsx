@@ -1,3 +1,5 @@
+import { theme as appTheme } from '@/theme/mobile-theme';
+import { darkPilotStyles } from '@/theme/dark-pilot';
 import { FirstOutcomeHint } from '@/components/first-outcome-hint';
 import { CompactSearchInput } from '@/components/discovery/compact-search-input';
 import { useBuddyScreen } from '@/hooks/use-journey-buddy';
@@ -76,7 +78,7 @@ export default function SearchScreen() {
           <Pressable accessibilityRole="button" accessibilityLabel={savedOnly ? 'Show all public journeys' : 'Show saved journeys'} accessibilityState={{ selected: savedOnly }}
             onPress={() => setSavedOnly(value => !value)} style={[styles.savedToggle, savedOnly && styles.savedSelected]}><JourneyActionIcon name="bookmark" selected={savedOnly} /><Text style={[styles.savedLabel, savedOnly && styles.savedLabelSelected]}>Saved</Text></Pressable>
         </View> : <View style={styles.inputRow}>
-          <TextInput accessibilityLabel="Search journeys, places, stops or creators" placeholder="Try a place, stop or creator"
+          <TextInput selectionColor={appTheme.accent} keyboardAppearance="dark" accessibilityLabel="Search journeys, places, stops or creators" placeholder="Try a place, stop or creator"
             placeholderTextColor={colors.muted} value={query} onChangeText={changeQuery} maxLength={120}
             autoCapitalize="none" autoCorrect={false} returnKeyType="search" submitBehavior="blurAndSubmit" style={styles.input}
             clearButtonMode="never" />
@@ -107,7 +109,7 @@ export default function SearchScreen() {
     </KeyboardAvoidingView>
   </SafeAreaView>;
 }
-const styles = StyleSheet.create({
+const styles = darkPilotStyles(StyleSheet.create({
   compactRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   compactField: { flex: 1, minWidth: 0 },
   compactClear: { minWidth: 48, minHeight: 48, alignItems: 'center', justifyContent: 'center' },
@@ -129,4 +131,4 @@ const styles = StyleSheet.create({
   places: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
   chip: { minWidth: 48, minHeight: 48, justifyContent: 'center', paddingHorizontal: 14, borderRadius: 14, backgroundColor: colors.pale },
   chipText: { color: colors.ink, fontSize: 12, fontWeight: '500' },
-});
+}));

@@ -1,3 +1,4 @@
+import { darkPilotStyles } from '@/theme/dark-pilot';
 import { memo, useState } from 'react';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import type { PublicJourney } from '@/types/journey';
@@ -11,6 +12,7 @@ export const HomeJourneyCard = memo(function HomeJourneyCard({ journey, expanded
   journey: PublicJourney; expanded: boolean; width: number; selected: boolean;
   onOpen: (id: string) => void; onLocate: (id: string) => void; onHeight?: (height: number) => void;
 }) {
+  const s = lightStyles_s;
   const [failedUri, setFailedUri] = useState<string | null>(null);
   const [failedThumbnail, setFailedThumbnail] = useState<string | null>(null);
   const thumbnail = journey.coverThumbnail && journey.coverThumbnail !== failedThumbnail ? journey.coverThumbnail : null;
@@ -43,7 +45,7 @@ export const HomeJourneyCard = memo(function HomeJourneyCard({ journey, expanded
     </View>
   </View>;
 });
-const s = StyleSheet.create({
+const lightStyles_s = darkPilotStyles(StyleSheet.create({
   card: { borderRadius: 18, backgroundColor: colors.white, borderWidth: 1, borderColor: '#E1E8F4', overflow: 'hidden' },
   selected: { borderColor: '#3873CE', backgroundColor: '#F0F6FF' },
   story: { flexDirection: 'row', padding: 10, paddingBottom: 4, gap: 10 },
@@ -64,4 +66,4 @@ const s = StyleSheet.create({
   actionLabel: { color: '#2C63AF', fontSize: 11, lineHeight: 14, fontWeight: '600', textAlign: 'center', flexShrink: 1 },
   selectedLabel: { color: '#6555CF' },
   selectedAction: { backgroundColor: '#E6E0FF' },
-});
+}));

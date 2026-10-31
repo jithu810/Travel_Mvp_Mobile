@@ -1,3 +1,4 @@
+import { useDarkPilot, darkPilotStyles } from '@/theme/dark-pilot';
 import { StatusBar } from 'expo-status-bar';
 import { theme } from '@/theme/mobile-theme';
 import { useEffect, useState, type ReactNode } from 'react';
@@ -7,6 +8,8 @@ import { colors } from '@/components/discovery/ui';
 import { useBuddySuppression } from '@/hooks/use-journey-buddy';
 
 export function StorySheet({ visible, title, subtitle, onClose, children, scrollable = true, suppressBuddy = true }: { visible: boolean; title: string; subtitle?: string; onClose: () => void; children: ReactNode; scrollable?: boolean; suppressBuddy?: boolean }) {
+  const styles = lightStyles_styles;
+  const dark = useDarkPilot();
   useBuddySuppression(visible && suppressBuddy);
   const [reduceMotion, setReduceMotion] = useState(true);
   useEffect(() => {
@@ -23,13 +26,13 @@ export function StorySheet({ visible, title, subtitle, onClose, children, scroll
   }, []);
   return <Modal visible={visible} animationType={reduceMotion ? 'none' : 'slide'} presentationStyle="fullScreen" onRequestClose={onClose}>
     <SafeAreaView style={styles.safe}>
-      {visible && <StatusBar style="dark" />}
+      {visible && <StatusBar style={dark ? 'light' : 'dark'} />}
       <View style={styles.header}><View style={styles.heading}><Text accessibilityRole="header" numberOfLines={subtitle ? 2 : undefined} style={styles.title}>{title}</Text>{subtitle && <Text style={styles.subtitle}>{subtitle}</Text>}</View><Pressable accessibilityRole="button" accessibilityLabel={subtitle ? 'Close journey map' : 'Close ' + title} onPress={onClose} style={styles.close}><Text style={styles.closeLabel}>Close</Text></Pressable></View>
       {scrollable ? <ScrollView contentContainerStyle={styles.content}>{children}</ScrollView> : <View style={styles.fill}>{children}</View>}
     </SafeAreaView>
   </Modal>;
 }
-const styles = StyleSheet.create({
+const lightStyles_styles = darkPilotStyles(StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.paper, experimental_backgroundImage: theme.backgroundGradient },
   header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 18, paddingVertical: 8, gap: 12 },
   heading: { flex: 1, minWidth: 0, gap: 2 },
@@ -38,4 +41,4 @@ const styles = StyleSheet.create({
   close: { minHeight: 48, minWidth: 48, paddingHorizontal: 14, justifyContent: 'center', borderRadius: 22, backgroundColor: colors.pale },
   closeLabel: { color: colors.ink, fontWeight: '600', fontSize: 13 },
   content: { padding: 20, gap: 18, paddingBottom: 32 }, fill: { flex: 1, minHeight: 0, paddingHorizontal: 16, paddingBottom: 12 },
-});
+}));

@@ -1,3 +1,5 @@
+import { theme as appTheme } from '@/theme/mobile-theme';
+import { darkPilotStyles } from '@/theme/dark-pilot';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Image, Keyboard, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, useWindowDimensions, View } from 'react-native';
@@ -160,13 +162,13 @@ export default function AuthScreen() {
               <Text style={[styles.label, authStyles.label]}>Email</Text><Text style={authStyles.body}>{email}</Text>
               <Pressable accessibilityRole="button" disabled={busy} onPress={changeEmail} style={authStyles.switch}><Text style={[styles.label, authStyles.label]}>Change email</Text></Pressable>
             </View>}
-            {registration && !emailStep && <View style={[styles.field, authStyles.field]}><Text style={[styles.label, authStyles.label]}>Display name</Text><TextInput accessibilityLabel="Display name" value={name} onChangeText={setName} editable={!busy} maxLength={80} autoComplete="name" selectionColor="#FFD18B" onFocus={event => { focusedInput.current = event.nativeEvent.target; revealInput(); }}
+            {registration && !emailStep && <View style={[styles.field, authStyles.field]}><Text style={[styles.label, authStyles.label]}>Display name</Text><TextInput placeholderTextColor={appTheme.muted} keyboardAppearance="dark" accessibilityLabel="Display name" value={name} onChangeText={setName} editable={!busy} maxLength={80} autoComplete="name" selectionColor="#FFD18B" onFocus={event => { focusedInput.current = event.nativeEvent.target; revealInput(); }}
               onBlur={() => { focusedInput.current = null; }}
               style={[styles.input, authStyles.input]} /></View>}
-            {(!registration || emailStep) && <View style={[styles.field, authStyles.field]}><Text style={[styles.label, authStyles.label]}>Email</Text><TextInput accessibilityLabel="Email address" value={email} onChangeText={value => { if (!submitLock.current) setEmail(value); }} editable={!busy} autoCapitalize="none" autoCorrect={false} keyboardType="email-address" autoComplete="email" maxLength={254} returnKeyType={emailStep ? 'next' : 'default'} onSubmitEditing={emailStep ? continueRegistration : undefined} selectionColor="#FFD18B" onFocus={event => { focusedInput.current = event.nativeEvent.target; revealInput(); }}
+            {(!registration || emailStep) && <View style={[styles.field, authStyles.field]}><Text style={[styles.label, authStyles.label]}>Email</Text><TextInput placeholderTextColor={appTheme.muted} keyboardAppearance="dark" accessibilityLabel="Email address" value={email} onChangeText={value => { if (!submitLock.current) setEmail(value); }} editable={!busy} autoCapitalize="none" autoCorrect={false} keyboardType="email-address" autoComplete="email" maxLength={254} returnKeyType={emailStep ? 'next' : 'default'} onSubmitEditing={emailStep ? continueRegistration : undefined} selectionColor="#FFD18B" onFocus={event => { focusedInput.current = event.nativeEvent.target; revealInput(); }}
               onBlur={() => { focusedInput.current = null; }}
               style={[styles.input, authStyles.input]} /></View>}
-            {!emailStep && <View style={[styles.field, authStyles.field]}><Text style={[styles.label, authStyles.label]}>Password</Text><TextInput accessibilityLabel="Password" value={password} onChangeText={setPassword} editable={!busy} secureTextEntry autoCapitalize="none" autoCorrect={false} autoComplete={mode === 'register' ? 'new-password' : 'current-password'} returnKeyType="go" onSubmitEditing={() => { void submit(); }} selectionColor="#FFD18B" onFocus={event => { focusedInput.current = event.nativeEvent.target; revealInput(); }}
+            {!emailStep && <View style={[styles.field, authStyles.field]}><Text style={[styles.label, authStyles.label]}>Password</Text><TextInput placeholderTextColor={appTheme.muted} keyboardAppearance="dark" accessibilityLabel="Password" value={password} onChangeText={setPassword} editable={!busy} secureTextEntry autoCapitalize="none" autoCorrect={false} autoComplete={mode === 'register' ? 'new-password' : 'current-password'} returnKeyType="go" onSubmitEditing={() => { void submit(); }} selectionColor="#FFD18B" onFocus={event => { focusedInput.current = event.nativeEvent.target; revealInput(); }}
               onBlur={() => { focusedInput.current = null; }}
               style={[styles.input, authStyles.input]} /></View>}
             {error && <Text accessibilityRole="alert" style={[styles.feedback, authStyles.feedback]}>{error}</Text>}
@@ -191,10 +193,10 @@ export default function AuthScreen() {
     </KeyboardAvoidingView>
   </View></SafeAreaView></View>;
 }
-const styles = StyleSheet.create({
+const styles = darkPilotStyles(StyleSheet.create({
   form: { gap: 18, paddingTop: 16 }, field: { gap: 8 },
   label: { color: colors.ink, fontSize: 14, fontWeight: '600' },
   input: { minHeight: 52, borderRadius: 14, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.white, padding: 14, color: colors.ink, fontSize: 16 },
   feedback: { color: colors.ink, fontSize: 13, lineHeight: 21 },
   switch: { minHeight: 44, alignItems: 'center', justifyContent: 'center' }, disabled: { opacity: 0.6 },
-});
+}));

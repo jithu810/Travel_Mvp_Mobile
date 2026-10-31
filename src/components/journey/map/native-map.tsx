@@ -1,3 +1,4 @@
+import { lightTheme } from '@/theme/mobile-theme';
 import { JourneyActionIcon } from '@/components/journey/journey-action-icon';
 import { nearbyFocus, type NearbyPoint } from '@/lib/journey/nearby';
 import { NearbyLocations } from '../nearby-locations';
@@ -243,7 +244,7 @@ export const NativeJourneyMap = memo(function NativeJourneyMap({ data, stops, re
           }}>
           <Mapbox.CircleLayer id="stop-circles" style={{
             circleRadius: navigationMode ? 10 : ['case', ['get', 'selected'], presentation === 'preview' || (memoryPreview && storyBuddy) ? 12 : 18, presentation === 'preview' || (memoryPreview && storyBuddy) ? 10 : 14],
-            circleColor: ['case', ['get', 'destination'], '#2677D9', ['get', 'selected'], colors.ink, colors.green],
+            circleColor: ['case', ['get', 'destination'], '#2677D9', ['get', 'selected'], lightTheme.text, lightTheme.accent],
             circleStrokeWidth: ['case', ['get', 'selected'], memoryPreview && storyBuddy ? 2 : 4, 2], circleStrokeColor: '#FFFFFF',
           }} />
           <Mapbox.SymbolLayer id="stop-numbers" style={{ textField: ['get', 'number'], textSize: 12, textColor: '#FFFFFF', textAllowOverlap: true, textIgnorePlacement: true }} />
@@ -273,7 +274,7 @@ export const NativeJourneyMap = memo(function NativeJourneyMap({ data, stops, re
       {!ready && <View style={styles.loading} pointerEvents="none" accessibilityLabel="Loading journey map" accessibilityRole="progressbar"><ActivityIndicator color={colors.green} /><Text style={styles.note}>Loading map…</Text></View>}
       {presentation !== 'preview' && <Pressable {...fitProtection} accessibilityRole="button" accessibilityLabel="Fit journey and reset map orientation"
         accessibilityState={{ disabled: !ready || !frame }} disabled={!ready || !frame} onPress={() => { if (navigationMode) follow.explore(); fit(); }} style={[styles.fit, { top: 12 + Math.max(0, controlTopInset) }, !navigationMode && { width: 48, paddingHorizontal: 10, borderRadius: 22 }, navigationMode && { top: undefined, bottom: (navigationPadding?.bottom ?? 220) + 36 }, compactControls && { left: undefined, right: 54, top: Math.max(0, controlTopInset) + 4, paddingHorizontal: 0, backgroundColor: 'transparent', alignItems: 'center' }]}>
-        {navigationMode ? <Text style={styles.fitLabel}>↗ Fit journey</Text> : compactControls ? <View style={styles.compactControlFace}><View style={styles.compactControlIcon}><JourneyActionIcon name="fit" /></View></View> : <JourneyActionIcon name="fit" />}
+        {navigationMode ? <Text style={styles.fitLabel}>↗ Fit journey</Text> : compactControls ? <View style={styles.compactControlFace}><View style={styles.compactControlIcon}><JourneyActionIcon name="fit" color="#243E68" /></View></View> : <JourneyActionIcon name="fit" color="#243E68" />}
       </Pressable>}
       {navigationMode && travelCamera && <View pointerEvents="box-none" style={[styles.locationControls, { bottom: (navigationPadding?.bottom ?? 220) + 36 }]}>
         <Pressable {...locationProtection} accessibilityRole="button" accessibilityLabel="My Location, recenter map" accessibilityHint="Centers on accurate foreground GPS and resumes following. Does not start the trip."
@@ -299,16 +300,16 @@ const styles = StyleSheet.create({
   card: { borderRadius: 24, borderWidth: 1, borderColor: colors.line, overflow: 'hidden', backgroundColor: colors.paper },
   viewport: { height: 310, position: 'relative' }, map: { flex: 1, backgroundColor: spaceColor },
   loading: { position: 'absolute', top: 0, bottom: 0, left: 0, right: 0, backgroundColor: colors.pale, alignItems: 'center', justifyContent: 'center', gap: 10 },
-  fit: { position: 'absolute', top: 12, left: 12, minHeight: 48, justifyContent: 'center', paddingHorizontal: 13, backgroundColor: colors.paper, borderRadius: 14 },
-  fitLabel: { fontSize: 12, color: colors.green, fontWeight: '600' },
-  compactControlFace: { width: 34, height: 34, borderRadius: 17, backgroundColor: colors.paper, alignItems: 'center', justifyContent: 'center' },
+  fit: { position: 'absolute', top: 12, left: 12, minHeight: 48, justifyContent: 'center', paddingHorizontal: 13, backgroundColor: lightTheme.surface, borderRadius: 14 },
+  fitLabel: { fontSize: 12, color: lightTheme.accent, fontWeight: '600' },
+  compactControlFace: { width: 34, height: 34, borderRadius: 17, backgroundColor: lightTheme.surface, alignItems: 'center', justifyContent: 'center' },
   compactControlIcon: { transform: [{ scale: 0.75 }] },
   locationControls: { position: 'absolute', right: 62, alignItems: 'flex-end', maxWidth: 170, gap: 6 },
-  recenter: { minHeight: 48, paddingHorizontal: 12, borderRadius: 16, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.paper, justifyContent: 'center', elevation: 3 },
+  recenter: { minHeight: 48, paddingHorizontal: 12, borderRadius: 16, borderWidth: 1, borderColor: colors.line, backgroundColor: lightTheme.surface, justifyContent: 'center', elevation: 3 },
   overviewNote: { color: colors.muted, fontSize: 11, lineHeight: 17, paddingHorizontal: 10, paddingVertical: 6 },
   caption: { padding: 16, gap: 6 }, selected: { color: colors.ink, fontSize: 14, lineHeight: 21, fontWeight: '600' },
   note: { color: colors.muted, fontSize: 12, lineHeight: 19 },
-  buddyHelp: { position: 'absolute', top: 60, left: 12, minHeight: 44, paddingHorizontal: 12, justifyContent: 'center', borderRadius: 20, backgroundColor: colors.paper },
+  buddyHelp: { position: 'absolute', top: 60, left: 12, minHeight: 44, paddingHorizontal: 12, justifyContent: 'center', borderRadius: 20, backgroundColor: lightTheme.surface },
   buddyImageProbe: { position: 'absolute', top: 0, left: 0, width: 128, height: 128, opacity: 0 },
   buddyImageContent: { width: 128, height: 128 },
 });

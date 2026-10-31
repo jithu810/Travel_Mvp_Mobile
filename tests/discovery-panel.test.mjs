@@ -66,7 +66,7 @@ test('panel has an explicit accessible toggle, vertical expanded scrolling, real
   assert.ok(card.includes('onLocate(journey.id)'));
   assert.ok(card.includes('onOpen(journey.id)'));
   const home = readFileSync('src/app/discover.tsx', 'utf8');
-  assert.ok(home.includes("<Stack.Screen options={{ statusBarStyle: initialLoading ? 'dark' : 'light' }} />"));
+  assert.ok(home.includes("<Stack.Screen options={{ statusBarStyle: initialLoading && !dark ? 'dark' : 'light' }} />"));
   assert.ok(!home.includes('StatusBar.pushStackEntry'));
 });
 

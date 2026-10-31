@@ -1,3 +1,4 @@
+import { darkPilotStyles } from '@/theme/dark-pilot';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { primaryControl } from '@/theme/mobile-theme';
@@ -11,6 +12,7 @@ import type { FirstOutcome } from '@/lib/first-outcome';
 // Back counts as Explore myself. Account keeps the on/off switch for later changes.
 // ready: Home is focused and loaded. It also waits for session restore, which keeps the startup loader up.
 export function BuddyIntro({ ready, choosing = false, onGuide, onChoose, onClose }: { ready: boolean; choosing?: boolean; onGuide?: () => void; onChoose?: (goal: FirstOutcome) => void; onClose?: () => void }) {
+  const s = lightStyles_s;
   const intro = useBuddyIntro(), auth = useSessionState();
   if (!ready || auth.loading || (!intro.visible && !choosing)) return null;
   const close = () => { if (intro.visible) intro.skip(); onClose?.(); };
@@ -40,7 +42,7 @@ export function BuddyIntro({ ready, choosing = false, onGuide, onChoose, onClose
     </SafeAreaView>
   </Modal>;
 }
-const s = StyleSheet.create({
+const lightStyles_s = darkPilotStyles(StyleSheet.create({
   scrim: { flex: 1, padding: 24, justifyContent: 'center', alignItems: 'center', backgroundColor: '#10231F66' },
   card: { width: '100%', maxWidth: 360, maxHeight: '100%', flexGrow: 0, borderRadius: 24, backgroundColor: '#FFFCF3', borderWidth: 1, borderColor: '#A9C9BB' },
   content: { padding: 20, gap: 14 },
@@ -54,4 +56,4 @@ const s = StyleSheet.create({
   secondaryText: { color: colors.ink, fontSize: 15, lineHeight: 20, fontWeight: '600', textAlign: 'center' },
   pressed: { opacity: 0.7 },
   note: { color: colors.muted, fontSize: 12, lineHeight: 17, textAlign: 'center' },
-});
+}));

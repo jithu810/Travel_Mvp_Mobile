@@ -1,10 +1,10 @@
+import { lightTheme } from '@/theme/mobile-theme';
 import Mapbox, { AnimatedPoint, type PointAnnotation } from '@rnmapbox/maps';
 import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, Easing, Image, StyleSheet, View } from 'react-native';
 import type { DiscoveryPoints } from '@/lib/discovery/map';
 import { createTravelPlayback, travelLegs, travelLine, travelPosition, type TravelLeg } from '@/lib/discovery/travel';
 import type { Coordinate } from '@/lib/journey/map-data';
-import { colors } from '../ui';
 import { useThumbnailSource } from '@/hooks/use-thumbnail-source';
 import { useBuddyPreference } from '@/hooks/use-journey-buddy';
 import { TravelingBuddy } from './traveling-buddy';
@@ -43,7 +43,7 @@ function TravelingPlane({ legs }: { legs: TravelLeg[] }) {
   }, [legs, position]);
   return <Mapbox.Animated.ShapeSource id="discovery-travel-plane" shape={position}>
     <Mapbox.SymbolLayer id="discovery-travel-plane-icon" style={{ textField: '✈', textFont: ['Arial Unicode MS Regular'],
-      textSize: 26, textColor: colors.ink, textHaloColor: '#FFFFFF', textHaloWidth: 2,
+      textSize: 26, textColor: lightTheme.text, textHaloColor: '#FFFFFF', textHaloWidth: 2,
       textRotate: bearing - 45, textRotationAlignment: 'map', textAllowOverlap: true, textIgnorePlacement: true }} />
   </Mapbox.Animated.ShapeSource>;
 }
@@ -72,7 +72,7 @@ export function JourneyOverlays({ points, route, onOpen, playing, playbackKey, d
   </>;
 }
 const s = StyleSheet.create({
-  photoRing: { width: 42, height: 42, borderRadius: 21, borderWidth: 3, borderColor: '#FFFFFF', backgroundColor: colors.ink,
+  photoRing: { width: 42, height: 42, borderRadius: 21, borderWidth: 3, borderColor: '#FFFFFF', backgroundColor: lightTheme.text,
     overflow: 'hidden' },
   photo: { width: 36, height: 36, borderRadius: 18 },
 });

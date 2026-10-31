@@ -1,10 +1,13 @@
+import { darkPilotStyles } from '@/theme/dark-pilot';
 import { theme } from '@/theme/mobile-theme';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import type { PublicJourney } from '@/types/journey';
 import { futureActions, storySnapshot } from '@/lib/journey/snapshot';
-import { colors, ui } from '@/components/discovery/ui';
+import { colors, ui as lightUi } from '@/components/discovery/ui';
 
 export function StorySnapshot({ journey }: { journey: PublicJourney }) {
+  const styles = lightStyles_styles;
+  const ui = lightUi;
   const value = storySnapshot(journey);
   if (!value.stopCount || (!value.pace && !value.signals.length)) return null;
   return <View style={styles.snapshot}>
@@ -15,6 +18,8 @@ export function StorySnapshot({ journey }: { journey: PublicJourney }) {
   </View>;
 }
 export function FutureJourneyActions() {
+  const styles = lightStyles_styles;
+  const ui = lightUi;
   return <View style={styles.actions}>
     <Text accessibilityRole="header" style={ui.sectionTitle}>Make it your next chapter</Text>
     <Text style={styles.note}>Journey actions will be available in a future update.</Text>
@@ -24,7 +29,7 @@ export function FutureJourneyActions() {
     </Pressable>)}</View>
   </View>;
 }
-const styles = StyleSheet.create({
+const lightStyles_styles = darkPilotStyles(StyleSheet.create({
   snapshot: { borderWidth: 1, borderColor: colors.line, backgroundColor: colors.pale, padding: 18, borderRadius: 20, gap: 8 },
   snapshotTitle: { color: colors.ink, fontSize: 16, fontWeight: '600', lineHeight: 23 },
   note: { color: colors.muted, fontSize: 12, lineHeight: 19 },
@@ -33,4 +38,4 @@ const styles = StyleSheet.create({
   actionRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 4 },
   action: { minHeight: 44, justifyContent: 'center', paddingHorizontal: 13, paddingVertical: 10, borderRadius: 12, borderWidth: 1, borderColor: colors.line, backgroundColor: theme.inset },
   actionLabel: { fontSize: 12, color: colors.muted },
-});
+}));

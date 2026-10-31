@@ -18,7 +18,7 @@ export function ProfileHeader({ onSettings }: { onSettings: () => void }) {
   const router = useRouter();
   useFocusEffect(useCallback(() => {
     if (Platform.OS === 'web') return;
-    const entry = StatusBar.pushStackEntry({ barStyle: 'dark-content' });
+    const entry = StatusBar.pushStackEntry({ barStyle: 'light-content' });
     return () => StatusBar.popStackEntry(entry);
   }, []));
   const protection = useBuddyProtectedBounds();

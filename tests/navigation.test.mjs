@@ -1,3 +1,4 @@
+import { appMobileTheme, lightPilotTheme } from './helpers/dark-pilot-harness.mjs';
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { readFileSync } from 'node:fs';
@@ -8,7 +9,7 @@ const guidanceModule = { exports: {} };
 new Function('module', 'exports', ts.transpileModule(readFileSync('src/lib/journey/turn-guidance.ts', 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText)(guidanceModule, guidanceModule.exports);
 const deviationModule = { exports: {} };
 new Function('require', 'module', 'exports', ts.transpileModule(readFileSync('src/lib/journey/off-route.ts', 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText)(() => guidanceModule.exports, deviationModule, deviationModule.exports);
-new Function('require', 'module', 'exports', ts.transpileModule(readFileSync('src/lib/journey/navigation.ts', 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText)(name => name === './off-route' ? deviationModule.exports : guidanceModule.exports, module, module.exports);
+new Function('require', 'module', 'exports', ts.transpileModule(readFileSync('src/lib/journey/navigation.ts', 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText)(name => { if (name === '@/theme/dark-pilot') return lightPilotTheme; if (name === '@/theme/mobile-theme') return appMobileTheme; return name === './off-route' ? deviationModule.exports : guidanceModule.exports; }, module, module.exports);
 const { navigationFix, navigationBlock, firstNavigationStop, parseRoadRoute, requestRoadRoute, createNavigation, observeNavigation, ROUTE_TIMEOUT_MS, routeSummary } = module.exports;
 const now = 100000;
 const fix = (patch = {}) => ({ latitude: 8, longitude: 76, accuracy: 10, timestamp: now, ...patch });
@@ -159,7 +160,7 @@ test('native map renders a separate blue route source only when supplied and for
     '@/hooks/use-buddy-map-pins': buddyMapPinsStub,
     '@/lib/buddy/map-controls': { journeyBuddyControls: () => [] },
   };
-  new Function('require','module','exports',ts.transpileModule(readFileSync('src/components/journey/map/native-map.tsx', 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX } }).outputText)(id => { assert.ok(id in mocks, id); return mocks[id]; }, native, native.exports);
+  new Function('require','module','exports',ts.transpileModule(readFileSync('src/components/journey/map/native-map.tsx', 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX } }).outputText)(id => { if (id === '@/theme/dark-pilot') return lightPilotTheme; if (id === '@/theme/mobile-theme') return appMobileTheme;  assert.ok(id in mocks, id); return mocks[id]; }, native, native.exports);
   const nodes = node => !node || typeof node !== 'object' ? [] : [node, ...[node.props?.children].flat(Infinity).flatMap(nodes)];
   const render = route => nodes(native.exports.NativeJourneyMap({ data: { markers: [] }, stops: [], presentation: 'expanded', navigationRoute: route }));
   assert.equal(render(null).some(node => node.props?.id === 'travel-road-route'), false);

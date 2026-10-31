@@ -1,10 +1,11 @@
+import { appMobileTheme, lightPilotTheme } from './helpers/dark-pilot-harness.mjs';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import ts from 'typescript';
 function load(path, modules = {}) {
   const module = { exports: {} };
-  new Function('require', 'module', 'exports', ts.transpileModule(readFileSync(path, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX } }).outputText)(name => modules[name] ?? {}, module, module.exports);
+  new Function('require', 'module', 'exports', ts.transpileModule(readFileSync(path, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX } }).outputText)(name => { if (name === '@/theme/dark-pilot') return lightPilotTheme; if (name === '@/theme/mobile-theme') return appMobileTheme; return modules[name] ?? {}; }, module, module.exports);
   return module.exports;
 }
 const { buddyContextLine, claimBuddyContext, BUDDY_CONTEXT_DELAY, BUDDY_CONTEXT_DURATION } = load('src/lib/buddy/contextual-lines.ts');

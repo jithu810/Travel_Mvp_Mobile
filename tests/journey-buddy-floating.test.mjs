@@ -1,10 +1,11 @@
+import { lightPilotTheme } from './helpers/dark-pilot-harness.mjs';
 import assert from 'node:assert/strict';
 import { readFileSync, existsSync } from 'node:fs';
 import { test } from 'node:test';
 import ts from 'typescript';
 function load(file, modules = {}, timers = globalThis) {
   const exports = {}, source = ts.transpileModule(readFileSync(file, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX } }).outputText;
-  new Function('require', 'exports', 'setTimeout', 'clearTimeout', source)(id => { assert.ok(id in modules, id); return modules[id]; }, exports, timers.setTimeout, timers.clearTimeout); return exports;
+  new Function('require', 'exports', 'setTimeout', 'clearTimeout', source)(id => { if (id === '@/theme/dark-pilot') return lightPilotTheme; assert.ok(id in modules, id); return modules[id]; }, exports, timers.setTimeout, timers.clearTimeout); return exports;
 }
 const model = load('src/lib/buddy/model.ts'), geometry = load('src/lib/buddy/geometry.ts', { './model': model });
 const globeStyle = load('src/lib/discovery/globe-style.ts');

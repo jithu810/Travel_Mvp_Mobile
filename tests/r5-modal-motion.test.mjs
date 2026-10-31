@@ -1,3 +1,4 @@
+import { lightPilotTheme } from './helpers/dark-pilot-harness.mjs';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
@@ -17,6 +18,7 @@ function fixture(name, query) {
   native.PanResponder = { create: () => ({ panHandlers: {} }) };
   native.AccessibilityInfo = { isReduceMotionEnabled: query, addEventListener(event, callback) { assert.equal(event, 'reduceMotionChanged'); listener = callback; return { remove() { removed++; } }; } };
   const modules = {
+    '@/theme/dark-pilot': lightPilotTheme,
     react: hooks, 'react-native': native,
     'react/jsx-runtime': { jsx: (type, props) => ({ type, props }), jsxs: (type, props) => ({ type, props }) },
     'expo-status-bar': { StatusBar: 'StatusBar' },
