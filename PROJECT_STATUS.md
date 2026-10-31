@@ -1,3 +1,19 @@
+## Registration backend activated - 2026-10-31
+
+Server secret configured after owner CLI login under existing approval. Live registration-email-check returns200/exists:true for the owner's existing email and200/exists:false for the synthetic new email; no-store verified. Database/function/secret activation complete. Only designed quota counters written; no accounts created or mail sent. Previous47tests/staticchecks and independent review cover unchanged source. Mobile source remains local/unpublished; phone verification and canonical migration reconciliation pending. See docs/qa/email-first-auth-function-rollout-2026-10-31.md. This supersedes earlier blocked-secret/503 notes.
+
+## Registration Edge Function rollout - 2026-10-31
+
+Owner-approved registration-email-check version1 deployed ACTIVE on gwybjhqgnrpouwcdvusi. Database migration is applied. Server secret setup is blocked because the Supabase CLI is not authenticated; connector cannot set secrets. Live synthetic POST correctly returns503 until setup completes. No accounts created or mail sent. Owner CLI login needed; then existing authorization covers secret setup and verification. Mobile code remains local/unpublished; phone verification pending. See docs/qa/email-first-auth-function-rollout-2026-10-31.md.
+
+## Registration database rollout - 2026-10-31
+
+Owner-approved database-only migration registration_email_check (20261031071032) applied to gwybjhqgnrpouwcdvusi; post-apply function permissions/RLS/catalog checks pass. No Auth users changed. Edge Function deployment and server secret provisioning remain pending separate approval; the new registration flow is not active yet. Local app code remains unpublished. See docs/qa/email-first-auth-db-rollout-2026-10-31.md; this supersedes earlier no-hosted-change notes for the database portion only.
+
+## Email-first registration - 2026-10-31
+
+LOCAL / UNPUBLISHED after b154220: registration checks email before showing details. Existing accounts go to sign-in with the email retained; new accounts proceed; failed checks stay on email. Sign-in remains email/password. Backend proposal provides a service-role-only RPC and Edge endpoint with durable global/email quotas. Account-existence disclosure and pilot limits are documented. 47 tests pass (40 Mobile, 5 backend including isolated PostgreSQL, 2 independent cross-layer QA); TypeScript/scoped lint and independent review pass. No live changes applied. Until separately approved SQL/function/secret rollout, registration checking is unavailable and fails closed. Deno/hosted/phone verification and publication remain pending. See docs/qa/email-first-auth-qa-2026-10-31.md and backend/email-registration/README.md. Historical R5 publication authorization below does not cover this feature.
+
 Publication request 2026-10-31: owner authorized committing/pushing the completed R5 snapshot on feature/backlog-phase1 and updating draft PR https://github.com/jithu810/Travel_Mvp_Mobile/pull/29. Earlier local/unpublished notes are historical checkpoints. Merge and production deployment remain unauthorized; confirmed revision/publication status belongs to the PR.
 
 ## R5 completed on tested Android scope - 2026-10-31

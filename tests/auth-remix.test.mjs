@@ -46,8 +46,16 @@ test('registration confirmation, friendly errors, and synchronous duplicate-tap 
   for (const code of ['invalid_credentials', 'email_not_confirmed', 'weak_password', 'over_request_rate_limit']) {
     assert.ok(authModel.authError({ code }, 'signin').length > 10);
   }
+  assert.match(authModel.authError({ code: 'user_already_exists' }, 'register'), /already registered.*Sign in/);
   const failing = authModel.createAuthController(async () => { throw { code: 'invalid_credentials' }; });
   assert.match((await failing.submit('signin', values)).message, /incorrect/);
+});
+
+test('email-only validation accepts trimmed addresses and rejects malformed or excessive input', () => {
+  assert.equal(authModel.validateEmail(' traveler@example.org '), null);
+  for (const email of ['', '   ', 'invalid', 'name@domain', 'two words@example.org', 'a'.repeat(255) + '@example.org']) {
+    assert.equal(authModel.validateEmail(email), 'Enter a valid email address.');
+  }
 });
 test('session restoration restores a saved session and observes sign-out', async () => {
   let callback, unsubscribed = false; const updates = []; const saved = { user: { id: uid } };
