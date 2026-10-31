@@ -1,5 +1,27 @@
 import { supabase } from '../supabase/client';
-import type { AuthMode, AuthValues } from './model';
+import { validateEmail, type AuthMode, type AuthValues } from './model';
+export async function checkRegistrationEmail(email: string): Promise<boolean> {
+  const invalid = validateEmail(email);
+  if (invalid) throw new Error(invalid);
+  const unavailable = 'We could not check this email. Check your connection and try again.';
+  if (!supabase) throw new Error(unavailable);
+  let result;
+  try {
+    result = await supabase.functions.invoke('registration-email-check', { body: { email: email.trim() } });
+  } catch {
+    throw new Error(unavailable);
+  }
+  if (!result || typeof result !== 'object') throw new Error(unavailable);
+  if (result.error) {
+    const status = typeof Response !== 'undefined' && result.error.context instanceof Response ? result.error.context.status : undefined;
+    if (status === 429) throw new Error('Too many email checks. Please wait a little before trying again.');
+    if (status === 400) throw new Error('Enter a valid email address.');
+    throw new Error(unavailable);
+  }
+  const data: unknown = result.data;
+  if (!data || typeof data !== 'object' || !('exists' in data) || typeof data.exists !== 'boolean') throw new Error(unavailable);
+  return data.exists;
+}
 export async function authenticate(mode: AuthMode, values: AuthValues): Promise<'signed-in' | 'confirmation'> {
   if (!supabase) throw new Error('Authentication unavailable.');
   if (mode === 'register') {

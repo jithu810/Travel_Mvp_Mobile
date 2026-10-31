@@ -3,6 +3,7 @@ import { useEffect, useState, useSyncExternalStore } from 'react';
 import { AppState, Modal, Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { useBuddyApi } from '@/hooks/use-journey-buddy';
 import { BuddyHelpSheet } from './buddy-help-sheet';
+import { buddyHelpLine } from '@/lib/buddy/help-actions';
 
 export function MapBuddyHelp({ origin = { x: 0, y: 0 } }: { origin?: { x: number; y: number } } = {}) {
   const api = useBuddyApi();
@@ -30,7 +31,7 @@ function MapHelp({ api }: { api: NonNullable<ReturnType<typeof useBuddyApi>>; or
   const above = !!anchor && anchor.y > height + 72;
   const top = anchor ? Math.max(48, Math.min(window.height - height - 48, above ? anchor.y - height - 28 : anchor.y + 28)) : 48;
   const bubble = <BuddyHelpSheet fallback={!anchor} placement={anchor ? { x: left, y: top, above, tailX: Math.max(18, Math.min(width - 18, anchor.x - left)) } : undefined} onMeasure={setHeight} width={width} maxHeight={Math.max(124, window.height - 100)}
-    canAddMemory={!!current.state?.canAddMemory} travel={travel} tour={tour} onClose={close}
+    canAddMemory={!!current.state?.canAddMemory} travel={travel} tour={tour} onClose={close} contextualLine={buddyHelpLine(request.path)}
     onAddMemory={() => { if (!allowed()) return; api.store.closeMapHelp(); api.store.act(request.owner, request.path, 'addMemory'); }}
     onCreate={() => navigate('/create')} onDrafts={() => { if (!allowed()) return; api.store.setTour(null); navigate('/account'); }}
     onTour={() => { if (!allowed()) return; if (tour === null) api.store.setTour(0); else navigate((['/discover', '/create', '/account'] as const)[tour]); }}

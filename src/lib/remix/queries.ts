@@ -1,11 +1,12 @@
 import { supabase } from '../supabase/client';
+import { accountCheckMessage } from '../auth/model';
 import { isJourneyId, object } from '../discovery/model';
 import { loadPublicJourney, loadPublicJourneyCard } from '../discovery/queries';
 import { mapLimited, normalizeDraft, RemixFailure, type PrivateDraft, type RemixSource } from './model';
 function api() { if (!supabase) throw new Error('Accounts are not configured yet.'); return supabase; }
 async function owner(userId: string, signal: AbortSignal) {
   const { data, error } = await api().auth.getUser();
-  if (signal.aborted || error || data.user?.id !== userId) throw new Error('Sign in again to access your private drafts.');
+  if (signal.aborted || error || data.user?.id !== userId) throw new Error(accountCheckMessage(error, 'Sign in again to access your private drafts.'));
 }
 export async function loadPrivateDraft(id: string, userId: string, signal: AbortSignal): Promise<PrivateDraft | null> {
   if (!isJourneyId(id)) return null;

@@ -120,13 +120,13 @@ test('actual map ownership honors off, reduced static presence, routine live gui
 test('actual map Help reuses accessible fallback, current action owner, tour and route guards', () => {
   const h = hooks(), store = createBuddyStore(), routes = [], api = { store, preference: { get: () => ({ enabled: true }) } };
   let adds = 0; const owner = {}; store.environment('/journey/one', true); store.screen(owner, { path: '/journey/one', state: { canAddMemory: true }, act: () => adds++ });
-  const { MapBuddyHelp } = load('src/components/buddy/map-buddy-help.tsx', { react: h.react, 'react/jsx-runtime': runtime, 'expo-router': { useRouter: () => ({ navigate: path => routes.push(path) }) }, 'react-native': { Modal: 'Modal', View: 'View', Pressable: 'Pressable', StyleSheet: { absoluteFill: { position: 'absolute' } }, AppState: { currentState: 'active' }, useWindowDimensions: () => ({ width: 390, height: 800 }) }, '@/hooks/use-journey-buddy': { useBuddyApi: () => api }, './buddy-help-sheet': { BuddyHelpSheet: 'BuddyHelpSheet' } });
+  const { MapBuddyHelp } = load('src/components/buddy/map-buddy-help.tsx', { react: h.react, 'react/jsx-runtime': runtime, 'expo-router': { useRouter: () => ({ navigate: path => routes.push(path) }) }, 'react-native': { Modal: 'Modal', View: 'View', Pressable: 'Pressable', StyleSheet: { absoluteFill: { position: 'absolute' } }, AppState: { currentState: 'active' }, useWindowDimensions: () => ({ width: 390, height: 800 }) }, '@/hooks/use-journey-buddy': { useBuddyApi: () => api }, './buddy-help-sheet': { BuddyHelpSheet: 'BuddyHelpSheet' }, '@/lib/buddy/help-actions': load('src/lib/buddy/help-actions.ts') });
   const element = MapBuddyHelp(), render = () => h.render(element.type, element.props);
   store.openMapHelp('/journey/one', { x: 120, y: 220 }); const layer = render(); let bubble = layer.props.children.props.children[1];
   assert.equal(layer.type, 'Modal');
   assert.equal(bubble.props.fallback, false); assert.ok(bubble.props.placement.y > 220, 'Near-top Buddy gets a bubble below');
   assert.ok(bubble.props.placement.x >= 0); bubble.props.onClose();
-  store.openMapHelp('/journey/one'); let tree = render(); assert.equal(tree.props.fallback, true); assert.equal(tree.props.canAddMemory, true);
+  store.openMapHelp('/journey/one'); let tree = render(); assert.equal(tree.props.fallback, true); assert.equal(tree.props.canAddMemory, true); assert.match(tree.props.contextualLine, /Swipe to start uses every stop/, 'Story map help explains the Story controls');
   const staleClose = tree.props.onClose;
   tree.props.onAddMemory(); assert.equal(adds, 1); assert.equal(store.getMapHelp(), null);
   store.openMapHelp('/journey/one'); const newer = store.getMapHelp(); store.setTour(1); tree = render(); staleClose();
@@ -215,7 +215,7 @@ test('anchored map messages present above the expanded native map, use window co
   const h = hooks(), store = createBuddyStore(), routes = [], api = { store, preference: { get: () => ({ enabled: true }) } };
   const path = '/journey/expanded'; store.environment(path, true); store.screen({}, { path, state: { floating: true }, act() {} });
   const native = { AppState: { currentState: 'active' }, Modal: 'Modal', View: 'View', Pressable: 'Pressable', StyleSheet: { absoluteFill: { position: 'absolute', top: 0, bottom: 0, left: 0, right: 0 } }, useWindowDimensions: () => ({ width: 390, height: 800 }) };
-  const { MapBuddyHelp } = load('src/components/buddy/map-buddy-help.tsx', { react: h.react, 'react/jsx-runtime': runtime, 'expo-router': { useRouter: () => ({ navigate: route => routes.push(route) }) }, 'react-native': native, '@/hooks/use-journey-buddy': { useBuddyApi: () => api }, './buddy-help-sheet': { BuddyHelpSheet: 'BuddyHelpSheet' } });
+  const { MapBuddyHelp } = load('src/components/buddy/map-buddy-help.tsx', { react: h.react, 'react/jsx-runtime': runtime, 'expo-router': { useRouter: () => ({ navigate: route => routes.push(route) }) }, 'react-native': native, '@/hooks/use-journey-buddy': { useBuddyApi: () => api }, './buddy-help-sheet': { BuddyHelpSheet: 'BuddyHelpSheet' }, '@/lib/buddy/help-actions': load('src/lib/buddy/help-actions.ts') });
   const element = MapBuddyHelp({ origin: { x: 17, y: 29 } }), render = () => h.render(element.type, element.props);
   store.openMapHelp(path, { x: 120, y: 220 }); let layer = render();
   assert.equal(layer.type, 'Modal'); assert.equal(layer.props.visible, true); assert.equal(layer.props.transparent, true); assert.equal(layer.props.presentationStyle, 'overFullScreen');

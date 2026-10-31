@@ -36,6 +36,6 @@ const s = StyleSheet.create({
   symbol: { fontSize: 24, color: colors.ink }, text: { minWidth: 0, gap: 3 },
   name: { color: colors.ink, fontSize: 15, lineHeight: 20, fontWeight: '600' }, note: { color: colors.muted, fontSize: 12, lineHeight: 18 },
   tools: { backgroundColor: '#F2F0F7', flexDirection: 'row', borderTopWidth: 1, borderColor: colors.line, paddingHorizontal: 6 },
-  tool: { flex: 1, minHeight: 44, paddingHorizontal: 4, alignItems: 'center', justifyContent: 'center' },
+  tool: { flex: 1, minHeight: 48, paddingHorizontal: 4, alignItems: 'center', justifyContent: 'center' },
   toolText: { color: colors.ink, fontSize: 11, textAlign: 'center' }, muted: { opacity: 0.4 },
 });

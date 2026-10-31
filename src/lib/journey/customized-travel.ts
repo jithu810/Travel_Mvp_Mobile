@@ -7,8 +7,22 @@ import type { PublicJourney } from '../../types/journey';
 // Process memory only: these IDs are never submitted to a backend query or write.
 const itineraries = new Map<string, PublicJourney>();
 const sourceIds = new Map<string, string>();
+// Stops the user added from place search (not from the source journey).
+const addedStopIds = new Set<string>();
 export function customizedTravel(id: string) { return itineraries.get(id) ?? null; }
 export function customizedSourceId(id: string) { return sourceIds.get(id) ?? null; }
+export function isAddedCustomizedStop(stopId: string) { return addedStopIds.has(stopId); }
+// Sign-out: temporary routes belong to the account that made them.
+export function clearCustomizedTravels() { itineraries.clear(); sourceIds.clear(); addedStopIds.clear(); }
+// Re-registers a temporary route rebuilt from a device recovery copy under its original id.
+export function restoreCustomizedTravel(journey: PublicJourney, sourceId: string, addedIds: readonly string[]) {
+  if (!canOpenTravelMode(journey) || journey.id === sourceId) throw new Error('Selected stops are unavailable.');
+  if (itineraries.has(journey.id)) return journey.id;
+  itineraries.set(journey.id, journey);
+  sourceIds.set(journey.id, sourceId);
+  addedIds.forEach(id => addedStopIds.add(id));
+  return journey.id;
+}
 export function customizedTravelIssue(source: PublicJourney, selectedIds: readonly string[]) {
   if (!canOpenTravelMode(source) || !selectedIds.length || selectedIds.length > 50
     || new Set(selectedIds).size !== selectedIds.length || selectedIds.some(id => typeof id !== 'string')) {
@@ -63,6 +77,7 @@ export function appendCustomizedStop(expected: PublicJourney, place: Place) {
   const updated = { ...expected, stops: [...expected.stops, { id: stopId, name: place.name.trim(), latitude: place.latitude,
     longitude: place.longitude, sequence, description: '', photo: null, rating: null, dayNumber: null }] };
   const id = createCustomizedTravel(updated, updated.stops.map(stop => stop.id));
+  addedStopIds.add(stopId);
   const next = itineraries.get(id)!;
   // Old preview tokens follow edits, so returning through Customize can still reach the trip.
   for (const [key, value] of itineraries) if (value === expected) itineraries.set(key, next);

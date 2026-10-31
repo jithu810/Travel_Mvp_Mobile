@@ -18,10 +18,14 @@ import { hideViewerJourneys, onlyViewerJourneysCopy } from '@/lib/discovery/mode
 import { discoveryRoute } from '@/lib/discovery/travel';
 import { spaceColor } from '@/lib/discovery/presentation';
 import { invalidatePublicJourneys, loadDiscoveryEntries, loadPublicJourney } from '@/lib/discovery/queries';
+import { firstOutcomeRoute } from '@/lib/first-outcome';
+import { BuddyIntro } from '@/components/buddy/buddy-intro';
+import { useUnfinishedTrip } from '@/hooks/use-trip-recovery';
 
 export default function DiscoverScreen() {
   const router = useRouter();
-  const headerProtection = useBuddyProtectedBounds(), bannerProtection = useBuddyProtectedBounds();
+  const [choosingOutcome, setChoosingOutcome] = useState(false);
+  const headerProtection = useBuddyProtectedBounds(), bannerProtection = useBuddyProtectedBounds(), tripProtection = useBuddyProtectedBounds();
   const insets = useSafeAreaInsets();
   // The public load never waits for authentication; only the viewer filter does.
   const state = useLoad(loadDiscoveryEntries);
@@ -29,6 +33,9 @@ export default function DiscoverScreen() {
   const reloadPublic = state.refresh;
   const refreshPublic = () => { invalidatePublicJourneys(); state.refresh(); };
   useFocusEffect(useCallback(() => { reloadPublic(); }, [reloadPublic]));
+  // The first-use intro belongs to the visible Home only, never over a screen pushed above it.
+  const [focused, setFocused] = useState(false);
+  useFocusEffect(useCallback(() => { setFocused(true); return () => setFocused(false); }, []));
   useEffect(() => {
     const listener = AppState.addEventListener('change', next => { if (next === 'active') reloadPublic(); });
     return () => listener.remove();
@@ -60,6 +67,9 @@ export default function DiscoverScreen() {
   const navBottom = Math.max(0, insets.bottom) + 8;
   const navClearance = navBottom + navHeight + 12;
   const [bannerHeight, setBannerHeight] = useState(54);
+  // A device-only copy of the signed-in user's unfinished trip; Resume opens its Travel Mode.
+  const trip = useUnfinishedTrip(viewer.pending ? null : viewer.id);
+  const [tripHeight, setTripHeight] = useState(52);
   const [railHeight, setRailHeight] = useState(260);
   const [layout, setLayout] = useState({ height: 0, width: 360 });
   const [locateVersion, setLocateVersion] = useState(0);
@@ -88,6 +98,7 @@ export default function DiscoverScreen() {
       <View {...headerProtection} style={[s.header, { top: headerTop }]} onLayout={event => { headerProtection.onLayout(); setHeaderHeight(event.nativeEvent.layout.height); }}>
         <View style={s.search}><PlacePicker label="Search places" homeSearch compact embeddedSuggestions autoSuggest disabled={false}
           dismissVersion={dismissVersion} proximity={userProximity || mapProximity} onSelect={selectPlace} /></View>
+        <Pressable accessibilityRole="button" accessibilityLabel="Choose a starting point" onPress={() => { dismissSearch(); setChoosingOutcome(true); }} style={s.help}><Text style={s.helpText}>?</Text></Pressable>
       </View>
       <View style={s.exploration} onTouchStart={dismissSearch} onLayout={event => {
         const { width, height } = event.nativeEvent.layout;
@@ -97,17 +108,23 @@ export default function DiscoverScreen() {
         <DiscoveryPanel journeys={journeys} selectedId={selectedId} onLocate={locate} onOpen={open}
           notice={notice} onClear={() => setSelectedId(null)} onRetrySelection={selection.error ? selection.retry : undefined}
           loading={state.loading || (viewer.pending && !state.error)} emptyText={onlyOwn ? onlyViewerJourneysCopy : undefined} refreshing={state.refreshing} error={state.error} onRefresh={refreshPublic}
-          onInteraction={setSheetInteracting} onHeight={setRailHeight} availableHeight={layout.height} availableWidth={layout.width} bottomClearance={navClearance + bannerHeight + 12} topClearance={headerClearance} />
+          onInteraction={setSheetInteracting} onHeight={setRailHeight} availableHeight={layout.height} availableWidth={layout.width} bottomClearance={navClearance + bannerHeight + 12 + (trip ? tripHeight + 8 : 0)} topClearance={headerClearance} />
       </View>
       <Pressable {...bannerProtection} accessibilityRole="button" accessibilityLabel="Create Journey from Home" onPress={() => router.push('/create')}
         onLayout={event => { bannerProtection.onLayout(); setBannerHeight(event.nativeEvent.layout.height); }} style={[s.banner, { bottom: navClearance }]}>
-        <View style={s.bannerCopy}><Text style={s.bannerTitle}>Start your own journey</Text><Text style={s.bannerSubtitle}>Make memories into stories</Text></View>
+        <View style={s.bannerCopy}><Text style={s.bannerTitle}>Start your own journey</Text></View>
         <View style={s.bannerAction}><Text style={s.bannerActionText}>Create Journey ↗</Text></View>
       </Pressable>
       <View pointerEvents="none" testID="home-status-shade" style={[s.statusShade, { height: headerTop + 12 }]} />
       <FloatingNavigation active="explore" onHeight={setNavHeight} />
+      {trip && <View {...tripProtection} testID="home-unfinished-trip" onLayout={event => { tripProtection.onLayout(); setTripHeight(event.nativeEvent.layout.height); }} style={[s.banner, { bottom: navClearance + bannerHeight + 8 }]}>
+        <View style={s.bannerCopy}><Text numberOfLines={1} style={s.bannerTitle}>Unfinished trip: {trip.title}</Text></View>
+        <Pressable accessibilityRole="button" accessibilityLabel={'Resume unfinished trip: ' + trip.title} onPress={() => router.push({ pathname: '/travel/[id]', params: trip.customized ? { id: trip.journeyId, customized: '1' } : { id: trip.journeyId } })} style={s.bannerAction}><Text style={s.bannerActionText}>Resume</Text></Pressable>
+      </View>}
       {initialLoading && <BrandedLoading overlay message="Exploring the world…" />}
     </View>
+    {/* A Modal: outside the page so it adds no Home layout node. */}
+    <BuddyIntro ready={focused && !initialLoading} choosing={choosingOutcome} onGuide={() => setChoosingOutcome(true)} onClose={() => setChoosingOutcome(false)} onChoose={goal => { setChoosingOutcome(false); router.push(firstOutcomeRoute(goal)); }} />
   </SafeAreaView>;
 }
 const s = StyleSheet.create({
@@ -115,13 +132,15 @@ const s = StyleSheet.create({
   safe: { flex: 1, backgroundColor: theme.background },
   page: { flex: 1, width: '100%', maxWidth: 900, alignSelf: 'center' },
   header: { position: 'absolute', left: 0, right: 0, elevation: 10, minHeight: 52, paddingHorizontal: 18, paddingVertical: 6, flexDirection: 'row', alignItems: 'center', gap: 8, zIndex: 10 },
-  search: { flex: 1, minWidth: 0, minHeight: 44, justifyContent: 'center' },
-  banner: { position: 'absolute', left: 16, right: 16, zIndex: 3, minHeight: 54, borderRadius: 20, paddingHorizontal: 12, paddingVertical: 4,
+  help: { minWidth: 48, minHeight: 48, borderRadius: 22, backgroundColor: theme.surface, justifyContent: 'center', alignItems: 'center' },
+  helpText: { color: theme.text, fontSize: 20, fontWeight: '700' },
+  search: { flex: 1, minWidth: 0, minHeight: 48, justifyContent: 'center' },
+  banner: { position: 'absolute', left: 16, right: 16, zIndex: 3, minHeight: 48, borderRadius: 20, paddingHorizontal: 12, paddingVertical: 4,
     flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 6, backgroundColor: theme.surface, borderWidth: 1, borderColor: theme.border },
-  bannerCopy: { flexGrow: 1, flexShrink: 1, flexBasis: 130, gap: 2 },
+  bannerCopy: { flexGrow: 1, flexShrink: 0, flexBasis: 'auto', gap: 2 },
   bannerTitle: { color: theme.text, fontSize: 12, fontWeight: '600' },
   bannerSubtitle: { color: theme.muted, fontSize: 10 },
-  bannerAction: { ...primaryControl, minHeight: 44, borderRadius: 24, paddingHorizontal: 12, justifyContent: 'center' },
+  bannerAction: { ...primaryControl, minHeight: 48, borderRadius: 24, paddingHorizontal: 12, justifyContent: 'center' },
   bannerActionText: { color: theme.white, fontSize: 11, fontWeight: '700' },
   exploration: { flex: 1 },
   map: { position: 'absolute', top: 0, bottom: 0, left: 0, right: 0, backgroundColor: spaceColor },

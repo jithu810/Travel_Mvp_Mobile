@@ -100,5 +100,5 @@ const s = StyleSheet.create({
   captionRow: { gap: 0 }, captionRead: { flex: 1, minWidth: 0 }, optionsActions: { paddingHorizontal: 6, paddingBottom: 2, alignItems: 'flex-end' },
   caption: { paddingHorizontal: 14, paddingTop: 10, paddingBottom: 0, gap: 3 }, name: { fontSize: 22, lineHeight: 28, fontWeight: '700', color: theme.text }, note: { color: theme.muted, fontSize: 12, lineHeight: 18 },
   hint: { color: theme.muted, fontSize: 10, lineHeight: 16, flexShrink: 1 }, link: { color: theme.accent, fontSize: 12, lineHeight: 18, fontWeight: '600' },
-  controls: { flexDirection: 'row', gap: 4 }, control: { minHeight: 44, minWidth: 44, paddingHorizontal: 8, borderRadius: 18, backgroundColor: 'transparent', alignItems: 'center', justifyContent: 'center' }, disabled: { opacity: 0.4 }, empty: { padding: 18, gap: 8 },
+  controls: { flexDirection: 'row', gap: 4 }, control: { minHeight: 48, minWidth: 48, paddingHorizontal: 8, borderRadius: 18, backgroundColor: 'transparent', alignItems: 'center', justifyContent: 'center' }, disabled: { opacity: 0.4 }, empty: { padding: 18, gap: 8 },
 });

@@ -163,7 +163,8 @@ native.StyleSheet = { create: x => x }; native.Platform = { OS: 'android' }; nat
 native.AppState = { addEventListener: () => ({ remove() {} }) };
 const all = tree => !tree || typeof tree !== 'object' ? [] : [tree, ...[tree.props?.children].flat(Infinity).flatMap(all)];
 function load(path, modules, timers = globalThis) {
-  modules={'@/hooks/use-buddy-geometry':buddyGeometryStub,...modules};
+  modules={'@/components/first-outcome-hint':{FirstOutcomeHint:'FirstOutcomeHint'},'@/lib/first-outcome':{firstOutcomeRoute:goal=>goal==='find'?'/search':'/create'},...modules};
+  modules={'@/hooks/use-buddy-geometry':buddyGeometryStub,'@/hooks/use-trip-recovery':{useTripRecovery:()=>({checking:false,notice:null}),useUnfinishedTrip:()=>null},...modules};
   modules = {'@/hooks/use-journey-buddy':{useBuddyScreen(){}},'@/components/buddy/buddy-space':{BuddySpace:'BuddySpace'},...modules};
   if(path!=='src/lib/buddy/model.ts' && !('@/lib/buddy/model' in modules))modules['@/lib/buddy/model']=load('src/lib/buddy/model.ts',{});
   const exports = {};
@@ -211,7 +212,7 @@ function homeScreen(h, getAuth, publicLoader, timers) {
     ...shared, react: h.hooks,
     'react-native-safe-area-context': { SafeAreaView: 'SafeAreaView', useSafeAreaInsets: () => ({ top: 0, bottom: 0 }) },
     'expo-router': { Stack: { Screen: 'StackScreen' }, useRouter: () => ({ push() {} }), useFocusEffect() {} },
-    '@/theme/mobile-theme': { theme: {}, primaryControl: {} }, '@/components/branded-loading': { BrandedLoading: 'BrandedLoading' },
+    '@/theme/mobile-theme': { theme: {}, primaryControl: {} }, '@/components/branded-loading': { BrandedLoading: 'BrandedLoading' }, '@/components/buddy/buddy-intro': { BuddyIntro: 'BuddyIntro' },
     '@/components/create/place-picker': { PlacePicker: 'PlacePicker' }, '@/components/floating-navigation': { FloatingNavigation: 'Navigation' },
     '@/components/discovery/globe/discovery-globe': { DiscoveryGlobe: 'Globe' }, '@/components/discovery/discovery-panel': { DiscoveryPanel: 'Panel' },
     '@/hooks/use-discovery-viewer': viewerHook(h, getAuth, timers), '@/hooks/use-load': { useLoad: load('src/hooks/use-load.ts', { react: h.hooks }).useLoad },
@@ -232,7 +233,7 @@ test('Search/Explore and Story list hide own journeys per viewer without refetch
     render(); await tick(); let tree = render();
     assert.ok(!tree.some(n => n.type === 'BrandedLoading'), 'session restore keeps the screen mounted');
     assert.ok(input(tree), 'search field stays mounted while the viewer is pending');
-    assert.deepEqual(data(tree), [], 'own cards never flash'); assert.equal(list(tree).props.ListEmptyComponent.type, 'LoadingCards');
+    assert.deepEqual(data(tree), [], 'own cards never flash'); assert.equal(list(tree).props.ListEmptyComponent.props.children.type, 'LoadingCards');
     input(tree).props.onChangeText('kerala'); tree = render(); assert.deepEqual(data(tree), [], 'public results area is held even for a typed query');
     input(tree).props.onChangeText(''); auth = signedIn(U); tree = render();
     assert.deepEqual(data(tree), [jid(2), jid(3)]);
@@ -256,16 +257,16 @@ test('Search/Explore and Story list hide own journeys per viewer without refetch
 test('Search browse shows the only-own empty copy, otherwise the existing copy', async () => {
   const h = stateHarness(); let auth = signedIn(U), rows = ownOnly();
   const component = searchScreen(h, () => auth, () => undefined, async () => rows);
-  const render = () => h.render(component), empty = t => list(t).props.ListEmptyComponent;
+  const render = () => h.render(component), empty = t => list(t).props.ListEmptyComponent.props.children;
   try {
     render(); await tick(); let tree = render();
     assert.deepEqual(data(tree), []);
-    assert.equal(empty(tree).props.title, 'Only your journeys so far'); assert.equal(empty(tree).props.body, 'Search to find them.');
+    assert.equal(empty(tree).props.title, 'Only your journeys so far'); assert.match(empty(tree).props.body, /Account.*private drafts/);assert.equal(empty(tree).props.action,'View my journeys');
     input(tree).props.onChangeText('Journey'); tree = render(); assert.deepEqual(data(tree), [jid(1), jid(2)], 'search finds own journeys');
-    input(tree).props.onChangeText('zzz'); tree = render(); assert.equal(empty(tree).props.title, 'No journeys found');
+    input(tree).props.onChangeText('zzz'); tree = render(); assert.equal(empty(tree).props.title, 'No journeys match your search');
     input(tree).props.onChangeText(''); auth = signedOut; tree = render(); assert.deepEqual(data(tree), [jid(1), jid(2)]);
     rows = []; list(tree).props.refreshControl.props.onRefresh(); render(); await tick(); auth = signedIn(U); tree = render();
-    assert.equal(empty(tree).props.title, 'More stories are on their way', 'genuinely empty collection keeps existing copy');
+    assert.equal(empty(tree).props.title, 'No public journeys yet', 'empty collection offers starting a private journey');
   } finally { h.dispose(); }
 });
 

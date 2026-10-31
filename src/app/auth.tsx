@@ -5,8 +5,9 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { colors, ui } from '@/components/auth/legacy-ui';
 import { useSessionState } from '@/hooks/session-context';
 import { useActionIntent } from '@/hooks/action-intent';
-import { createAuthController, type AuthMode } from '@/lib/auth/model';
-import { authenticate } from '@/lib/auth/queries';
+import { createAuthController, validateEmail, type AuthMode } from '@/lib/auth/model';
+import { authenticate, checkRegistrationEmail } from '@/lib/auth/queries';
+import { googleSignInSupported, isGoogleSignInPending, signInWithGoogle } from '@/lib/auth/google';
 import { StatusBar } from 'expo-status-bar';
 import { signupStyles as authStyles } from '@/components/auth/signup-styles';
 
@@ -20,9 +21,12 @@ export default function AuthScreen() {
   const finished = useRef(false);
   const mounted = useRef(false);
   const submitLock = useRef(false);
+  const requestVersion = useRef(0);
   const controller = useMemo(() => createAuthController(authenticate), []);
   const [mode, setMode] = useState<AuthMode>('signin');
+  const [registrationStep, setRegistrationStep] = useState<'email' | 'details'>('email');
   const registration = mode === 'register';
+  const emailStep = registration && registrationStep === 'email';
   const { height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const scroll = useRef<ScrollView>(null);
@@ -51,26 +55,72 @@ export default function AuthScreen() {
   const [message, setMessage] = useState<string | null>(null);
   useFocusEffect(useCallback(() => {
     mounted.current = true;
-    return () => { mounted.current = false; if (!finished.current) cancelIntent(); };
+    setBusy(false);
+    return () => { mounted.current = false; requestVersion.current++; submitLock.current = false; if (!finished.current && !isGoogleSignInPending()) cancelIntent(); };
   }, [cancelIntent]));
   function backAfterAuth() {
     finished.current = true;
     if (router.canGoBack()) router.back();
     else if (returnJourney) router.replace({ pathname: '/journey/[id]', params: { id: returnJourney } });
+    else if (creating) router.replace('/create');
     else router.replace('/account');
+  }
+  function changeEmail() {
+    if (submitLock.current) return;
+    setRegistrationStep('email'); setPassword(''); setError(null); setMessage(null);
+    focusedInput.current = null;
+  }
+  async function continueRegistration() {
+    if (submitLock.current) return;
+    setError(null); setMessage(null);
+    const invalid = validateEmail(email);
+    if (invalid) { setError(invalid); return; }
+    submitLock.current = true; setBusy(true);
+    const version = ++requestVersion.current;
+    const normalizedEmail = email.trim();
+    try {
+      const exists = await checkRegistrationEmail(normalizedEmail);
+      if (!mounted.current || version !== requestVersion.current) return;
+      setEmail(normalizedEmail); setPassword(''); focusedInput.current = null;
+      if (exists) {
+        setMode('signin'); setName(''); setRegistrationStep('email');
+        setMessage('This email is already registered. Sign in.');
+      } else setRegistrationStep('details');
+    } catch (error) {
+      if (mounted.current && version === requestVersion.current) setError(error instanceof Error ? error.message : 'We could not check this email. Please try again.');
+    } finally {
+      if (mounted.current && version === requestVersion.current) { submitLock.current = false; setBusy(false); }
+    }
   }
   async function submit() {
     if (submitLock.current) return;
+    if (emailStep) { await continueRegistration(); return; }
     submitLock.current = true;
     setError(null); setMessage(null);
     setBusy(true);
+    const version = ++requestVersion.current;
     const result = await controller.submit(mode, { email, password, name });
+    if (!mounted.current || version !== requestVersion.current) return;
     submitLock.current = false;
-    if (!mounted.current) return;
     setPassword(''); setBusy(false);
     if (result.kind === 'signed-in') backAfterAuth();
-    else if (result.kind === 'confirmation') { setMode('signin'); setMessage('Check your email to confirm your account, then return here and sign in. You are not signed in yet.'); }
+    else if (result.kind === 'confirmation') { setMode('signin'); setRegistrationStep('email'); setMessage('If this is a new email, check your inbox to confirm your account, then sign in. Already registered? Sign in with your existing password. You are not signed in yet.'); }
     else if (result.kind === 'error') setError(result.message);
+  }
+  async function googleSignIn() {
+    if (submitLock.current) return;
+    submitLock.current = true; setBusy(true); setError(null); setMessage(null);
+    Keyboard.dismiss();
+    const version = ++requestVersion.current;
+    try {
+      const result = await signInWithGoogle(returnJourney, creating ? 'create' : undefined);
+      if (!mounted.current || version !== requestVersion.current) return;
+      if (result) backAfterAuth();
+    } catch {
+      if (mounted.current && version === requestVersion.current) setError('We could not complete Google sign-in. Check your connection and try again. If you recently updated the app, install the latest build.');
+    } finally {
+      if (mounted.current && version === requestVersion.current) { submitLock.current = false; setBusy(false); }
+    }
   }
   return <View style={[ui.safe, authStyles.background]}>
     <>
@@ -80,7 +130,12 @@ export default function AuthScreen() {
     </>
     <SafeAreaView style={[ui.safe, authStyles.transparent]}><View style={ui.page}>
     <View onLayout={event => setHeaderHeight(event.nativeEvent.layout.height)} style={[ui.header, authStyles.header]}>
-      <Pressable accessibilityRole="button" accessibilityLabel="Go back" onPress={() => router.canGoBack() ? router.back() : router.replace('/discover')} style={authStyles.back}>
+      <Pressable accessibilityRole="button" accessibilityLabel="Go back" disabled={busy} onPress={() => {
+        if (submitLock.current) return;
+        if (registration && !emailStep) changeEmail();
+        else if (router.canGoBack()) router.back();
+        else router.replace('/discover');
+      }} style={authStyles.back}>
         <Text style={authStyles.backText}>‹</Text>
       </Pressable>
       <Text style={authStyles.headerTitle}>{registration ? 'Create account' : 'Sign in'}</Text>
@@ -101,30 +156,34 @@ export default function AuthScreen() {
         {auth.loading ? <ActivityIndicator color={colors.white} /> : auth.session
           ? <Pressable accessibilityRole="button" onPress={backAfterAuth} style={[ui.action, authStyles.emailButton]}><Text style={[ui.actionLabel, authStyles.emailLabel]}>Continue</Text></Pressable>
           : <>
-            {mode === 'register' && <View style={[styles.field, authStyles.field]}><Text style={[styles.label, authStyles.label]}>Display name</Text><TextInput accessibilityLabel="Display name" value={name} onChangeText={setName} editable={!busy} maxLength={80} autoComplete="name" selectionColor="#FFD18B" onFocus={event => { focusedInput.current = event.nativeEvent.target; revealInput(); }}
+            {registration && !emailStep && <View style={[styles.field, authStyles.field]}>
+              <Text style={[styles.label, authStyles.label]}>Email</Text><Text style={authStyles.body}>{email}</Text>
+              <Pressable accessibilityRole="button" disabled={busy} onPress={changeEmail} style={authStyles.switch}><Text style={[styles.label, authStyles.label]}>Change email</Text></Pressable>
+            </View>}
+            {registration && !emailStep && <View style={[styles.field, authStyles.field]}><Text style={[styles.label, authStyles.label]}>Display name</Text><TextInput accessibilityLabel="Display name" value={name} onChangeText={setName} editable={!busy} maxLength={80} autoComplete="name" selectionColor="#FFD18B" onFocus={event => { focusedInput.current = event.nativeEvent.target; revealInput(); }}
               onBlur={() => { focusedInput.current = null; }}
               style={[styles.input, authStyles.input]} /></View>}
-            <View style={[styles.field, authStyles.field]}><Text style={[styles.label, authStyles.label]}>Email</Text><TextInput accessibilityLabel="Email address" value={email} onChangeText={setEmail} editable={!busy} autoCapitalize="none" autoCorrect={false} keyboardType="email-address" autoComplete="email" maxLength={254} selectionColor="#FFD18B" onFocus={event => { focusedInput.current = event.nativeEvent.target; revealInput(); }}
+            {(!registration || emailStep) && <View style={[styles.field, authStyles.field]}><Text style={[styles.label, authStyles.label]}>Email</Text><TextInput accessibilityLabel="Email address" value={email} onChangeText={value => { if (!submitLock.current) setEmail(value); }} editable={!busy} autoCapitalize="none" autoCorrect={false} keyboardType="email-address" autoComplete="email" maxLength={254} returnKeyType={emailStep ? 'next' : 'default'} onSubmitEditing={emailStep ? continueRegistration : undefined} selectionColor="#FFD18B" onFocus={event => { focusedInput.current = event.nativeEvent.target; revealInput(); }}
               onBlur={() => { focusedInput.current = null; }}
-              style={[styles.input, authStyles.input]} /></View>
-            <View style={[styles.field, authStyles.field]}><Text style={[styles.label, authStyles.label]}>Password</Text><TextInput accessibilityLabel="Password" value={password} onChangeText={setPassword} editable={!busy} secureTextEntry autoCapitalize="none" autoCorrect={false} autoComplete={mode === 'register' ? 'new-password' : 'current-password'} returnKeyType="go" onSubmitEditing={() => { void submit(); }} selectionColor="#FFD18B" onFocus={event => { focusedInput.current = event.nativeEvent.target; revealInput(); }}
+              style={[styles.input, authStyles.input]} /></View>}
+            {!emailStep && <View style={[styles.field, authStyles.field]}><Text style={[styles.label, authStyles.label]}>Password</Text><TextInput accessibilityLabel="Password" value={password} onChangeText={setPassword} editable={!busy} secureTextEntry autoCapitalize="none" autoCorrect={false} autoComplete={mode === 'register' ? 'new-password' : 'current-password'} returnKeyType="go" onSubmitEditing={() => { void submit(); }} selectionColor="#FFD18B" onFocus={event => { focusedInput.current = event.nativeEvent.target; revealInput(); }}
               onBlur={() => { focusedInput.current = null; }}
-              style={[styles.input, authStyles.input]} /></View>
+              style={[styles.input, authStyles.input]} /></View>}
             {error && <Text accessibilityRole="alert" style={[styles.feedback, authStyles.feedback]}>{error}</Text>}
             {message && <Text accessibilityLiveRegion="polite" style={[styles.feedback, authStyles.feedback]}>{message}</Text>}
             <Pressable accessibilityRole="button" disabled={busy} accessibilityState={{ disabled: busy }} onPress={() => { void submit(); }} style={[ui.action, authStyles.emailButton, busy && styles.disabled]}>
-              {busy ? <ActivityIndicator color={colors.white} /> : <Text style={[ui.actionLabel, authStyles.emailLabel]}>{mode === 'signin' ? 'Sign in with email' : 'Register with email'}</Text>}
+              {busy ? <ActivityIndicator color={colors.white} /> : <Text style={[ui.actionLabel, authStyles.emailLabel]}>{mode === 'signin' ? 'Sign in with email' : emailStep ? 'Continue' : 'Register with email'}</Text>}
             </Pressable>
-            {registration && <View style={authStyles.googleOption}>
-              <Pressable accessibilityRole="button" accessibilityLabel="Continue with Google" accessibilityHint="Google sign-up is not available yet." accessibilityState={{ disabled: true }} disabled style={authStyles.googleButton}>
+            <View style={authStyles.googleOption}>
+              <Pressable accessibilityRole="button" accessibilityLabel="Continue with Google" accessibilityHint={googleSignInSupported ? 'Opens Google sign-in in your browser.' : 'Available in the mobile app.'} accessibilityState={{ disabled: busy || !googleSignInSupported }} disabled={busy || !googleSignInSupported} onPress={() => { void googleSignIn(); }} style={[authStyles.googleButton, busy && styles.disabled]}>
                 <Image source={require('../../assets/auth/google-g.png')} accessible={false} style={authStyles.googleLogo} resizeMode="contain" />
                 <View style={authStyles.googleCopy}>
                   <Text style={authStyles.googleLabel}>Continue with Google</Text>
-                  <Text style={authStyles.googleHint}>Not available yet</Text>
+                  {!googleSignInSupported && <Text style={authStyles.googleHint}>Available in the mobile app</Text>}
                 </View>
               </Pressable>
-            </View>}
-            <Pressable accessibilityRole="button" disabled={busy} onPress={() => { setMode(mode === 'signin' ? 'register' : 'signin'); setPassword(''); setError(null); setMessage(null); }} style={[styles.switch, authStyles.switch]}>
+            </View>
+            <Pressable accessibilityRole="button" disabled={busy} onPress={() => { if (submitLock.current) return; setMode(mode === 'signin' ? 'register' : 'signin'); setRegistrationStep('email'); setPassword(''); setError(null); setMessage(null); }} style={[styles.switch, authStyles.switch]}>
               <Text style={[styles.label, authStyles.label]}>{mode === 'signin' ? 'New here? Create an account' : 'Already registered? Sign in'}</Text>
             </Pressable>
           </>}

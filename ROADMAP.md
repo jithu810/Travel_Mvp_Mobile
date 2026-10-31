@@ -1,3 +1,118 @@
+## Google and email authentication publication - 2026-10-31
+
+Owner authorized completed Google OAuth/report commit and branch push including existing email-first registration a8f0c74; update draft PR #29 on feature/backlog-phase1. Existing test/review evidence retained and owner reports branded login works. Broader device account-switch/link/cancel/restart checks remain scoped limitations. Earlier unpublished checkpoints are historical; publication status belongs to resulting GitHub revision/PR. No merge or further hosted changes authorized.
+
+## Branded Google login confirmed by owner - 2026-10-31
+
+Owner-reported Google login and branded consent now work on Journey Google Test/CPH2813 Android16 through Metro8081 following Google branding verification/publication. Owner called it travel buddy; configured brand Journey Buddy. Account switching/repeated chooser, same-email linking, cancellation and restart persistence still need specific evidence. Existing automated QA/review pass; no runtime change. Mobile implementation remains local/unpublished. See docs/qa/google-account-chooser-2026-10-31.md.
+
+## Google account selection follow-up - 2026-10-31
+
+Owner-reported initial Google login succeeds. Account chooser request added to login/registration to prevent silently reusing the browser account. Local checks pass; independent QA/review passed with no actionable findings; owner device retry pending. Browser flow retained; no new native build. Local/unpublished; docs/qa/google-account-chooser-2026-10-31.md.
+
+## Google test development app installed - 2026-10-31
+
+Separate Journey Google Test development build installed and launch/login UI verified on real CPH2813/Android16 through Metro8081; original apps preserved. Native browser module/artifact QA passes. Real Google sign-in and same-email linking remain pending owner-led testing with callback app selection. Local/unpublished; details docs/qa/google-dev-rebuild-2026-10-31.md.
+
+## Google sign-in local implementation - 2026-10-31
+
+Mobile Google OAuth implementation and automated QA complete; existing email/password retained. No backend changes required. Independent review completed after correcting Create return navigation; no remaining actionable findings. Native rebuild and real Google/device verification remain pending, including same-email linking. Local/unpublished. See docs/qa/google-oauth-task-2026-10-31.md.
+
+## Registration backend activated - 2026-10-31
+
+Server secret configured after owner CLI login under existing approval. Live registration-email-check returns200/exists:true for the owner's existing email and200/exists:false for the synthetic new email; no-store verified. Database/function/secret activation complete. Only designed quota counters written; no accounts created or mail sent. Previous47tests/staticchecks and independent review cover unchanged source. Mobile source remains local/unpublished; phone verification and canonical migration reconciliation pending. See docs/qa/email-first-auth-function-rollout-2026-10-31.md. This supersedes earlier blocked-secret/503 notes.
+
+## Registration Edge Function rollout - 2026-10-31
+
+Owner-approved registration-email-check version1 deployed ACTIVE on gwybjhqgnrpouwcdvusi. Database migration is applied. Server secret setup is blocked because the Supabase CLI is not authenticated; connector cannot set secrets. Live synthetic POST correctly returns503 until setup completes. No accounts created or mail sent. Owner CLI login needed; then existing authorization covers secret setup and verification. Mobile code remains local/unpublished; phone verification pending. See docs/qa/email-first-auth-function-rollout-2026-10-31.md.
+
+## Registration database rollout - 2026-10-31
+
+Owner-approved database-only migration registration_email_check (20261031071032) applied to gwybjhqgnrpouwcdvusi; post-apply function permissions/RLS/catalog checks pass. No Auth users changed. Edge Function deployment and server secret provisioning remain pending separate approval; the new registration flow is not active yet. Local app code remains unpublished. See docs/qa/email-first-auth-db-rollout-2026-10-31.md; this supersedes earlier no-hosted-change notes for the database portion only.
+
+## Email-first registration - 2026-10-31
+
+LOCAL / UNPUBLISHED after b154220: registration checks email before showing details. Existing accounts go to sign-in with the email retained; new accounts proceed; failed checks stay on email. Sign-in remains email/password. Backend proposal provides a service-role-only RPC and Edge endpoint with durable global/email quotas. Account-existence disclosure and pilot limits are documented. 47 tests pass (40 Mobile, 5 backend including isolated PostgreSQL, 2 independent cross-layer QA); TypeScript/scoped lint and independent review pass. No live changes applied. Until separately approved SQL/function/secret rollout, registration checking is unavailable and fails closed. Deno/hosted/phone verification and publication remain pending. See docs/qa/email-first-auth-qa-2026-10-31.md and backend/email-registration/README.md. Historical R5 publication authorization below does not cover this feature.
+
+Publication request 2026-10-31: owner authorized committing/pushing the completed R5 snapshot on feature/backlog-phase1 and updating draft PR https://github.com/jithu810/Travel_Mvp_Mobile/pull/29. Earlier local/unpublished notes are historical checkpoints. Merge and production deployment remain unauthorized; confirmed revision/publication status belongs to the PR.
+
+## R5 completed on tested Android scope - 2026-10-31
+
+Code complete, final Outdoor APK installed/hash verified, and physical CPH2813/Android16 portrait checks complete across nine R5 areas; TalkBack removed by owner. Normal/2.0 text,contrast/targets,motion,keyboard/safe areas,Buddy overlap,scroll/maps and bounded resource sampling recorded. Temporary owner-approved private test draft deleted; no memories/photos uploaded/saved. Original font/motion1.0,density480 retained. Focused tests/type/lint and independent code/evidence reviews pass. Backlog17/24 complete,7 open; R4 GPS/network next. Single-device scope and high measured memory footprint remain limits,not platform certification. All work local/unpublished. See docs/qa/r5-final-qa-2026-10-31.md. Earlier R5 pending/build notes below are historical.
+
+## Updated R5 APK build - 2026-10-31
+
+Offline ARM64 Outdoor build passed with freshly regenerated configured JS bundle; package/signature verified against installed app. Installation confirmed at10:23:50; on-device APK hash matches verified build. Outdoor launches and populated Home/account avatar verified. Updated-build physical checks remain unverified, R5 open,16/24. Details: docs/qa/r5-updated-build-2026-10-31.md. Local/unpublished; no app data clear or hosted writes.
+
+## Owner scope update - 2026-10-31
+
+Owner scope decision (2026-10-31): TalkBack/screen-reader testing is removed from the planned backlog and R5 acceptance criteria; no replacement task is planned. Earlier TalkBack pending/deferred notes below are historical and no longer requirements. Existing accessibility labels remain in the app. R5 stays open for its other pending checks; completion remains 16/24.
+
+## Home motion / scoped contrast — 2026-10-31
+- Home reduced-motion sample passed on installed Outdoor; settings restored. One local destination-caption contrast correction passes analytical check and10 Search regressions; not yet in APK/JBuild. Batch into later approved build. Broad R5/R4 remain open,16/24; docs/qa/r5-motion-contrast-2026-10-31.md.
+
+## Outdoor Story/settings large-text check — 2026-10-31
+- Story/options/About/Account settings verified readable and reachable by scrolling at2.0 text on installed release;1.0 restored. No code/build change. Selected bounds measured but broad touch-target/contrast/reduced-motion/TalkBack and GPS/network checks remain. R5 stays open,16/24; docs/qa/r5-outdoor-story-settings-2026-10-31.md.
+
+## Updated standalone Outdoor comparison — 2026-10-31
+- Updated local ARM64 APK built/installed without EAS,matching certificate and exact installed hash verified. Metro-off Home visible by5.8s first cold/by3.1s repeat; prolonged dev blank not reproduced. QA and independent review completed; source/build evidence in docs/qa/outdoor-local-build-2026-10-31.md. No publication,deployment or data clear. R5 stays open,16/24; remaining accessibility/reliability and sustained performance checks pending.
+
+## R5 startup trace — 2026-10-31
+- Bundle/entry/root tracing narrowed delay to largely before app entry in the diagnostic run; cause unproven. Probes removed and original Metro restored. Next: approved preview APK build/install comparison; same package replaces dev client. R5 stays open,16/24 complete; see performance QA note.
+
+## R5 development performance sample — 2026-10-31
+- Cold-start blank period reproduced before branded loader, eventually recovered; warm return quick. Dev frame/memory measurements and limitations recorded in docs/qa/r5-performance-2026-10-31.md. Garbled loader text corrected (5 tests/scoped lint pass). R5 remains open; startup tracing and an approved release/profile-build comparison are pending. Local/unpublished, 16/24 complete.
+
+## R5 keyboard/footer slice — 2026-10-31
+- Shared place-result footer now wraps at large text; phone keyboard checks and limitations in docs/qa/r5-keyboard-2026-10-31.md. 82 tests/scoped lint pass, original text restored. Local/unpublished. R5 remains open (16/24); next performance/startup investigation should account for the observed prolonged blank dev reload before claiming reliability.
+
+## R5 Home large-text slice — 2026-10-31
+- Home search placeholder and Create banner now fit at 2.0 text scale; physical CPH2813 verification and normal-text restoration complete. 82 affected tests, final 17 Home regressions, TypeScript/scoped lint and self-review pass. Local/unpublished; broader R5 remains open (16/24 complete). Next bounded check: keyboard/safe-area visibility; TalkBack remains deferred. See docs/qa/r5-home-large-text-2026-10-31.md.
+
+## Completed local update set reviewed - 2026-10-30
+- B2 preferences, B3 Saved continuation, U8 first-outcome guidance and completed R5/R6 UI slices reviewed together. 225/225 affected tests, TypeScript, scoped ESLint and whitespace checks pass; independent Code Reviewer found no actionable issues in the stable combined snapshot.
+- Prepared for local commit only; no GitHub push, merge, deployment or hosted write. Pilot documents already committed as c1ed4d5. Overall 16/24 complete, 8 open; E2 prepared but deferred for lack of participants, broader R4/R5/R6 and B4/E1/U4/E4 remain open. Existing phone evidence and limits are in docs/qa; full suite not repeated for this bounded combined review.
+
+## E3 success measures agreed - 2026-10-30
+- Owner accepted observable success definitions and the proposed 4-of-5 core-task pilot target. Manual observation only; no analytics, runtime or backend change. Documentation self-review and whitespace check; no device or application tests needed.
+- E3 COMPLETE: 16/24 backlog items complete, 8 open. R5 preferences and R6 empty-state slices are complete; their broader items remain open. E2 pilot preparation is next. See docs/success-measures.md. Local/unpublished; earlier entries are historical.
+
+## B2 device-only travel preferences completed - 2026-10-30
+- LOCAL, UNPUBLISHED: Account settings now offer optional Nature/Food/Culture interests and Relaxed/Packed pace, with edit/cancel/save/forget. Each signed-in account has a separate record on this phone; retained after signout with disclosure, hidden from guests/others, never synced. Manual Home/Search Buddy tips use explicit choices; search results/routes and authoritative continuation actions remain unchanged.
+- VERIFIED: read-only live backend preflight found no backend changes needed. QA independently passed 85 affected tests plus 4 additional storage/isolation scenarios. TypeScript, scoped ESLint and diff checks pass; independent review has no actionable findings. CPH2813 Android16/Codex8081 verified save, cold-relaunch persistence, edit cancellation, Forget and neutral state after second relaunch; temporary choices forgotten. No hosted writes. Physical account-switch/failure injection/manual tip capture and broad accessibility were not performed; automated evidence and R5 limitations recorded.
+- B2 COMPLETE under mixed phone/automated scope: 15/24 complete, 9 remaining. See docs/qa/b2-device-preferences-2026-10-30.md, b2-backend-preflight-2026-10-30.md and b2-qa-2026-10-30.md. Earlier entries are historical.
+
+## U8 first useful outcome completed - 2026-10-30
+- LOCAL, UNPUBLISHED: first-use Guide me now offers Find a journey / Keep a memory. Home ? provides optional replay; Search/Create guidance is dismissible and route-local. Confirmed private creation carries guidance into Add a stop; existing authentication, permission and data behavior retained.
+- VERIFIED: 160 initial affected tests, final focused regressions, TypeScript/scoped ESLint and diff checks pass. QA and independent review have no remaining actionable findings. CPH2813 / Android 16 / Codex Metro 8081: chooser, both destination screens and final Close/dismissal verified; modal stretching and unreadable glyph fixed. No hosted writes. Live sign-in/save, first-install and broad accessibility are not phone-verified; automated coverage and R5 limits documented.
+- U8 COMPLETE under mixed evidence scope: 14/24 complete, 10 remaining. B2 needs preference/storage decisions; R4/R5 remain device-check work and U4 awaits E2 pilot. See docs/qa/u8-first-outcome-2026-10-30.md and u8-qa-2026-10-30.md. Earlier entries are historical.
+
+## B3 saved-journey prompt completed - 2026-10-30
+- LOCAL, UNPUBLISHED: Buddy in Search's Saved view names a settled visible saved journey and offers Open saved journey using the existing Story route. Prompt clears under loading/refresh/error/account uncertainty/empty results; stale actions recheck current state. Existing draft and recoverable-trip paths retained. UI-only; no new backend reads, writes or persistence.
+- VERIFIED: 89 affected tests, TypeScript, scoped ESLint and diff check pass. Independent review: no actionable findings. CPH2813 / Android 16 / Codex Metro 8081: actual saved title and action visible; action opens matching Story. Error/account/stale cases automated-only; no live writes. B3 COMPLETE, overall 13/24 complete and 11 remaining. U8 next; other pending decisions/checks unchanged. See docs/qa/b3-saved-journey-2026-10-30.md. Earlier status entries below are historical.
+## Create retry button visibility - 2026-10-30
+- LOCAL, UNPUBLISHED: error and Create/Save Changes button now share the form scroller, preventing an unreachable footer. Phone error/keyboard/retry check and 87 focused tests pass; independent review has no actionable findings. No backend behavior or live writes changed. Specific R5 finding resolved; broader R5 remains open. B3/U8 not started.
+
+## R3 creation recovery verification - 2026-10-30
+- R3 COMPLETE under mixed phone/automated scope: 87 focused tests pass; phone unsaved restore, controlled rejection and pre-submission interruption retained edits. Approved live private test draft saved once; recovery cleared and saved draft reopened after restart without a prompt. One private test draft retained in Sreejith Gs account; no photos/publication. Ambiguous commits and interrupted uploads automated-only; physical network-loss remains R4. Error text can hide the Create button (R5 follow-up). No application code changes; prior review reused. Overall 12/24 complete, 12 remaining. Documentation local/unpublished. See docs/qa/r3-phone-recovery-2026-10-30.md; earlier counts below are historical.
+
+## R2 real-GPS recovery verification - 2026-10-30
+- R2 COMPLETE: CPH2813 / Android 16, Metro 8081. Active and paused trips recovered after force-stop; five-stop itinerary and one manual completion preserved. Restored paused with GPS off; explicit Resume restarted real GPS guidance. Finish cleared local recovery and GPS requests. No hosted writes/application changes. Existing independent review and automated evidence reused; moving-route reliability remains R4. Overall 11/24 complete, 13 remaining. R3 save/recovery scenarios next. Documentation local/unpublished. Details: docs/qa/r2-phone-recovery-2026-10-30.md. Earlier pending/count entries below are historical.
+
+## U1 phone verification - 2026-10-30
+- U1 COMPLETE: CPH2813 / Android 16, Codex Metro 8081. Approved single-key Buddy reset; Guide me opened tour 1/3; force-stop/relaunch retained Buddy enabled without repeating intro/tour. No app-data clear, hosted writes or application code changes. Previous independent review passed; existing automated evidence reused. TalkBack deferred to R5. Overall 10/24 complete, 14 remaining; R2 real GPS is next. Documentation local/unpublished. Earlier pending/count entries below are historical.
+
+## Phone backlog verification - 2026-10-30
+- [x] B5 greeting reset, automatic expiry, revisit suppression and cold-relaunch suppression verified on CPH2813 / Android 16. Existing 69 tests/static checks and independent review pass. Overall 9/24 complete; publication authorized on feature/backlog-phase1, merge not authorized.
+- [x] U5 Saved/draft/recoverable-work paths closed under the owner's accepted code-checked scope; phone Search and Account paths inspected. Status update local/unpublished.
+- [x] U2 owner-directed removal of duplicate Find a journey button; phone reload confirms more globe space, bottom Search retained; 17 Home tests and static checks pass. Local/unpublished.
+- [ ] U1 review passed, cold relaunch still pending. R2/R3 and broader R4/R5 checks remain pending. See IMPROVEMENT_BACKLOG.md.
+
+## Improvement backlog phase 1 - 2026-10-30
+- Implemented on feature/backlog-phase1 (published, not merged): Search tile captions, Make it yours, first-use Buddy card, task-specific Buddy actions and reasons, once-per-install greetings, Home Find a journey, on-device recovery of unsaved Create edits and unfinished trips.
+- Tested: full suite, independent review and emulator checks; selected phone checks. See PROJECT_STATUS.md and IMPROVEMENT_BACKLOG.md.
+- Pending: real-GPS and reliability checks on the phone (R2, R4), accessibility and performance (R5), B2 preferences storage decision, B3 recoverable-trip prompts, U8, B4, R6, then the E1-E4 pilot work. U4 labels wait for pilot evidence.
+
 ## Buddy contextual text and gestures - 2026-10-28
 - [x] Matching Wave/Curious assets, preset local contextual messages, cooldown/expiry and interaction/sleep/Travel guards.58 focused checks, static checks and independent review pass.
 - [ ] Complete native automatic/manual speech/gesture capture and accessibility matrix. Local/unpublished; no AI or audio.

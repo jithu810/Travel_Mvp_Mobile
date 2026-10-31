@@ -1,0 +1,21 @@
+# Email-first registration assessment
+
+Architect / 2026-10-31 Asia/Kolkata. Local implementation authorized by owner; publication and live changes are not authorized.
+
+Baseline: `b154220dbffb71ec120f51118be8815c03a74c6d`, `feature/backlog-phase1`, clean working tree before task.
+
+Inspected: `src/app/auth.tsx`, `src/lib/auth/model.ts`, `src/lib/auth/queries.ts`, `tests/auth-screen.test.mjs`, `tests/auth-remix.test.mjs`, package scripts and Mobile guidance.
+
+Tier: sensitive (authentication flow). Full bounded read-only backend preflight assigned to Backend Developer, project `gwybjhqgnrpouwcdvusi`. Implementation gate requires its completed report. Existing signup currently maps every sessionless success to a definite confirmation prompt; no account-existence API is present in the inspected auth path.
+
+Scope: registration starts with local email validation and Continue/keyboard submission, then display name/password. Sign-in stays email/password, as owner confirmed. No signup request before final submission. Preserve intent navigation, password clearing, busy protection and keyboard access. Use conditional signup feedback and explicit existing-user error handling without probing email existence. No database, RLS, RPC, Storage, session persistence or project configuration changes planned.
+
+Verification: specialist implementation and behavioral auth tests, TypeScript/scoped lint, specialist QA and independent review of a stable snapshot. Physical phone check requires session handoff; no live registration/sign-in/data writes are authorized for testing. Backend report and final results are recorded separately.
+
+Gate release: Architect reviewed `email-first-auth-preflight-2026-10-31.md`, including current relevant schema, policies, grants, trigger, Storage and canonical migration comparison. No backend changes required; existing ACL drift is unrelated and preserved. Mobile Developer released to the bounded local implementation. Hosted confirmation flags and Auth binary are unverified; response copy must remain conditional.
+
+Owner scope correction after initial implementation: existing emails must be blocked at the email step and directed to sign-in; only new emails may reach details. This requires a reliable account-existence contract that the original bounded client-only scope does not provide. Earlier no-backend-change gate no longer covers the revised scope. Implementation paused; Backend Developer reassessment assigned. Existing four-file local change is partial, despite its 34 passing focused tests/typecheck/scoped lint. No live deployment/database change is authorized.
+
+Revised gate release: reviewed saved backend reassessment and isolated test plan. Local implementation may proceed for `registration-email-check` Edge Function, private durable global minute/day and HMAC-email quotas, service-role-only lookup RPC, and Mobile strict boolean/error handling. Omit IP limiting until trustworthy gateway semantics are established; global/email quotas remain mandatory. Account enumeration is inherent in the owner's requested immediate branching and must be disclosed at rollout. No live changes authorized. Backend artifacts remain local proposals in Mobile `backend/email-registration/`, with deployment instructions; canonical Web migration integration is pending. Failure/rate limit/malformed response must stay on email, never assume new account. Endpoint/config deployment and native runtime verification remain rollout gates.
+
+Final local evidence: 40 Mobile tests + 5 backend tests (including fresh isolated PostgreSQL permissions, quotas, concurrency and no Auth mutations) + 2 independent cross-layer QA tests pass. TypeScript, scoped lint and whitespace checks pass. Independent Code Reviewer found no actionable findings against matching stable hashes; QA independently checked the handler/HTTP/Mobile adapter contract and found no acceptance issues. See `email-first-auth-qa-2026-10-31.md` for snapshot hashes and limits. No Deno/hosted/physical-device verification, live changes, GitHub publication or account deletion performed for this feature. Production SQL application, function deployment and server-only hash secret configuration require separate owner approval for project `gwybjhqgnrpouwcdvusi`.

@@ -1,5 +1,5 @@
-import { useState, type ReactNode } from 'react';
-import { KeyboardAvoidingView, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useEffect, useState, type ReactNode } from 'react';
+import { AccessibilityInfo, KeyboardAvoidingView, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Action } from '../discovery/ui';
 import { PlacePicker } from './place-picker';
@@ -10,6 +10,19 @@ export function MemoryEditorSheet({ value, isNew, proximity, busy, blocked, erro
   photoControl?: ReactNode; preparingPhoto?: boolean; savingLabel?: string;
   onChange: (patch: Partial<StopInput>) => void; onClose: () => void; onSave: () => void; onReload?: () => void;
 }) {
+  const [reduceMotion, setReduceMotion] = useState(true);
+  useEffect(() => {
+    let active = true;
+    let receivedChange = false;
+    const subscription = AccessibilityInfo.addEventListener('reduceMotionChanged', value => {
+      receivedChange = true;
+      if (active) setReduceMotion(value);
+    });
+    void AccessibilityInfo.isReduceMotionEnabled().then(value => {
+      if (active && !receivedChange) setReduceMotion(value);
+    }).catch(() => { /* Keep the motion-safe default if the platform query fails. */ });
+    return () => { active = false; subscription.remove(); };
+  }, []);
   const [nameOpen, setNameOpen] = useState(!isNew || Boolean(value.name));
   const [nameEdited, setNameEdited] = useState(!isNew);
   const [noteOpen, setNoteOpen] = useState(Boolean(value.description));
@@ -17,7 +30,7 @@ export function MemoryEditorSheet({ value, isNew, proximity, busy, blocked, erro
   const location = useMemoryLocation(value, busy || blocked || preparingPhoto, onChange, () => setNameOpen(true));
   const disabled = busy || blocked || preparingPhoto || location.busy;
   const close = () => { location.cancel(); onClose(); };
-  return <Modal visible transparent animationType="slide" onRequestClose={close}>
+  return <Modal visible transparent animationType={reduceMotion ? 'none' : 'slide'} onRequestClose={close}>
     <SafeAreaView style={s.overlay}>
       <KeyboardAvoidingView style={s.avoid} behavior="padding">
         <View style={s.panel}>
@@ -82,9 +95,9 @@ const s = StyleSheet.create({
   details: { padding: 12, borderRadius: 20, backgroundColor: '#E4EAF6', gap: 8 },
   counter: { color: '#556176', fontSize: 11, lineHeight: 16, textAlign: 'right' },
   header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 18, paddingTop: 4, gap: 8 },
-  close: { minHeight: 44, minWidth: 44, borderRadius: 22, borderWidth: 1, borderColor: '#FFFFFF', backgroundColor: '#F0F3FA', alignItems: 'center', justifyContent: 'center' },
+  close: { minHeight: 48, minWidth: 48, borderRadius: 22, borderWidth: 1, borderColor: '#FFFFFF', backgroundColor: '#F0F3FA', alignItems: 'center', justifyContent: 'center' },
   scroll: { flexShrink: 1 }, content: { paddingHorizontal: 18, paddingBottom: 6, gap: 8 }, field: { gap: 6 },
   footer: { flexShrink: 0, paddingHorizontal: 18, paddingVertical: 10, gap: 7, backgroundColor: '#EAF0F9', borderTopWidth: 1, borderTopColor: '#FFFFFF' },
-  textAction: { minHeight: 44, justifyContent: 'center' }, link: { color: '#4858AF', fontSize: 13, lineHeight: 19, fontWeight: '600' },
+  textAction: { minHeight: 48, justifyContent: 'center' }, link: { color: '#4858AF', fontSize: 13, lineHeight: 19, fontWeight: '600' },
   note: { color: '#505D73', fontSize: 11, lineHeight: 16 }, noteInput: { minHeight: 88, textAlignVertical: 'top' },
 });

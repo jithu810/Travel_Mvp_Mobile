@@ -18,8 +18,8 @@ function hooks(){let slots=[],cursor=0,effects=[];return {
   render(fn){cursor=0;effects=[];const tree=fn();effects.forEach(f=>f());return tree;},
 };}
 function load(path,modules={},react=hooks().react){
-  modules={'@/hooks/use-buddy-geometry':buddyGeometryStub,...modules};const exports={};const code=ts.transpileModule(readFileSync(path,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX}}).outputText;
-  modules={'@/hooks/use-journey-buddy':{useBuddyScreen(){},useBuddyPreference:()=>({loaded:true,enabled:false,error:null,setEnabled(){}})},...modules};
+  modules={'@/components/buddy/travel-preferences-settings':{TravelPreferencesSettings:'TravelPreferencesSettings'},'@/hooks/use-buddy-geometry':buddyGeometryStub,'@/lib/journey/trip-recovery-store':{tripPersistence:{clearUser:async()=>{}}},...modules};const exports={};const code=ts.transpileModule(readFileSync(path,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX}}).outputText;
+  modules={'@/hooks/use-journey-buddy':{useBuddyScreen(state){buddyScreens.push(state);},useBuddyGreetingsReset:()=>()=>{},useBuddyPreference:()=>({loaded:true,enabled:false,error:null,setEnabled(){}})},...modules};
   new Function('require','exports',code)(name=>name==='@/theme/mobile-theme'?mobileTheme:name==='@/components/discovery/thumbnail-photo'?{ThumbnailPhoto:'JourneyPhoto'}:name==='./profile-styles'?load('src/components/profile/profile-styles.ts',{'@/components/discovery/ui':ui}):name==='react'?react:name==='@/components/delete-draft-action'?{DeleteDraftAction:'DeleteDraftAction'}:name==='@/lib/remix/model'?{draftRemixCredit:source=>source===undefined?'Remix of another journey':source===null?'Remixed from an original journey that is currently unavailable.':'Remix of '+source.title+' · by '+source.creatorName}:name==='@/components/branded-loading'?{BrandedLoading:'BrandedLoading'}:name==='@/components/art/journey-art'?{JourneyArt:'JourneyArt',StopArt:'StopArt'}:name==='@/lib/art/journey-art'?{artSeed:(id,stops)=>'seed:'+id+':'+(stops||[]).length}:name==='react/jsx-runtime'?{jsx,jsxs:jsx,Fragment:'Fragment'}:name==='react-native'?native:name.endsWith('.png')?1:name in modules?modules[name]:(()=>{throw Error(name);})(),exports);return exports;}
 function all(tree,type){if(!tree||typeof tree!=='object')return [];return [...(tree.type===type?[tree]:[]),...[tree.props?.children].flat(Infinity).flatMap(t=>all(t,type))];}
 const uid='22222222-2222-4222-8222-222222222222';const journey={id:'real',title:'Hill journey',destination:'Ponmudi',cover:'https://test/cover.jpg',durationDays:1,stops:[{},{}]};
@@ -31,7 +31,7 @@ test('reference profile composition retains real identity/avatar, owner-only fun
     const tree=components.ProfileIdentity({name:'Real traveler',username:'real_user',bio:'Real bio',avatar:'https://test/avatar',count:1,owner:true});
     assert.equal(tree.props.style.overflow,'hidden');assert.equal(all(tree,'DiscoveryGlobe').length,0);assert.equal(all(tree,'JourneyPhoto')[0].props.uri,'https://test/avatar');
     assert.ok(all(tree,'Text').some(n=>n.props.children==='Real bio'));assert.ok(all(tree,'Text').some(n=>[n.props.children].flat().join('')==='@real_user'));
-    const button=all(tree,'Pressable')[0];assert.equal(button.props.disabled,undefined);assert.equal(typeof button.props.onPress,'function');button.props.onPress();assert.equal(routes.at(-1),'/profile/edit');assert.equal(button.props.style({pressed:false})[0].minHeight,44);
+    const button=all(tree,'Pressable')[0];assert.equal(button.props.disabled,undefined);assert.equal(typeof button.props.onPress,'function');button.props.onPress();assert.equal(routes.at(-1),'/profile/edit');assert.ok(button.props.style({pressed:false})[0].minHeight>=48);
     const avatar=all(tree,'View').find(n=>Array.isArray(n.props.style)&&n.props.style[1]?.width);assert.equal(avatar.props.style[1].width,width<360?56:60);
   }
   const visitor=components.ProfileIdentity({name:'Visitor',count:0});assert.equal(all(visitor,'Pressable').length,0);assert.equal(all(visitor,'JourneyPhoto').length,0);
@@ -50,16 +50,19 @@ test('profile journey and draft cards retain their routes, truthful facts and ph
   assert.equal(all(header,'Pressable').length,2,'Header only exposes working back and settings actions');
 });
 
-function accountHarness(){const h=hooks(),routes=[],loaders=[];let auth={loading:false,session:{user:{id:uid,email:'private@example.test',user_metadata:{display_name:'Real owner'}}}},finish,fail=false,calls=0,cancels=0;
+const buddyScreens=[];
+function accountHarness(){const h=hooks(),routes=[],loaders=[];let auth={loading:false,session:{user:{id:uid,email:'private@example.test',user_metadata:{display_name:'Real owner'}}}},finish,fail=false,calls=0,cancels=0;const recoveryCleared=[],tripsCleared=[];
   let draftRefreshes=0;const draftState={data:[{id:'draft',title:'Actual draft'}],refresh(){draftRefreshes++;},retry(){},loading:false};const publishedState={data:{profile:null,journeys:[journey]},refresh(){},retry(){},loading:false};
   const components=Object.fromEntries(['ProfileHeader','ProfileIdentity','ProfileCollections','ProfileDraftCard','ProfileJourneyCard','ProfileTabs'].map(n=>[n,n]));components.profileStyles={};
   const modules={'expo-router':{useRouter:()=>({push:r=>routes.push(r)}),useFocusEffect:()=>{}},'react-native-safe-area-context':{SafeAreaView:'SafeAreaView'},'@/components/discovery/ui':ui,'@/components/profile/profile-ui':components,
     '@/hooks/session-context':{useSessionState:()=>auth},'@/hooks/action-intent':{useActionIntent:()=>({cancel(){cancels++;}})},
     '@/hooks/use-load':{useLoad:fn=>{loaders.push(fn);return loaders.length%2?draftState:publishedState;}},
     '@/lib/remix/queries':{loadPrivateDrafts:async()=>draftState.data,withDraftSources:(drafts,cards)=>drafts.map(d=>d.sourceId&&cards.has(d.sourceId)?{...d,source:cards.get(d.sourceId)}:d)},'@/hooks/use-draft-credits':{useDraftCredits:()=>new Map()},'@/lib/profile/queries':{loadPublicProfile:async()=>null,loadPublishedProfileJourneys:async()=>[journey]},
-    '@/lib/profile/edit-queries':{loadOwnProfile:async()=>({id:uid,username:'real',displayName:'Real owner',bio:'',avatarPreview:null})},'@/lib/discovery/model':{safePhoto:()=>null},'@/lib/auth/queries':{signOutAccount:()=>{calls++;return new Promise((resolve,reject)=>{finish=()=>fail?reject(Error('failure')):resolve();});}}};
+    '@/lib/profile/edit-queries':{loadOwnProfile:async()=>({id:uid,username:'real',displayName:'Real owner',bio:'',avatarPreview:null})},'@/lib/discovery/model':{safePhoto:()=>null},'@/lib/auth/queries':{signOutAccount:()=>{calls++;return new Promise((resolve,reject)=>{finish=()=>fail?reject(Error('failure')):resolve();});}},
+    '@/lib/create/recovery-store':{creationRecovery:{clearUser:async user=>{recoveryCleared.push(user);}}},
+    '@/lib/journey/trip-recovery-store':{tripPersistence:{clearUser:async user=>{tripsCleared.push(user);}}}};
   const {default:Screen}=load('src/app/account.tsx',modules,h.react);
-  return {render:()=>h.render(Screen),routes,loaders,draftState,publishedState,setAuth:v=>auth=v,setFail:v=>fail=v,finish:()=>finish(),calls:()=>calls,cancels:()=>cancels,draftRefreshes:()=>draftRefreshes};
+  return {render:()=>h.render(Screen),routes,loaders,draftState,publishedState,setAuth:v=>auth=v,setFail:v=>fail=v,finish:()=>finish(),calls:()=>calls,cancels:()=>cancels,draftRefreshes:()=>draftRefreshes,recoveryCleared,tripsCleared};
 }
 test('Account tabs preserve private draft entry, published cards, settings actions and guarded sign-out failure',async()=>{
   const h=accountHarness();let tree=h.render(),list=all(tree,'FlatList')[0];assert.equal(list.props.data[0].kind,'draft');
@@ -69,13 +72,16 @@ test('Account tabs preserve private draft entry, published cards, settings actio
   all(tree,'ProfileHeader')[0].props.onSettings();tree=h.render();assert.equal(all(tree,'Modal')[0].props.visible,true);
   const signOut=all(tree,'Action').find(n=>n.props.label==='Sign out');h.setFail(true);signOut.props.onPress();signOut.props.onPress();assert.equal(h.calls(),1);assert.equal(h.cancels(),1);
   tree=h.render();assert.equal(all(tree,'Action').find(n=>n.props.label==='Signing out…').props.disabled,true);h.finish();await new Promise(setImmediate);tree=h.render();assert.ok(all(tree,'Text').some(n=>n.props.accessibilityRole==='alert'));
+  assert.deepEqual(h.recoveryCleared,[],'A failed sign-out keeps unsaved Create recovery');assert.deepEqual(h.tripsCleared,[],'and the unfinished trip copy');
   h.setFail(false);all(tree,'Action').find(n=>n.props.label==='Sign out').props.onPress();h.finish();await new Promise(setImmediate);assert.equal(all(h.render(),'Modal')[0].props.visible,false);
+  assert.deepEqual(h.recoveryCleared,[uid],'Sign-out clears only the signed-out user recovery copies');
+  assert.deepEqual(h.tripsCleared,[uid],'Sign-out clears the signed-out user unfinished trip copy');
 });
 test('Account gates private content while signed out/loading and preserves draft failure/empty recovery',()=>{
   const h=accountHarness();h.setAuth({loading:true,session:null});assert.equal(all(h.render(),'FlatList').length,0);
   h.setAuth({loading:false,session:null});let tree=h.render();assert.equal(all(tree,'FlatList').length,0);all(tree,'Message')[0].props.retry();assert.equal(h.routes.at(-1),'/auth');
   h.setAuth({loading:false,session:{user:{id:uid,user_metadata:{}}}});h.draftState.data=[];h.draftState.error='Offline';tree=h.render();let list=all(tree,'FlatList')[0];assert.equal(list.props.ListEmptyComponent.props.body,'Offline');
-  h.draftState.error=null;list=all(h.render(),'FlatList')[0];list.props.ListEmptyComponent.props.retry();assert.equal(h.routes.at(-1),'/create');
+  h.draftState.error=null;list=all(h.render(),'FlatList')[0];assert.equal(list.props.ListEmptyComponent.props.title,'No private drafts yet');assert.match(list.props.ListEmptyComponent.props.body,/save your journey privately/);assert.equal(list.props.ListEmptyComponent.props.action,'Start a journey');list.props.ListEmptyComponent.props.retry();assert.equal(h.routes.at(-1),'/create');
 });
 test('public Profile exposes only published data and gates owner tab navigation',()=>{
   const routes=[];let viewer=null,state={data:{profile:{id:uid,username:'real',displayName:'Actual creator',avatar:null,bio:'Bio'},journeys:[journey]}};
@@ -125,4 +131,11 @@ test('long biography is bounded until explicitly expanded and full name remains 
   const title=all(tree,'Text').find(n=>n.props.accessibilityRole==='header');assert.equal(title.props.accessibilityLabel,name);assert.equal(title.props.numberOfLines,2);
   all(tree,'Pressable')[0].props.onPress();tree=render();assert.equal(all(tree,'Text').find(n=>n.props.children===bio).props.numberOfLines,undefined);
   all(tree,'Pressable')[0].props.onPress();assert.equal(all(render(),'Text').find(n=>n.props.children===bio).props.numberOfLines,2);
+});
+test('B3: Buddy offers Continue editing only for a draft from a successful load, never a stale one after a failed refresh',()=>{
+  const h=accountHarness();const draft=h.draftState.data[0];assert.ok(draft&&draft.id);
+  buddyScreens.length=0;h.render();assert.deepEqual(buddyScreens.at(-1).resume,{id:draft.id,title:draft.title});
+  h.draftState.error='Offline';buddyScreens.length=0;h.render();assert.equal(buddyScreens.at(-1).resume,undefined,'A failed refresh never offers the last-known draft');
+  h.draftState.error=null;h.draftState.refreshing=true;buddyScreens.length=0;h.render();assert.equal(buddyScreens.at(-1).resume,undefined,'A running refresh never offers the last-known draft');h.draftState.refreshing=false;
+  h.draftState.data=[];buddyScreens.length=0;h.render();assert.equal(buddyScreens.at(-1).resume,undefined,'No drafts: Buddy offers Start a new journey instead');
 });

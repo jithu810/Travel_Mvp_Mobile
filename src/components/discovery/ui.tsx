@@ -19,7 +19,7 @@ export function ScreenHeader({ title, back = false, right, compact = false }: { 
 }
 export function Action({ label, onPress, disabled = false, accessibilityLabel, secondary = false, compact = false, vibrant = false, memorySheet = false }: { label: string; onPress: () => void; disabled?: boolean; accessibilityLabel?: string; secondary?: boolean; compact?: boolean; vibrant?: boolean; memorySheet?: boolean }) {
   const protection = useBuddyProtectedBounds();
-  return <Pressable {...protection} accessibilityRole="button" accessibilityLabel={accessibilityLabel ?? label} disabled={disabled} accessibilityState={{ disabled }} onPress={onPress} style={({ pressed }) => [ui.action, vibrant && ui.vibrantAction, memorySheet && ui.memoryAction, secondary && { backgroundColor: colors.pale, experimental_backgroundImage: 'none', borderColor: colors.line, boxShadow: 'none' }, (pressed || disabled) && { opacity: 0.75 }, compact && { minHeight: 44, paddingHorizontal: 14 }]}>
+  return <Pressable {...protection} accessibilityRole="button" accessibilityLabel={accessibilityLabel ?? label} disabled={disabled} accessibilityState={{ disabled }} onPress={onPress} style={({ pressed }) => [ui.action, vibrant && ui.vibrantAction, memorySheet && ui.memoryAction, secondary && { backgroundColor: colors.pale, experimental_backgroundImage: 'none', borderColor: colors.line, boxShadow: 'none' }, (pressed || disabled) && { opacity: 0.75 }, compact && { minWidth: 48, minHeight: memorySheet ? 50 : 48, paddingHorizontal: 14 }]}>
     <Text style={[ui.actionLabel, vibrant && ui.vibrantLabel, memorySheet && ui.memoryLabel, secondary && { color: colors.ink }]}>{label}</Text>
   </Pressable>;
 }
@@ -41,7 +41,7 @@ export const ui = StyleSheet.create({
   list: { paddingHorizontal: 22, paddingBottom: 30, flexGrow: 1 },
   header: { minHeight: 76, paddingHorizontal: 22, paddingVertical: 14, flexDirection: 'row', alignItems: 'center', gap: 12 },
   compactHeader: { minHeight: 56, paddingVertical: 6, paddingHorizontal: 16, gap: 10 },
-  compactBack: { width: 44, height: 44, borderRadius: 14 },
+  compactBack: { width: 48, height: 48, borderRadius: 14 },
   logo: { backgroundColor: colors.ink, width: 38, height: 38, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
   logoText: { color: colors.paper, fontWeight: '700', fontSize: 15 },
   headerTitle: { flex: 1, color: colors.ink, fontWeight: '600', fontSize: 18 },

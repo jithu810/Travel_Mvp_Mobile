@@ -1,8 +1,9 @@
+import { TravelPreferencesSettings } from '@/components/buddy/travel-preferences-settings';
 import { BrandedLoading } from '@/components/branded-loading';
 import { useCallback, useRef, useState } from 'react';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { ActivityIndicator, FlatList, Modal, Pressable, RefreshControl, ScrollView, Switch, Text, useWindowDimensions, View } from 'react-native';
-import { useBuddyPreference, useBuddyScreen } from '@/hooks/use-journey-buddy';
+import { useBuddyGreetingsReset, useBuddyPreference, useBuddyScreen } from '@/hooks/use-journey-buddy';
 import { useBuddyProtectedBounds, useBuddyScroll } from '@/hooks/use-buddy-geometry';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Action, colors, Message, ui } from '@/components/discovery/ui';
@@ -16,6 +17,8 @@ import { loadPublishedProfileJourneys } from '@/lib/profile/queries';
 import { loadOwnProfile } from '@/lib/profile/edit-queries';
 import { safePhoto } from '@/lib/discovery/model';
 import { signOutAccount } from '@/lib/auth/queries';
+import { creationRecovery } from '@/lib/create/recovery-store';
+import { tripPersistence } from '@/lib/journey/trip-recovery-store';
 import type { PublicJourney } from '@/types/journey';
 
 type Row = { kind: 'draft'; draft: PrivateDraftSummary } | { kind: 'published'; journey: PublicJourney };
@@ -41,20 +44,25 @@ export default function AccountScreen() {
   const [deleteMessage, setDeleteMessage] = useState('');
   const [error, setError] = useState<string | null>(null);
   const buddy = useBuddyPreference();
+  const resetBuddyGreetings = useBuddyGreetingsReset();
   const window = useWindowDimensions();
   const buddyGridProtection = useBuddyProtectedBounds(useCallback(rect => [
     { x: 0, y: 0, width: window.width, height: Math.max(0, rect.y - 8) },
     { x: 0, y: rect.y + rect.height + 8, width: window.width, height: window.height },
   ], [window.width, window.height]));
   const scroll = useBuddyScroll(), footerProtection = useBuddyProtectedBounds();
-  useBuddyScreen({ floating: true, suppressed: settings || busy || auth.loading });
+  // Only a loaded draft is offered; nothing is written and no copy is made from here.
+  // A failed or running refresh may hold a deleted draft in the last-known list, so offer only a settled, successful load.
+  const resumeDraft = drafts.error || drafts.refreshing ? undefined : drafts.data?.[0];
+  useBuddyScreen({ floating: true, suppressed: settings || busy || auth.loading, resume: resumeDraft ? { id: resumeDraft.id, title: resumeDraft.title } : undefined });
   const refreshDrafts = drafts.refresh, refreshPublished = published.refresh;
   useFocusEffect(useCallback(() => { refreshDrafts(); refreshPublished(); }, [refreshDrafts, refreshPublished]));
   async function signOut() {
     if (signOutLock.current) return;
     signOutLock.current = true;
     setBusy(true); setError(null); intent.cancel();
-    try { await signOutAccount(); setSettings(false); } catch { setError('Couldn’t sign out. Please retry.'); } finally { signOutLock.current = false; setBusy(false); }
+    // Unsaved Create work and unfinished-trip copies on this device belong to the signed-out account only.
+    try { await signOutAccount(); if (userId) { void creationRecovery.clearUser(userId); void tripPersistence.clearUser(userId); } setSettings(false); } catch { setError('Couldn’t sign out. Please retry.'); } finally { signOutLock.current = false; setBusy(false); }
   }
   const profile = published.data?.profile;
   const name = profile?.displayName || (typeof metadata?.display_name === 'string' && metadata.display_name.trim() ? metadata.display_name.trim() : 'Traveler');
@@ -84,15 +92,17 @@ export default function AccountScreen() {
           {collectionError && rows.length > 0 && <Message title="Couldn’t refresh journeys" body={collectionError} retry={retry} />}
         </View>}
         ListEmptyComponent={loading ? <ActivityIndicator accessibilityLabel={tab === 'drafts' ? 'Loading private drafts' : 'Loading published journeys'} /> : collectionError ? <Message title={tab === 'drafts' ? 'Couldn’t load drafts' : 'Couldn’t load journeys'} body={collectionError} retry={retry} />
-          : <Message title={tab === 'drafts' ? 'No private drafts yet' : 'No public journeys yet'} body={tab === 'drafts' ? 'Remix a public journey or start your own story.' : 'Your published journeys will appear here.'} retry={() => router.push('/create')} action="Create Journey" />}
+          : <Message title={tab === 'drafts' ? 'No private drafts yet' : 'No public journeys yet'} body={tab === 'drafts' ? 'Start with a place and a title, then save your journey privately. You can return here to add stops and memories before publishing.' : 'Journeys you choose to publish will appear here. You can start a private draft and share it when you are ready.'} retry={() => router.push('/create')} action="Start a journey" />}
         ListFooterComponent={<Pressable {...footerProtection} accessibilityRole="button" accessibilityLabel={tab === 'drafts' ? 'Refresh drafts' : 'Refresh published journeys'} onPress={refresh} style={s.close}><Text style={ui.body}>↻ Refresh {tab === 'drafts' ? 'drafts' : 'journeys'}</Text></Pressable>} />}
     </View>
     <Modal visible={settings} transparent animationType="none" onRequestClose={() => { if (!busy) setSettings(false); }}>
       <View style={s.shade}><SafeAreaView edges={['bottom', 'left', 'right']} style={s.sheet}><ScrollView keyboardShouldPersistTaps="handled">
         <View style={s.settingsRow}><Text accessibilityRole="header" style={s.heading}>Account settings</Text><Pressable accessibilityRole="button" accessibilityLabel="Close account settings" disabled={busy} onPress={() => setSettings(false)} style={s.close}><Text style={s.heading}>×</Text></Pressable></View>
         <View style={[s.settingsRow, { gap: 12, marginBottom: 12 }]}><View style={{ flex: 1 }}><Text style={s.heading}>Journey Buddy</Text><Text style={ui.body}>A tiny explorer for your adventures. Saved on this device.</Text></View>
-          <Switch accessibilityLabel="Journey Buddy" accessibilityHint="Show or hide your little journey helper" disabled={!buddy.loaded} value={buddy.enabled} onValueChange={buddy.setEnabled} /></View>
+          <Switch accessibilityLabel="Journey Buddy" accessibilityHint="Show or hide your little journey helper" style={{ minWidth: 48, minHeight: 48 }} disabled={!buddy.loaded} value={buddy.enabled} onValueChange={buddy.setEnabled} /></View>
+        <Action label="Show Buddy greetings again" secondary onPress={resetBuddyGreetings} />
         {buddy.error && <Text accessibilityRole="alert" style={ui.body}>{buddy.error}</Text>}
+        <TravelPreferencesSettings />
         {auth.session ? <View style={{ gap: 12 }}><Text selectable style={ui.body}>{auth.session.user.email}</Text>
           <Action label="Create Journey" onPress={() => { setSettings(false); router.push('/create'); }} />
           <Action label="Refresh drafts" secondary onPress={() => { refreshDrafts(); setTab('drafts'); setSettings(false); }} />

@@ -1,3 +1,4 @@
+import { FirstOutcomeHint } from '@/components/first-outcome-hint';
 import { StorySheet } from '@/components/journey/story-sheet';
 import { JourneyActionIcon } from '@/components/journey/journey-action-icon';
 import { StopArt } from '@/components/art/journey-art';
@@ -27,13 +28,15 @@ import { safePhoto } from '@/lib/discovery/model';
 import { usePreventRemove } from 'expo-router/react-navigation';
 import { CreateJourneyHeader } from '@/components/create/create-journey-header';
 import { QuickJourneySetup } from '@/components/create/quick-journey-setup';
-import { selectDestination } from '@/lib/create/editor-model';
+import { selectDestination, suggestedTitle } from '@/lib/create/editor-model';
+import { useCreationRecovery } from '@/hooks/use-creation-recovery';
+import type { Recovery } from '@/lib/create/recovery';
 import { useLoad } from '@/hooks/use-load';
 import { loadPrivateDrafts } from '@/lib/remix/queries';
 import { randomUUID, idsAvailable } from '@/lib/create/id';
 import { Stack, useFocusEffect, useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Keyboard, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { AccessibilityInfo, ActivityIndicator, Alert, Keyboard, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Action, colors, Message, ScreenHeader, ui } from '@/components/discovery/ui';
 import { JourneyMap } from '@/components/journey/map/journey-map';
@@ -66,17 +69,31 @@ export function RemixDraftMap({ geometry, selectedId, onSelect, active, topInset
 const DraftMap = memo(function DraftMap({ geometry, photos, thumbnails, selectedId, onSelect, active, height, topInset, remix = false }: { height: number; topInset: number; geometry: string; photos: string; thumbnails: string; selectedId: string | null; onSelect: (id: string) => void; active: boolean; remix?: boolean }) {
   const stops = useMemo(() => { const thumbs = JSON.parse(thumbnails) as Record<string, string | null>; return previewStops(JSON.parse(geometry) as StopInput[]).map(stop => ({ ...stop, photoThumbnail: thumbs[stop.id] || null })); }, [geometry, thumbnails]);
   const memoryPhotos = useMemo(() => JSON.parse(photos) as Record<string, string | null>, [photos]);
-  if (!stops.length) return <View style={[createStyles.emptyMap, { height: Math.max(200, height), paddingTop: topInset + 12 }]}><DraftRouteIllustration /><Text style={createStyles.adventureTitle}>Your next adventure starts here</Text><Text style={createStyles.adventureNote}>Every journey begins with one place.</Text></View>;
-  if (!stops.some(stop => coordinates(stop.latitude, stop.longitude))) return <View style={[createStyles.emptyMap, { height: Math.max(145, height - 30), paddingTop: topInset + 12 }]}><Text style={createStyles.emptyMapTitle}>Your route takes shape here</Text><Text style={createStyles.emptyMapNote}>Add a location to a memory to see your route. Named moments can still be saved privately.</Text></View>;
+  if (!stops.length) return <View style={[createStyles.emptyMap, { minHeight: Math.max(200, height), paddingTop: topInset + 12 }]}><DraftRouteIllustration /><Text style={createStyles.adventureTitle}>Your next adventure starts here</Text><Text style={createStyles.adventureNote}>Every journey begins with one place.</Text></View>;
+  if (!stops.some(stop => coordinates(stop.latitude, stop.longitude))) return <View style={[createStyles.emptyMap, { minHeight: Math.max(145, height - 30), paddingTop: topInset + 12 }]}><Text style={createStyles.emptyMapTitle}>Your route takes shape here</Text><Text style={createStyles.emptyMapNote}>Add a location to a memory to see your route. Named moments can still be saved privately.</Text></View>;
   return <View style={{ height, marginHorizontal: -16, borderBottomLeftRadius: 28, borderBottomRightRadius: 28, overflow: 'hidden', backgroundColor: '#080F1E' }}>{remix
     ? <RemixDraftMap geometry={geometry} selectedId={selectedId} onSelect={onSelect} active={active} topInset={topInset} />
     : <JourneyMap stops={stops} presentation="expanded" memoryPhotos={memoryPhotos} animateMemoryRoute={active} controlTopInset={topInset} selectedId={selectedId} onSelect={onSelect} />}</View>;
 });
 export function NewJourneyEditor({ ownerId, initial, onReload, onDestinationFocus, dismissSearchVersion = 0, keyboardOpen = false }: { ownerId: string; initial?: CreateForm; onReload?: () => void; onDestinationFocus?: (place: Place | null) => void; dismissSearchVersion?: number; keyboardOpen?: boolean }) {
   const router = useRouter(), navigation = useNavigation();
+  const guidedMemory = useLocalSearchParams<{ guide?: string }>().guide === 'memory';
   const celebrate = useBuddyCelebration();
   const scroll = useBuddyScroll(), footerProtection = useBuddyProtectedBounds();
   const insets = useSafeAreaInsets(), window = useWindowDimensions();
+  const [reduceMotion, setReduceMotion] = useState(true);
+  useEffect(() => {
+    let active = true;
+    let receivedChange = false;
+    const subscription = AccessibilityInfo.addEventListener('reduceMotionChanged', value => {
+      receivedChange = true;
+      if (active) setReduceMotion(value);
+    });
+    void AccessibilityInfo.isReduceMotionEnabled().then(value => {
+      if (active && !receivedChange) setReduceMotion(value);
+    }).catch(() => { /* Keep the motion-safe default if the platform query fails. */ });
+    return () => { active = false; subscription.remove(); };
+  }, []);
   const [editorFocused, setEditorFocused] = useState(true);
   const allowExit = useRef(false);
   const [form, setForm] = useState<CreateForm>(() => initial ?? newForm(randomUUID()));
@@ -122,6 +139,14 @@ export function NewJourneyEditor({ ownerId, initial, onReload, onDestinationFocu
   useBuddyScreen({ floating: true, suppressed: !editorFocused || disabled || settingsOpen || coverOpen || !!memoryEdit || keyboardOpen,
     canAddMemory: !!form.updatedAt && !publishedId && !disabled && form.stops.length < 50 }, { addMemory });
   useEffect(() => { latest.current = { form, memoryEdit, candidates: localPhotos.candidates, disabled, settingsOpen, coverOpen }; }, [form, memoryEdit, localPhotos.candidates, disabled, settingsOpen, coverOpen]);
+  // Restore only refills the editor; the user still saves explicitly through the usual flow.
+  function restoreRecovery(recovery: Recovery) {
+    if (lock.current || localPhotos.isBusy()) return false;
+    titleEdited.current = !recovery.form.destination || recovery.form.title !== suggestedTitle(recovery.form.destination);
+    setForm(recovery.form); setMemoryEdit(recovery.memoryEdit); setError(null); setMessage(null); setDirty(true);
+    return true;
+  }
+  const clearRecovery = useCreationRecovery({ userId: ownerId, form, memoryEdit, dirty, hasLocalPhotos, onRestore: restoreRecovery });
   usePreventRemove(dirty || memoryChanged(memoryEdit) || busy || hasLocalPhotos || photoBusy, ({ data }) => {
     if (allowExit.current) { navigation.dispatch(data.action); return; }
     if (localPhotos.isBusy()) { Alert.alert('Preparing photo', 'Wait for photo preparation to finish before leaving.'); return; }
@@ -129,7 +154,7 @@ export function NewJourneyEditor({ ownerId, initial, onReload, onDestinationFocu
     const current = latest.current, generation = focus.current.generation;
     Alert.alert('Discard unsaved changes?', form.updatedAt ? 'Your last saved journey stays private. Unsaved changes and local photo previews will be lost.' : 'This journey has not been saved. Your setup changes will be lost.', [
       { text: 'Keep editing', style: 'cancel' }, { text: 'Discard', style: 'destructive', onPress: () => {
-        if (!lock.current && !localPhotos.isBusy() && latest.current === current && focus.current.active && focus.current.generation === generation) navigation.dispatch(data.action);
+        if (!lock.current && !localPhotos.isBusy() && latest.current === current && focus.current.active && focus.current.generation === generation) { clearRecovery(); navigation.dispatch(data.action); }
       } },
     ]);
   });
@@ -138,7 +163,7 @@ export function NewJourneyEditor({ ownerId, initial, onReload, onDestinationFocu
     const current = latest.current, generation = focus.current.generation;
     Alert.alert('Reload saved draft?', 'This discards unsaved journey and memory changes and loads the current saved version.', [
       { text: 'Cancel', style: 'cancel' }, { text: 'Reload', onPress: () => {
-        if (!lock.current && !localPhotos.isBusy() && latest.current === current && focus.current.active && focus.current.generation === generation) onReload();
+        if (!lock.current && !localPhotos.isBusy() && latest.current === current && focus.current.active && focus.current.generation === generation) { clearRecovery(); onReload(); }
       } },
     ]);
   }
@@ -169,7 +194,7 @@ export function NewJourneyEditor({ ownerId, initial, onReload, onDestinationFocu
       phase => { if (!lifetime.current.signal.aborted) setSavePhase(phase); },
       checkpoint => {
         if (lifetime.current.signal.aborted) return;
-        setForm(checkpoint); setDirty(false);
+        setForm(checkpoint); setDirty(false); clearRecovery(checkpoint.id);
         setMemoryEdit(current => {
           const savedStop = checkpoint.stops.find(stop => stop.id === current?.value.id);
           return current && savedStop ? { ...current, isNew: false, baseline: { ...savedStop } } : current;
@@ -180,7 +205,7 @@ export function NewJourneyEditor({ ownerId, initial, onReload, onDestinationFocu
     setBusy(false);
     if (result.kind === 'error') { setError(result.message); setUncertain(Boolean(result.uncertain)); }
     if (result.kind === 'saved') {
-      setForm(result.form); setDirty(false); localPhotos.acceptSaved(pendingPhotos);
+      setForm(result.form); setDirty(false); clearRecovery(result.form.id); localPhotos.acceptSaved(pendingPhotos);
       if (savingMemory) setMemoryEdit(null);
       if (savingMemory && focus.current.active && focus.current.generation === generation) celebrate('jump', result);
       if (savingSettings) setSettingsOpen(false);
@@ -188,7 +213,7 @@ export function NewJourneyEditor({ ownerId, initial, onReload, onDestinationFocu
       setMessage(Object.keys(pendingPhotos).length ? (result.saved.status === 'published' ? 'Journey and photos published.' : 'Journey and photos saved privately.') : savingMemory ? 'Memory saved privately.' : result.saved.status === 'draft' ? 'Draft saved. Only you can open it.' : 'Your journey is published.');
       if (focus.current.active && focus.current.generation === generation) {
         if (result.saved.status === 'published') { allowExit.current = true; router.push({ pathname: '/journey/[id]', params: { id: result.saved.id } }); }
-        else if (!snapshot.updatedAt) { allowExit.current = true; router.replace({ pathname: '/create', params: { draft: result.saved.id } }); }
+        else if (!snapshot.updatedAt) { allowExit.current = true; router.replace({ pathname: '/create', params: { draft: result.saved.id, ...(guidedMemory ? { guide: 'memory' } : {}) } }); }
       }
     }
   }
@@ -241,8 +266,8 @@ export function NewJourneyEditor({ ownerId, initial, onReload, onDestinationFocu
     </View>
   </View>;
   return <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    {editorFocused && <><StatusBar style="light" /><View pointerEvents="none" style={{ position: 'absolute', top: 0, left: 0, right: 0, height: insets.top, backgroundColor: '#101B2E', zIndex: 100 }} /></>}
     <ScrollView {...scroll} style={{ flex: 1 }} contentContainerStyle={[ui.list, { gap: 10, paddingTop: 0, paddingBottom: 12, paddingHorizontal: 16 }]} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
-    {editorFocused && <StatusBar style={settingsOpen || coverOpen || memoryEdit ? 'dark' : 'light'} />}
     <DraftMap geometry={geometry} photos={memoryPhotos} thumbnails={memoryThumbnails} remix={!!form.sourceId} selectedId={selectedId} onSelect={setSelectedMemoryId} active={editorFocused && !settingsOpen && !coverOpen && !memoryEdit && !busy && !photoBusy && (!form.sourceId || (!keyboardOpen && !uncertain))} height={form.sourceId ? Math.max(180, Math.min(310, window.height * 0.33)) : Math.max(180, Math.min(270, window.height * 0.29))} topInset={insets.top} />
     <View pointerEvents="none" style={[createStyles.statusShade, { height: insets.top + 20 }]} />
       <MemoryDeck emptyContent={firstStop} title={form.title} credit={form.sourceId ? <SourceAttribution key={form.sourceId} id={form.sourceId} variant="editor" /> : undefined} status={busy ? savePhase : photoBusy ? 'Preparing photo…' : uncertain ? 'Needs attention' : dirty ? 'Unsaved changes' : hasLocalPhotos ? 'Photos not saved' : 'Saved privately'} leading={<Pressable accessibilityRole="button" accessibilityLabel="Go back" onPress={() => router.canGoBack() ? router.back() : router.replace('/discover')} style={createStyles.heroBack}><Text accessible={false} style={createStyles.heroBackText}>‹</Text></Pressable>} stops={form.stops} selectedId={selectedId} onSelect={setSelectedMemoryId} active={editorFocused && !settingsOpen && !coverOpen && !memoryEdit && !busy && !photoBusy} actions={editorActions} renderMemory={(stop, index, cardWidth, swipe) => <MemoryRow deck swipeHandlers={swipe?.handlers} canInteract={swipe?.canInteract} key={stop.id} fallback={form.sourceId ? <StopArt seed={artSeed(form.sourceId, form.stops)} stops={form.stops} index={index} name={stop.name} accessibilityLabel={'Stop art. ' + (stop.name || 'Unnamed stop')} /> : undefined} cardWidth={cardWidth} selected={selectedId === stop.id} stop={stop} index={index} total={form.stops.length} disabled={disabled}
@@ -263,7 +288,7 @@ export function NewJourneyEditor({ ownerId, initial, onReload, onDestinationFocu
       {(readiness || uncertain || busy) && <Text accessibilityLiveRegion="polite" style={createStyles.publishReason}>{readiness || (uncertain ? 'Check the save result before retrying.' : savePhase)}</Text>}
       <SwipeAction active={editorFocused && !settingsOpen && !coverOpen && !memoryEdit && !disabled && !readiness} onComplete={publish} label="Swipe to publish journey" accessibilityLabel="Publish Journey" hint="Make this journey public" accessibilityHint="Swipe right or double tap to publish this journey and its photos publicly." openingLabel="Preparing to publish…" resetKey={JSON.stringify([ownerId, form, localPhotos.candidates, uncertain])} /></>}
     </View>
-    {coverOpen && <Modal visible transparent animationType="slide" onRequestClose={() => { if (!lock.current && !localPhotos.isBusy()) setCoverOpen(false); }}>
+    {coverOpen && <Modal visible transparent animationType={reduceMotion ? 'none' : 'slide'} onRequestClose={() => { if (!lock.current && !localPhotos.isBusy()) setCoverOpen(false); }}>
       <SafeAreaView style={createStyles.settingsOverlay}><KeyboardAvoidingView behavior="padding" style={createStyles.settingsAvoid}><View style={createStyles.settingsPanel} accessibilityViewIsModal>
         <View style={createStyles.settingsHeader}><Text accessibilityRole="header" style={createStyles.settingsTitle}>Journey cover</Text><Pressable accessibilityRole="button" accessibilityLabel="Close cover photo options" disabled={busy || photoBusy} onPress={() => { if (!lock.current && !localPhotos.isBusy()) setCoverOpen(false); }} style={createStyles.settingsClose}><Text style={createStyles.settingsCloseText}>×</Text></Pressable></View>
         <Text style={createStyles.settingsNote}>Choose a cover. Changes upload only when you explicitly save or publish.</Text>
@@ -271,7 +296,7 @@ export function NewJourneyEditor({ ownerId, initial, onReload, onDestinationFocu
         busy={localPhotos.busyKey === 'cover'} disabled={disabled} error={localPhotos.errors.cover} onSelect={() => { if (!lock.current && !disabled) localPhotos.select('cover'); }} onTakePhoto={() => { if (!lock.current && !disabled) localPhotos.select('cover', 'camera'); }} onRemove={() => localPhotos.remove('cover')} hasSavedPhoto={!!form.coverPath} onRemoveSaved={() => change({ coverPath: null })} onPreviewError={photos.refreshPreview} />
       </View></KeyboardAvoidingView></SafeAreaView>
     </Modal>}
-    {settingsOpen && <Modal visible transparent animationType="slide" onRequestClose={() => { if (!lock.current && !localPhotos.isBusy()) setSettingsOpen(false); }}>
+    {settingsOpen && <Modal visible transparent animationType={reduceMotion ? 'none' : 'slide'} onRequestClose={() => { if (!lock.current && !localPhotos.isBusy()) setSettingsOpen(false); }}>
       <SafeAreaView style={createStyles.settingsOverlay}>
         <KeyboardAvoidingView behavior="padding" style={createStyles.settingsAvoid}>
           <View style={createStyles.settingsPanel} accessibilityViewIsModal>
@@ -342,12 +367,13 @@ export default function CreateScreen() {
     const show = Keyboard.addListener('keyboardDidShow', () => setKeyboardOpen(true)), hide = Keyboard.addListener('keyboardDidHide', () => setKeyboardOpen(false));
     return () => { show.remove(); hide.remove(); };
   }, []);
-  const params = useLocalSearchParams<{ draft?: string | string[] }>();
+  const params = useLocalSearchParams<{ draft?: string | string[]; guide?: string }>();
   const draftId = typeof params.draft === 'string' ? params.draft : params.draft ? 'invalid' : null;
   useFocusEffect(useCallback(() => {
     if (!auth.loading && !auth.session && !prompted.current) { prompted.current = true; router.push({ pathname: '/auth', params: { context: 'create' } }); }
   }, [auth.loading, auth.session, router]));
   return <SafeAreaView edges={['left', 'right', 'bottom']} style={ui.safe}><Stack.Screen options={{ statusBarStyle: draftId ? 'dark' : 'light' }} /><View style={ui.page} onTouchStart={!draftId ? () => setDismissSearchVersion(n => n + 1) : undefined}>{draftId ? (!auth.session || auth.loading) && <SafeAreaView edges={['top']}><ScreenHeader title="Your journey" back compact /></SafeAreaView> : <CreateJourneyHeader destination={focus?.ownerId === userId ? focus?.place : null} destinationVersion={focus?.version} keyboardOpen={keyboardOpen} />}
+    {params.guide === 'memory' && !auth.loading && auth.session && <FirstOutcomeHint key={draftId ?? 'new'} title={draftId ? 'Add your first memory' : 'Start with the journey behind your memory'}>{draftId ? 'Add a stop to your journey. Give the moment a name or note, then save your changes when ready. A photo and location are optional.' : 'Choose a destination and title, then create a private journey. You can add your first memory next. Photos are optional; nothing is saved until you choose to save.'}</FirstOutcomeHint>}
     {auth.loading ? <ActivityIndicator /> : !auth.session ? <View style={ui.list}><Message title="Make your next chapter" body="Sign in to create a journey. Nothing is created until you save or publish." retry={() => router.push({ pathname: '/auth', params: { context: 'create' } })} action="Sign in to create" /></View>
       : draftId ? <DraftEditorEntry key={auth.session.user.id + ':' + draftId} id={draftId} ownerId={auth.session.user.id} keyboardOpen={keyboardOpen} />
         : !idsAvailable ? <View style={ui.list}><Message title="An app update is needed" body="Update this development client before creating journeys." /></View> : <NewJourneyEditor key={auth.session.user.id} ownerId={auth.session.user.id} onDestinationFocus={focusDestination} dismissSearchVersion={dismissSearchVersion} keyboardOpen={keyboardOpen} />}
@@ -355,7 +381,7 @@ export default function CreateScreen() {
 }
 
 const createStyles = StyleSheet.create({
-  remixMapControl: { position: 'absolute', width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
+  remixMapControl: { position: 'absolute', width: 48, height: 48, alignItems: 'center', justifyContent: 'center' },
   remixMapControlFace: { width: 34, height: 34, borderRadius: 17, backgroundColor: colors.paper, alignItems: 'center', justifyContent: 'center' },
   remixMapControlIcon: { transform: [{ scale: 0.75 }] },
   remixMapBackGlyph: { color: colors.ink, fontSize: 28, lineHeight: 32 },
@@ -366,7 +392,7 @@ const createStyles = StyleSheet.create({
   emptyMap: { marginHorizontal: -16, paddingHorizontal: 24, paddingBottom: 16, justifyContent: 'center', gap: 6, borderBottomLeftRadius: 28, borderBottomRightRadius: 28, backgroundColor: '#101B2E' }, emptyMapTitle: { color: '#FFFFFF', fontSize: 17, lineHeight: 23, fontWeight: '600' }, emptyMapNote: { color: '#D3DCEC', fontSize: 12, lineHeight: 18 },
   coverBand: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   statusShade: { position: 'absolute', top: 0, left: 0, right: 0, experimental_backgroundImage: 'linear-gradient(180deg, rgba(5,15,30,0.78) 0%, rgba(5,15,30,0) 100%)' },
-  actionRail: { width: 96, padding: 2, gap: 2, flexDirection: 'row', flexWrap: 'wrap', borderRadius: 14, backgroundColor: colors.pale }, railLabel: { color: colors.ink, fontSize: 9, lineHeight: 12, textAlign: 'center' }, railButton: { width: 44, minHeight: 44, justifyContent: 'center', alignItems: 'center' },
+  actionRail: { width: 104, padding: 2, gap: 2, flexDirection: 'row', flexWrap: 'wrap', borderRadius: 14, backgroundColor: colors.pale }, railLabel: { color: colors.ink, fontSize: 9, lineHeight: 12, textAlign: 'center' }, railButton: { width: 48, minHeight: 48, justifyContent: 'center', alignItems: 'center' },
   publishReason: { color: theme.muted, fontSize: 11, lineHeight: 16 },
   photoHint: { color: theme.muted, fontSize: 12, lineHeight: 18, paddingHorizontal: 4 },
   settingsOverlay: { flex: 1, backgroundColor: 'rgba(15, 24, 43, 0.38)' },
@@ -374,13 +400,13 @@ const createStyles = StyleSheet.create({
   settingsPanel: { maxHeight: '98%', width: '100%', maxWidth: 560, alignSelf: 'center', padding: 14, gap: 8, borderTopLeftRadius: 30, borderTopRightRadius: 30, borderWidth: 1, borderColor: '#FFFFFF', backgroundColor: '#EDF1F8', experimental_backgroundImage: 'linear-gradient(135deg, #FFF8F1 0%, #EDF1F8 55%, #E2EAF6 100%)' },
   settingsHeader: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   settingsTitle: { flex: 1, fontSize: 28, lineHeight: 34, fontWeight: '700', color: '#101B2E' },
-  settingsClose: { minWidth: 44, minHeight: 44, borderRadius: 22, borderWidth: 1, borderColor: '#FFFFFF', backgroundColor: '#F0F3FA', alignItems: 'center', justifyContent: 'center' },
+  settingsClose: { minWidth: 48, minHeight: 48, borderRadius: 22, borderWidth: 1, borderColor: '#FFFFFF', backgroundColor: '#F0F3FA', alignItems: 'center', justifyContent: 'center' },
   settingsCloseText: { color: '#172239', fontSize: 30, lineHeight: 34 },
   settingsNote: { color: '#505D73', fontSize: 12, lineHeight: 18 },
   editorHero: { gap: 4 },
   heroShade: { experimental_backgroundImage: 'linear-gradient(180deg, rgba(247, 248, 252, 0.90) 0%, rgba(237, 241, 248, 0.82) 30%, rgba(235, 238, 255, 0.96) 100%)' },
   heroToolbar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 6 },
-  heroBack: { width: 44, minHeight: 44, borderRadius: 22, backgroundColor: theme.lavender, borderWidth: 1, borderColor: '#FFFFFF', justifyContent: 'center', alignItems: 'center' },
+  heroBack: { width: 48, minHeight: 48, borderRadius: 22, backgroundColor: theme.lavender, borderWidth: 1, borderColor: '#FFFFFF', justifyContent: 'center', alignItems: 'center' },
   heroBackText: { color: theme.text, fontSize: 30, lineHeight: 34 },
   privateBadge: { color: theme.accent, fontSize: 12, lineHeight: 18, fontWeight: '600' },
   editorTitle: { color: theme.text, fontSize: 18, lineHeight: 24, fontWeight: '700' },
@@ -399,7 +425,7 @@ const createStyles = StyleSheet.create({
   editorFooter: { flexShrink: 0, paddingHorizontal: 16, paddingTop: 12, paddingBottom: 0, gap: 4 },
   editorActionRow: { flexDirection: 'row', alignItems: 'stretch', gap: 8 },
   editorActionSlot: { flex: 1, minWidth: 0 },
-  publishAction: { ...primaryControl, flex: 1, minWidth: 0, minHeight: 44, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 14, borderWidth: 1, borderColor: colors.ink, justifyContent: 'center', alignItems: 'center' },
+  publishAction: { ...primaryControl, flex: 1, minWidth: 0, minHeight: 48, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 14, borderWidth: 1, borderColor: colors.ink, justifyContent: 'center', alignItems: 'center' },
   publishLabel: { color: colors.white, fontSize: 14, lineHeight: 20, fontWeight: '600', textAlign: 'center' },
   publishDisabled: { backgroundColor: theme.inset, experimental_backgroundImage: 'none', boxShadow: 'none', borderColor: colors.line },
   publishLabelDisabled: { color: colors.muted },
@@ -417,6 +443,6 @@ const createStyles = StyleSheet.create({
   draftTitle: { color: colors.ink, fontSize: 15, lineHeight: 21, fontWeight: '600' },
   draftStatus: { color: colors.muted, fontSize: 12, lineHeight: 18 },
   draftArrow: { color: colors.ink, fontSize: 26 },
-  allDrafts: { width: 88, minHeight: 44, justifyContent: 'center', alignItems: 'flex-end', paddingHorizontal: 4 },
+  allDrafts: { width: 88, minHeight: 48, justifyContent: 'center', alignItems: 'flex-end', paddingHorizontal: 4 },
   allDraftsText: { color: colors.ink, fontSize: 14, lineHeight: 20, fontWeight: '600' },
 });

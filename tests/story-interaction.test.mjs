@@ -38,7 +38,7 @@ function harness(runEffects = true) {
   };
 }
 function load(path, modules, hooks = harness(false).hooks, timers = globalThis) {
-  modules={'@/lib/journey/customized-travel':{customizedTravel:()=>null},'@/hooks/use-buddy-geometry':buddyGeometryStub,...modules};
+  modules={'@/lib/journey/customized-travel':{customizedTravel:()=>null},'@/hooks/use-buddy-geometry':buddyGeometryStub,'@/hooks/use-trip-recovery':{useTripRecovery:()=>({checking:false,notice:null}),useUnfinishedTrip:()=>null},...modules};
   const source = ts.transpileModule(readFileSync(path, 'utf8'), {
     compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true },
   }).outputText;
@@ -519,6 +519,9 @@ test('Travel renders permission, weak-fix and unavailable states honestly withou
   assert.equal(store.get(journeyId).status, 'ready', 'Permission Retry does not begin the trip');
   store.transition(journey, 'begin', store.get(journeyId)); gps = { status: 'unavailable', canAskAgain: true, position: null }; tree = render();
   assert.match(text(tree), /Stop 1 of 2/); assert.match(text(tree), /GPS temporarily unavailable/); button(tree, 'Retry location').props.onPress(); assert.equal(retries, 2);
+  gps = { status: 'unavailable', reason: 'settings-declined', canAskAgain: true, position: null }; tree = render();
+  assert.match(text(find(tree, 'ItinerarySheet').props.footer), /Location settings need attention\. Turn on Location Accuracy, then tap Retry location\./); assert.doesNotMatch(text(tree), /Retrying automatically/);
+  assert.ok(button(tree, 'Pause')); assert.ok(button(tree, 'Finish')); button(tree, 'Retry location').props.onPress(); assert.equal(retries, 3);
   find(tree, 'MapItinerary').props.onSelect('second');
   gps = { status: 'weak', canAskAgain: true, position: { latitude: 8, longitude: 76, accuracy: 250, timestamp: 100 } }; tree = render();
   assert.match(text(tree), /signal weak/); assert.match(text(tree), /250 m/);
@@ -637,7 +640,7 @@ test('map header remains safe-area bounded and Close and Android back share dism
   assert.ok(find(tree, 'SafeAreaView'));
   assert.equal(find(tree, 'ScrollView'), null, 'Map is not inside the itinerary scroll surface');
   assert.equal(find(tree, 'Text').props.numberOfLines, 2);
-  assert.equal(find(tree, 'Pressable').props.style.minHeight, 44);
+  assert.ok(find(tree, 'Pressable').props.style.minHeight >= 48);
   find(tree, 'Pressable').props.onPress();
   find(tree, 'Modal').props.onRequestClose();
   assert.equal(closed, 2);
@@ -1757,41 +1760,113 @@ test('Story walker map omits the separate Buddy help button', () => {
   assert.equal(all(tree, 'Pressable').some(node => node.props.accessibilityLabel === 'Journey Buddy help'), false);
   assert.ok(find(tree, 'StoryWalkingBuddy')); h.dispose();
 });
-test('rail JourneyOptions preserves anonymous Remix, existing private copy, blocked feedback and About/customize routes', async () => {
-  for (const mode of ['anonymous', 'signed-in', 'existing', 'blocked']) {
+test('rail JourneyOptions explains Customize vs Remix in one choice sheet and preserves anonymous, resumed, existing and blocked Remix', async () => {
+  for (const mode of ['anonymous', 'signed-in', 'existing', 'blocked', 'resume']) {
     const h = harness();
-    const routes = [], intents = [], copies = [];
+    const routes = [], intents = [], copies = [], consumed = [];
     let uses = 0, about = 0;
     const state = { busy: false, copyId: mode === 'existing' ? 'private-copy' : null, blocked: mode === 'blocked', error: mode === 'blocked' ? 'Check your drafts' : null };
+    const pending = mode === 'resume' ? { journeyId, action: 'remix', token: 'intent-token' } : null;
     const component = load('src/components/journey/journey-options.tsx', {
       'expo-router': { useRouter: () => ({ push: route => routes.push(route) }) }, 'react-native': native,
       '../discovery/ui': { ...ui, Action: 'Action' },
       '@/hooks/session-context': { useSessionState: () => ({ loading: false, session: mode === 'anonymous' ? null : { user: { id: 'owner' } } }) },
-      '@/hooks/action-intent': { useActionIntent: () => ({ pending: null, begin: (id, action) => { intents.push([id, action]); return true; } }) },
+      '@/hooks/action-intent': { useActionIntent: () => ({ pending, begin: (id, action) => { intents.push([id, action]); return true; }, consume: token => { consumed.push(token); return true; } }) },
       '@/lib/remix/model': { remixStore: { get: () => state, subscribe: () => () => {}, run: async (_key, task) => task() } },
       '@/lib/remix/queries': { remixJourney: async (id, user) => { copies.push([id, user]); return 'new-copy'; } },
       './story-sheet': { StorySheet: 'StorySheet' },
       'react-native-safe-area-context': { SafeAreaView: 'SafeAreaView' },
     }, h.hooks);
-    let tree = h.render(component.JourneyOptions, { id: journeyId, onUse: () => uses++, presentation:'rail', onAbout:()=>about++ });
-    all(tree,'Pressable').find(n=>n.props.accessibilityLabel==='About this journey').props.onPress();assert.equal(about,1);
-    all(tree,'Pressable').find(n=>n.props.accessibilityLabel==='Customize stops').props.onPress();assert.deepEqual(routes.pop(),{pathname:'/customize/[id]',params:{id:journeyId}});
-    assert.equal(all(tree,'JourneyActionIcon').length,3);
-    const remix = all(tree, 'Pressable').find(n => n.props.accessibilityLabel === (mode === 'existing' ? 'Open private copy' : 'Remix This Journey'));
+    const props = { id: journeyId, onUse: () => uses++, presentation:'rail', onAbout:()=>about++ };
+    const sheet = (t, title) => all(t,'StorySheet').find(n => n.props.title === title);
+    const button = (t, label) => all(t,'Pressable').find(n => n.props.accessibilityLabel === label);
+    const sheetButtons = t => all(t,'StorySheet').flatMap(n => all(n,'Pressable'));
+    const railLabels = t => all(t,'Pressable').filter(n => !sheetButtons(t).includes(n)).map(n => n.props.accessibilityLabel);
+    let tree = h.render(component.JourneyOptions, props);
+    if (mode === 'resume') {
+      // Returning from sign-in consumes the deferred Remix intent once and opens the new copy.
+      await new Promise(resolve => setImmediate(resolve));
+      assert.deepEqual(consumed, ['intent-token']); assert.deepEqual(copies, [[journeyId, 'owner']]);
+      assert.deepEqual(routes.at(-1), { pathname: '/create', params: { draft: 'new-copy' } }); continue;
+    }
+    // Remix and Customize are no longer separate rail buttons: one choice sheet explains both.
+    assert.deepEqual(railLabels(tree), ['Make it yours', 'About this journey', ...(mode === 'blocked' ? ['Check your drafts'] : [])]);
+    button(tree,'About this journey').props.onPress();assert.equal(about,1);
+    assert.equal(sheet(tree,'Make this journey yours').props.visible,false);
+    button(tree,'Make it yours').props.onPress();tree=h.render(component.JourneyOptions, props);
+    const choice = sheet(tree,'Make this journey yours');assert.equal(choice.props.visible,true);
+    const copyText = JSON.stringify(all(choice,'Text').map(n => n.props.children));
+    assert.match(copyText,/Nothing is saved/,'Customize explains it is temporary');
+    assert.match(copyText,mode === 'existing' ? /already have a private draft/ : /private draft in your account/,'Remix explains it saves a draft');
+    assert.equal(/Requires sign-in/.test(copyText), mode === 'anonymous','Sign-in is mentioned only to signed-out viewers');
+    // Screen-reader labels match the visible titles (label in name).
+    all(choice,'Pressable').find(n => n.props.accessibilityLabel === 'Pick stops for this trip').props.onPress();assert.deepEqual(routes.pop(),{pathname:'/customize/[id]',params:{id:journeyId}});
+    tree=h.render(component.JourneyOptions, props);assert.equal(sheet(tree,'Make this journey yours').props.visible,false,'Choosing closes the sheet');
+    button(tree,'Make it yours').props.onPress();tree=h.render(component.JourneyOptions, props);
+    const remix = all(sheet(tree,'Make this journey yours'),'Pressable').find(n => n.props.accessibilityLabel === (mode === 'existing' ? 'Open my editable copy' : 'Save an editable copy'));
+    assert.equal(remix.props.accessibilityHint.startsWith('Requires sign-in'), mode === 'anonymous');
     if (mode === 'blocked') {
-      assert.equal(remix.props.disabled, true);
-      all(tree,'Pressable').find(n=>n.props.accessibilityLabel==='Check your drafts').props.onPress();tree=h.render(component.JourneyOptions,{id:journeyId,onUse:()=>{},presentation:'rail'});assert.equal(find(tree,'StorySheet').props.visible,true);
-      find(tree, 'Action').props.onPress();
+      assert.equal(remix.props.disabled, true); assert.equal(remix.props.accessibilityState.disabled, true);
+      all(sheet(tree,'Make this journey yours'),'Action')[0].props.onPress();assert.equal(routes.at(-1), '/account','In-sheet recovery opens Account drafts');
+      button(tree,'Check your drafts').props.onPress();tree=h.render(component.JourneyOptions,props);assert.equal(sheet(tree,'Remix journey').props.visible,true);
+      all(sheet(tree,'Remix journey'),'Action')[0].props.onPress();
       assert.equal(routes.at(-1), '/account');
     } else {
       remix.props.onPress(); await new Promise(resolve => setImmediate(resolve));
       if (mode === 'anonymous') { assert.deepEqual(intents, [[journeyId, 'remix']]); assert.equal(routes.at(-1), '/auth'); }
       else assert.deepEqual(routes.at(-1), { pathname: '/create', params: { draft: mode === 'existing' ? 'private-copy' : 'new-copy' } });
       assert.equal(copies.length, mode === 'signed-in' ? 1 : 0);
+      tree=h.render(component.JourneyOptions, props);
+      assert.equal(sheet(tree,'Make this journey yours').props.visible,false);assert.equal(sheet(tree,'Remix journey').props.visible,false);
     }
-    if(mode!=='blocked')assert.equal(find(tree,'StorySheet').props.visible,false);
   }
 });
+test('rail Make it yours announces a copy in progress and disables the copy choice while busy', () => {
+  const h = harness();
+  const state = { busy: true, copyId: null, blocked: false, error: null };
+  const component = load('src/components/journey/journey-options.tsx', {
+    'expo-router': { useRouter: () => ({ push() {} }) }, 'react-native': native, '../discovery/ui': { ...ui, Action: 'Action' },
+    '@/hooks/session-context': { useSessionState: () => ({ loading: false, session: { user: { id: 'owner' } } }) },
+    '@/hooks/action-intent': { useActionIntent: () => ({ pending: null, begin: () => true }) },
+    '@/lib/remix/model': { remixStore: { get: () => state, subscribe: () => () => {}, run: async () => null } },
+    '@/lib/remix/queries': { remixJourney: async () => 'x' }, './story-sheet': { StorySheet: 'StorySheet' }, 'react-native-safe-area-context': { SafeAreaView: 'SafeAreaView' },
+  }, h.hooks);
+  const tree = h.render(component.JourneyOptions, { id: journeyId, onUse() {}, presentation: 'rail', onAbout() {} });
+  const rail = all(tree,'Pressable').find(n => n.props.accessibilityLabel === 'Make it yours');
+  assert.equal(rail.props.accessibilityState.busy, true); assert.ok(all(rail,'ActivityIndicator').length);
+  const save = all(tree,'Pressable').find(n => n.props.accessibilityLabel === 'Save an editable copy');
+  assert.equal(save.props.disabled, true); assert.equal(save.props.accessibilityState.busy, true);
+});
+test('StorySheet respects motion changes, ignores stale queries and cleans up on unmount', async () => {
+  const h = harness();
+  let resolveQuery, listener, removed = 0;
+  const accessibility = {
+    isReduceMotionEnabled: () => new Promise(resolve => { resolveQuery = resolve; }),
+    addEventListener: (event, callback) => { assert.equal(event, 'reduceMotionChanged'); listener = callback; return { remove() { removed++; } }; },
+  };
+  const { StorySheet } = load('src/components/journey/story-sheet.tsx', { 'react-native': { ...native, AccessibilityInfo: accessibility }, 'react-native-safe-area-context': { SafeAreaView: 'SafeAreaView' }, '@/components/discovery/ui': ui }, h.hooks);
+  const props = { visible: true, title: 'About', onClose() {}, children: 'Content' };
+  assert.equal(h.render(StorySheet, props).props.animationType, 'none');
+  listener(false);
+  assert.equal(h.render(StorySheet, props).props.animationType, 'slide');
+  resolveQuery(true); await Promise.resolve();
+  assert.equal(h.render(StorySheet, props).props.animationType, 'slide', 'A stale initial query cannot override a newer preference');
+  listener(true);
+  assert.equal(h.render(StorySheet, props).props.animationType, 'none');
+  h.dispose(); listener(false);
+  assert.equal(removed, 1);
+  assert.equal(h.lateUpdates(), 0);
+});
+
+test('StorySheet keeps motion disabled when the platform query fails', async () => {
+  const h = harness();
+  const { StorySheet } = load('src/components/journey/story-sheet.tsx', { 'react-native': { ...native, AccessibilityInfo: { ...native.AccessibilityInfo, isReduceMotionEnabled: async () => { throw new Error('unavailable'); } } }, 'react-native-safe-area-context': { SafeAreaView: 'SafeAreaView' }, '@/components/discovery/ui': ui }, h.hooks);
+  const props = { visible: true, title: 'About', onClose() {}, children: 'Content' };
+  h.render(StorySheet, props); await Promise.resolve(); await Promise.resolve();
+  assert.equal(h.render(StorySheet, props).props.animationType, 'none');
+  h.dispose();
+});
+
 test('StorySheet owns dark status icons only while visible and releases ownership when closed',()=>{
  const {StorySheet}=load('src/components/journey/story-sheet.tsx',{'react-native':native,'react-native-safe-area-context':{SafeAreaView:'SafeAreaView'},'@/components/discovery/ui':ui});
  const props={title:'Feedback',onClose(){},children:'Message'};
@@ -1887,4 +1962,49 @@ test('stop story viewer shows stop art for photo-less or failed photos with one 
   assert.equal(find(tree, 'CircleMap'), null, 'The notes sheet would cover the credit, so the circle hides');
   assert.equal(stopArt(tree).props.inset.right, 0);
   } finally { if (previousToken === undefined) delete process.env.EXPO_PUBLIC_MAPBOX_TOKEN; else process.env.EXPO_PUBLIC_MAPBOX_TOKEN = previousToken; }
+});
+
+test('R2: Travel Mode shows loading while a recovered temporary route is offered and the unavailable message after a discard', () => {
+  const h = harness(); let recovery = { checking: true, notice: null }, ids = [];
+  const store = sessionModel.createTripStore();
+  const { default: Screen } = load('src/app/travel/[id].tsx', {
+    ...sessionMocks(store),
+    '@/hooks/use-trip-recovery': { useTripRecovery: (routeId, id) => { ids.push([routeId, id]); return recovery; } },
+    'expo-router': { useRouter: () => ({ canGoBack: () => true, back() {}, replace() {} }), useLocalSearchParams: () => ({ id: journeyId, customized: '1' }), useFocusEffect: callback => h.hooks.useEffect(callback, [callback]) },
+    'react-native': { ...native, ScrollView: 'ScrollView', BackHandler: { addEventListener: () => ({ remove() {} }) } },
+    'react-native-safe-area-context': { SafeAreaView: 'SafeAreaView' }, '@/components/discovery/ui': ui,
+    '@/components/journey/map/journey-map': { JourneyMap: 'JourneyMap' }, '@/components/journey/map-itinerary': { MapItinerary: 'MapItinerary' },
+    '@/hooks/use-load': { useLoad: () => ({ data: null, loading: false, error: null, retry() {} }) },
+    '@/lib/discovery/queries': { loadPublicJourney: async () => null },
+    '@/lib/discovery/model': { isJourneyId: value => value === journeyId }, '@/lib/journey/map-data': mapData,
+    '@/lib/journey/story-layout': layout, '@/lib/journey/travel-preview': eligibility,
+  }, h.hooks);
+  let tree = h.render(Screen, {});
+  assert.ok(find(tree, 'BrandedLoading')); assert.deepEqual(ids.at(-1), [journeyId, null]);
+  recovery = { checking: false, notice: 'This journey is no longer available.' }; tree = h.render(Screen, {});
+  assert.equal(find(tree, 'Message').props.body, 'This journey is no longer available.');
+});
+
+test('R2: Begin Trip waits while a saved trip is checked; texts say how long progress is kept', () => {
+  const h = harness(), requesting = []; const store = sessionModel.createTripStore();
+  const { TravelModeContent } = load('src/app/travel/[id].tsx', {
+    ...sessionMocks(store),
+    'expo-router': {}, 'react-native': { ...native, ScrollView: 'ScrollView' },
+    'react-native-safe-area-context': {}, '@/components/discovery/ui': ui,
+    '@/components/journey/map/journey-map': { JourneyMap: 'JourneyMap' }, '@/components/journey/map-itinerary': { MapItinerary: 'MapItinerary' },
+    '@/hooks/use-load': {}, '@/lib/discovery/queries': {}, '@/lib/discovery/model': {}, '@/lib/journey/map-data': mapData,
+    '@/lib/journey/story-layout': layout, '@/lib/journey/travel-preview': eligibility,
+  }, h.hooks);
+  const journey = { id: journeyId, title: 'Coastal trip', stops: [{ ...stop('first'), sequence: 0, latitude: 8, longitude: 76 }] };
+  const text = tree => all(tree, 'Text').map(item => [item.props.children].flat(Infinity).join('')).join(' ');
+  let tree = h.render(TravelModeContent, { journey, onExit() {}, resumeChecking: true, signedIn: true, onLocationRequesting: value => requesting.push(value) });
+  let begin = all(tree, 'Pressable').find(n => n.props.accessibilityLabel === 'Begin Trip');
+  assert.equal(begin.props.disabled, true); assert.match(text(tree), /Checking for a saved trip/);
+  begin.props.onPress(); assert.equal(store.get(journeyId).status, 'ready', 'No trip starts during the check');
+  assert.match(text(tree), /Progress kept on this phone for up to 7 days · No travel verification or location history/);
+  assert.equal(requesting.at(-1), false, 'Reports permission activity for the resume prompt');
+  tree = h.render(TravelModeContent, { journey, onExit() {}, resumeChecking: false, signedIn: false });
+  begin = all(tree, 'Pressable').find(n => n.props.accessibilityLabel === 'Begin Trip');
+  assert.equal(begin.props.disabled, false); assert.match(text(tree), /Progress kept until the app closes/);
+  assert.doesNotMatch(text(tree), /GPS (history|stored)/);
 });

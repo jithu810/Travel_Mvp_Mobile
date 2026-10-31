@@ -18,6 +18,7 @@ function harness() {
   return { hooks, reset(){slots.forEach(slot=>slot?.cleanup?.());slots.length=0;}, render(fn, props) { cursor=0;effects=[];const result=fn(props);effects.forEach(fn=>fn());return result; } };
 }
 const native = Object.fromEntries(['Image','View','Text','TextInput','Pressable','ScrollView','KeyboardAvoidingView','ActivityIndicator','Modal'].map(name=>[name,name]));
+native.AccessibilityInfo={isReduceMotionEnabled:async()=>true,addEventListener:()=>({remove(){}})};
 native.useWindowDimensions=()=>({width:390,height:844,fontScale:1});
 native.AppState={addEventListener(){return {remove(){}};}};native.Animated={View:'AnimatedView'};native.Keyboard={dismiss(){},addListener(){return {remove(){}};}};native.StyleSheet={create:value=>value};native.Platform={OS:'android'};
 const ui = { colors: {}, ui: {}, Action:'Action', Message:'Message', ScreenHeader:'ScreenHeader' };
@@ -25,9 +26,15 @@ function load(file, modules, hooks=harness().hooks, timers=globalThis) {
   modules={'@/components/journey/story-sheet':{StorySheet:'StorySheet'},'@/components/journey/journey-action-icon':{JourneyActionIcon:'JourneyActionIcon'},'@/hooks/use-buddy-geometry':buddyGeometryStub,'@/components/art/journey-art':{StopArt:'StopArt'},'@/lib/art/journey-art':{artSeed:(_id,stops)=>'stop:'+stops[0]?.id},...modules};
   const exports={}; const jsx=(type,props)=>({type,props});
   const code=ts.transpileModule(readFileSync(file,'utf8'), {compilerOptions:{module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX,target:ts.ScriptTarget.ES2022}}).outputText;
-  new Function('require','exports','setTimeout','clearTimeout',code)(name=>{ if (name === '@/theme/mobile-theme') return mobileTheme;
+  new Function('require','exports','setTimeout','clearTimeout',code)(name=>{ if(name==='@/components/first-outcome-hint')return {FirstOutcomeHint:'FirstOutcomeHint'};
+    if(name==='@/lib/first-outcome')return load('src/lib/first-outcome.ts',{});
+    if(name==='@/components/first-outcome-hint')return {FirstOutcomeHint:'FirstOutcomeHint'};
+    if(name==='@/lib/first-outcome')return load('src/lib/first-outcome.ts',{});
+    if (name === '@/theme/mobile-theme') return mobileTheme;
     if(name==='@/hooks/use-journey-buddy')return {useBuddyCelebration:()=>()=>{},useBuddyScreen(){},...modules[name]};
     if(name==='@/hooks/use-buddy-map-pins')return buddyMapPinsStub;
+    if(name==='@/hooks/use-creation-recovery')return modules[name]||{useCreationRecovery:()=>()=>{}};
+    if(name==='@/hooks/use-trip-recovery')return modules[name]||{useTripRecovery:()=>({checking:false,notice:null}),useUnfinishedTrip:()=>null};
     if(name==='@/lib/buddy/map-controls')return load('src/lib/buddy/map-controls.ts',{'../discovery/globe-style':load('src/lib/discovery/globe-style.ts',{})});
     if(name==='@/lib/buddy/model')return load('src/lib/buddy/model.ts',{});
     if(name==='@/components/buddy/buddy-space')return {BuddySpace:'BuddySpace'};
@@ -44,7 +51,7 @@ function load(file, modules, hooks=harness().hooks, timers=globalThis) {
     if(name==='../media/image-variants')return load('src/lib/media/image-variants.ts',{});
     if(name==='@/lib/create/thumbnail-device')return {prepareThumbnail:async()=>{throw Error('Thumbnail not enabled in this test');},removeThumbnail(){}};
     if(name==='@/components/discovery/compact-search-input')return load('src/components/discovery/compact-search-input.tsx',{},hooks);
-    if(name==='@/lib/journey/nearby')return load('src/lib/journey/nearby.ts',{}); if(name.endsWith('/nearby-locations'))return {NearbyLocations:'NearbyLocations'}; if(name==='@/components/branded-loading')return {BrandedLoading:'BrandedLoading'};if(name==='@/lib/discovery/destination-camera')return destinationHelpers;if(name==='@/hooks/use-discovery-sheet')return modules[name] || {useDiscoverySheet:()=>({height:56,expanded:true,responders:{handle:{},content:{}},offset:{current:0},setScrollOffset(){},toggle(){}})};if(name==='@/components/create/create-journey-header')return {CreateJourneyHeader:'CreateJourneyHeader'};if(name==='expo-status-bar')return {StatusBar:'StatusBar'};if(name==='react')return hooks;if(name==='react/jsx-runtime')return {jsx,jsxs:jsx,Fragment:'Fragment'};
+    if(name==='@/lib/journey/nearby')return load('src/lib/journey/nearby.ts',{}); if(name.endsWith('/nearby-locations'))return {NearbyLocations:'NearbyLocations'}; if(name==='@/components/branded-loading')return {BrandedLoading:'BrandedLoading'};if(name==='@/components/buddy/buddy-intro')return {BuddyIntro:'BuddyIntro'};if(name==='@/lib/discovery/destination-camera')return destinationHelpers;if(name==='@/hooks/use-discovery-sheet')return modules[name] || {useDiscoverySheet:()=>({height:56,expanded:true,responders:{handle:{},content:{}},offset:{current:0},setScrollOffset(){},toggle(){}})};if(name==='@/components/create/create-journey-header')return {CreateJourneyHeader:'CreateJourneyHeader'};if(name==='expo-status-bar')return {StatusBar:'StatusBar'};if(name==='react')return hooks;if(name==='react/jsx-runtime')return {jsx,jsxs:jsx,Fragment:'Fragment'};
     if(name==='@/lib/journey/story-buddy-playback'){const map=load('src/lib/journey/map-data.ts',{});return load('src/lib/journey/story-buddy-playback.ts',{'./map-data':map,'../discovery/travel':load('src/lib/discovery/travel.ts',{'../journey/map-data':map})});}
     if(name==='../home-control-icon')return {HomeControlIcon:'HomeControlIcon'};if(name==='react-native')return {...native,...modules[name]};if(name==='expo-router')return {Stack:{Screen:'StackScreen'},...modules[name]};if(name in modules)return modules[name];throw Error(name);
   },exports,timers.setTimeout,timers.clearTimeout);return exports;
@@ -57,7 +64,7 @@ const photoSave=load('src/lib/create/photo-save.ts', {'./model':model,'../discov
 const memory=load('src/lib/create/memory.ts', {'./model':model});
 const editor=load('src/lib/create/editor-model.ts', {'../discovery/model':{},'./model':model});
 const place={name:'Varkala',label:'Varkala, Kerala',latitude:8.7,longitude:76.7,mapboxId:'place'};
-function screenHarness(initial, photoState = {}, buddyEvents = []) {
+function screenHarness(initial, photoState = {}, buddyEvents = [], recoveryStorage = null, guide = undefined, nativeOverrides = {}) {
   photoState.candidates ??= {}; photoState.errors ??= {};
   photoState.candidates=Object.fromEntries(Object.entries(photoState.candidates).map(([key,p])=>[key,{width:800,height:600,size:1000,mime:'image/png',...p}]));
   const h=harness(), writes=[],routes=[],alerts=[],uploads=[],celebrations=[];let fail=false, uncertain=true, pending=null, prevented=null, canGoBack=true, focusCleanup=null; const dispatches=[];
@@ -72,16 +79,18 @@ function screenHarness(initial, photoState = {}, buddyEvents = []) {
     'expo-router/react-navigation':{usePreventRemove:(enabled,callback)=>{prevented={enabled,callback};}},
     '@/lib/discovery/model':{safePhoto:path=>path.startsWith('https:')?path:null},
     '@/lib/create/memory':memory,'@/components/create/memory-row':{MemoryRow:'MemoryRow'},'@/components/create/memory-editor-sheet':{MemoryEditorSheet:'MemoryEditorSheet'},
-    'expo-router':{useLocalSearchParams:()=>({draft:initial?.id}),useNavigation:()=>({dispatch:action=>dispatches.push(action)}),useRouter:()=>({canGoBack:()=>canGoBack,back:()=>routes.push('back'),push:route=>routes.push(route),replace:route=>routes.push(route)}),useFocusEffect:fn=>h.hooks.useEffect(()=>{const cleanup=fn();focusCleanup=cleanup;return cleanup;},[fn])},
-    'react-native':{Alert:{alert:(...args)=>alerts.push(args)}},'react-native-safe-area-context':{SafeAreaView:'SafeAreaView'},
+    'expo-router':{useLocalSearchParams:()=>({draft:initial?.id,guide}),useNavigation:()=>({dispatch:action=>dispatches.push(action)}),useRouter:()=>({canGoBack:()=>canGoBack,back:()=>routes.push('back'),push:route=>routes.push(route),replace:route=>routes.push(route)}),useFocusEffect:fn=>h.hooks.useEffect(()=>{const cleanup=fn();focusCleanup=cleanup;return cleanup;},[fn])},
+    'react-native':{Alert:{alert:(...args)=>alerts.push(args)},...nativeOverrides},'react-native-safe-area-context':{SafeAreaView:'SafeAreaView'},
     '@/components/discovery/ui':ui,'@/components/create/place-picker':{PlacePicker:'PlacePicker',formStyles:{}},
     '@/components/create/quick-journey-setup':{QuickJourneySetup:'QuickJourneySetup'},'@/lib/create/editor-model':editor,
     '@/components/journey/map/journey-map':{JourneyMap:'JourneyMap'},'@/hooks/session-context':{useSessionState:()=>({loading:false,session:{user:{id:uid}}})},'@/hooks/use-load':{useLoad:()=>({data:{'journey-media/raw/stop.png':'https://signed.test/stop'},error:null})},'@/lib/remix/queries':{},
     '@/lib/create/model':model,'@/lib/create/queries':{saveNewJourney:async payload=>{writes.push(payload);if(pending)await pending;if(fail)throw new model.SaveFailure('This journey changed. Reload saved draft.',uncertain);return {id,status:payload.status,updated_at:'2026-10-14T12:00:00Z'};}},
   };
+  // Optional: wire the real on-device recovery hook to a synthetic storage port.
+  if(recoveryStorage){const recovery=load('src/lib/create/recovery.ts',{});modules['@/hooks/use-creation-recovery']=load('src/hooks/use-creation-recovery.ts',{...modules,'@/lib/create/recovery':recovery,'@/lib/create/recovery-store':{creationRecovery:recovery.createCreationRecovery(recoveryStorage)}},h.hooks,{setTimeout:()=>0,clearTimeout(){}});}
   const {NewJourneyEditor,RemixDraftMap,default:CreateScreen}=load('src/app/create.tsx',modules,h.hooks);
   let reloads=0;
-  return {celebrations,blur:()=>focusCleanup?.(),mountChild:node=>{h.reset();return h.render(node.type,node.props);},renderRemixMap:props=>h.render(RemixDraftMap,props),renderEntry:()=>h.render(CreateScreen,{}),setCanGoBack:value=>{canGoBack=value;},render:(props={})=>h.render(NewJourneyEditor,{ownerId:uid,initial,onReload:()=>reloads++,...props}),writes,routes,alerts,uploads,setFailure:(value=true,ambiguous=true)=>{fail=value;uncertain=ambiguous;},setPending:value=>{pending=value;},prevented:()=>prevented,dispatches,reloads:()=>reloads};
+  return {celebrations,dispose:()=>h.reset(),blur:()=>focusCleanup?.(),mountChild:node=>{h.reset();return h.render(node.type,node.props);},renderRemixMap:props=>h.render(RemixDraftMap,props),renderEntry:()=>h.render(CreateScreen,{}),setCanGoBack:value=>{canGoBack=value;},render:(props={})=>h.render(NewJourneyEditor,{ownerId:uid,initial,onReload:()=>reloads++,...props}),writes,routes,alerts,uploads,setFailure:(value=true,ambiguous=true)=>{fail=value;uncertain=ambiguous;},setPending:value=>{pending=value;},prevented:()=>prevented,dispatches,reloads:()=>reloads};
 }
 test('actual editor quick-start saves privately with zero stops and routes to the saved editable journey',async()=>{
   const h=screenHarness();let tree=h.render();let setup=all(tree,'QuickJourneySetup')[0];
@@ -382,34 +391,34 @@ test('private history resumes actual drafts and keeps all-drafts, empty, loading
   const retry=()=>{};state={error:'Offline',retry};tree=DraftShortcuts({ownerId:uid});assert.equal(all(tree,'Message')[0].props.retry,retry);
 });
 
-test('compact creation keeps CTA outside the only controls scroller and history in a separate sibling', () => {
+test('compact creation scrolls feedback and retry together while history stays separate', () => {
   const h=screenHarness();const page=h.render().props.children;
   assert.equal(page.type,'View');assert.equal(page.props.style.flex,undefined);assert.equal(page.props.style.flexShrink,1);assert.equal(page.props.style.minHeight,0);
   assert.equal(h.render().props.style.flexShrink,1);assert.equal(h.render().props.style.flex,undefined,'Quick Start uses natural height so the globe receives slack');
   assert.deepEqual(page.props.children.map(n=>n.type?.name || n.type),['QuickJourneySetup','DraftShortcuts']);
   const {QuickJourneySetup}=load('src/components/create/quick-journey-setup.tsx',{'../discovery/ui':ui,'./place-picker':{PlacePicker:'PlacePicker',formStyles:{}}});
   const tree=QuickJourneySetup({form:model.newForm(id),disabled:false,onTitle(){},onDestination(){},onChange(){},onStart(){},feedback:{type:'Text',props:{children:'Check destination'}}});
-  const [controls,footer]=tree.props.children;
+  const controls=all(tree,'ScrollView')[0], footer=controls.props.children.at(-1);
   assert.equal(controls.type,'ScrollView');assert.equal(controls.props.style.flexShrink,1);
   assert.equal(all(controls,'ScrollView').length,1,'No nested main controls scroll');
-  assert.equal(all(controls,'Action').length,0,'Create is never inside scroll content');
+  assert.equal(all(controls,'Action').length,1,'Retry remains reachable by scrolling past feedback');
   assert.equal(footer.props.style.flexShrink,0);assert.equal(all(footer,'Action')[0].props.label,'Create my journey');
-  assert.ok(all(controls,'Text').some(n=>n.props.children==='Check destination'),'Errors scroll without displacing CTA');
+  assert.ok(all(controls,'Text').some(n=>n.props.children==='Check destination'),'Error stays in the same scroller as retry');
   assert.equal(tree.props.style.flexShrink,1);
 });
 
-test('reference form keeps compact controls and leaves a protected CTA when globe header reduces available height', () => {
+test('reference form keeps compact controls and a scrollable CTA when globe header reduces available height', () => {
   const shared=load('src/components/discovery/ui.tsx',{'expo-router':{useRouter:()=>({})}});
   const setup=load('src/components/create/quick-journey-setup.tsx',{'../discovery/ui':shared,'./place-picker':{PlacePicker:'PlacePicker',formStyles:{input:{},label:{fontSize:14}}}});
   const tree=setup.QuickJourneySetup({form:{...model.newForm(id),destination:place},disabled:false,onTitle(){},onDestination(){},onChange(){},onStart(){}});
-  const [controls,footer]=tree.props.children, [destination,details]=controls.props.children;
+  const controls=all(tree,'ScrollView')[0], footer=controls.props.children.at(-1), [destination,details]=controls.props.children;
   const [title,traveler,duration]=details.props.children;
   const inputStyle=all(title,'TextInput')[0].props.style.at(-1);
-  const chips=all(traveler,'Pressable');assert.equal(chips.length,4);assert.ok(chips.every(n=>n.props.style[0].minHeight>=44));
+  const chips=all(traveler,'Pressable');assert.equal(chips.length,4);assert.ok(chips.every(n=>n.props.style[0].minHeight>=48));
   assert.equal(traveler.props.children[1].props.style.flexWrap,'wrap');assert.equal(duration.props.style.flexWrap,'wrap');
   // Conservative normal-text vertical budget using rendered component styles (not a native layout measurement).
-  const destinationHeight=destination.props.style.padding*2+44+destination.props.style.gap+23;
-  const detailsHeight=details.props.style.padding*2+2+inputStyle.minHeight+(18+4+44)+44+2*details.props.style.gap;
+  const destinationHeight=destination.props.style.padding*2+48+destination.props.style.gap+23;
+  const detailsHeight=details.props.style.padding*2+2+inputStyle.minHeight+(18+4+48)+48+2*details.props.style.gap;
   const formHeight=destinationHeight+controls.props.contentContainerStyle.gap+detailsHeight+tree.props.style.gap+shared.ui.action.minHeight;
   for(const [width,height] of [[320,568],[360,640],[393,851],[412,915]]) {
     const banner=Math.max(112,Math.min(240,(width-16)*0.62,height-590));
@@ -417,8 +426,8 @@ test('reference form keeps compact controls and leaves a protected CTA when glob
     assert.ok(shared.ui.action.minHeight+2*tree.props.style.padding+2<available, width+'x'+height+' leaves space for CTA and shrinkable controls');
     if(width>=393)assert.ok(formHeight+2*tree.props.style.padding+2<=available,'Tall portrait accommodates normal-text form estimate');
   }
-  assert.equal(footer.props.style.flexShrink,0,'Short landscape, expanded text and errors retain CTA while controls can scroll');
-  assert.equal(controls.props.style.flexShrink,1);assert.equal(shared.ui.compactBack.width,44);
+  assert.equal(footer.props.style.flexShrink,0,'CTA keeps its touch target inside scroll content');
+  assert.equal(controls.props.style.flexShrink,1);assert.ok(shared.ui.compactBack.width>=48);
   assert.equal(shared.ui.header.minHeight,76,'Other screen header default retained');
 });
 
@@ -443,7 +452,7 @@ test('compact header retains back navigation and discover fallback with unchange
   for(const compact of [false,true]) {
     const tree=ScreenHeader({title:'Plan your journey',back:true,compact});
     const button=all(tree,'Pressable')[0];button.props.onPress();assert.equal(routes.at(-1),back?'back':'/discover');
-    if(compact) { assert.equal(tree.props.style[1].minHeight,56);assert.equal(button.props.style[1].width,44); }
+    if(compact) { assert.equal(tree.props.style[1].minHeight,56);assert.ok(button.props.style[1].width>=48); }
     else assert.equal(tree.props.style[1],false);
     back=false;
   }
@@ -503,10 +512,13 @@ test('draft editor puts map first, cover below and publish confirmation outside 
   const h=screenHarness({...privateForm(),coverPath:'https://saved.test/cover.jpg'},state);
   let tree=h.render();const scroll=all(tree,'ScrollView')[0];
   assert.equal(all(tree,'PhotoField').length,0);
+  assert.equal(scroll.props.children[0],all(scroll,'DraftMap')[0],'Draft map stays first in scroll content');
   all(tree,'Pressable').find(n=>n.props.accessibilityLabel==='Edit cover photo').props.onPress();tree=h.render();
   assert.equal(all(tree,'PhotoField')[0].props.candidate.uri,'file:///unsaved-cover.jpg');
   assert.equal(all(scroll,'SwipeAction').length,0);
-  const footer=tree.props.children[1];assert.equal(footer.props.style.flexShrink,0);
+  const footer=tree.props.children.flat(Infinity).find(node=>node?.type==='View' && node.props.style?.flexShrink===0);
+  assert.ok(footer,'Editor retains a nonshrinking footer outside the scroll');
+  assert.equal(all(scroll,'View').includes(footer),false);
   assert.equal(all(footer,'SwipeAction').length,0);
   assert.ok(all(tree,'Pressable').some(n=>n.props.accessibilityLabel==='Save Draft'));
   assert.ok(all(tree,'Pressable').some(n=>n.props.accessibilityLabel==='Add your first stop'));
@@ -622,12 +634,14 @@ test('static horizontal history keeps a centered heading, every draft, and no sh
 
 
 test('embedded Create suggestions stay below an editable icon input and outside dismissal cancels stale autocomplete',async()=>{
-  const h=harness(),timers=new Map(),requests=[],selected=[];let timerId=0,dismissed=0;
-  const {PlacePicker}=load('src/components/create/place-picker.tsx',{'../discovery/ui':ui,'react-native':{Keyboard:{dismiss(){dismissed++;}}},'@/lib/create/places':{searchPlaces:(query,destination,proximity,signal)=>new Promise(resolve=>requests.push({query,signal,resolve}))}},h.hooks,{setTimeout:fn=>{const key=++timerId;timers.set(key,fn);return key;},clearTimeout:key=>timers.delete(key)});
+  const h=harness(),timers=new Map(),requests=[],selected=[];let timerId=0,dismissed=0,fontScale=1;
+  const {PlacePicker}=load('src/components/create/place-picker.tsx',{'../discovery/ui':ui,'react-native':{useWindowDimensions:()=>({width:360,height:780,fontScale}),Keyboard:{dismiss(){dismissed++;}}},'@/lib/create/places':{searchPlaces:(query,destination,proximity,signal)=>new Promise(resolve=>requests.push({query,signal,resolve}))}},h.hooks,{setTimeout:fn=>{const key=++timerId;timers.set(key,fn);return key;},clearTimeout:key=>timers.delete(key)});
   let props={label:'Destination',compact:true,embeddedSuggestions:true,autoSuggest:true,destinationOnly:true,disabled:false,dismissVersion:0,onSelect:p=>selected.push(p)};
   let tree=h.render(PlacePicker,props);all(tree,'TextInput')[0].props.onChangeText('Kochi');tree=h.render(PlacePicker,props);timers.forEach(fn=>fn());timers.clear();
   requests[0].resolve([{...place,name:'Kochi',label:'Kochi'}]);await tick();tree=h.render(PlacePicker,props);
   assert.equal(all(tree,'Modal').length,0);assert.equal(all(tree,'TextInput')[0].props.value,'Kochi');assert.equal(all(tree,'TextInput')[0].props.editable,true);assert.equal(dismissed,0,'Autocomplete does not close keyboard');
+  assert.equal(all(tree,'TextInput')[0].props.placeholder,'Search destinations');fontScale=2;tree=h.render(PlacePicker,props);
+  assert.equal(all(tree,'TextInput')[0].props.placeholder,'Destination');assert.equal(all(tree,'TextInput')[0].props.value,'Kochi','Resizing preserves the query');assert.equal(all(tree,'ScrollView').length,1,'Resizing preserves available results');assert.equal(requests.length,1,'Resizing does not trigger another search');
   const input=all(tree,'TextInput')[0],list=all(tree,'ScrollView')[0];assert.equal(input.props.style.at(-1).paddingLeft,36);assert.equal(list.props.nestedScrollEnabled,true);assert.equal(list.props.style.maxHeight,132);
   assert.equal(tree.props.children[1].type,'View');assert.equal(tree.props.children[3].type,'View','Suggestions follow the search row in normal flow');
   let stopped=false;tree.props.onTouchStart({stopPropagation(){stopped=true;}});assert.equal(stopped,true,'Search touches do not count as outside taps');
@@ -676,7 +690,7 @@ test('Create passes selected destination/version and outside-dismiss state witho
     const editorTree=screenHarness().render({keyboardOpen:true});assert.equal(all(editorTree,'DraftShortcuts')[0].props.keyboardHidden,true);
   } finally {native.Keyboard.addListener=old;}
   const shared=load('src/components/discovery/ui.tsx',{'expo-router':{useRouter:()=>({})}});
-  const compact=shared.Action({label:'Create my journey',compact:true,onPress(){}});assert.equal(compact.props.style({pressed:false}).at(-1).minHeight,44);assert.equal(shared.ui.action.minHeight,48,'Other screen buttons retain default size');
+  const compact=shared.Action({label:'Create my journey',compact:true,onPress(){}});assert.ok(compact.props.style({pressed:false}).at(-1).minHeight>=48);assert.equal(shared.ui.action.minHeight,48,'Other screen buttons retain default size');
 });
 
 
@@ -785,7 +799,11 @@ test('private memory deck preserves order and edit semantics without moving publ
  const stops=[memoryRow(sid,'First',{day:'1',rating:'0'}),memoryRow(uid,'Second')];
  const h=screenHarness({...privateForm(),stops});let tree=h.render();
  const deck=all(tree,'MemoryDeck')[0];assert.deepEqual(deck.props.stops.map(s=>s.id),stops.map(s=>s.id));
- assert.equal(all(tree.props.children[1],'SwipeAction').length,1);
+ const scroll=all(tree,'ScrollView')[0];
+ const footer=tree.props.children.flat(Infinity).find(node=>node?.type==='View' && all(node,'SwipeAction').length===1);
+ assert.ok(footer,'Publish confirmation belongs to a direct footer sibling of the scroll');
+ assert.equal(footer.props.style.flexShrink,0);assert.equal(all(scroll,'SwipeAction').length,0);
+ assert.equal(all(tree,'SwipeAction').length,1);
  deck.props.onSelect(uid);tree=h.render();assert.equal(all(tree,'MemoryRow')[1].props.selected,true);
  all(tree,'MemoryRow')[1].props.onEdit();tree=h.render();assert.equal(all(tree,'MemoryEditorSheet')[0].props.value.id,uid);
  assert.equal(h.writes.length,0);
@@ -871,6 +889,40 @@ test('journey settings popup retains edits on close and saves the full draft thr
   all(tree,'QuickJourneySetup')[0].props.onStart();await tick();tree=h.render();assert.equal(h.writes.length,1);assert.equal(all(tree,'Modal').length,0);
 });
 
+test('editor cover/settings modals follow live motion preferences without a stale query override', async () => {
+  let resolve, listener, removed = 0;
+  const h = screenHarness(privateForm(), {}, [], null, undefined, { AccessibilityInfo: {
+    isReduceMotionEnabled: () => new Promise(done => { resolve = done; }),
+    addEventListener: (event, callback) => { assert.equal(event, 'reduceMotionChanged'); listener = callback; return { remove() { removed++; } }; },
+  } });
+  let tree = h.render();
+  const button = label => all(tree, 'Pressable').find(node => node.props.accessibilityLabel === label);
+  button('Edit cover photo').props.onPress(); tree = h.render();
+  assert.equal(all(tree, 'Modal')[0].props.animationType, 'none');
+  listener(false); tree = h.render();
+  assert.equal(all(tree, 'Modal')[0].props.animationType, 'slide');
+  resolve(true); await Promise.resolve(); tree = h.render();
+  assert.equal(all(tree, 'Modal')[0].props.animationType, 'slide');
+  all(tree, 'Modal')[0].props.onRequestClose(); tree = h.render();
+  button('Journey settings').props.onPress(); tree = h.render();
+  assert.equal(all(tree, 'Modal')[0].props.animationType, 'slide');
+  listener(true); tree = h.render();
+  assert.equal(all(tree, 'Modal')[0].props.animationType, 'none');
+  assert.equal(all(tree, 'StatusBar')[0].props.style, 'light');
+  h.dispose(); listener(false);
+  assert.equal(removed, 1); assert.equal(h.writes.length, 0);
+});
+
+test('editor modal preference query failure keeps transitions disabled', async () => {
+  const h = screenHarness(privateForm(), {}, [], null, undefined, { AccessibilityInfo: {
+    isReduceMotionEnabled: async () => { throw Error('Unavailable'); },
+    addEventListener: () => ({ remove() {} }),
+  } });
+  let tree = h.render(); await Promise.resolve(); await Promise.resolve();
+  all(tree, 'Pressable').find(node => node.props.accessibilityLabel === 'Journey settings').props.onPress(); tree = h.render();
+  assert.equal(all(tree, 'Modal')[0].props.animationType, 'none'); h.dispose();
+});
+
 test('journey settings keeps validation failures open and creation controls expose the existing description',async()=>{
   const h=screenHarness(privateForm());let tree=h.render();all(tree,'Pressable').find(n=>n.props.accessibilityLabel==='Journey settings').props.onPress();tree=h.render();
   all(tree,'QuickJourneySetup')[0].props.onTitle('');tree=h.render();all(tree,'QuickJourneySetup')[0].props.onStart();await tick();tree=h.render();assert.equal(all(tree,'Modal').length,1);assert.equal(h.writes.length,0);assert.ok(all(tree,'QuickJourneySetup')[0].props.feedback);
@@ -934,4 +986,60 @@ test('Journey Buddy uses the actual guarded memory buffer, never writes on openi
  const setup=[];screenHarness(undefined,{},setup).render();assert.equal(setup.at(-1).state.canAddMemory,false,'Quick Start must save a draft explicitly first');
  const photos={busyKey:'cover'},busy=[];const pending=screenHarness(privateForm(),photos,busy);pending.render();
  assert.equal(busy.at(-1).state.suppressed,true);busy.at(-1).actions.addMemory();assert.equal(all(pending.render(),'MemoryEditorSheet').length,0);
+});
+test('R3: editor offers device-only recovery; Restore refills unsaved edits without saving and a save clears the copy',async()=>{
+  const recovery=load('src/lib/create/recovery.ts',{}),key=recovery.recoveryKey(uid,id);
+  const initial={...model.newForm(id),title:'Saved',destination:place,traveler:'solo',updatedAt:'2026-10-14T10:00:00Z',stops:[{id:sid,name:'Beach',description:'',latitude:1,longitude:1,mapboxId:null,photoPath:null,day:'',rating:''}]};
+  const data=new Map([[key,JSON.stringify(recovery.buildSnapshot(uid,{...initial,title:'Recovered title',stops:[{...initial.stops[0],description:'Unsaved words'}]},null,true,Date.now()))]]);
+  const storage={getItem:async k=>data.get(k)??null,setItem:async(k,v)=>{data.set(k,v);},removeItem:async k=>{data.delete(k);},getAllKeys:async()=>[...data.keys()]};
+  const h=screenHarness(initial,{},[],storage);let tree=h.render();await new Promise(setImmediate);await new Promise(setImmediate);tree=h.render();
+  const prompt=h.alerts.find(a=>a[0]==='Restore unsaved changes?');assert.ok(prompt);assert.match(prompt[1],/New photos that weren’t saved can’t be restored/);
+  tree=h.render();assert.equal(all(tree,'MemoryDeck')[0].props.title,'Saved','Nothing restored until the user chooses');
+  prompt[2].find(b=>b.text==='Restore').onPress();tree=h.render();
+  assert.equal(all(tree,'MemoryDeck')[0].props.title,'Recovered title');assert.equal(all(tree,'MemoryDeck')[0].props.stops[0].description,'Unsaved words');
+  assert.equal(all(tree,'MemoryDeck')[0].props.status,'Unsaved changes');assert.equal(h.writes.length,0,'Restore never saves');
+  assert.ok(data.has(key));
+  all(tree,'Pressable').find(n=>n.props.accessibilityLabel==='Save Draft').props.onPress();await new Promise(setImmediate);await new Promise(setImmediate);
+  assert.equal(h.writes.length,1);assert.equal(h.writes[0].title,'Recovered title');assert.equal(h.writes[0].updated_at,initial.updatedAt);
+  assert.equal(data.has(key),false,'A successful save removes the recovery copy');
+});
+test('R3: Discard in the leave alert also removes the recovery copy',async()=>{
+  const recovery=load('src/lib/create/recovery.ts',{}),key=recovery.recoveryKey(uid,id);
+  const initial={...model.newForm(id),title:'Saved',destination:place,traveler:'solo',updatedAt:'2026-10-14T10:00:00Z',stops:[]};
+  const data=new Map([[key,JSON.stringify(recovery.buildSnapshot(uid,{...initial,title:'Recovered'},null,false,Date.now()))]]);
+  const storage={getItem:async k=>data.get(k)??null,setItem:async(k,v)=>{data.set(k,v);},removeItem:async k=>{data.delete(k);},getAllKeys:async()=>[...data.keys()]};
+  const h=screenHarness(initial,{},[],storage);h.render();await new Promise(setImmediate);await new Promise(setImmediate);h.render();
+  h.alerts.find(a=>a[0]==='Restore unsaved changes?')[2].find(b=>b.text==='Restore').onPress();h.render();h.render();
+  assert.equal(h.prevented().enabled,true);h.prevented().callback({data:{action:'leave'}});
+  h.alerts.find(a=>a[0]==='Discard unsaved changes?')[2].find(b=>b.text==='Discard').onPress();await new Promise(setImmediate);
+  assert.deepEqual(h.dispatches,['leave']);assert.equal(data.has(key),false);assert.equal(h.writes.length,0);
+});
+test('R3: Restore is ignored while a photo is preparing; the recovery copy stays',async()=>{
+  const recovery=load('src/lib/create/recovery.ts',{}),key=recovery.recoveryKey(uid,id);
+  const initial={...model.newForm(id),title:'Saved',destination:place,traveler:'solo',updatedAt:'2026-10-14T10:00:00Z',stops:[]};
+  const data=new Map([[key,JSON.stringify(recovery.buildSnapshot(uid,{...initial,title:'Recovered'},null,false,Date.now()))]]);
+  const storage={getItem:async k=>data.get(k)??null,setItem:async(k,v)=>{data.set(k,v);},removeItem:async k=>{data.delete(k);},getAllKeys:async()=>[...data.keys()]};
+  const photoState={},h=screenHarness(initial,photoState,[],storage);h.render();await new Promise(setImmediate);await new Promise(setImmediate);h.render();
+  photoState.busyKey='cover';h.alerts.find(a=>a[0]==='Restore unsaved changes?')[2].find(b=>b.text==='Restore').onPress();const tree=h.render();
+  assert.equal(all(tree,'MemoryDeck')[0].props.title,'Saved');assert.equal(h.writes.length,0);assert.ok(data.has(key));
+});
+
+test('U8 memory intent continues into the private draft after explicit quick-start save', async () => {
+  const h = screenHarness(undefined, {}, [], null, 'memory');
+  let setup = all(h.render(), 'QuickJourneySetup')[0];
+  setup.props.onDestination(place); setup = all(h.render(), 'QuickJourneySetup')[0];
+  setup.props.onChange({traveler:'solo'}); setup = all(h.render(), 'QuickJourneySetup')[0];
+  assert.equal(h.writes.length, 0, 'Guidance itself never saves');
+  setup.props.onStart(); await new Promise(setImmediate);
+  assert.equal(h.writes.length, 1);
+  assert.deepEqual(h.routes.at(-1), {pathname:'/create',params:{draft:id,guide:'memory'}});
+});
+
+test('U8 saved-draft guidance describes adding a stop without inventing an Add memory control', () => {
+  const h = screenHarness(privateForm(), {}, [], null, 'memory');
+  const hint = all(h.renderEntry(), 'FirstOutcomeHint')[0];
+  assert.equal(hint.props.title, 'Add your first memory');
+  assert.match(hint.props.children, /^Add a stop to your journey\./);
+  assert.doesNotMatch(hint.props.children, /Open Add memory/);
+  assert.equal(h.writes.length, 0);
 });

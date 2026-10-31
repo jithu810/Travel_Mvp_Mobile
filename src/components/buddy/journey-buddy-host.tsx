@@ -1,3 +1,5 @@
+import { useTravelPreferences } from '@/hooks/use-travel-preferences';
+import { travelPreferenceTip } from '@/lib/buddy/travel-preferences';
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { AccessibilityInfo, Animated, AppState, PanResponder, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { usePathname, useRouter } from 'expo-router';
@@ -10,8 +12,9 @@ import { BuddySprite } from './buddy-sprite';
 import { BuddyHelpSheet } from './buddy-help-sheet';
 import { createBuddyPositionCapture } from '@/lib/buddy/position';
 import { buddyCelebrationDuration } from '@/lib/buddy/animations';
-import { buddyContextLine, claimBuddyContext, BUDDY_CONTEXT_DELAY, BUDDY_CONTEXT_DURATION, type BuddyContextLine } from '@/lib/buddy/contextual-lines';
+import { buddyContextLine, buddyGreetingKey, claimBuddyContext, BUDDY_CONTEXT_DELAY, BUDDY_CONTEXT_DURATION, type BuddyContextLine } from '@/lib/buddy/contextual-lines';
 import { MapBuddyHelp } from './map-buddy-help';
+import { buddyHelpLine, buddyHelpPrimary, buddyResumeReason, buddySavedReason } from '@/lib/buddy/help-actions';
 
 type Api = NonNullable<ReturnType<typeof useBuddyApi>>;
 export function JourneyBuddyHost() {
@@ -200,21 +203,26 @@ function BuddyActor({ api, path, geometry, screen, interacting }: { api: Api; pa
     let active = true, expiry: ReturnType<typeof setTimeout> | undefined;
     const allowed = () => active && alive.current && api.preference.get().enabled && api.store.get().path === path
       && AppState.currentState === 'active' && !api.store.current().suppressed && !api.store.current().interacting
-      && !api.store.current().state?.travel && !api.store.getCelebration() && !api.store.getMapHelp() && api.store.getTour() === null;
+      && !api.store.current().state?.travel && !api.store.getCelebration() && !api.store.getMapHelp() && api.store.getTour() === null
+      // Once per screen per install; checked at display time so a late-loading list still counts.
+      && api.greetings.isLoaded() && !api.greetings.has(buddyGreetingKey(path));
     const timer = setTimeout(() => {
       if (!allowed()) return;
       capture.read(value => {
         if (!allowed()) return;
-        const safe = nearestBuddyPosition(value, geometry);
-        if (!safe || !placeBuddyBubble(safe, geometry, Math.min(252, corridor.width), minimumBubbleHeight)
+        // Geometry is read at display time; as a dependency its frequent updates kept restarting this timer on Home.
+        const { geometry: now, corridor: area } = latest.current;
+        const safe = nearestBuddyPosition(value, now);
+        if (!safe || !placeBuddyBubble(safe, now, Math.min(252, area.width), minimumBubbleHeight)
           || !claimBuddyContext(api.store, path)) return;
+        api.greetings.mark(buddyGreetingKey(path));
         point.current = safe; position.setValue(safe); setWalking(false); setAnchor(safe); setBubbleHeight(0);
         setContextual(line);
         expiry = setTimeout(() => { if (active && alive.current) setContextual(null); }, BUDDY_CONTEXT_DURATION);
       });
     }, BUDDY_CONTEXT_DELAY);
     return () => { active = false; clearTimeout(timer); clearTimeout(expiry); if (alive.current) setContextual(null); };
-  }, [api, path, screen?.travel, help, reaction, interacting, dragging, asleep, pendingCelebration, capture, geometry, corridor.width, minimumBubbleHeight, position]);
+  }, [api, path, screen?.travel, help, reaction, interacting, dragging, asleep, pendingCelebration, capture, minimumBubbleHeight, position]);
   const openHelp = () => {
     if (!alive.current || !api.preference.get().enabled || path !== api.store.get().path || api.store.current().suppressed || AppState.currentState !== 'active') return;
     if (api.store.current().state?.travel?.guidance || api.store.current().state?.travel?.arrival) return;
@@ -280,7 +288,7 @@ function BuddyActor({ api, path, geometry, screen, interacting }: { api: Api; pa
     onPanResponderTerminationRequest: () => true,
     onPanResponderTerminate: () => { wakeGesture.current = false; gestureState.current.generation++; gestureState.current.active = false; capture.cancel(); if (alive.current) { setDragging(false); setParked(true); } },
   }), [position, shouldStart, api, path, capture, poseOwner, stopTravelBurst, wakeBuddy]);
-  const navigate = (route: '/discover' | '/create' | '/account') => {
+  const navigate = (route: '/discover' | '/search' | '/create' | '/account') => {
     if (!alive.current) return;
     if (!api.preference.get().enabled || path !== api.store.get().path || AppState.currentState !== 'active' || api.store.current().suppressed) { setHelp(null); return; }
     if (route !== path) setHelp(null); router.navigate(route);
@@ -320,9 +328,20 @@ function BuddyActor({ api, path, geometry, screen, interacting }: { api: Api; pa
     const timer = setTimeout(() => { if (alive.current && api.store.get().path === path) setHelpMeasurementFailed(true); }, 500);
     return () => clearTimeout(timer);
   }, [api, path, help, bubbleFit.fits, placement, helpMeasurementFailed]);
+  const travelPreferences = useTravelPreferences();
+  const preferenceTip = help && !screen?.travel && !screen?.resume && !screen?.savedJourney && !screen?.canAddMemory && travelPreferences.loaded && !travelPreferences.error
+    ? travelPreferenceTip(path, travelPreferences.value) : undefined;
   const manualFallback = !!help && (!bubbleFit.fits || helpMeasurementFailed);
   const closeBubble = () => { setHelp(null); setReaction(null); setContextual(null); api.store.setTour(null); };
   const tour = api.store.getTour();
+  const helpPrimary = screen?.resume ? { label: 'Continue editing', onPress: () => { api.store.setTour(null); if (path === '/account' && api.preference.get().enabled) router.push({ pathname: '/create', params: { draft: screen.resume!.id } }); } } : screen?.savedJourney && path === '/search' ? { label: 'Open saved journey', onPress: () => openSavedJourney() } : undefined;
+  function openSavedJourney() {
+    if (!canAct()) return;
+    const current = api.store.current().state?.savedJourney;
+    if (!current || current.id !== screen?.savedJourney?.id) return;
+    api.store.setTour(null); setHelp(null);
+    router.push({ pathname: '/journey/[id]', params: { id: current.id, source: 'search' } });
+  }
   return <>
     <Animated.View pointerEvents="box-none" style={[s.character, { transform: position.getTranslateTransform() }]}>
       <View {...gesture.panHandlers} collapsable={false} pointerEvents="box-only" accessible focusable
@@ -343,9 +362,10 @@ function BuddyActor({ api, path, geometry, screen, interacting }: { api: Api; pa
         setBubbleHeight(old => old === height ? old : height);
       }}
       placement={placement ? { ...placement.rect, above: placement.above, tailX: placement.tailX } : undefined}
-      contextualLine={buddyContextLine(path)?.text} reaction={contextualVisible ? contextual.text : !help && reactionVisible ? reaction?.text : undefined} tour={help ? tour : null}
+      contextualLine={(screen?.resume ? buddyResumeReason(screen.resume.title) : screen?.savedJourney && path === '/search' ? buddySavedReason(screen.savedJourney.title) : preferenceTip ?? buddyHelpPrimary(path)?.reason) ?? buddyContextLine(path)?.text ?? buddyHelpLine(path)} reaction={contextualVisible ? contextual.text : !help && reactionVisible ? reaction?.text : undefined} tour={help ? tour : null}
       onTour={() => { if (!canAct()) return; if (tour === null) { api.store.setTour(0); } else navigate((['/discover', '/create', '/account'] as const)[tour]); }}
       onNext={() => { if (!canAct()) return; if (tour === 2) closeBubble(); else { api.store.setTour((tour ?? -1) + 1); } }}
+      primary={helpPrimary ? { label: helpPrimary.label, onPress: helpPrimary.onPress } : buddyHelpPrimary(path) ? { label: buddyHelpPrimary(path)!.label, onPress: () => { api.store.setTour(null); navigate(buddyHelpPrimary(path)!.route); } } : undefined}
       onClose={closeBubble} onCreate={() => navigate('/create')} onDrafts={() => { api.store.setTour(null); navigate('/account'); }}
       onAddMemory={() => { if (!alive.current || !api.preference.get().enabled || !help) return; const captured = help; setHelp(null); api.store.act(captured.owner, path, 'addMemory'); }} />}
   </>;

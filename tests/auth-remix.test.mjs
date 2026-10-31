@@ -46,8 +46,16 @@ test('registration confirmation, friendly errors, and synchronous duplicate-tap 
   for (const code of ['invalid_credentials', 'email_not_confirmed', 'weak_password', 'over_request_rate_limit']) {
     assert.ok(authModel.authError({ code }, 'signin').length > 10);
   }
+  assert.match(authModel.authError({ code: 'user_already_exists' }, 'register'), /already registered.*Sign in/);
   const failing = authModel.createAuthController(async () => { throw { code: 'invalid_credentials' }; });
   assert.match((await failing.submit('signin', values)).message, /incorrect/);
+});
+
+test('email-only validation accepts trimmed addresses and rejects malformed or excessive input', () => {
+  assert.equal(authModel.validateEmail(' traveler@example.org '), null);
+  for (const email of ['', '   ', 'invalid', 'name@domain', 'two words@example.org', 'a'.repeat(255) + '@example.org']) {
+    assert.equal(authModel.validateEmail(email), 'Enter a valid email address.');
+  }
 });
 test('session restoration restores a saved session and observes sign-out', async () => {
   let callback, unsubscribed = false; const updates = []; const saved = { user: { id: uid } };
@@ -120,10 +128,10 @@ test('uncertain copies block retries, known SQL failures permit retry, and known
   await store.run('known', async () => { throw new RemixFailure('Read failed', true, copyId); });
   assert.equal(store.get('known').copyId, copyId); assert.equal(store.get('known').error, 'Read failed');
 });
-const calls = []; let viewer = uid; let currentDraft = draftRow; let copyError = null; let confirmation = true; let authError = null;
+const calls = []; let viewer = uid; let currentDraft = draftRow; let copyError = null; let confirmation = true; let authError = null; let accountError = null;
 const client = {
   auth: {
-    getUser: async () => ({ data: { user: viewer ? { id: viewer } : null }, error: null }),
+    getUser: async () => ({ data: { user: viewer ? { id: viewer } : null }, error: accountError }),
     signInWithPassword: async args => { calls.push(['signin', args]); return { data: { session: authError ? null : { user: { id: uid } } }, error: authError }; },
     signUp: async args => { calls.push(['register', args]); return { data: { session: confirmation ? null : { user: { id: uid } } }, error: authError }; },
     signOut: async args => { calls.push(['signout', args]); return { error: authError }; },
@@ -193,6 +201,11 @@ test('Use targets existing Travel Mode; authenticated returns consume intents on
   assert.equal(options.includes("pathname: '/draft/[id]'"),false);
   assert.ok(options.includes('intent.consume(intent.pending.token)'));
   const auth = readFileSync('src/app/auth.tsx', 'utf8');
-  assert.ok(auth.includes('router.canGoBack()')); assert.ok(auth.includes('if (!finished.current) cancelIntent()'));
+  assert.ok(auth.includes('router.canGoBack()')); assert.ok(auth.includes('if (!finished.current && !isGoogleSignInPending()) cancelIntent()'));
   assert.ok(auth.includes('You are not signed in yet.'));
+});
+test('an unreachable account check is not reported as signed out and reads no drafts', async () => {
+  calls.length = 0; viewer = uid; accountError = { name: 'AuthRetryableFetchError', status: 0 };
+  await assert.rejects(() => queries.loadPrivateDrafts(uid, new AbortController().signal), /Check your connection/); assert.equal(calls.length, 0);
+  accountError = { name: 'AuthSessionMissingError', status: 400 }; await assert.rejects(() => queries.loadPrivateDrafts(uid, new AbortController().signal), /Sign in again/); accountError = null;
 });

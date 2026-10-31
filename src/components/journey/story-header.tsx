@@ -44,7 +44,7 @@ const styles = StyleSheet.create({
   titles: { position: 'absolute', bottom: 12, left: 16, right: 16, gap: 3, backgroundColor: 'rgba(5,28,24,0.65)', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 12 },
   title: { fontSize: 27, lineHeight: 31, letterSpacing: -0.7, color: colors.white, fontWeight: '700' },
   destination: { fontSize: 12, lineHeight: 18, color: '#F4F6EC' },
-  creator: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 44, flex: 1, minWidth: 0 },
+  creator: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 48, flex: 1, minWidth: 0 },
   avatar: { width: 30, height: 30, borderRadius: 15, backgroundColor: colors.pale, alignItems: 'center', justifyContent: 'center' },
   initial: { fontSize: 13, fontWeight: '600', color: colors.ink },
   name: { color: colors.ink, fontSize: 12, lineHeight: 18, flexShrink: 1, fontWeight: '600' },

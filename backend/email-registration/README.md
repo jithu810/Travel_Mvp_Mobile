@@ -1,0 +1,15 @@
+# Registration email check — local rollout proposal
+
+No hosted changes have been applied. Function name: `registration-email-check`.
+
+POST JSON `{ "email": "person@example.test" }`; 200 `{ "exists": boolean }`, 400 `{ "error": "invalid_email" }`, 429 `{ "error": "rate_limited" }` with Retry-After, 503 `{ "error": "unavailable" }`. Responses are no-store. No signup, email delivery, user mutation or login occurs. All account providers, including SSO and unconfirmed accounts, count as existing. This does not prove that password sign-in is available.
+
+This deliberately exposes account membership. Pilot controls are atomic PostgreSQL quotas: global 30/minute and 1000/day, per-HMAC-email 3/15 minutes. Fixed windows allow boundary bursts. There is no per-IP control or CAPTCHA: managed gateway IP trust is unverified. Distributed enumeration remains possible within quotas; global quota exhaustion can deny legitimate callers. Global quota must not be described as bot-proof. Existing Supabase Auth quotas do not cover this custom endpoint.
+
+Counters store HMAC hashes, never raw email/IP. EMAIL_LOOKUP_HASH_SECRET must be an independently generated server-only random secret (at least 32 characters). Do not reuse public keys or put it in EXPO_PUBLIC variables. The function also uses server-side SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY. Do not log request bodies, Auth rows, headers, credentials or identifiers. Secret rotation changes per-email keys; global quotas remain.
+
+The proposal SQL transaction creates a private RLS table and a narrow SECURITY DEFINER RPC, revoked from PUBLIC/anon/authenticated and granted only to service_role. The public endpoint is anonymous by design; a publishable key is no identity proof and CORS is no authorization. On approved deployment configure the function gateway to permit unauthenticated/public-key requests (`verify_jwt = false` for this function); the admin key stays exclusively server-side. Both backend HTTP and RPC failures must keep Mobile on email, never proceed as new.
+
+Review/apply `rollout-proposal.sql` only after separate owner approval naming the production project. Deploy index.js and handler.ts as the registration-email-check function only after separate deployment approval, and provision the hash secret through a secure owner-controlled mechanism. The JavaScript Deno entry imports the TypeScript handler with its actual `.ts` extension, keeping Deno resolution valid without changing Mobile's TypeScript configuration. No automated provisioning is included. The lower(trim(email)) scan intentionally handles every instance/provider; live catalog estimates 6 Auth users. It uses no new Auth-schema index; reassess indexed query/performance before larger rollout.
+
+Run the isolated backend tests before rollout, then approved Deno checks, post-deploy permissions/read-only smoke tests and phone branching checks. Current local tests do not prove Deno/hosted behavior. To disable, remove Mobile use/disable the function before a separately approved SQL rollback dropping public.registration_email_check(text,text) and private.registration_email_limits. Never delete Auth users for rollback.

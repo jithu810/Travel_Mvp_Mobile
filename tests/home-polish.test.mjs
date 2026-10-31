@@ -9,14 +9,18 @@ new Function('exports', ts.transpileModule(readFileSync('src/theme/mobile-theme.
 
 
 function load(file, dependencies, state = null, hookOverrides = {}) {
-  dependencies={'@/hooks/use-buddy-geometry':buddyGeometryStub,...dependencies};
+  dependencies={'@/hooks/use-buddy-geometry':buddyGeometryStub,'@/hooks/use-trip-recovery':{useTripRecovery:()=>({checking:false,notice:null}),useUnfinishedTrip:()=>null},...dependencies};
   const exports = {};
   const jsx = (type, props) => ({ type, props });
   const react = { useRef:()=>({current:null}),useEffect:()=>{}, memo: fn => fn, useState: initial => typeof state === 'function' ? state(initial) : [state ?? initial, () => {}], useMemo: fn => fn(), useCallback: fn => fn, ...hookOverrides };
   const rn = { StyleSheet: { create: value => value }, Platform: { OS: 'web' }, StatusBar: {} };
   for (const name of ['View', 'Text', 'Pressable', 'Image', 'TextInput']) rn[name] = name;
   const source = ts.transpileModule(readFileSync(file, 'utf8'), { compilerOptions: { jsx: ts.JsxEmit.ReactJSX, module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
-  new Function('require', 'exports', source)(name => { if (name === '@/theme/mobile-theme') return mobileTheme;
+  new Function('require', 'exports', source)(name => { if(name==='@/components/first-outcome-hint')return {FirstOutcomeHint:'FirstOutcomeHint'};
+    if(name==='@/lib/first-outcome')return load('src/lib/first-outcome.ts',{});
+    if(name==='@/components/first-outcome-hint')return {FirstOutcomeHint:'FirstOutcomeHint'};
+    if(name==='@/lib/first-outcome')return load('src/lib/first-outcome.ts',{});
+    if (name === '@/theme/mobile-theme') return mobileTheme;
     if(name==='@/hooks/use-journey-buddy')return {useBuddyScreen(){}};
     if(name==='@/hooks/use-buddy-map-pins')return buddyMapPinsStub;
     if(name==='@/lib/buddy/map-controls')return load('src/lib/buddy/map-controls.ts',{'../discovery/globe-style':load('src/lib/discovery/globe-style.ts',{})});
@@ -46,7 +50,7 @@ function load(file, dependencies, state = null, hookOverrides = {}) {
     if(name==='@/hooks/use-discovery-viewer' && !(name in dependencies))return {useDiscoveryViewer:()=>({pending:false,id:null})};
     if(name==='expo-router')return {Stack:{Screen:'StackScreen'},useFocusEffect:()=>{},useGlobalSearchParams:()=>({}),...dependencies[name]};
     if (name in dependencies) return name==='@/lib/discovery/map'?{worldCamera:{centerCoordinate:[35,18]},...dependencies[name]}:dependencies[name];
-    if(name==='@/components/branded-loading')return {BrandedLoading:'BrandedLoading'};throw Error(name);
+    if(name==='@/components/branded-loading')return {BrandedLoading:'BrandedLoading'};if(name==='@/components/buddy/buddy-intro')return {BuddyIntro:'BuddyIntro'};throw Error(name);
   }, exports);
   return exports;
 }
@@ -133,13 +137,14 @@ test('Home embeds place search; Account and navigation retain existing routes an
   const tree = home.default();
   const all = nodes(tree);
   assert.ok(!all.some(n => n.props?.accessibilityLabel === 'Journey Creator logo'));
-  const header = tree.props.children.props.children[1];
+  const page = [tree.props.children].flat()[0], header = page.props.children[1];
   assert.equal(header.props.style[0].flexDirection, 'row');
-  // Search is the only header control; the inactive notification bell was removed (backlog U6).
-  const search = header.props.children;
+  // Search and a compact optional guidance entry; notification bell remains removed.
+  const search = header.props.children[0];
+  assert.equal(header.props.children[1].props.accessibilityLabel, 'Choose a starting point');
   assert.equal(search.props.style.flex, 1);
   assert.equal(search.props.style.minWidth, 0);
-  assert.equal(search.props.style.minHeight, 44);
+  assert.ok(search.props.style.minHeight >= 48);
   const picker = search.props.children;
   assert.equal(picker.type, 'PlacePicker');
   assert.equal(picker.props.label, 'Search places');
@@ -184,7 +189,7 @@ test('Home embeds place search; Account and navigation retain existing routes an
   assert.ok(!nodes(panel).includes(nav));
   for (const child of nav.props.children.slice(1)) {
     assert.equal(child.props.style({ pressed: false })[0].flex, 1);
-    assert.equal(child.props.style({ pressed: false })[0].minHeight, 46);
+    assert.equal(child.props.style({ pressed: false })[0].minHeight, 48);
   }
   }
 });
@@ -416,7 +421,8 @@ test('Home retains navigation and its live globe through loading, refreshing and
     '@/lib/discovery/map':{discoveryPoints:()=>({features:[]})},'@/lib/discovery/travel':{discoveryRoute:()=>null},
     '@/lib/discovery/presentation':{spaceColor:'#080F1E'},'@/lib/discovery/queries':{loadPublicJourney:()=>{},loadDiscoveryEntries:()=>{}},
   });
-  const tree = home.default(), all = nodes(tree), children = tree.props.children.props.children;
+  const tree = home.default(), all = nodes(tree), page = [tree.props.children].flat()[0], children = page.props.children;
+  assert.equal([tree.props.children].flat().filter(Boolean).map(n => n.type).join(), "View,BuddyIntro", "Only the modal first-use intro sits beside the page");
   assert.equal(children.filter(Boolean).length, 6, 'Buddy floating overlay adds no Home layout node');
   assert.equal(children[2].type, 'View');
   assert.equal(children[5].type, 'Navigation');
@@ -459,4 +465,29 @@ test('Home image lists expose data only in active layout and More keeps every jo
   const lists=render(),active=lists.find(n=>n.props.horizontal===!expanded),hidden=lists.find(n=>n!==active);assert.equal(active.props.data.length,size);assert.equal(hidden.props.data.length,0);assert.equal(hidden.props.ListFooterComponent,null);assert.equal(hidden.props.ListEmptyComponent,null);
   if(size<61){active.props.ListFooterComponent.props.onPress();expanded=!expanded;}
  }
+});
+test('R2: Home shows "Unfinished trip" with Resume for the signed-in user copy and keeps the panel clear',()=>{
+  const routes=[];let trip=null;
+  const home=load('src/app/discover.tsx',{
+    '@/components/floating-navigation':{FloatingNavigation:'Navigation'},
+    'expo-router':{useRouter:()=>({push:route=>routes.push(route)}),useFocusEffect:()=>{}},
+    'react-native-safe-area-context':{SafeAreaView:'SafeAreaView',useSafeAreaInsets:()=>({bottom:24})},
+    '@/components/discovery/globe/discovery-globe':{DiscoveryGlobe:'Globe'},'@/components/discovery/discovery-panel':{DiscoveryPanel:'Panel'},
+    '@/hooks/use-load':{useLoad:()=>({refresh(){},data:[],loading:false})},
+    '@/lib/discovery/map':{discoveryPoints:()=>({features:[]})},'@/lib/discovery/travel':{discoveryRoute:()=>null},
+    '@/lib/discovery/presentation':{spaceColor:'#080F1E'},'@/lib/discovery/queries':{loadPublicJourney:()=>{},loadDiscoveryEntries:()=>{}},
+    '@/hooks/use-trip-recovery':{useUnfinishedTrip:()=>trip},
+  });
+  let all=nodes(home.default());const clearance=all.find(n=>n.type==='Panel').props.bottomClearance;
+  assert.equal(all.some(n=>n.props?.testID==='home-unfinished-trip'),false,'No copy: no card');
+  trip={journeyId:'11111111-1111-4111-8111-111111111111',customized:false,title:'Coast trip'};all=nodes(home.default());
+  const card=all.find(n=>n.props?.testID==='home-unfinished-trip');assert.ok(card);
+  assert.ok(nodes(card).some(n=>n.type==='Text'&&[n.props.children].flat().join('')==='Unfinished trip: Coast trip'));
+  assert.ok(typeof card.props.onLayout==='function','Measured for Buddy protected bounds');
+  assert.ok(all.find(n=>n.type==='Panel').props.bottomClearance>clearance,'The panel keeps clear of the card');
+  nodes(card).find(n=>n.props?.accessibilityLabel==='Resume unfinished trip: Coast trip').props.onPress();
+  assert.deepEqual(routes.at(-1),{pathname:'/travel/[id]',params:{id:trip.journeyId}});
+  trip={...trip,journeyId:'55555555-5555-4555-8555-555555555555',customized:true};
+  nodes(nodes(home.default()).find(n=>n.props?.testID==='home-unfinished-trip')).find(n=>n.props?.accessibilityRole==='button').props.onPress();
+  assert.deepEqual(routes.at(-1),{pathname:'/travel/[id]',params:{id:trip.journeyId,customized:'1'}});
 });

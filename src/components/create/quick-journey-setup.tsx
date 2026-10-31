@@ -42,10 +42,10 @@ export function QuickJourneySetup({ form, disabled, editing = false, saving = fa
       <TextInput accessibilityLabel="Journey description (optional)" value={form.description} editable={!disabled} multiline maxLength={5000} onChangeText={description => onChange({ description })} placeholder="What made this journey special?" style={[formStyles.input, s.editInput, s.description]} />
     </View>}
     {feedback}
-    </ScrollView>
     <View style={s.start}>
     <Action compact vibrant={!editing} memorySheet={editing} label={saving ? 'Saving…' : editing ? 'Save Changes' : 'Create my journey'} disabled={disabled} onPress={onStart} />
     </View>
+    </ScrollView>
   </View>;
 }
 const s = StyleSheet.create({
@@ -59,17 +59,17 @@ const s = StyleSheet.create({
   controlContent: { gap: 6 },
   destinationCard: { gap: 6, padding: 0, borderRadius: 20, backgroundColor: theme.surface },
   detailsCard: { gap: 10, padding: 0, borderRadius: 20, backgroundColor: theme.surface },
-  titleInput: { minHeight: 44, padding: 10, borderRadius: 16, backgroundColor: theme.inset, borderColor: theme.border, boxShadow: 'inset 0 1px 3px rgba(85, 72, 49, 0.08)' },
+  titleInput: { minHeight: 48, padding: 10, borderRadius: 16, backgroundColor: theme.inset, borderColor: theme.border, boxShadow: 'inset 0 1px 3px rgba(85, 72, 49, 0.08)' },
   selectedPlace: { gap: 4, paddingTop: 4, borderTopWidth: 1, borderTopColor: colors.line },
   placeName: { color: colors.ink, fontSize: 13, lineHeight: 18, fontWeight: '600' },
   durationRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
   durationLabel: { flexShrink: 1, gap: 4 },
   start: { gap: 4, flexShrink: 0 }, field: { gap: 4 }, choices: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
-  chip: { minHeight: 44, paddingHorizontal: 8, flexDirection: 'row', alignItems: 'center', gap: 4, justifyContent: 'center', borderRadius: 16, backgroundColor: colors.pale, borderWidth: 1, borderColor: '#FFFFFF', boxShadow: '0 3px 5px rgba(53, 72, 56, 0.10)' },
+  chip: { minHeight: 48, paddingHorizontal: 8, flexDirection: 'row', alignItems: 'center', gap: 4, justifyContent: 'center', borderRadius: 16, backgroundColor: colors.pale, borderWidth: 1, borderColor: '#FFFFFF', boxShadow: '0 3px 5px rgba(53, 72, 56, 0.10)' },
   chipIcon: { color: colors.ink, fontSize: 13 },
   selected: { borderColor: '#326A8C', boxShadow: '0 0 0 1px #326A8C, 0 3px 5px rgba(50, 106, 140, 0.14)' }, chipText: { color: colors.ink, fontSize: 12, fontWeight: '600' }, selectedText: { color: '#163F57', fontWeight: '700' },
-  duration: { flexDirection: 'row', alignItems: 'center', gap: 4 }, days: { minWidth: 64, minHeight: 44, padding: 8, textAlign: 'center', borderColor: '#FFFFFF', backgroundColor: theme.surface, boxShadow: '0 2px 4px rgba(57, 49, 29, 0.14)' },
-  step: { minWidth: 44, minHeight: 44, borderRadius: 14, backgroundColor: theme.lavender, borderWidth: 1, borderColor: '#FFFFFF', boxShadow: '0 2px 4px rgba(57, 49, 29, 0.14)', alignItems: 'center', justifyContent: 'center' },
+  duration: { flexDirection: 'row', alignItems: 'center', gap: 4 }, days: { minWidth: 64, minHeight: 48, padding: 8, textAlign: 'center', borderColor: '#FFFFFF', backgroundColor: theme.surface, boxShadow: '0 2px 4px rgba(57, 49, 29, 0.14)' },
+  step: { minWidth: 48, minHeight: 48, borderRadius: 14, backgroundColor: theme.lavender, borderWidth: 1, borderColor: '#FFFFFF', boxShadow: '0 2px 4px rgba(57, 49, 29, 0.14)', alignItems: 'center', justifyContent: 'center' },
   dimmed: { opacity: 0.5 },
   stepText: { color: colors.ink, fontSize: 22 },
 });

@@ -4,7 +4,7 @@ import { AccessibilityInfo, ActivityIndicator, Animated, AppState, Image, StyleS
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 // A presentation only loader: callers own readiness, errors and retries.
-export function BrandedLoading({ message = 'Preparing your journeyâ€¦', compact = false, overlay = false }: { message?: string; compact?: boolean; overlay?: boolean }) {
+export function BrandedLoading({ message = 'Preparing your journey...', compact = false, overlay = false }: { message?: string; compact?: boolean; overlay?: boolean }) {
   const [pulse] = useState(() => new Animated.Value(1));
   const [reduceMotion, setReduceMotion] = useState(true);
   const [active, setActive] = useState(AppState.currentState === 'active');

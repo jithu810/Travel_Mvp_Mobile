@@ -1,12 +1,16 @@
 export type Position = Readonly<{ latitude: number; longitude: number; accuracy: number | null; timestamp: number; heading?: number | null; speed?: number | null; direction?: number | null; directionSource?: 'course' | 'compass' | null }>;
 export type LocationStatus = 'ready' | 'permitted' | 'requesting' | 'tracking' | 'weak' | 'unavailable' | 'denied' | 'paused' | 'finished' | 'stopped';
-export type LocationSnapshot = Readonly<{ status: LocationStatus; position: Position | null; canAskAgain: boolean; reason?: 'acquiring' | 'services-disabled' | 'temporary' }>;
+export type LocationSnapshot = Readonly<{ status: LocationStatus; position: Position | null; canAskAgain: boolean; reason?: 'acquiring' | 'services-disabled' | 'temporary' | 'settings-declined' }>;
+// Port-neutral marker: the user refused the OS prompt to enable required location settings.
+export type LocationSettingsDeclined = Error & { settingsDeclined: true };
 export type Heading = Readonly<{ heading: number; accuracy: number; timestamp: number }>;
 export const COMPASS_MAX_AGE_MS = 30_000;
 export type LocationPort = {
   watchHeading?: (update: (heading: Heading) => void, error: () => void) => Promise<{ remove: () => void }>;
   permission: (request: boolean, onlyIfUndetermined?: boolean) => Promise<{ granted: boolean; canAskAgain: boolean }>;
   services: () => Promise<boolean>;
+  // Silent, dialog-free check of the setting a declined prompt asked for. Absent means no check.
+  settingsEnabled?: () => Promise<boolean>;
   watch: (update: (position: Position) => void, error: () => void) => Promise<{ remove: () => void }>;
 };
 type SessionStatus = 'ready' | 'active' | 'paused' | 'finished' | 'completed';
@@ -34,6 +38,14 @@ export function createForegroundLocation(port: LocationPort, now = Date.now, tim
   let prepared = false, failures = 0, pendingWatch = false;
   let retryTimer: ReturnType<typeof setTimeout> | undefined;
   let sessionIdentity: unknown;
+  // A declined settings prompt is a user choice: nothing reopens it until an explicit Retry,
+  // Pause then Resume, or a new session. Returning to the app only checks silently whether
+  // the setting is now on. declineScope ignores only foreground/focus changes, because the
+  // prompt itself backgrounds Android and stales the connect token. The latch lives in this
+  // controller, so leaving and reopening Travel Mode may show the prompt once more; accepted.
+  // The same rejection also arrives with no prompt when Android cannot resolve the settings,
+  // so nothing was declined there: the latch still applies and the copy must not claim a refusal.
+  let declined = false, declineScope = 0, declineIdentity: unknown;
   const direction = createTravelDirection();
   const publish = (next: LocationSnapshot) => { snapshot = next; listeners.forEach(listener => listener()); };
   const clearTimer = () => { if (timeout !== undefined) timers.clear(timeout); timeout = undefined; };
@@ -61,7 +73,7 @@ export function createForegroundLocation(port: LocationPort, now = Date.now, tim
   const usable = () => focused && foreground;
   const idle = (): LocationStatus => status === 'ready' ? 'ready' : status === 'paused' ? 'paused' : status === 'finished' || status === 'completed' ? 'finished' : 'stopped';
   const scheduleRecovery = () => {
-    if (status !== 'active' || !usable() || retryTimer !== undefined) return;
+    if (declined || status !== 'active' || !usable() || retryTimer !== undefined) return;
     const token = generation;
     const delay = Math.min(30000, 2000 * 2 ** Math.min(failures++, 4));
     retryTimer = timers.set(() => {
@@ -76,10 +88,22 @@ export function createForegroundLocation(port: LocationPort, now = Date.now, tim
     publish({ status: 'unavailable', position: null, canAskAgain: snapshot.canAskAgain, reason });
     scheduleRecovery();
   };
+  // Reaching the watcher proves permission was granted, so Retry always stays available.
+  const declinedSnapshot: LocationSnapshot = { status: 'unavailable', position: null, canAskAgain: true, reason: 'settings-declined' };
+  const recheckSettings = () => {
+    if (!declined || !port.settingsEnabled) return;
+    const token = generation, scope = declineScope, check = port.settingsEnabled;
+    void Promise.resolve().then(check).then(enabled => {
+      if (!enabled || !declined || token !== generation || scope !== declineScope || !usable()) return;
+      declined = false;
+      return connect(false);
+    }).catch(() => { /* Unknown settings state stays latched; Retry remains available. */ });
+  };
   const connect = async (request: boolean, begin?: () => boolean, prepare = false, onlyIfUndetermined = false) => {
-    if (!usable() || busy || pendingWatch || (begin || prepare ? status !== 'ready' : status !== 'active')) return;
+    if (declined || !usable() || busy || pendingWatch || (begin || prepare ? status !== 'ready' : status !== 'active')) return;
     stop(); busy = true;
     const token = generation;
+    let watchScope = -1;
     const current = () => token === generation && usable();
     publish({ status: 'requesting', position: null, canAskAgain: snapshot.canAskAgain, reason: 'acquiring' });
     timeout = timers.set(() => {
@@ -148,6 +172,7 @@ export function createForegroundLocation(port: LocationPort, now = Date.now, tim
       };
       const expire = () => { clearTimer(); timeout = timers.set(unavailable, 30000); };
       expire();
+      watchScope = declineScope;
       pendingWatch = true;
       const next = await Promise.resolve().then(() => current() ? port.watch(position => {
         if (!current() || status !== 'active' || !validPosition(position, now()) || position.timestamp <= lastTimestamp) return;
@@ -162,8 +187,12 @@ export function createForegroundLocation(port: LocationPort, now = Date.now, tim
         clearTimer(); timeout = timers.set(unavailable, Math.max(1, 30000 - (now() - position.timestamp)));
       }, unavailable) : { remove() {} }).finally(() => { pendingWatch = false; });
       if (!current()) next.remove(); else subscription = next;
-    } catch {
-      if (current()) fail();
+    } catch (error) {
+      if ((error as Partial<LocationSettingsDeclined> | null | undefined)?.settingsDeclined === true && watchScope === declineScope && status === 'active') {
+        // Checked before current(): the prompt's own app-state change usually staled this token.
+        declined = true; failures = 0;
+        stop(); publish(declinedSnapshot);
+      } else if (current()) fail();
     } finally {
       if (token === generation) busy = false;
     }
@@ -178,7 +207,10 @@ export function createForegroundLocation(port: LocationPort, now = Date.now, tim
       return connect(request, undefined, true, true);
     },
     begin: (commit: () => boolean) => connect(!prepared, commit),
-    retry: () => connect(true, undefined, status === 'ready'),
+    retry() {
+      if (usable() && !busy && !pendingWatch) declined = false;
+      return connect(true, undefined, status === 'ready');
+    },
     sync(nextStatus: SessionStatus, appActive: boolean, screenFocused: boolean, appState = appActive ? 'active' : 'background', identity?: unknown) {
       if (status === 'ready' && nextStatus === 'ready' && focused && screenFocused && busy && snapshot.status === 'requesting') {
         if (appState === 'inactive') { foreground = false; permissionDialogInactive = true; return; }
@@ -186,13 +218,18 @@ export function createForegroundLocation(port: LocationPort, now = Date.now, tim
           foreground = true; permissionDialogInactive = false; foregroundReady?.(); foregroundReady = undefined; return;
         }
       }
+      const wasUsable = usable();
       const changed = sessionIdentity !== identity || permissionDialogInactive || status !== nextStatus || foreground !== appActive || focused !== screenFocused;
       sessionIdentity = identity;
       status = nextStatus; foreground = appActive; focused = screenFocused;
+      // Blur cleanup syncs without an identity; that is not a new session.
+      if (nextStatus !== 'active' || (identity !== undefined && identity !== declineIdentity)) { declined = false; declineScope++; }
+      if (identity !== undefined) declineIdentity = identity;
       if (!changed) return;
       failures = 0;
-      stop(); publish({ ...snapshot, status: idle(), position: null });
+      stop(); publish(declined ? declinedSnapshot : { ...snapshot, status: idle(), position: null });
       if (status === 'active' && usable()) { if (pendingWatch) scheduleRecovery(); else void connect(false); }
+      if (!wasUsable) recheckSettings();
     },
     stop,
   };
@@ -204,6 +241,7 @@ export function locationLabel(value: LocationSnapshot, now = Date.now()) {
     || !Number.isFinite(value.position.accuracy) || value.position.accuracy < 0 || value.position.accuracy > 25))
     return 'Waiting for precise GPS · Direction will appear when location improves';
   if (value.status === 'requesting' && value.reason === 'acquiring') return 'Checking location permission / acquiring GPS…';
+  if (value.status === 'unavailable' && value.reason === 'settings-declined') return 'Location settings need attention. Turn on Location Accuracy, then tap Retry location.';
   if (value.status === 'unavailable') return value.reason === 'services-disabled'
     ? 'Device location is off · Enable location; recovery retries automatically during an active trip'
     : 'GPS temporarily unavailable · Retrying automatically during an active trip';

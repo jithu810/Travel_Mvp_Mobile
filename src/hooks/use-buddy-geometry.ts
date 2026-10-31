@@ -33,7 +33,8 @@ export function useBuddyProtectedBounds(project?: (rect: BuddyRect) => readonly 
     if (!node) api.store.protect(owner.current, path, []);
     else if (api.preference.get().enabled) api.store.requestMeasurements();
   }, [api, path]);
-  const onLayout = useCallback(() => { if (focused.current && api?.store.get().path === path && api.preference.get().enabled) api.store.requestMeasurements(); }, [api, path]);
+  // Re-measure only this view. A global requestMeasurements here republished every protected view, and each republish re-laid them out.
+  const onLayout = useCallback(() => { if (api?.preference.get().enabled) measure(); }, [api, measure]);
   return { ref: attach, collapsable: false as const, onLayout };
 }
 

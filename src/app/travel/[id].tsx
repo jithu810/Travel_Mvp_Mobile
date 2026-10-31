@@ -3,7 +3,7 @@ import { useBuddyCelebration, useBuddyScreen } from '@/hooks/use-journey-buddy';
 import { useBuddyProtectedBounds } from '@/hooks/use-buddy-geometry';
 import { BrandedLoading } from '@/components/branded-loading';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AppState, BackHandler, Linking, Platform, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, Message } from '@/components/discovery/ui';
@@ -27,6 +27,7 @@ import { buildMapData, hasCoordinates } from '@/lib/journey/map-data';
 import { selectedStopId } from '@/lib/journey/story-layout';
 import { customizedTravel } from '@/lib/journey/customized-travel';
 import { canOpenTravelMode } from '@/lib/journey/travel-preview';
+import { useTripRecovery } from '@/hooks/use-trip-recovery';
 import type { PublicJourney } from '@/types/journey';
 
 export default function TravelModeScreen() {
@@ -40,6 +41,8 @@ export default function TravelModeScreen() {
   const state = useLoad(loader);
   const session = useTripSnapshot(id);
   const available = local ? (localJourney ? session.journey ?? localJourney : null) : session.journey ?? state.data;
+  const [locationRequesting, setLocationRequesting] = useState(false);
+  const recovery = useTripRecovery(routeId, canOpenTravelMode(available) ? available.id : null, locationRequesting);
   const [leaving, setLeaving] = useState(false);
   useBuddyScreen({ suppressed: leaving || !canOpenTravelMode(available) });
   const exit = useCallback(() => {
@@ -57,12 +60,12 @@ export default function TravelModeScreen() {
     return () => subscription.remove();
   }, [requestExit]));
   return <View style={styles.screen}>
-    {canOpenTravelMode(available) ? <TravelModeContent key={available.id} journey={available} onExit={requestExit} refreshNotice={session.journey && state.error ? 'Original could not refresh. Using this session’s itinerary.' : undefined} /> : <SafeAreaView style={styles.unavailable}>
+    {canOpenTravelMode(available) ? <TravelModeContent key={available.id} journey={available} onExit={requestExit} resumeChecking={recovery.checking} signedIn={recovery.signedIn} onLocationRequesting={setLocationRequesting} refreshNotice={session.journey && state.error ? 'Original could not refresh. Using this session’s itinerary.' : undefined} /> : <SafeAreaView style={styles.unavailable}>
       <View style={styles.header}><Text accessibilityRole="header" style={styles.title}>Travel Mode</Text><Exit onExit={requestExit} /></View>
-      <View style={styles.unavailable}>{state.loading ? <BrandedLoading message="Opening your itinerary…" />
-        : <Message title="Journey unavailable" body={(local ? 'This local selection is unavailable. Return to Customize stops and select again.' : state.error) || 'Choose a public journey with at least one stop to open Travel Mode.'} retry={state.error ? state.retry : undefined} />}</View>
+      <View style={styles.unavailable}>{state.loading || (local && recovery.checking) ? <BrandedLoading message="Opening your itinerary…" />
+        : <Message title="Journey unavailable" body={recovery.notice || recovery.retryNotice || (local ? 'This local selection is unavailable. Return to Customize stops and select again.' : state.error) || 'Choose a public journey with at least one stop to open Travel Mode.'} retry={recovery.retryNotice ? recovery.retry : state.error && !recovery.notice ? state.retry : undefined} />}</View>
     </SafeAreaView>}
-    {leaving && <TripConfirmation title="Leave Travel Mode?" body={(session.status === 'active' ? 'Your local timer keeps running while you’re away.' : 'Your local session stays paused.') + ' Reopen this journey’s Travel Mode to return. This session is kept only until the app process closes.'} confirmLabel="Leave and keep session" onCancel={() => setLeaving(false)} onConfirm={() => { setLeaving(false); exit(); }} />}
+    {leaving && <TripConfirmation title="Leave Travel Mode?" body={(session.status === 'active' ? 'Your local timer keeps running while you’re away.' : 'Your local session stays paused.') + ' Reopen this journey’s Travel Mode to return.' + (recovery.signedIn ? ' If the app closes, your progress stays on this phone for up to 7 days.' : ' Your progress is kept only until the app closes.')} confirmLabel="Leave and keep session" onCancel={() => setLeaving(false)} onConfirm={() => { setLeaving(false); exit(); }} />}
   </View>;
 }
 
@@ -70,7 +73,7 @@ function Exit({ onExit }: { onExit: () => void }) {
   return <Pressable accessibilityRole="button" accessibilityLabel="Exit Travel Mode" onPress={onExit} style={styles.exit}><Text style={styles.exitLabel}>Exit</Text></Pressable>;
 }
 
-export function TravelModeContent({ journey, onExit, refreshNotice }: { journey: PublicJourney; onExit: () => void; refreshNotice?: string }) {
+export function TravelModeContent({ journey, onExit, refreshNotice, resumeChecking = false, signedIn = false, onLocationRequesting }: { journey: PublicJourney; onExit: () => void; refreshNotice?: string; resumeChecking?: boolean; signedIn?: boolean; onLocationRequesting?: (requesting: boolean) => void }) {
   const topProtection = useBuddyProtectedBounds();
   const window = useWindowDimensions();
   const insets = useSafeAreaInsets();
@@ -86,6 +89,10 @@ export function TravelModeContent({ journey, onExit, refreshNotice }: { journey:
   const navigation = useTripNavigation(journey, session, location.source);
   const arrival = useTripArrival(journey, session, location.source);
   const requesting = location.status === 'requesting';
+  // A permission request may be on screen; the resume prompt waits for it.
+  useEffect(() => { onLocationRequesting?.(requesting); }, [requesting, onLocationRequesting]);
+  // Begin waits while a saved trip is being checked, so a resume offer never lands on a live trip.
+  const beginBlocked = requesting || resumeChecking || location.status === 'denied' || Platform.OS === 'web';
   const compactRouteStatus = navigation.message.startsWith('Waiting for GPS:') ? 'Waiting for an accurate GPS fix' : navigation.message;
   const showLocationStatus = (session.status === 'active' && location.status === 'tracking' && location.position?.directionSource !== 'course') || Platform.OS === 'web' || ['ready', 'requesting', 'weak', 'unavailable', 'denied', 'stopped'].includes(location.status);
   const [confirmation, setConfirmation] = useState<{ action: 'finish' | 'new' | 'complete'; session: TripSession; stopId?: string; epoch: number } | null>(null);
@@ -152,7 +159,7 @@ export function TravelModeContent({ journey, onExit, refreshNotice }: { journey:
         {showLocationStatus && <Text accessibilityLiveRegion="polite" numberOfLines={2} style={styles.note}>{Platform.OS === 'web' ? 'GPS requires the iOS or Android development build' : locationLabel(location)}</Text>}
       {terminal && <Text numberOfLines={2} style={styles.note}>{session.title} · {session.completedStopIds.length}/{session.plannedStops} completed · Final duration {formatTripTime(elapsed)}</Text>}
       <View style={styles.actions}>
-        {session.status === 'ready' ? <Pressable hitSlop={2} accessibilityRole="button" accessibilityLabel="Begin Trip" accessibilityHint="Starts the local trip timer and foreground GPS after permission is allowed." disabled={requesting || location.status === 'denied' || Platform.OS === 'web'} accessibilityState={{ disabled: requesting || location.status === 'denied' || Platform.OS === 'web', busy: requesting }} onPress={() => { void location.begin(); }} style={[styles.begin, (requesting || location.status === 'denied' || Platform.OS === 'web') && { opacity: 0.55 }]}><Text style={styles.beginLabel}>{requesting ? 'Requesting location…' : 'Begin Trip →'}</Text></Pressable>
+        {session.status === 'ready' ? <Pressable hitSlop={2} accessibilityRole="button" accessibilityLabel="Begin Trip" accessibilityHint="Starts the local trip timer and foreground GPS after permission is allowed." disabled={beginBlocked} accessibilityState={{ disabled: beginBlocked, busy: requesting || resumeChecking }} onPress={() => { if (!resumeChecking) void location.begin(); }} style={[styles.begin, beginBlocked && { opacity: 0.55 }]}><Text style={styles.beginLabel}>{requesting ? 'Requesting location…' : resumeChecking ? 'Checking for a saved trip…' : 'Begin Trip →'}</Text></Pressable>
           : terminal ? <Pressable hitSlop={2} accessibilityRole="button" accessibilityLabel="Start a new trip" onPress={() => requestConfirmation('new')} style={styles.begin}><Text style={styles.beginLabel}>Start a new trip</Text></Pressable>
             : <><Pressable hitSlop={2} accessibilityRole="button" accessibilityLabel={session.status === 'active' ? 'Pause' : 'Resume'} onPress={() => act(session.status === 'active' ? 'pause' : 'resume')} style={styles.begin}><Text style={styles.beginLabel}>{session.status === 'active' ? 'Pause' : 'Resume'}</Text></Pressable>
               <Pressable hitSlop={2} accessibilityRole="button" accessibilityLabel="Finish" onPress={() => requestConfirmation('finish')} style={styles.finish}><Text style={styles.exitLabel}>Finish</Text></Pressable></>}
@@ -183,7 +190,7 @@ export function TravelModeContent({ journey, onExit, refreshNotice }: { journey:
       </>}
       <Text style={styles.routeNote}>Creator’s planned connections{missing ? ' · ' + missing + (missing === 1 ? ' unmapped stop' : ' unmapped stops') : ''}</Text>
         <Text style={styles.routeNote}>Blue: driving route · Dashed green: planned stops · Route duration is the last calculation, not live ETA</Text>
-        <Text style={styles.routeNote}>In memory only · No travel verification or location history</Text>
+        <Text style={styles.routeNote}>{signedIn ? 'Progress kept on this phone for up to 7 days' : 'Progress kept until the app closes'} · No travel verification or location history</Text>
       </ItinerarySheet>
     </View>
     {confirmation && <TripConfirmation title={confirmation.action === 'complete' ? 'Complete this stop?' : confirmation.action === 'finish' ? 'Finish this trip?' : 'Start a new trip?'}

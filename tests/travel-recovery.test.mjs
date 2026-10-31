@@ -41,6 +41,14 @@ test('disabled services use capped backoff, then recover; denied permission stop
  f.setGranted(false); f.callbacks.at(-1).error(); await f.tick();
  assert.equal(f.c.get().status, 'denied'); assert.equal(f.timers.size, 0); assert.equal(f.counts().maximum, 1);
 });
+test('non-declined watcher rejections keep capped backoff and foreground reconnect', async () => {
+ const f = locationFixture(); await flush(); f.callbacks[0].error(); const original = f.port.watch; let attempts = 0;
+ f.port.watch = async () => { attempts++; throw Object.assign(new Error('native'), { code: 'ERR_LOCATION_UNAVAILABLE' }); };
+ const delays = []; for (let i = 0; i < 6; i++) delays.push(await f.tick());
+ assert.deepEqual(delays, [2000, 4000, 8000, 16000, 30000, 30000]); assert.equal(attempts, 6); assert.equal(f.c.get().reason, 'temporary');
+ f.c.sync('active', false, true); f.c.sync('active', true, true); await flush(); assert.equal(attempts, 7, 'Foreground still reconnects at once');
+ f.port.watch = original; await f.tick(); f.fix(); assert.equal(f.c.get().status, 'tracking'); assert.equal(f.counts().maximum, 1); f.c.stop();
+});
 test('pending recovery and obsolete callbacks cancel on lifecycle exit and session replacement', async () => {
  for (const args of [['paused', true, true], ['finished', true, true], ['completed', true, true], ['active', false, true], ['active', true, false], ['ready', true, true]]) {
    const f = locationFixture(); await flush(); f.callbacks[0].error(); const retry = [...f.timers.values()][0].fn;

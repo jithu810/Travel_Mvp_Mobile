@@ -11,8 +11,10 @@ export const buddyTour = [
 
 // Historical module name; this is an anchored bubble, not a modal or bottom sheet.
 export function BuddyHelpSheet({ canAddMemory, travel, onAddMemory, onCreate, onDrafts, onClose, onTour, onNext,
-  tour = null, reaction, contextualLine, placement, fallback = false, width = 252, maxHeight = 320, onMeasure }: {
+  tour = null, reaction, contextualLine, placement, fallback = false, width = 252, maxHeight = 320, onMeasure, primary }: {
   canAddMemory: boolean; travel?: BuddyTravel; onAddMemory: () => void; onCreate: () => void; onDrafts: () => void; onClose: () => void;
+  /** Screen-specific first action when there is no memory to capture; defaults to Open my drafts. */
+  primary?: { label: string; onPress: () => void };
   onTour?: () => void; onNext?: () => void; tour?: number | null; reaction?: string; contextualLine?: string;
   placement?: { x: number; y: number; above: boolean; tailX: number }; width?: number; maxHeight?: number; onMeasure?: (height: number) => void;
   fallback?: boolean;
@@ -24,7 +26,7 @@ export function BuddyHelpSheet({ canAddMemory, travel, onAddMemory, onCreate, on
   const step = tour !== null ? buddyTour[tour] : undefined;
   const text = reaction ?? step?.text ?? (travel
     ? buddyTravelCopy(travel) + ' GPS updates stop when you pause or finish, leave Travel Mode, or put the app in the background. Returning to an active trip resumes updates.' + (canAddMemory ? '' : ' Capture moments in a private draft.')
-    : contextualLine ?? (canAddMemory ? 'A moment worth keeping? Let’s tuck it into your story.' : 'Tiny backpack, big adventures! Shall we explore?'));
+    : contextualLine ?? (canAddMemory ? 'A moment worth keeping? Let’s tuck it into your story.' : 'Need a place to start? Find a journey, or make your own.'));
   const shown = fallback || !!placement;
   const content = <View testID="buddy-speech-bubble" accessibilityViewIsModal={fallback} pointerEvents={shown ? 'auto' : 'none'} accessibilityElementsHidden={!shown} importantForAccessibility={shown ? 'auto' : 'no-hide-descendants'} onTouchStart={event => event.stopPropagation()}
     onLayout={fallback ? undefined : event => onMeasure?.(event.nativeEvent.layout.height)}
@@ -40,7 +42,7 @@ export function BuddyHelpSheet({ canAddMemory, travel, onAddMemory, onCreate, on
         <HelpAction label={step.label} onPress={onTour ?? onCreate} />
         <HelpAction secondary label={tour === 2 ? 'Finish tour' : 'Next'} onPress={onNext ?? onClose} />
       </> : <>
-        <HelpAction label={canAddMemory ? 'Capture a moment' : 'Open my drafts'} onPress={canAddMemory ? onAddMemory : onDrafts} />
+        {canAddMemory ? <HelpAction label="Capture a moment" onPress={onAddMemory} /> : <HelpAction label={primary?.label ?? 'Open my drafts'} onPress={primary?.onPress ?? onDrafts} />}
         <HelpAction secondary label="Show me around" onPress={onTour ?? onCreate} />
       </>}
     </View>}

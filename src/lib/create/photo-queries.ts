@@ -1,4 +1,5 @@
 import { supabase } from '../supabase/client';
+import { accountCheckMessage } from '../auth/model';
 import { isJourneyId } from '../discovery/model';
 import { SaveFailure, type CreateForm } from './model';
 import type { LocalPhoto } from './photo-model';
@@ -7,7 +8,7 @@ import { isThumbnailObjectName, storedThumbnailsEnabled, thumbnailObjectName } f
 async function viewer(expectedOwner: string, signal: AbortSignal) {
   if (!supabase || signal.aborted) throw new SaveFailure('Photo saving is unavailable or cancelled.');
   const { data, error } = await supabase.auth.getUser();
-  if (signal.aborted || error || data.user?.id !== expectedOwner || !isJourneyId(data.user.id)) throw new SaveFailure('Sign in again before saving photos.');
+  if (signal.aborted || error || data.user?.id !== expectedOwner || !isJourneyId(data.user.id)) throw new SaveFailure(accountCheckMessage(error, 'Sign in again before saving photos.'));
   return { client: supabase, owner: data.user.id };
 }
 export async function checkPhotoDraft(form: CreateForm, ownerId: string, signal: AbortSignal) {
