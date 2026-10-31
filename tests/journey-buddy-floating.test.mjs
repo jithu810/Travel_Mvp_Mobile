@@ -1,4 +1,4 @@
-import { lightPilotTheme } from './helpers/dark-pilot-harness.mjs';
+import { appMobileTheme, lightPilotTheme } from './helpers/dark-pilot-harness.mjs';
 import assert from 'node:assert/strict';
 import { readFileSync, existsSync } from 'node:fs';
 import { test } from 'node:test';
@@ -99,7 +99,7 @@ test('200 animated layout events defer native measurements until one settled bat
 });
 test('Home globe failure protects its actual Retry map button and tracks fallback scrolling without adding a wrapper', () => {
   let retries = 0; const jsx = (type, props) => ({ type, props }), protection = { onLayout() {}, ref: 'retry-control', collapsable: false }, scroll = { onScroll() {} };
-  const { GlobeFallback } = load('src/components/discovery/globe/fallback.tsx', { 'react/jsx-runtime': { jsx, jsxs: jsx }, 'react-native': { View: 'View', ScrollView: 'ScrollView', Pressable: 'Pressable', Text: 'Text', StyleSheet: { create: value => value } }, '@/components/branded-loading': {}, '@/lib/discovery/presentation': {}, '../ui': { colors: {} }, '@/hooks/use-buddy-geometry': { useBuddyProtectedBounds: () => protection, useBuddyScroll: () => scroll } });
+  const { GlobeFallback } = load('src/components/discovery/globe/fallback.tsx', { '@/theme/mobile-theme': appMobileTheme, 'react/jsx-runtime': { jsx, jsxs: jsx }, 'react-native': { View: 'View', ScrollView: 'ScrollView', Pressable: 'Pressable', Text: 'Text', StyleSheet: { create: value => value } }, '@/components/branded-loading': {}, '@/lib/discovery/presentation': {}, '../ui': { colors: {} }, '@/hooks/use-buddy-geometry': { useBuddyProtectedBounds: () => protection, useBuddyScroll: () => scroll } });
   const tree = GlobeFallback({ message: 'Unavailable', retry: () => retries++, bottomInset: 200 });
   assert.equal(tree.type, 'View'); const content = tree.props.children; assert.equal(content.type, 'ScrollView'); assert.equal(content.props.onScroll, scroll.onScroll);
   const button = content.props.children.find(child => child?.type === 'Pressable'); assert.equal(button.props.ref, protection.ref); assert.equal(button.props.collapsable, false); button.props.onPress(); assert.equal(retries, 1);

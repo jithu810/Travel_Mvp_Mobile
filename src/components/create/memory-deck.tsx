@@ -8,7 +8,8 @@ import { useBuddyProtectedBounds } from '@/hooks/use-buddy-geometry';
 
 export type MemorySwipe = { handlers: GestureResponderHandlers; canInteract: () => boolean };
 // Browsing changes selection only; MemoryRow owns the separate edit/reorder/remove controls.
-export function MemoryDeck({ stops, selectedId, onSelect, renderMemory, actions, active = true, title, status, leading, emptyContent, credit }: {
+export function MemoryDeck({ stops, selectedId, onSelect, renderMemory, actions, active = true, title, status, leading, emptyContent, credit, fitted = false, onMinimumHeight }: {
+  fitted?: boolean; onMinimumHeight?: (height: number) => void;
   stops: StopInput[]; selectedId: string | null; onSelect: (id: string) => void;
   renderMemory: (stop: StopInput, index: number, width: number, swipe?: MemorySwipe) => ReactNode; actions: ReactNode; active?: boolean; title?: string; status?: string; leading?: ReactNode; emptyContent?: ReactNode;
   /** Optional one-line credit under the title, such as a remix's original journey. */ credit?: ReactNode;
@@ -67,15 +68,16 @@ export function MemoryDeck({ stops, selectedId, onSelect, renderMemory, actions,
   // Renderer forwards canInteract into MemoryRow event handlers without calling it.
   // eslint-disable-next-line react-hooks/refs
   const card = memory ? renderMemory(memory, selected, width, { handlers: swipe.panHandlers, canInteract }) : null;
-  return <View {...protection} testID="draft-memory-deck" onLayout={event => { protection.onLayout(); setWidth(event.nativeEvent.layout.width); }}>
-    <View style={s.header}>{leading}<View style={s.heading}>{title && <Text accessibilityRole="header" numberOfLines={1} style={s.headingTitle}>{title}</Text>}{credit}<Text numberOfLines={1} style={s.progress} accessibilityLiveRegion="polite">{stops.length ? 'Memory ' + (selected + 1) + ' of ' + stops.length : 'Memories · 0/50'}{status ? ' · ' + status : ''}</Text></View>
+  return <View {...protection} style={fitted && s.fit} testID="draft-memory-deck" onLayout={event => { protection.onLayout(); setWidth(event.nativeEvent.layout.width); }}>
+    {/* Fixed card 328dp plus the 12dp stack edge; credit/retry height is measured. */}
+    <View style={s.header} onLayout={event => onMinimumHeight?.(event.nativeEvent.layout.height + 340)}>{leading}<View style={s.heading}>{title && <Text accessibilityRole="header" numberOfLines={1} style={s.headingTitle}>{title}</Text>}{credit}<Text numberOfLines={1} style={s.progress} accessibilityLiveRegion="polite">{stops.length ? 'Memory ' + (selected + 1) + ' of ' + stops.length : 'Memories · 0/50'}{status ? ' · ' + status : ''}</Text></View>
       {stops.length > 0 && <View style={s.controls}><Pressable accessibilityRole="button" accessibilityLabel="Previous memory card" disabled={!active || selected === 0} accessibilityState={{ disabled: !active || selected === 0 }} onPress={() => browse(-1)} style={s.arrow}><Text style={s.arrowText}>←</Text></Pressable><Pressable accessibilityRole="button" accessibilityLabel="Next memory card" disabled={!active || selected >= stops.length - 1} accessibilityState={{ disabled: !active || selected >= stops.length - 1 }} onPress={() => browse(1)} style={s.arrow}><Text style={s.arrowText}>→</Text></Pressable></View>}
     </View>
-    {memory ? <View style={s.stack}>
+    {memory ? <View style={[s.stack, fitted && s.fit]}>
       {behind.map((stop, index) => <View key={stop.id} testID="draft-memory-rear" pointerEvents="none" accessible={false} accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={[s.rear, { top: (behind.length - index - 1) * 8, left: (behind.length - index) * 8, right: (behind.length - index) * 8, height: width * 9 / 16, transform: [{ rotate: index ? '-2deg' : '2deg' }] }]}>
         {renderMemory(stop, stops.indexOf(stop), width, { handlers: {}, canInteract: () => false })}
       </View>)}
-      <Animated.View testID="draft-memory-active" style={{ transform: [{ translateX: x }, { rotate: x.interpolate({ inputRange: [-400, 0, 400], outputRange: ['-8deg', '0deg', '8deg'], extrapolate: 'clamp' }) }] }}>
+      <Animated.View testID="draft-memory-active" style={[fitted && s.fit, { transform: [{ translateX: x }, { rotate: x.interpolate({ inputRange: [-400, 0, 400], outputRange: ['-8deg', '0deg', '8deg'], extrapolate: 'clamp' }) }] }]}>
         {card}
       </Animated.View>
       <View pointerEvents="box-none" style={s.actions}>{actions}</View>
@@ -83,10 +85,11 @@ export function MemoryDeck({ stops, selectedId, onSelect, renderMemory, actions,
   </View>;
 }
 const s = darkPilotStyles(StyleSheet.create({
+  fit: { flex: 1, minHeight: 0 },
   heading: { flex: 1, minWidth: 0 }, headingTitle: { color: theme.text, fontSize: 16, lineHeight: 22, fontWeight: '600' },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }, progress: { color: theme.muted, fontSize: 12, lineHeight: 18 }, controls: { flexDirection: 'row' },
   arrow: { minWidth: 48, minHeight: 48, alignItems: 'center', justifyContent: 'center' }, arrowText: { color: theme.accent, fontSize: 18 },
   stack: { paddingTop: 12 }, rear: { position: 'absolute', borderRadius: 22, backgroundColor: theme.lavender, overflow: 'hidden' },
-  actions: { position: 'absolute', right: 8, top: 24 }, empty: { minHeight: 160, padding: 16, borderRadius: 22, backgroundColor: theme.surface, flexDirection: 'row', gap: 8, alignItems: 'center' }, emptyCopy: { flex: 1, gap: 8 },
+  actions: { position: 'absolute', right: 8, top: 16 }, empty: { minHeight: 160, padding: 16, borderRadius: 22, backgroundColor: theme.surface, flexDirection: 'row', gap: 8, alignItems: 'center' }, emptyCopy: { flex: 1, gap: 8 },
   title: { color: theme.text, fontSize: 18, fontWeight: '700' }, note: { color: theme.muted, fontSize: 12, lineHeight: 18 },
 }));

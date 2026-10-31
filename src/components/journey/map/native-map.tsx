@@ -56,6 +56,7 @@ export const NativeJourneyMap = memo(function NativeJourneyMap({ data, stops, re
   const foreground = useRef(AppState.currentState === 'active');
   const pose = useRef<MapState['properties'] | null>(null);
   const transitioning = useRef(false);
+  const loopTransition = useRef(false);
   const fitted = useRef<{ frame: NonNullable<ReturnType<typeof frameJourneyMap>>; style: GlobeStyle } | null>(null);
   const [appActive, setAppActive] = useState(AppState.currentState === 'active');
   const [viewport, setViewport] = useState({ width: 0, height: 0 });
@@ -98,13 +99,14 @@ export const NativeJourneyMap = memo(function NativeJourneyMap({ data, stops, re
       centerCoordinate: current.center, zoomLevel: current.zoom, heading: current.heading, pitch: current.pitch,
       animationMode: 'easeTo', animationDuration: 0,
     });
-    transitioning.current = false;
+    transitioning.current = false; loopTransition.current = false;
   }, []);
+  useEffect(() => { if (reduceMotion && loopTransition.current) cancelTransition(); }, [reduceMotion, cancelTransition]);
   useFocusEffect(useCallback(() => {
     if (!memoryPreview) return;
     setFocused(true);
-    return () => { touching.current = false; setNearby([]); setFocused(false); setMemoryIdle(false); cancelTransition(); };
-  }, [memoryPreview, cancelTransition]));
+    return () => { touching.current = false; setNearby([]); setFocused(false); setMemoryIdle(false); cancelTransition(); storyBuddy?.pause(); };
+  }, [memoryPreview, cancelTransition, storyBuddy]));
   const selectMemory = useCallback((id: string) => {
     if (!mounted.current || !foreground.current) return;
     if (memoryPreview) setMemoryIdle(false);
@@ -132,11 +134,11 @@ export const NativeJourneyMap = memo(function NativeJourneyMap({ data, stops, re
     const subscription = AppState.addEventListener('change', state => {
       if (!mounted.current) return;
       foreground.current = state === 'active';
-      if (!foreground.current) { cancelTransition(); touching.current = false; setMemoryIdle(false); }
+      if (!foreground.current) { cancelTransition(); storyBuddy?.pause(); touching.current = false; setMemoryIdle(false); }
       setAppActive(foreground.current);
     });
-    return () => { mounted.current = false; cancelTransition(); subscription.remove(); };
-  }, [cancelTransition]);
+    return () => { mounted.current = false; cancelTransition(); storyBuddy?.pause(); subscription.remove(); };
+  }, [cancelTransition, storyBuddy]);
   useEffect(() => {
     let active = true;
     let changed = false;
@@ -155,9 +157,10 @@ export const NativeJourneyMap = memo(function NativeJourneyMap({ data, stops, re
   const fit = useCallback(() => {
     if (!frame || !ready || failed || !mounted.current || !foreground.current || (memoryPreview && !focused)) return;
     if (navigationMode && travelCamera && !canMove()) return;
+    storyBuddy?.cancelLoop();
     transitioning.current = !reduceMotion;
     camera.current?.setCamera({ ...frame.camera, animationMode: 'easeTo', animationDuration: reduceMotion ? 0 : 450 });
-  }, [frame, ready, failed, reduceMotion, navigationMode, travelCamera, canMove, memoryPreview, focused]);
+  }, [frame, ready, failed, reduceMotion, navigationMode, travelCamera, canMove, memoryPreview, focused, storyBuddy]);
   useEffect(() => {
     if (!ready || !appActive || !frame) return;
     // Accessibility updates must not reset a map the traveler has already panned.
@@ -169,27 +172,41 @@ export const NativeJourneyMap = memo(function NativeJourneyMap({ data, stops, re
   }, [ready, appActive, frame, style, fit, navigationMode, travelCamera]);
   useEffect(() => {
     if (!ready || failed || !mounted.current || !foreground.current || (memoryPreview && !focused) || (navigationMode && travelCamera && !canMove())) { if (!memoryPreview) lastSelection.current = selectedId; return; }
-    if (selected && selectedId !== lastSelection.current) {
+    if (selected && selectedId !== lastSelection.current && !(storyBuddy?.get().loopPhase === 'jump' && !navigationMode)) {
       // Story Buddy walks toward the selected stop while the camera keeps the
       // normal move-to-stop behavior; selection never re-fits the whole journey.
       if (navigationMode) explore();
+      loopTransition.current = false;
       transitioning.current = !reduceMotion;
       const currentZoom = pose.current?.zoom ?? frame?.camera.zoomLevel ?? 0;
       const local = !navigationMode ? nearbyFocus(nearbyPoints, selected.id, currentZoom) : null;
       camera.current?.setCamera({
       ...(local && local.zoomLevel > currentZoom + 0.01 ? { zoomLevel: local.zoomLevel } : {}),
       centerCoordinate: [selected.coordinate[0], Math.max(-85.0511287798066, Math.min(85.0511287798066, selected.coordinate[1]))],
-      animationMode: 'easeTo', animationDuration: reduceMotion ? 0 : 450,
+      animationMode: 'easeTo', animationDuration: reduceMotion || (storyBuddy?.get().loopSelectionId === selectedId && storyBuddy?.get().loopCameraDuration === 0) ? 0 : 450,
       });
     }
     lastSelection.current = selectedId;
-  }, [ready, failed, selected, selectedId, reduceMotion, navigationMode, travelCamera, explore, canMove, memoryPreview, focused, nearbyPoints, frame]);
+  }, [ready, failed, selected, selectedId, reduceMotion, navigationMode, travelCamera, explore, canMove, memoryPreview, focused, nearbyPoints, frame, storyBuddy]);
+  useEffect(() => {
+    if (!storyBuddy || navigationMode) return;
+    let seen = storyBuddy.get().loopCameraRevision;
+    return storyBuddy.subscribe(() => {
+      const state = storyBuddy.get();
+      if (state.loopCameraRevision === seen) return;
+      seen = state.loopCameraRevision;
+      if (!state.loopTarget || !ready || failed || !focused || !mounted.current || !foreground.current || touching.current || !motionKnown) return;
+      transitioning.current = !reduceMotion; loopTransition.current = !reduceMotion;
+      camera.current?.setCamera({ centerCoordinate: [state.loopTarget[0], Math.max(-85.0511287798066, Math.min(85.0511287798066, state.loopTarget[1]))], animationMode: 'easeTo', animationDuration: reduceMotion ? 0 : 1600 });
+    });
+  }, [storyBuddy, navigationMode, ready, failed, focused, reduceMotion, motionKnown]);
   // Late native events from a replaced style cannot skip fallback steps or
   // mark the replacement ready. Each keyed style receives its own timeout.
   const mapError = useCallback(() => {
     if (!mounted.current || !foreground.current) return;
+    storyBuddy?.pause();
     setMapState(previous => previous.style === style ? { style: navigationMode ? 'failed' : nextGlobeStyle(style), ready: false } : previous);
-  }, [style, setMapState, navigationMode]);
+  }, [style, setMapState, navigationMode, storyBuddy]);
   useEffect(() => {
     if (ready || failed || !frame || !appActive) return;
     const timeout = setTimeout(mapError, 20000);
@@ -215,12 +232,12 @@ export const NativeJourneyMap = memo(function NativeJourneyMap({ data, stops, re
           if (!mounted.current || (navigationMode && travelCamera && !canMove())) return;
           pose.current = state.properties;
           // Native Mapbox gestures interrupt its animator; do not fight the gesture with another command.
-          if (state.gestures.isGestureActive) { if (memoryPreview) setMemoryIdle(false); transitioning.current = false; if (navigationMode) follow.explore(); }
+          if (state.gestures.isGestureActive) { storyBuddy?.cancelLoop(); loopTransition.current = false; if (memoryPreview) setMemoryIdle(false); transitioning.current = false; if (navigationMode) follow.explore(); }
         }}
-        onTouchStart={memoryPreview ? () => { touching.current = true; setMemoryIdle(false); cancelTransition(); } : undefined}
+        onTouchStart={memoryPreview ? () => { touching.current = true; setMemoryIdle(false); cancelTransition(); if (storyBuddy?.get().loopPhase) storyBuddy.cancelLoop(); } : undefined}
         onTouchEnd={memoryPreview ? () => { touching.current = false; } : undefined}
         onTouchCancel={memoryPreview ? () => { touching.current = false; } : undefined}
-        onMapIdle={state => { pins.idle(state.properties); if (liveBuddy) liveSafety.idle(); if (mounted.current) { transitioning.current = false; if (memoryPreview && !touching.current) setMemoryIdle(true); } }}
+        onMapIdle={state => { pins.idle(state.properties); if (liveBuddy) liveSafety.idle(); if (mounted.current) { transitioning.current = false; loopTransition.current = false; if (memoryPreview && !touching.current) setMemoryIdle(true); } }}
         onDidFinishLoadingMap={() => {
           if (mounted.current) setMapState(previous => previous.style === style && !previous.ready ? { ...previous, ready: true } : previous);
         }} onMapLoadingError={mapError}>

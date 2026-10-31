@@ -1,3 +1,11 @@
+## Approved Mobile UI baseline - 2026-10-31
+
+Owner reports verifying and approving the current pages. Read docs/approved-mobile-ui.md before UI edits. Button/icon/image/copy/animation changes must preserve positions, card geometry, map shape/corners and status-bar treatment, guides, slider/navigation and scrolling. Additional layout or scroll changes need explicit owner approval. Physical evidence covers CPH2813 Android16; broad multi-phone compatibility is unverified. Documentation and code remain local/unpublished.
+
+## Product-owner UI rule - 2026-10-31
+
+Future UI changes must preserve the agreed scrolling behavior. Do not introduce vertical scrolling or enable a previously fixed screen to scroll without explicit product-owner approval. Include scrolling behavior and physical/UI verification evidence in UI change reports. Preserve existing local layout work and verify original, remixed and selected Journey variants when shared layout changes.
+
 ## App-wide dark theme extension - 2026-10-31
 
 Local/unpublished: approved Home/Story dark palette extended to every Mobile route and shared UI surfaces, including Search, Create/edit/memory/photo sheets, Account/settings/profiles, authentication/callback, drafts/customization and Travel. Immutable default dark presentation; no Light/Dark/System selector or stored theme preference added. Maps/photos/art/export artwork keep their palettes with explicit readable map controls. No backend/auth/navigation/GPS/persistence behavior, dependency or native changes. Physical CPH2813 Android16/Google Test via Metro8081: Home/Search/Create selection/Account/Settings/Edit Profile/Story/Travel permission-recovery preview inspected. No saves/uploads/BeginTrip/sign-out. Automated QA and independent review pass; final checks and limits in docs/qa/dark-theme-all-pages.md, dark-theme-all-pages-qa.md and dark-theme-all-pages-architect.md. This supersedes the earlier two-route-only scope.

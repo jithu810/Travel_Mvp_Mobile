@@ -1,8 +1,8 @@
 import { theme } from '@/theme/mobile-theme';
 import { darkPilotStyles } from '@/theme/dark-pilot';
 import { StyleSheet, View } from 'react-native';
-export function EditorActionIcon({ name, light = false }: { name: 'add' | 'save' | 'settings' | 'cover'; light?: boolean }) {
-  const color = light ? theme.white : theme.text;
+export function EditorActionIcon({ name, light = false, color: explicitColor }: { name: 'add' | 'save' | 'settings' | 'cover'; light?: boolean; color?: string }) {
+  const color = explicitColor ?? (light ? theme.white : theme.text);
   return <View pointerEvents="none" accessible={false} importantForAccessibility="no-hide-descendants" style={s.frame}>
     {name === 'cover' ? <><View style={[s.photo, { borderColor: color }]} /><View style={[s.sun, { backgroundColor: color }]} /><View style={[s.mountain, { borderColor: color }]} /></> : name === 'add' ? <><View style={[s.horizontal, { backgroundColor: color }]} /><View style={[s.vertical, { backgroundColor: color }]} /></> : name === 'save' ? <><View style={[s.save, { borderColor: color }]} /><View style={[s.saveTop, { borderColor: color }]} /><View style={[s.saveBottom, { borderColor: color }]} /></> : <><View style={[s.settings, { borderColor: color }]} /><View style={[s.center, { borderColor: color }]} /><View style={[s.tooth, { backgroundColor: color }]} /><View style={[s.tooth, { backgroundColor: color, transform: [{ rotate: '90deg' }] }]} /></>}
   </View>;

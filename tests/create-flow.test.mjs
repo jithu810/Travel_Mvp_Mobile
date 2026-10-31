@@ -804,6 +804,12 @@ test('private memory deck preserves order and edit semantics without moving publ
  const stops=[memoryRow(sid,'First',{day:'1',rating:'0'}),memoryRow(uid,'Second')];
  const h=screenHarness({...privateForm(),stops});let tree=h.render();
  const deck=all(tree,'MemoryDeck')[0];assert.deepEqual(deck.props.stops.map(s=>s.id),stops.map(s=>s.id));
+ assert.equal(all(tree,'ScrollView')[0].props.scrollEnabled,false,'Normal portrait editor fits without vertical scrolling');
+ tree.props.onLayout({nativeEvent:{layout:{height:500}}});tree=h.render();
+ assert.equal(all(tree,'ScrollView')[0].props.scrollEnabled,true,'Short viewport keeps editor controls reachable');
+ tree.props.onLayout({nativeEvent:{layout:{height:800}}});tree=h.render();
+ assert.equal(all(tree,'ScrollView')[0].props.scrollEnabled,false,'Portrait restores fixed composition');
+ tree=h.render({keyboardOpen:true});assert.equal(all(tree,'ScrollView')[0].props.scrollEnabled,true,'Keyboard enables safe scroll fallback');tree=h.render();
  const scroll=all(tree,'ScrollView')[0];
  const footer=tree.props.children.flat(Infinity).find(node=>node?.type==='View' && all(node,'SwipeAction').length===1);
  assert.ok(footer,'Publish confirmation belongs to a direct footer sibling of the scroll');

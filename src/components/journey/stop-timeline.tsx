@@ -14,7 +14,7 @@ import { artSeed, validGeoPoint } from '@/lib/art/journey-art';
 // Photo-less (or failed-photo) stops show generated stop art instead of map images:
 // no network requests, and each stop looks distinct (its own highlight and tint).
 
-type CarouselProps = { stops: JourneyStop[]; horizontal: true; selectedId: string | null; onSelect: (id: string) => void; onDetails: (id: string) => void; stacked?: boolean; compact?: boolean; active?: boolean; photoActions?: ReactNode; optionsActions?: ReactNode; creator?: ReactNode };
+type CarouselProps = { stops: JourneyStop[]; horizontal: true; selectedId: string | null; onSelect: (id: string) => void; onDetails: (id: string) => void; onLoop?: (id: string, reducedMotion: boolean) => void; stacked?: boolean; fitted?: boolean; textScale?: number; compact?: boolean; active?: boolean; photoActions?: ReactNode; optionsActions?: ReactNode; creator?: ReactNode };
 export function StopTimeline(props: CarouselProps | { stops: JourneyStop[]; horizontal?: false }) {
   return props.horizontal ? props.stacked ? <StopCardDeck {...props} /> : <HorizontalStopTimeline {...props} /> : <VerticalStopTimeline stops={props.stops} />;
 }

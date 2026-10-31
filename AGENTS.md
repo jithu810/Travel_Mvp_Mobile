@@ -41,3 +41,7 @@ Read `IMPROVEMENT_BACKLOG.md` when planning discretionary mobile improvements. E
 
 ## Shared Android phone session
 For authorized physical-device work, follow `D:/Travel_Mvp/.agents/skills/phone-session/SKILL.md` once per conversation and after a device ownership change. Codex uses Metro/reverse port 8081; Claude Code uses 8082. Android wireless-debugging/pairing ports are separate and must come from the phone. One phone has one active testing owner: coordinate handoff before switching sessions; never replace the other session's mapping or stop its server. If the shared skill is unavailable, report it before operating the phone.
+
+## Approved UI preservation
+
+Read `docs/approved-mobile-ui.md` before any Mobile UI change. The owner approved the current page composition on 2026-10-31. Changes to a button, icon, image, copy or animation do not authorize adding scrolling, moving other elements, resizing cards/maps, changing the map shape/corners or status-bar treatment, or rearranging the slider/navigation. Preserve the existing approved layout and scroll behavior. Obtain explicit owner approval before any such additional change, including a new or broadened scroll fallback. If fitting conflicts with the requested change, report the conflict and ask instead of redesigning. Include layout/scroll preservation and actual verification evidence in UI reports; do not claim broad phone compatibility from single-device testing.

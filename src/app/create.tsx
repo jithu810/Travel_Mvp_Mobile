@@ -83,6 +83,8 @@ export function NewJourneyEditor({ ownerId, initial, onReload, onDestinationFocu
   const celebrate = useBuddyCelebration();
   const scroll = useBuddyScroll(), footerProtection = useBuddyProtectedBounds();
   const insets = useSafeAreaInsets(), window = useWindowDimensions();
+  const [editorHeight, setEditorHeight] = useState(0), [footerHeight, setFooterHeight] = useState(80);
+  const [minimumDeckHeight, setMinimumDeckHeight] = useState(420);
   const [reduceMotion, setReduceMotion] = useState(true);
   useEffect(() => {
     let active = true;
@@ -251,11 +253,12 @@ export function NewJourneyEditor({ ownerId, initial, onReload, onDestinationFocu
   const readiness = publicationIssue(form);
   // Guidance only: photos stay optional and never gate publishing.
   const photoHint = needsRemixPhotoHint(form.sourceId, form.stops, Object.keys(localPhotos.candidates));
-  const editorActions = <View style={[createStyles.actionRail, form.stops.length > 0 && { backgroundColor: 'rgba(5,15,30,0.58)' }]}>
-    <Pressable accessibilityRole="button" accessibilityLabel="Edit cover photo" disabled={disabled} accessibilityState={{ disabled, expanded: coverOpen }} onPress={() => { if (!disabled && !lock.current && !localPhotos.isBusy()) setCoverOpen(true); }} style={[createStyles.railButton, disabled && { opacity: 0.5 }]}><EditorActionIcon name="cover" light={form.stops.length > 0} /><Text style={[createStyles.railLabel, form.stops.length > 0 && { color: colors.white }]}>Cover</Text></Pressable>
-    <Pressable accessibilityRole="button" accessibilityLabel="Add memory" disabled={disabled || form.stops.length >= 50} accessibilityState={{ disabled: disabled || form.stops.length >= 50 }} onPress={addMemory} style={[createStyles.railButton, (disabled || form.stops.length >= 50) && { opacity: 0.5 }]}><EditorActionIcon name="add" light={form.stops.length > 0} /><Text style={[createStyles.railLabel, form.stops.length > 0 && { color: colors.white }]}>Add stop</Text></Pressable>
-    <Pressable accessibilityRole="button" accessibilityLabel="Save Draft" disabled={disabled} accessibilityState={{ disabled, busy }} onPress={() => { void save('draft'); }} style={[createStyles.railButton, disabled && { opacity: 0.5 }]}>{busy ? <ActivityIndicator color={colors.ink} /> : <EditorActionIcon name="save" light={form.stops.length > 0} />}<Text style={[createStyles.railLabel, form.stops.length > 0 && { color: colors.white }]}>Save draft</Text></Pressable>
-    <Pressable accessibilityRole="button" accessibilityLabel="Journey settings" disabled={disabled} accessibilityState={{ expanded: settingsOpen, disabled }} onPress={() => { if (!lock.current && !localPhotos.isBusy()) setSettingsOpen(true); }} style={[createStyles.railButton, disabled && { opacity: 0.5 }]}><EditorActionIcon name="settings" light={form.stops.length > 0} /><Text style={[createStyles.railLabel, form.stops.length > 0 && { color: colors.white }]}>Settings</Text></Pressable>
+  const selectedHasPhoto = Boolean((JSON.parse(memoryPhotos) as Record<string, string | null>)[selectedId || '']);
+  const editorActions = <View style={createStyles.actionRail}>
+    <Pressable accessibilityRole="button" accessibilityLabel="Edit cover photo" disabled={disabled} accessibilityState={{ disabled, expanded: coverOpen }} onPress={() => { if (!disabled && !lock.current && !localPhotos.isBusy()) setCoverOpen(true); }} style={[createStyles.railButton, disabled && { opacity: 0.5 }]}><EditorActionIcon name="cover" color={selectedHasPhoto ? '#FFFFFF' : form.stops.length ? '#122036' : undefined} /><Text style={[createStyles.railLabel, form.stops.length > 0 && (selectedHasPhoto ? createStyles.photoRailLabel : { color: '#122036' })]}>Cover</Text></Pressable>
+    <Pressable accessibilityRole="button" accessibilityLabel="Add memory" disabled={disabled || form.stops.length >= 50} accessibilityState={{ disabled: disabled || form.stops.length >= 50 }} onPress={addMemory} style={[createStyles.railButton, (disabled || form.stops.length >= 50) && { opacity: 0.5 }]}><EditorActionIcon name="add" color={selectedHasPhoto ? '#FFFFFF' : form.stops.length ? '#122036' : undefined} /><Text style={[createStyles.railLabel, form.stops.length > 0 && (selectedHasPhoto ? createStyles.photoRailLabel : { color: '#122036' })]}>Add stop</Text></Pressable>
+    <Pressable accessibilityRole="button" accessibilityLabel="Save Draft" disabled={disabled} accessibilityState={{ disabled, busy }} onPress={() => { void save('draft'); }} style={[createStyles.railButton, disabled && { opacity: 0.5 }]}>{busy ? <ActivityIndicator color={colors.ink} /> : <EditorActionIcon name="save" color={selectedHasPhoto ? '#FFFFFF' : form.stops.length ? '#122036' : undefined} />}<Text style={[createStyles.railLabel, form.stops.length > 0 && (selectedHasPhoto ? createStyles.photoRailLabel : { color: '#122036' })]}>Save draft</Text></Pressable>
+    <Pressable accessibilityRole="button" accessibilityLabel="Journey settings" disabled={disabled} accessibilityState={{ expanded: settingsOpen, disabled }} onPress={() => { if (!lock.current && !localPhotos.isBusy()) setSettingsOpen(true); }} style={[createStyles.railButton, disabled && { opacity: 0.5 }]}><EditorActionIcon name="settings" color={selectedHasPhoto ? '#FFFFFF' : form.stops.length ? '#122036' : undefined} /><Text style={[createStyles.railLabel, form.stops.length > 0 && (selectedHasPhoto ? createStyles.photoRailLabel : { color: '#122036' })]}>Settings</Text></Pressable>
   </View>;
   const firstStop = <View style={createStyles.firstStopCard}>
     <Text accessibilityRole="header" style={createStyles.firstStopTitle}>Where does your journey begin?</Text>
@@ -267,17 +270,21 @@ export function NewJourneyEditor({ ownerId, initial, onReload, onDestinationFocu
       <Pressable accessibilityRole="button" accessibilityLabel="Save Draft" disabled={disabled} accessibilityState={{ disabled, busy }} onPress={() => { void save('draft'); }} style={createStyles.secondaryAction}>{busy ? <ActivityIndicator color={colors.ink} /> : <EditorActionIcon name="save" />}<Text style={createStyles.secondaryLabel}>Save draft</Text></Pressable>
     </View>
   </View>;
-  return <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-    {editorFocused && <><StatusBar style="light" /><View pointerEvents="none" style={{ position: 'absolute', top: 0, left: 0, right: 0, height: insets.top, backgroundColor: '#101B2E', zIndex: 100 }} /></>}
-    <ScrollView {...scroll} style={{ flex: 1 }} contentContainerStyle={[ui.list, { gap: 10, paddingTop: 0, paddingBottom: 12, paddingHorizontal: 16 }]} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
-    <DraftMap geometry={geometry} photos={memoryPhotos} thumbnails={memoryThumbnails} remix={!!form.sourceId} selectedId={selectedId} onSelect={setSelectedMemoryId} active={editorFocused && !settingsOpen && !coverOpen && !memoryEdit && !busy && !photoBusy && (!form.sourceId || (!keyboardOpen && !uncertain))} height={form.sourceId ? Math.max(180, Math.min(310, window.height * 0.33)) : Math.max(180, Math.min(270, window.height * 0.29))} topInset={insets.top} />
-    <View pointerEvents="none" style={[createStyles.statusShade, { height: insets.top + 20 }]} />
-      <MemoryDeck emptyContent={firstStop} title={form.title} credit={form.sourceId ? <SourceAttribution key={form.sourceId} id={form.sourceId} variant="editor" /> : undefined} status={busy ? savePhase : photoBusy ? 'Preparing photo…' : uncertain ? 'Needs attention' : dirty ? 'Unsaved changes' : hasLocalPhotos ? 'Photos not saved' : 'Saved privately'} leading={<Pressable accessibilityRole="button" accessibilityLabel="Go back" onPress={() => router.canGoBack() ? router.back() : router.replace('/discover')} style={createStyles.heroBack}><Text accessible={false} style={createStyles.heroBackText}>‹</Text></Pressable>} stops={form.stops} selectedId={selectedId} onSelect={setSelectedMemoryId} active={editorFocused && !settingsOpen && !coverOpen && !memoryEdit && !busy && !photoBusy} actions={editorActions} renderMemory={(stop, index, cardWidth, swipe) => <MemoryRow deck swipeHandlers={swipe?.handlers} canInteract={swipe?.canInteract} key={stop.id} fallback={form.sourceId ? <StopArt seed={artSeed(form.sourceId, form.stops)} stops={form.stops} index={index} name={stop.name} accessibilityLabel={'Stop art. ' + (stop.name || 'Unnamed stop')} /> : undefined} cardWidth={cardWidth} selected={selectedId === stop.id} stop={stop} index={index} total={form.stops.length} disabled={disabled}
+  const availableHeight = editorHeight || window.height - insets.bottom - 80;
+  const fitted = form.stops.length > 0 && !keyboardOpen && !error && !message && !uncertain && !busy && !photoBusy && !photos.error
+    && window.fontScale <= 1 && availableHeight >= minimumDeckHeight + footerHeight + 157;
+  const previewHeight = fitted
+    ? Math.max(145, availableHeight - minimumDeckHeight - footerHeight - 12)
+    : form.sourceId ? Math.max(180, Math.min(310, window.height * 0.33)) : Math.max(180, Math.min(270, window.height * 0.29));
+  return <KeyboardAvoidingView onLayout={event => setEditorHeight(event.nativeEvent.layout.height)} style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    {editorFocused && <><StatusBar style="light" /><View pointerEvents="none" style={[createStyles.statusShade, { height: insets.top + 20, zIndex: 100 }]} /></>}
+    <ScrollView {...scroll} scrollEnabled={!fitted} bounces={!fitted} showsVerticalScrollIndicator={!fitted} style={{ flex: 1 }} contentContainerStyle={[ui.list, fitted && { flexGrow: 1, flexBasis: 0 }, { gap: 10, paddingTop: 0, paddingBottom: fitted ? 0 : 12, paddingHorizontal: 16 }]} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
+    <DraftMap geometry={geometry} photos={memoryPhotos} thumbnails={memoryThumbnails} remix={!!form.sourceId} selectedId={selectedId} onSelect={setSelectedMemoryId} active={editorFocused && !settingsOpen && !coverOpen && !memoryEdit && !busy && !photoBusy && (!form.sourceId || (!keyboardOpen && !uncertain))} height={previewHeight} topInset={insets.top} />
+      <MemoryDeck fitted={fitted} onMinimumHeight={setMinimumDeckHeight} emptyContent={firstStop} title={form.title} credit={form.sourceId ? <SourceAttribution key={form.sourceId} id={form.sourceId} variant="editor" /> : undefined} status={busy ? savePhase : photoBusy ? 'Preparing photo…' : uncertain ? 'Needs attention' : dirty ? 'Unsaved changes' : hasLocalPhotos ? 'Photos not saved' : 'Saved privately'} leading={<Pressable accessibilityRole="button" accessibilityLabel="Go back" onPress={() => router.canGoBack() ? router.back() : router.replace('/discover')} style={createStyles.heroBack}><Text accessible={false} style={createStyles.heroBackText}>‹</Text></Pressable>} stops={form.stops} selectedId={selectedId} onSelect={setSelectedMemoryId} active={editorFocused && !settingsOpen && !coverOpen && !memoryEdit && !busy && !photoBusy} actions={editorActions} renderMemory={(stop, index, cardWidth, swipe) => <MemoryRow deck fitted={fitted} textScale={window.fontScale} swipeHandlers={swipe?.handlers} canInteract={swipe?.canInteract} key={stop.id} fallback={form.sourceId ? <StopArt seed={artSeed(form.sourceId, form.stops)} stops={form.stops} index={index} name={stop.name} accessibilityLabel={'Stop art. ' + (stop.name || 'Unnamed stop')} /> : undefined} cardWidth={cardWidth} selected={selectedId === stop.id} stop={stop} index={index} total={form.stops.length} disabled={disabled}
         localPhoto={!!localPhotos.candidates[stop.id]} photoThumbnail={!localPhotos.candidates[stop.id] && stop.photoPath ? photos.data?.[thumbnailStoragePath(stop.photoPath) || ''] || null : null} photo={localPhotos.candidates[stop.id]?.uri || (stop.photoPath ? stop.photoPath.startsWith('journey-media/') ? photos.data?.[stop.photoPath] || null : safePhoto(stop.photoPath) : null)}
         onEdit={() => { if (!disabled && !lock.current && !localPhotos.isBusy()) { setSelectedMemoryId(stop.id); setError(null); setMemoryEdit({ value: { ...stop }, baseline: { ...stop }, isNew: false }); } }}
         onPhotoError={photos.refreshPreview} onMove={offset => change({ stops: moveStop(form.stops, index, offset) })} onRemove={() => removeMemory(stop)} />} />
 
-      {photoHint && <Text testID="remix-photo-hint" style={createStyles.photoHint}>{remixPhotoHint}</Text>}
       {photos.error && <Text style={ui.body}>Some photo previews are unavailable. Original photos remain preserved.</Text>}
       {error && !memoryEdit && <Text accessibilityRole="alert" style={ui.body}>{error}</Text>}
       {message && <Text accessibilityLiveRegion="polite" style={ui.body}>{message}</Text>}
@@ -285,7 +292,8 @@ export function NewJourneyEditor({ ownerId, initial, onReload, onDestinationFocu
         {attemptedStatus === 'published' && <Action label="Check public journey" onPress={() => router.push({ pathname: '/journey/[id]', params: { id: form.id } })} />}
         <Text style={ui.body}>The form is preserved. Check the save result before trying again.</Text></>}
     </ScrollView>
-    <View {...footerProtection} style={createStyles.editorFooter}>
+    <View {...footerProtection} onLayout={event => { footerProtection.onLayout(); setFooterHeight(event.nativeEvent.layout.height); }} style={createStyles.editorFooter}>
+      {photoHint && <Text testID="remix-photo-hint" style={createStyles.photoHint}>{remixPhotoHint}</Text>}
       {form.stops.length === 0 ? <Text style={createStyles.emptyGuidance}>Add a stop to start building your journey.</Text> : <>
       {(readiness || uncertain || busy) && <Text accessibilityLiveRegion="polite" style={createStyles.publishReason}>{readiness || (uncertain ? 'Check the save result before retrying.' : savePhase)}</Text>}
       <SwipeAction active={editorFocused && !settingsOpen && !coverOpen && !memoryEdit && !disabled && !readiness} onComplete={publish} label="Swipe to publish journey" accessibilityLabel="Publish Journey" hint="Make this journey public" accessibilityHint="Swipe right or double tap to publish this journey and its photos publicly." openingLabel="Preparing to publish…" resetKey={JSON.stringify([ownerId, form, localPhotos.candidates, uncertain])} /></>}
@@ -394,9 +402,9 @@ const createStyles = darkPilotStyles(StyleSheet.create({
   emptyMap: { marginHorizontal: -16, paddingHorizontal: 24, paddingBottom: 16, justifyContent: 'center', gap: 6, borderBottomLeftRadius: 28, borderBottomRightRadius: 28, backgroundColor: '#101B2E' }, emptyMapTitle: { color: '#FFFFFF', fontSize: 17, lineHeight: 23, fontWeight: '600' }, emptyMapNote: { color: '#D3DCEC', fontSize: 12, lineHeight: 18 },
   coverBand: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   statusShade: { position: 'absolute', top: 0, left: 0, right: 0, experimental_backgroundImage: 'linear-gradient(180deg, rgba(5,15,30,0.78) 0%, rgba(5,15,30,0) 100%)' },
-  actionRail: { width: 104, padding: 2, gap: 2, flexDirection: 'row', flexWrap: 'wrap', borderRadius: 14, backgroundColor: colors.pale }, railLabel: { color: colors.ink, fontSize: 9, lineHeight: 12, textAlign: 'center' }, railButton: { width: 48, minHeight: 48, justifyContent: 'center', alignItems: 'center' },
+  actionRail: { width: 56, gap: 2, flexDirection: 'column', backgroundColor: 'transparent' }, photoRailLabel: { color: colors.white, textShadowColor: '#000000', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 }, railLabel: { color: colors.ink, fontSize: 9, lineHeight: 12, textAlign: 'center' }, railButton: { width: 48, minHeight: 48, justifyContent: 'center', alignItems: 'center' },
   publishReason: { color: theme.muted, fontSize: 11, lineHeight: 16 },
-  photoHint: { color: theme.muted, fontSize: 12, lineHeight: 18, paddingHorizontal: 4 },
+  photoHint: { flexShrink: 0, color: theme.muted, fontSize: 10, lineHeight: 14, paddingHorizontal: 4 },
   settingsOverlay: { flex: 1, backgroundColor: 'rgba(15, 24, 43, 0.38)' },
   settingsAvoid: { flex: 1, justifyContent: 'flex-end' },
   settingsPanel: { maxHeight: '98%', width: '100%', maxWidth: 560, alignSelf: 'center', padding: 14, gap: 8, borderTopLeftRadius: 30, borderTopRightRadius: 30, borderWidth: 1, borderColor: '#FFFFFF', backgroundColor: '#EDF1F8', experimental_backgroundImage: 'linear-gradient(135deg, #FFF8F1 0%, #EDF1F8 55%, #E2EAF6 100%)' },
@@ -424,7 +432,7 @@ const createStyles = darkPilotStyles(StyleSheet.create({
   emptySymbolText: { color: colors.white, fontSize: 42 },
   emptyTitle: { color: colors.ink, fontSize: 18, lineHeight: 24, fontWeight: '600', textAlign: 'center' },
   emptyBody: { color: colors.muted, fontSize: 14, lineHeight: 22, textAlign: 'center' },
-  editorFooter: { flexShrink: 0, paddingHorizontal: 16, paddingTop: 12, paddingBottom: 0, gap: 4 },
+  editorFooter: { flexShrink: 0, paddingHorizontal: 16, paddingTop: 4, paddingBottom: 0, gap: 4 },
   editorActionRow: { flexDirection: 'row', alignItems: 'stretch', gap: 8 },
   editorActionSlot: { flex: 1, minWidth: 0 },
   publishAction: { ...primaryControl, flex: 1, minWidth: 0, minHeight: 48, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 14, borderWidth: 1, borderColor: colors.ink, justifyContent: 'center', alignItems: 'center' },

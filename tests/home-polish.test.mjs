@@ -62,7 +62,7 @@ function nodes(tree) {
 }
 const colors = { paper: '#fff' };
 test('shared Search route highlights only its selected entry point and Story detail stays on Story', () => {
-  for (const [path, view, active] of [['/search', undefined, 'search'], ['/search', 'search', 'search'], ['/search', 'stories', 'story'], ['/journey/a', undefined, 'story'], ['/account', undefined, 'account']]) {
+  for (const [path, view, active] of [['/search', undefined, 'search'], ['/search', 'search', 'search'], ['/search', 'stories', 'story'], ['/journey/a', undefined, 'story'], ['/customized/a', undefined, 'story'], ['/account', undefined, 'account']]) {
     const nav = load('src/components/floating-navigation.tsx', {
       'expo-router': { usePathname: () => path, useGlobalSearchParams: () => ({ view }) },
       'react-native-safe-area-context': {},
@@ -400,10 +400,10 @@ test('shared navigation selects each destination and frame includes only standar
     assert.equal(tree.props.style[1].bottom, 32);
     assert.equal(tree.props.style[0].backgroundColor, 'rgba(21, 34, 56, 0.98)');
   }
-  for (const path of ['/search', '/create', '/account', '/journey/a', '/profile/traveler', '/', '/discover', '/auth', '/draft/a', '/travel/a']) {
+  for (const path of ['/search', '/create', '/account', '/journey/a', '/customized/a', '/profile/traveler', '/', '/discover', '/auth', '/draft/a', '/travel/a', '/customize/a']) {
     const nav = load('src/components/floating-navigation.tsx', { 'expo-router': { usePathname: () => path }, 'react-native-safe-area-context': {} });
     const tree = nav.MainNavigationFrame({ children: 'screen' });
-    const expected = ['/search', '/create', '/account', '/journey/a', '/profile/traveler'].includes(path);
+    const expected = ['/search', '/create', '/account', '/journey/a', '/customized/a', '/profile/traveler'].includes(path);
     assert.equal(Boolean(tree.props.children[1]), expected, path);
     assert.equal(Boolean(tree.props.children[0].props.style[1]), expected);
     if (expected) assert.equal(tree.props.children[0].props.style[1].paddingBottom, 72);

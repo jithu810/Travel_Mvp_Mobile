@@ -200,6 +200,13 @@ test('Story preserves map browsing while Use opens Travel directly and Remix rem
   assert.equal(buddyState.ownStory, undefined, 'Auth restoration does not guess ownership');
   buddyAuth = { loading: false, session: null, error: null }; tree = h.render(Screen, props);
   assert.ok(find(tree, 'ScrollView'), 'Map and cards retain an accessible short-screen scroll fallback');
+  assert.equal(find(tree, 'ScrollView').props.scrollEnabled, false, 'Portrait story fits without vertical scrolling');
+  tree.props.onLayout({ nativeEvent: { layout: { height: 500 } } });
+  tree = h.render(Screen, props);
+  assert.equal(find(tree, 'ScrollView').props.scrollEnabled, true, 'A short viewport keeps controls reachable');
+  tree.props.onLayout({ nativeEvent: { layout: { height: 700 } } });
+  tree = h.render(Screen, props);
+  assert.equal(find(tree, 'ScrollView').props.scrollEnabled, false, 'Returning to portrait restores the fixed composition');
   assert.equal(find(find(tree, 'ScrollView'), 'SwipeJourneyStart'), null, 'Swipe stays below the card scroll area');
   assert.ok(find(tree, 'SwipeJourneyStart'));
   assert.equal(find(tree, 'StopTimeline').props.creator.type, 'StoryCreator');
@@ -291,12 +298,43 @@ test('Story preserves map browsing while Use opens Travel directly and Remix rem
   const routeCount = routes.length; find(tree, 'JourneyOptions').props.onUse(); assert.equal(routes.length, routeCount);
   assert.equal(all(tree, 'Pressable').some(item => item.props.accessibilityLabel === 'Start Journey'), false);
 
+  // Remixed public stories retain the same no-scroll composition as original stories.
+  const publicSourceProps = { ...props, journey: { ...journey, sourceId: 'public-source' } };
+  tree = h.render(Screen, publicSourceProps);
+  tree.props.onLayout({ nativeEvent: { layout: { height: 800 } } }); tree = h.render(Screen, publicSourceProps);
+  const sourceFooter = tree.props.children.find(node => node?.type === 'View' && find(node, 'SourceAttribution'));
+  assert.ok(sourceFooter, 'Attribution occupies measured footer space');
+  assert.equal(find(find(tree, 'ScrollView'), 'SourceAttribution'), null, 'Attribution cannot grow the fixed map/card surface');
+  sourceFooter.props.onLayout({ nativeEvent: { layout: { height: 128 } } }); tree = h.render(Screen, publicSourceProps);
+  assert.equal(find(tree, 'ScrollView').props.scrollEnabled, false, 'Remixed public Story must not introduce vertical scrolling');
+  const scrollRef = find(tree, 'ScrollView').props.ref; const offsets=[];scrollRef.current={scrollTo:value=>offsets.push(value)};
+  tree.props.onLayout({ nativeEvent: { layout: { height: 500 } } }); tree = h.render(Screen, publicSourceProps);
+  tree.props.onLayout({ nativeEvent: { layout: { height: 800 } } }); tree = h.render(Screen, publicSourceProps);
+  assert.deepEqual(offsets.at(-1),{y:0,animated:false},'Restoring fixed layout also restores a previously scrolled map to the top');
+
   // The identical Story presentation is safe for a synthetic temporary journey.
   const removed = [];let cardsBack=0;
   const temporary = { onBack:()=>{cardsBack++;}, onRemove: id => removed.push(id), editingBlocked: false, error: null };
   const selectedProps = { ...props, journey: { ...journey, creatorId: journeyId, sourceId: 'public-source' }, temporary };
   buddyAuth = { loading: false, session: { user: { id: journeyId } }, error: null };
   find(tree, 'StorySheet').props.onClose(); tree = h.render(Screen, selectedProps);
+  tree.props.onLayout({ nativeEvent: { layout: { height: 800 } } });
+  tree = h.render(Screen, selectedProps);
+  assert.equal(find(tree, 'ScrollView').props.scrollEnabled, false, 'Selected-stops preview fits its card and selection note');
+  const selectionFooter = tree.props.children.find(node => node?.type === 'View' && find(node, 'SwipeAction'));
+  assert.ok(selectionFooter, 'Selection note and swipe control occupy a direct footer sibling');
+  assert.equal(find(find(tree, 'ScrollView'), 'SwipeAction'), null);
+  selectionFooter.props.onLayout({ nativeEvent: { layout: { height: 300 } } });
+  tree = h.render(Screen, selectedProps);
+  assert.equal(find(tree, 'ScrollView').props.scrollEnabled, true, 'Measured taller footer enables fallback instead of clipping');
+  selectionFooter.props.onLayout({ nativeEvent: { layout: { height: 130 } } });
+  tree = h.render(Screen, selectedProps);
+  assert.equal(find(tree, 'ScrollView').props.scrollEnabled, false, 'Normal measured footer restores fixed composition');
+  tree.props.onLayout({ nativeEvent: { layout: { height: 500 } } });
+  tree = h.render(Screen, selectedProps);
+  assert.equal(find(tree, 'ScrollView').props.scrollEnabled, true, 'Short selected-stops preview retains accessible scrolling');
+  tree.props.onLayout({ nativeEvent: { layout: { height: 800 } } });
+  tree = h.render(Screen, selectedProps);
   assert.equal(find(tree, 'SocialActions'), null);assert.equal(find(tree, 'JourneyOptions'), null);assert.equal(find(tree, 'SourceAttribution'), null);
   assert.equal(buddyState.ownStory, undefined, 'Temporary IDs cannot become editable owned stories');
   assert.equal(find(tree,'JourneyMap').props.storyBuddyMotion,'run');
@@ -1732,7 +1770,7 @@ test('bounded live companion shares accepted off-route coordinates, leaves dot/h
   h.props.currentPosition = null; tree = h.render(); assert.equal(source(tree, 'travel-current-position'), undefined); assert.equal(source(tree, 'travel-buddy-companion'), undefined); h.dispose();
 });
 
-const storyPlayback = () => ({ select() {}, subscribe: () => () => {}, get: () => ({ coordinate: null, moving: false, facing: 'left', revision: 0 }), configure() {}, pause() {} });
+const storyPlayback = () => ({ select() {}, subscribe: () => () => {}, get: () => ({ coordinate: null, moving: false, facing: 'left', revision: 0 }), configure() {}, pause() {}, cancelLoop() {} });
 test('Story Buddy card selection moves the camera to the selected stop and never re-fits the journey, even for non-fitting overviews', async () => {
   const cases = [[[mappedStop('a', 0, 76, 8), mappedStop('b', 1, 77, 9)], 'b', false], [[mappedStop('a', 0, -170, 10), mappedStop('b', 1, 10, 20), mappedStop('c', 2, 170, 89)], 'b', true]];
   for (const [stops, target, polar] of cases) {
@@ -2031,4 +2069,29 @@ test('public Story owns light native status icons during loading, failure and un
     assert.equal(find(tree, 'NativeStoryOptions').props.options.statusBarStyle, 'light');
     assert.ok(status.loading ? find(tree, 'BrandedLoading') : find(tree, 'Message'));
   }
+});
+
+test('Story loop camera waits for jump and uses one slow return without changing normal selection speed',async()=>{
+ const listeners=new Set();let reduceListener;let snapshot={loopPhase:null,loopCameraRevision:0,loopTarget:null},pauses=0;
+ const cancelLoop=()=>{snapshot={...snapshot,loopPhase:null,loopTarget:null};};
+ const playback={...storyPlayback(),cancelLoop,get:()=>snapshot,subscribe(fn){listeners.add(fn);return()=>listeners.delete(fn);},pause(){pauses++;snapshot={...snapshot,loopPhase:null,loopTarget:null};}};
+ const emit=patch=>{snapshot={...snapshot,...patch};listeners.forEach(fn=>fn());};
+ const stops=[mappedStop('a',0,76,8),mappedStop('b',1,77,9),mappedStop('c',2,78,10)];
+ const h=nativeMapHarness(stops,{AccessibilityInfo:{isReduceMotionEnabled:()=>Promise.resolve(false),addEventListener:(_event,fn)=>{reduceListener=fn;return {remove(){}};}}});
+ Object.assign(h.props,{storyBuddy:playback,memoryPhotos:{},selectedId:'c',animateMemoryRoute:false});
+ let tree=h.measure();await Promise.resolve();tree=h.render();const commands=[];find(tree,'Camera').props.ref.current={setCamera:command=>commands.push(command)};
+ find(tree,'MapView').props.onDidFinishLoadingMap();tree=h.render();commands.length=0;
+ emit({loopPhase:'jump',loopTarget:[76,8]});h.props.selectedId='a';tree=h.render();assert.equal(commands.length,0,'First card does not rush camera ahead of jump');
+ emit({loopPhase:'return',loopCameraRevision:1});assert.equal(commands.length,1);assert.equal(commands[0].animationDuration,1600);assert.deepEqual(commands[0].centerCoordinate,[76,8]);assert.equal(commands[0].padding,undefined);
+ emit({moving:true});assert.equal(commands.length,1,'Position ticks never duplicate loop camera');
+ find(tree,'MapView').props.onCameraChanged({properties:{center:[77,9],zoom:8,heading:0,pitch:0},gestures:{isGestureActive:false}});
+ reduceListener(true);tree=h.render();assert.equal(commands.at(-1).animationDuration,0,'Reduced motion interrupts an already running loop camera');assert.deepEqual(commands.at(-1).centerCoordinate,[77,9]);
+ reduceListener(false);tree=h.render();
+
+ emit({loopPhase:null,loopTarget:null});h.props.selectedId='b';tree=h.render();assert.equal(commands.at(-1).animationDuration,450,'Normal card selection preserves its speed');
+ const pauseCount=pauses;emit({loopPhase:'jump',loopTarget:[76,8]});find(tree,'MapView').props.onTouchStart();assert.equal(snapshot.loopPhase,null,'User gesture cancels a pending loop');assert.equal(pauses,pauseCount,'Exploration cancels loop without disabling playback');find(tree,'MapView').props.onTouchEnd();
+ emit({loopPhase:'jump',loopTarget:[76,8]});all(tree,'Pressable').find(n=>n.props.accessibilityLabel==='Fit journey and reset map orientation').props.onPress();assert.equal(snapshot.loopPhase,null,'Explicit Fit cancels pending loop before fitting');
+ emit({loopPhase:'jump',loopTarget:[76,8]});find(tree,'MapView').props.onCameraChanged({properties:{center:[77,9],zoom:8,heading:0,pitch:0},gestures:{isGestureActive:true}});assert.equal(snapshot.loopPhase,null,'Native gestures also cancel pending loop if touch callback was missed');
+ emit({loopPhase:null,loopTarget:null,loopSelectionId:'a',loopCameraDuration:0});h.props.selectedId='a';tree=h.render();assert.equal(commands.at(-1).animationDuration,0,'Immediate restart never falls back to ordinary450ms selection motion');
+ h.dispose();const count=commands.length;emit({loopPhase:'return',loopCameraRevision:2,loopTarget:[76,8]});assert.equal(commands.length,count);assert.equal(listeners.size,0);
 });
