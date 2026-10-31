@@ -640,7 +640,7 @@ test('map header remains safe-area bounded and Close and Android back share dism
   assert.ok(find(tree, 'SafeAreaView'));
   assert.equal(find(tree, 'ScrollView'), null, 'Map is not inside the itinerary scroll surface');
   assert.equal(find(tree, 'Text').props.numberOfLines, 2);
-  assert.equal(find(tree, 'Pressable').props.style.minHeight, 44);
+  assert.ok(find(tree, 'Pressable').props.style.minHeight >= 48);
   find(tree, 'Pressable').props.onPress();
   find(tree, 'Modal').props.onRequestClose();
   assert.equal(closed, 2);
@@ -1837,6 +1837,36 @@ test('rail Make it yours announces a copy in progress and disables the copy choi
   const save = all(tree,'Pressable').find(n => n.props.accessibilityLabel === 'Save an editable copy');
   assert.equal(save.props.disabled, true); assert.equal(save.props.accessibilityState.busy, true);
 });
+test('StorySheet respects motion changes, ignores stale queries and cleans up on unmount', async () => {
+  const h = harness();
+  let resolveQuery, listener, removed = 0;
+  const accessibility = {
+    isReduceMotionEnabled: () => new Promise(resolve => { resolveQuery = resolve; }),
+    addEventListener: (event, callback) => { assert.equal(event, 'reduceMotionChanged'); listener = callback; return { remove() { removed++; } }; },
+  };
+  const { StorySheet } = load('src/components/journey/story-sheet.tsx', { 'react-native': { ...native, AccessibilityInfo: accessibility }, 'react-native-safe-area-context': { SafeAreaView: 'SafeAreaView' }, '@/components/discovery/ui': ui }, h.hooks);
+  const props = { visible: true, title: 'About', onClose() {}, children: 'Content' };
+  assert.equal(h.render(StorySheet, props).props.animationType, 'none');
+  listener(false);
+  assert.equal(h.render(StorySheet, props).props.animationType, 'slide');
+  resolveQuery(true); await Promise.resolve();
+  assert.equal(h.render(StorySheet, props).props.animationType, 'slide', 'A stale initial query cannot override a newer preference');
+  listener(true);
+  assert.equal(h.render(StorySheet, props).props.animationType, 'none');
+  h.dispose(); listener(false);
+  assert.equal(removed, 1);
+  assert.equal(h.lateUpdates(), 0);
+});
+
+test('StorySheet keeps motion disabled when the platform query fails', async () => {
+  const h = harness();
+  const { StorySheet } = load('src/components/journey/story-sheet.tsx', { 'react-native': { ...native, AccessibilityInfo: { ...native.AccessibilityInfo, isReduceMotionEnabled: async () => { throw new Error('unavailable'); } } }, 'react-native-safe-area-context': { SafeAreaView: 'SafeAreaView' }, '@/components/discovery/ui': ui }, h.hooks);
+  const props = { visible: true, title: 'About', onClose() {}, children: 'Content' };
+  h.render(StorySheet, props); await Promise.resolve(); await Promise.resolve();
+  assert.equal(h.render(StorySheet, props).props.animationType, 'none');
+  h.dispose();
+});
+
 test('StorySheet owns dark status icons only while visible and releases ownership when closed',()=>{
  const {StorySheet}=load('src/components/journey/story-sheet.tsx',{'react-native':native,'react-native-safe-area-context':{SafeAreaView:'SafeAreaView'},'@/components/discovery/ui':ui});
  const props={title:'Feedback',onClose(){},children:'Message'};

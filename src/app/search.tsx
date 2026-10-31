@@ -110,8 +110,8 @@ export default function SearchScreen() {
 const styles = StyleSheet.create({
   compactRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   compactField: { flex: 1, minWidth: 0 },
-  compactClear: { minWidth: 44, minHeight: 32, alignItems: 'center', justifyContent: 'center', marginVertical: -5 },
-  savedToggle: { minWidth: 44, minHeight: 44, paddingHorizontal: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, borderRadius: 22 },
+  compactClear: { minWidth: 48, minHeight: 48, alignItems: 'center', justifyContent: 'center' },
+  savedToggle: { minWidth: 48, minHeight: 48, paddingHorizontal: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, borderRadius: 22 },
   savedSelected: { backgroundColor: colors.pale, borderWidth: 1, borderColor: colors.green },
   savedLabel: { color: colors.ink, fontSize: 12, fontWeight: '600' },
   savedLabelSelected: { color: colors.green },
@@ -127,6 +127,6 @@ const styles = StyleSheet.create({
   hint: { fontSize: 11, lineHeight: 17, color: colors.muted },
   resultsHeader: { gap: 14, paddingBottom: 18 },
   places: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
-  chip: { minHeight: 44, justifyContent: 'center', paddingHorizontal: 14, borderRadius: 14, backgroundColor: colors.pale },
+  chip: { minWidth: 48, minHeight: 48, justifyContent: 'center', paddingHorizontal: 14, borderRadius: 14, backgroundColor: colors.pale },
   chipText: { color: colors.ink, fontSize: 12, fontWeight: '500' },
 });

@@ -34,5 +34,5 @@ const styles = StyleSheet.create({
   pressed: { opacity: 0.75 },
   caption: { position: 'absolute', left: 1, right: 1, bottom: 1, paddingHorizontal: 6, paddingTop: 4, paddingBottom: 5, backgroundColor: 'rgba(17, 17, 17, 0.62)' },
   title: { color: '#fff', fontSize: 11, lineHeight: 14, fontWeight: '700' },
-  destination: { color: 'rgba(255, 255, 255, 0.86)', fontSize: 10, lineHeight: 13, fontWeight: '500' },
+  destination: { color: '#fff', fontSize: 10, lineHeight: 13, fontWeight: '500' },
 });

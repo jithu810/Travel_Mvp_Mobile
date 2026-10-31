@@ -99,7 +99,7 @@ export default function AccountScreen() {
       <View style={s.shade}><SafeAreaView edges={['bottom', 'left', 'right']} style={s.sheet}><ScrollView keyboardShouldPersistTaps="handled">
         <View style={s.settingsRow}><Text accessibilityRole="header" style={s.heading}>Account settings</Text><Pressable accessibilityRole="button" accessibilityLabel="Close account settings" disabled={busy} onPress={() => setSettings(false)} style={s.close}><Text style={s.heading}>×</Text></Pressable></View>
         <View style={[s.settingsRow, { gap: 12, marginBottom: 12 }]}><View style={{ flex: 1 }}><Text style={s.heading}>Journey Buddy</Text><Text style={ui.body}>A tiny explorer for your adventures. Saved on this device.</Text></View>
-          <Switch accessibilityLabel="Journey Buddy" accessibilityHint="Show or hide your little journey helper" disabled={!buddy.loaded} value={buddy.enabled} onValueChange={buddy.setEnabled} /></View>
+          <Switch accessibilityLabel="Journey Buddy" accessibilityHint="Show or hide your little journey helper" style={{ minWidth: 48, minHeight: 48 }} disabled={!buddy.loaded} value={buddy.enabled} onValueChange={buddy.setEnabled} /></View>
         <Action label="Show Buddy greetings again" secondary onPress={resetBuddyGreetings} />
         {buddy.error && <Text accessibilityRole="alert" style={ui.body}>{buddy.error}</Text>}
         <TravelPreferencesSettings />

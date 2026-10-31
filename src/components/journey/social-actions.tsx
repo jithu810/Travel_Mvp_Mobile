@@ -57,7 +57,7 @@ export function SocialActions({ journey, compact = false, selectedMemoryId, layo
   const saveButton = <Pressable accessibilityRole="button" accessibilityLabel={social.state?.saved ? 'Remove journey from Saved' : 'Save journey'}
         accessibilityState={{ disabled, selected: social.state?.saved ?? false }} disabled={disabled}
         onPress={() => { act('save'); }} style={({ pressed }) => [styles.button, compact && styles.compactButton, social.state?.saved && styles.active, rail && styles.railButton, disabled && styles.disabled, pressed && styles.pressed]}>
-        {social.busy === 'save' ? <ActivityIndicator color={colors.ink} /> : rail ? <JourneyActionIcon name="bookmark" selected={social.state?.saved} color="#FFFFFF" /> : <Text style={[styles.label, compact && styles.compactLabel]}>{social.state?.saved ? (compact ? 'Saved' : 'Saved ✓') : 'Save'}</Text>}
+        {social.busy === 'save' ? <ActivityIndicator color={rail ? '#FFFFFF' : colors.ink} /> : rail ? <JourneyActionIcon name="bookmark" selected={social.state?.saved} color="#FFFFFF" /> : <Text style={[styles.label, compact && styles.compactLabel]}>{social.state?.saved ? (compact ? 'Saved' : 'Saved ✓') : 'Save'}</Text>}
       </Pressable>;
   return <View style={[styles.section, compact && styles.compactSection, rail && styles.railSection]}>
     <View style={[styles.row, compact && styles.compactRow, rail && styles.railRow]}>
@@ -65,13 +65,13 @@ export function SocialActions({ journey, compact = false, selectedMemoryId, layo
       <Pressable accessibilityRole="button" accessibilityLabel={social.state?.liked ? 'Unlike journey' : 'Like journey'}
         accessibilityState={{ disabled, selected: social.state?.liked ?? false }} disabled={disabled}
         onPress={() => { act('like'); }} style={({ pressed }) => [styles.button, compact && styles.compactButton, social.state?.liked && styles.active, rail && styles.railButton, disabled && styles.disabled, pressed && styles.pressed]}>
-        {social.busy === 'like' ? <ActivityIndicator color={colors.ink} /> : rail ? <View style={styles.iconCount}><JourneyActionIcon name="heart" selected={social.state?.liked} />{likes !== null && likes !== undefined && <Text maxFontSizeMultiplier={1.2} numberOfLines={1} style={styles.count}>{likes}</Text>}</View> : <Text style={[styles.label, compact && styles.compactLabel]}>{(compact ? (social.state?.liked ? '♥ Like' : '♡ Like') : social.state?.liked ? '♥ Unlike' : '♡ Like') + (likes !== null && likes !== undefined ? ' · ' + likes : '')}</Text>}
+        {social.busy === 'like' ? <ActivityIndicator color={rail ? '#FFFFFF' : colors.ink} /> : rail ? <View style={styles.iconCount}><JourneyActionIcon name="heart" selected={social.state?.liked} />{likes !== null && likes !== undefined && <Text maxFontSizeMultiplier={1.2} numberOfLines={1} style={styles.count}>{likes}</Text>}</View> : <Text style={[styles.label, compact && styles.compactLabel]}>{(compact ? (social.state?.liked ? '♥ Like' : '♡ Like') : social.state?.liked ? '♥ Unlike' : '♡ Like') + (likes !== null && likes !== undefined ? ' · ' + likes : '')}</Text>}
       </Pressable>
       {!saveFirst && saveButton}
       <Pressable ref={shareButton} accessibilityRole="button" accessibilityLabel="Share public journey"
         accessibilityState={{ disabled: sharing }} disabled={sharing} onPress={() => { const next = createShareArtwork(journey, selectedMemoryId, process.env.EXPO_PUBLIC_SITE_URL); if (next && selectedMemoryId !== undefined) setArtwork(next); else void shareLink(); }}
         style={({ pressed }) => [styles.button, compact && styles.compactButton, rail && styles.railButton, pressed && styles.pressed]}>
-        {sharing ? <ActivityIndicator color={colors.ink} /> : rail ? <JourneyActionIcon name="share" color="#FFFFFF" /> : <Text style={[styles.label, compact && styles.compactLabel]}>{compact ? 'Share' : 'Share ↗'}</Text>}
+        {sharing ? <ActivityIndicator color={rail ? '#FFFFFF' : colors.ink} /> : rail ? <JourneyActionIcon name="share" color="#FFFFFF" /> : <Text style={[styles.label, compact && styles.compactLabel]}>{compact ? 'Share' : 'Share ↗'}</Text>}
       </Pressable>
       {overlayFeedback && (social.error || social.auth.error || social.message || shareMessage) && <Pressable accessibilityRole="button" accessibilityLiveRegion="polite" accessibilityLabel={'View journey action feedback: ' + (social.error || social.auth.error || social.message || shareMessage || '')} onPress={() => setFeedbackOpen(true)} style={[styles.status, rail && styles.railStatus]}><Text style={styles.label}>!</Text></Pressable>}
     </View>
@@ -81,21 +81,21 @@ export function SocialActions({ journey, compact = false, selectedMemoryId, layo
 }
 const styles = StyleSheet.create({
   iconCount: { alignItems: 'center' }, count: { color: '#FFFFFF', fontSize: 9, lineHeight: 11, fontWeight: '700' },
-  railSection: { marginTop: 0, gap: 0 }, railRow: { flexDirection: 'column', flexWrap: 'nowrap', gap: 3 },
-  railButton: { width: 44, minWidth: 44, minHeight: 44, flexBasis: 'auto', flexGrow: 0, paddingHorizontal: 2, paddingVertical: 3, borderRadius: 14, backgroundColor: 'transparent', borderWidth: 0 },
-  railLabel: { fontSize: 10, lineHeight: 15, textAlign: 'center' }, railStatus: { position: 'absolute', right: 48, top: 0 },
+  railSection: { marginTop: 0, gap: 0 }, railRow: { flexDirection: 'column', flexWrap: 'nowrap', gap: 3, backgroundColor: '#101B2E', borderRadius: 14 },
+  railButton: { width: 48, minWidth: 48, minHeight: 48, flexBasis: 'auto', flexGrow: 0, paddingHorizontal: 2, paddingVertical: 3, borderRadius: 14, backgroundColor: 'transparent', borderWidth: 0 },
+  railLabel: { fontSize: 10, lineHeight: 15, textAlign: 'center' }, railStatus: { position: 'absolute', right: 52, top: 0 },
   compactSection: { flex: 1, minWidth: 0, marginTop: 0 },
   compactRow: { flexWrap: 'wrap', gap: 3 },
-  compactButton: { minWidth: 44, flexBasis: 44, paddingHorizontal: 3, paddingVertical: 4, backgroundColor: 'transparent', borderWidth: 0 },
+  compactButton: { minWidth: 48, flexBasis: 48, paddingHorizontal: 3, paddingVertical: 4, backgroundColor: 'transparent', borderWidth: 0 },
   compactLabel: { fontSize: 12 },
-  status: { width: 44, minHeight: 44, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.pale, borderRadius: 22 },
+  status: { width: 48, minHeight: 48, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.pale, borderRadius: 22 },
   section: { gap: 10, marginTop: -8 },
   row: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  button: { minHeight: 44, flexGrow: 1, flexBasis: 90, minWidth: 90, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 10, borderRadius: 14, backgroundColor: colors.white, borderWidth: 1, borderColor: colors.line },
+  button: { minHeight: 48, flexGrow: 1, flexBasis: 90, minWidth: 90, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 10, borderRadius: 14, backgroundColor: colors.white, borderWidth: 1, borderColor: colors.line },
   active: { backgroundColor: colors.pale, borderColor: colors.green },
   disabled: { opacity: 0.6 }, pressed: { opacity: 0.7 },
   label: { color: colors.ink, fontSize: 13, fontWeight: '600' },
   note: { color: colors.muted, fontSize: 12, lineHeight: 19, flexShrink: 1 },
   feedback: { gap: 8 },
-  retry: { minHeight: 44, justifyContent: 'center', alignSelf: 'flex-start', paddingHorizontal: 12, borderRadius: 12, backgroundColor: colors.pale },
+  retry: { minHeight: 48, justifyContent: 'center', alignSelf: 'flex-start', paddingHorizontal: 12, borderRadius: 12, backgroundColor: colors.pale },
 });

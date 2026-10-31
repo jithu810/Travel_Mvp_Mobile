@@ -100,19 +100,19 @@ export function JourneyOptions({ id, onUse, inlineFeedback = false, menu, presen
 }
 
 const styles = StyleSheet.create({
-  rail: { gap: 3, flexDirection: 'row' }, railLabel: { color: colors.ink, fontSize: 10, lineHeight: 14, fontWeight: '600', textAlign: 'center' }, railButton: { minWidth: 56, minHeight: 54, paddingHorizontal: 3, borderRadius: 14, backgroundColor: 'transparent', alignItems: 'center', justifyContent: 'center' }, railFeedback: { alignSelf: 'center', width: 44, minHeight: 44, borderRadius: 22, backgroundColor: colors.pale, alignItems: 'center', justifyContent: 'center' },
-  choice: { flexDirection: 'row', alignItems: 'flex-start', gap: 14, minHeight: 44, padding: 16, borderRadius: 20, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.white },
+  rail: { gap: 3, flexDirection: 'row' }, railLabel: { color: colors.ink, fontSize: 10, lineHeight: 14, fontWeight: '600', textAlign: 'center' }, railButton: { minWidth: 56, minHeight: 54, paddingHorizontal: 3, borderRadius: 14, backgroundColor: 'transparent', alignItems: 'center', justifyContent: 'center' }, railFeedback: { alignSelf: 'center', width: 48, minHeight: 48, borderRadius: 22, backgroundColor: colors.pale, alignItems: 'center', justifyContent: 'center' },
+  choice: { flexDirection: 'row', alignItems: 'flex-start', gap: 14, minHeight: 48, padding: 16, borderRadius: 20, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.white },
   choiceText: { flex: 1, minWidth: 0, gap: 4 }, choiceTitle: { color: colors.ink, fontSize: 15, lineHeight: 21, fontWeight: '700' },
   menuOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.35)' },
   menuBackdrop: { position: 'absolute', top: 0, bottom: 0, left: 0, right: 0 },
   menuPanel: { maxHeight: '80%', backgroundColor: colors.paper, borderTopLeftRadius: 24, borderTopRightRadius: 24 },
   menuContent: { padding: 22, gap: 12 },
-  menuAction: { minHeight: 44, justifyContent: 'center', paddingVertical: 8 },
-  feedback: { minWidth: 44, minHeight: 44, justifyContent: 'center', alignItems: 'center' },
+  menuAction: { minHeight: 48, justifyContent: 'center', paddingVertical: 8 },
+  feedback: { minWidth: 48, minHeight: 48, justifyContent: 'center', alignItems: 'center' },
   card: { width: '100%', maxWidth: 300, padding: 6, borderRadius: 32, backgroundColor: colors.paper, borderWidth: 1, borderColor: colors.line, shadowColor: colors.ink, shadowOpacity: 0.16, shadowRadius: 14, shadowOffset: { width: 0, height: 5 }, elevation: 7 },
   buttons: { flexDirection: 'row', gap: 6 },
-  use: { ...primaryControl, flex: 1, minHeight: 44, paddingHorizontal: 12, paddingVertical: 10, borderRadius: 24, alignItems: 'center', justifyContent: 'center' },
+  use: { ...primaryControl, flex: 1, minHeight: 48, paddingHorizontal: 12, paddingVertical: 10, borderRadius: 24, alignItems: 'center', justifyContent: 'center' },
   useLabel: { color: colors.white, fontSize: 13, lineHeight: 19, fontWeight: '600', textAlign: 'center' },
-  remix: { flex: 1, minHeight: 44, paddingHorizontal: 16, paddingVertical: 10, borderRadius: 24, borderWidth: 1, borderColor: colors.ink, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.pale },
+  remix: { flex: 1, minHeight: 48, paddingHorizontal: 16, paddingVertical: 10, borderRadius: 24, borderWidth: 1, borderColor: colors.ink, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.pale },
   remixLabel: { color: colors.ink, fontSize: 13, lineHeight: 19, fontWeight: '600', textAlign: 'center' },
 });

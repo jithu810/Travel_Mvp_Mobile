@@ -1,3 +1,46 @@
+Publication request 2026-10-31: owner authorized committing/pushing the completed R5 snapshot on feature/backlog-phase1 and updating draft PR https://github.com/jithu810/Travel_Mvp_Mobile/pull/29. Earlier local/unpublished notes are historical checkpoints. Merge and production deployment remain unauthorized; confirmed revision/publication status belongs to the PR.
+
+## R5 completed on tested Android scope - 2026-10-31
+
+Code complete, final Outdoor APK installed/hash verified, and physical CPH2813/Android16 portrait checks complete across nine R5 areas; TalkBack removed by owner. Normal/2.0 text,contrast/targets,motion,keyboard/safe areas,Buddy overlap,scroll/maps and bounded resource sampling recorded. Temporary owner-approved private test draft deleted; no memories/photos uploaded/saved. Original font/motion1.0,density480 retained. Focused tests/type/lint and independent code/evidence reviews pass. Backlog17/24 complete,7 open; R4 GPS/network next. Single-device scope and high measured memory footprint remain limits,not platform certification. All work local/unpublished. See docs/qa/r5-final-qa-2026-10-31.md. Earlier R5 pending/build notes below are historical.
+
+## Updated R5 APK build - 2026-10-31
+
+Offline ARM64 Outdoor build passed with freshly regenerated configured JS bundle; package/signature verified against installed app. Installation confirmed at10:23:50; on-device APK hash matches verified build. Outdoor launches and populated Home/account avatar verified. Updated-build physical checks remain unverified, R5 open,16/24. Details: docs/qa/r5-updated-build-2026-10-31.md. Local/unpublished; no app data clear or hosted writes.
+
+## Owner scope update - 2026-10-31
+
+Owner scope decision (2026-10-31): TalkBack/screen-reader testing is removed from the planned backlog and R5 acceptance criteria; no replacement task is planned. Earlier TalkBack pending/deferred notes below are historical and no longer requirements. Existing accessibility labels remain in the app. R5 stays open for its other pending checks; completion remains 16/24.
+
+## Home reduced motion / caption contrast — 2026-10-31
+- Installed Outdoor Home stayed static in two identical reduced-motion frames4s apart; normal globe/Buddy animation resumed afterward. Restored transition scale1.0,font1.0; no GPS/preferences/data changes. Home-only evidence,not a full motion pass.
+- Found bright-photo destination-caption contrast4.41477:1; changed destination foreground to opaque white locally for worst-case5.29465:1.10 Search tests/calculation/whitespace/self-review pass. This new one-line fix is NOT in installed Outdoor APK or JBuild; no build/install/publication performed. Broad R5 remains open,16/24; docs/qa/r5-motion-contrast-2026-10-31.md.
+
+## Outdoor Story/settings large-text check — 2026-10-31
+- Installed release at360dp/2.0 text: Story actions reachable by scroll; options/About and Account settings readable/closable. Selected accessible bounds recorded; full hit-target audit remains partial. Restored1.0; no source changes,new build,saves,preferences or GPS/trip activation.
+- No blocking layout issue found in checked scope. No application tests repeated for unchanged APK; documentation self-review/whitespace only. Broad R5 remains open,16/24. Local/unpublished evidence: docs/qa/r5-outdoor-story-settings-2026-10-31.md.
+
+## Updated Journey Outdoor installed — 2026-10-31
+- Owner-approved local Gradle ARM64 release build in D:/JBuild succeeded and adb install-r updated Outdoor in place. Verified package/signature and installed APK SHA256 EF949F0F42B5846F50EFD61ED5369B05C9C852CB3280A90A15C7A95DD05E6ECF; no data clear, separate dev client intact. No EAS quota/Git publication/deployment.
+- With Metro stopped, first Home visible by5.8s and repeat by3.1s; prolonged dev blank not reproduced in two samples. Short navigation3.19% deadline misses,PSS~690MiB; not a controlled cross-build benchmark. Metro restored,phone left on Outdoor at normal text.
+- Full QA initial929/931; stale source-string test cleaned with92/92 affected tests passing,isolated sandbox PG retry1/1 passing; typecheck/lint pass. Independent source/sync/test/artifact review has no actionable findings. Build/install/comparison complete; broader R5/R4 remain open,16/24. Evidence: docs/qa/outdoor-local-build-2026-10-31.md and outdoor-build-qa-2026-10-31.md.
+
+## R5 startup trace — 2026-10-31
+- Cached Metro main bundle107ms; root render~6.3s after launch. Temporary entry trace showed~3.8s bundle-response-to-entry,686ms entry-to-root-module and390ms root-to-render. Cause unproven; no auth/data behavior change warranted.
+- Probes removed; original package main/Metro/root layout restored without diff, original Metro restarted. Prior local fixes retained. Next comparison requires approval to build/install the existing preview-profile APK; it shares the dev-client package. R5 stays open; details in performance QA note.
+
+## R5 development performance sample — 2026-10-31
+- Measured CPH2813 dev-client cold/warm starts and navigation: Home by 10.8s in first cold sample; repeat blank through 22.5s then recovered; warm return native wait32ms/Home screenshot after1s. Short navigation 7.37% deadline misses; PSS~776MiB. No release benchmark or confirmed cause; R5 stays open, 16/24.
+- Fixed garbled default loader text only; 5 loading tests/scoped lint/whitespace and Architect self-review pass. No hosted writes or new build. Local/unpublished. Evidence/limits: docs/qa/r5-performance-2026-10-31.md.
+
+## R5 keyboard/footer slice — 2026-10-31
+- Fixed large-text Mapbox attribution/Close overflow in shared place suggestions. CPH2813 verified Home keyboard at 1.0/2.0 and Search/Create keyboard controls at 2.0. Restored original text; no saves/hosted writes.
+- 82 affected tests, scoped lint, whitespace and Architect self-review pass. Prolonged blank dev reload recovered after app-only restart; cause/release behavior unverified. Broader keyboard matrix and performance pending; R5 remains open, 16/24 complete. Local/unpublished; docs/qa/r5-keyboard-2026-10-31.md.
+
+## R5 Home large-text slice — 2026-10-31
+- Fixed Home place-search clipping and narrow Create-banner copy at 2.0 text scale. CPH2813/Codex8081 verified; original 1.0 setting restored. Search/Account readability and Create scroll reachability checked.
+- 82 affected tests, final 17 Home regressions, TypeScript/scoped lint and Architect self-review pass. UI-only; no hosted writes. Local/unpublished. Broader R5 stays open, 16/24 complete; keyboard/performance and remaining accessibility checks pending. See docs/qa/r5-home-large-text-2026-10-31.md.
+
 ## Completed local update set reviewed - 2026-10-30
 - B2 preferences, B3 Saved continuation, U8 first-outcome guidance and completed R5/R6 UI slices reviewed together. 225/225 affected tests, TypeScript, scoped ESLint and whitespace checks pass; independent Code Reviewer found no actionable issues in the stable combined snapshot.
 - Prepared for local commit only; no GitHub push, merge, deployment or hosted write. Pilot documents already committed as c1ed4d5. Overall 16/24 complete, 8 open; E2 prepared but deferred for lack of participants, broader R4/R5/R6 and B4/E1/U4/E4 remain open. Existing phone evidence and limits are in docs/qa; full suite not repeated for this bounded combined review.
@@ -1080,3 +1123,6 @@ Turn-by-turn Android checklist: reload the existing development client, Begin Tr
 Travel camera Android checklist: reload the compatible development client, Begin Trip and wait for eligible GPS; verify street-level centering and blue route visibility. Walk or move safely and check following; pan/pinch/rotate, preview a stop or Fit Journey and verify exploration stays put until My Location. Expand/collapse details on a short screen and with larger text; check the control stays above the sheet and separate from compass, header and session controls. Check denial, unavailable/weak/stale GPS feedback, Pause/Resume, early Finish/final completion, Exit/reentry and background/foreground. Camera work adds no native dependency, so no new development build is expected.
 
 Initial documentation handoff: branch main, latest commit 448b1ea (chore: back up mobile app progress); package.json and package-lock.json already modified. The initial documentation task updated AGENTS.md and added these status/roadmap files. Navigation Milestone 1 adds the mobile route module/hook, Travel Mode/map wiring and focused tests, preserving pre-existing changes. No environment, backend, web, dependency, commit, push or deployment changes were made.
+
+### R5 local follow-up � 2026-10-31
+Prepared48dp touch targets in browsing/Create/Profile controls and platform-aware reduced-motion transitions in StorySheet. Source-only changes are newer than installed Outdoor; no rebuild/install or GitHub publication. Story tests66/66, TypeScript and StorySheet lint pass. R5 remains open for updated-build physical layout checks and remaining R5 checks; R4 GPS/network checks next. Details: docs/qa/r5-browsing-audit-2026-10-31.md.

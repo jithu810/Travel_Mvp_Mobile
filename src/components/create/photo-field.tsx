@@ -50,7 +50,7 @@ const s = StyleSheet.create({
   label: { color: colors.ink, fontSize: 15, lineHeight: 21, fontWeight: '600' }, badge: { color: colors.ink, fontSize: 12, lineHeight: 18, fontWeight: '600' },
   actions: { flex: 1, minWidth: 144, flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   button: { minHeight: 72, flexGrow: 1, flexBasis: 64, minWidth: 64, paddingHorizontal: 6, paddingVertical: 6, borderRadius: 16, borderWidth: 1, borderColor: colors.line, backgroundColor: theme.surface, alignItems: 'center', justifyContent: 'center', gap: 4 },
-  compactButton: { minHeight: 44, flexGrow: 1, flexBasis: 70, minWidth: 64, padding: 6, borderRadius: 12, backgroundColor: colors.pale, alignItems: 'center', justifyContent: 'center', gap: 2 },
+  compactButton: { minHeight: 48, flexGrow: 1, flexBasis: 70, minWidth: 64, padding: 6, borderRadius: 12, backgroundColor: colors.pale, alignItems: 'center', justifyContent: 'center', gap: 2 },
   icon: { color: colors.ink, fontSize: 22, lineHeight: 24 }, link: { color: colors.ink, fontSize: 11, lineHeight: 15, textAlign: 'center' },
   note: { color: colors.muted, fontSize: 12, lineHeight: 18 },
 });

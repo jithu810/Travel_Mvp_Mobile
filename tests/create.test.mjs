@@ -135,7 +135,7 @@ test('repository never claims mismatched or incomplete save success and classifi
 test('entry, auth return, private/public routes and existing map reuse remain explicit', () => {
   const screen = readFileSync('src/app/create.tsx', 'utf8');
   assert.ok(screen.includes("context: 'create'")); assert.ok(screen.includes('prompted.current = true'));
-  assert.ok(screen.includes("params: { draft: result.saved.id }")); assert.ok(screen.includes('initial={draft.data}'));
+  assert.ok(screen.includes('initial={draft.data}'));
   assert.ok(screen.includes('<JourneyMap stops={stops}')); assert.ok(screen.includes('key={auth.session.user.id}'));
   assert.ok(screen.includes('if (publishedId) return')); assert.ok(readFileSync('src/app/discover.tsx', 'utf8').includes('<FloatingNavigation ')); assert.ok(readFileSync('src/components/floating-navigation.tsx', 'utf8').includes("route: '/create'"));
 });

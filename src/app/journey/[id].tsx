@@ -1,3 +1,4 @@
+import { primaryControl } from '@/theme/mobile-theme';
 import { SwipeAction, SwipeJourneyStart } from '@/components/journey/swipe-journey-start';
 import { useBuddyScreen } from '@/hooks/use-journey-buddy';
 import { useSessionState } from '@/hooks/session-context';
@@ -132,18 +133,18 @@ export function JourneyStoryContent({ journey, refresh, refreshing, error, saveF
   </View>;
 }
 const styles = StyleSheet.create({
-  mapBack: { position: 'absolute', left: 6, width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
+  mapBack: { position: 'absolute', left: 6, width: 48, height: 48, alignItems: 'center', justifyContent: 'center' },
   mapControlFace: { width: 34, height: 34, borderRadius: 17, backgroundColor: colors.paper, alignItems: 'center', justifyContent: 'center' },
   mapControlIcon: { transform: [{ scale: 0.75 }] },
   mapBackGlyph: { color: colors.ink, fontSize: 28, lineHeight: 32 },
-  removeStop: { minHeight: 44, minWidth: 60, paddingHorizontal: 8, justifyContent: 'center', alignItems: 'center', borderRadius: 16, backgroundColor: colors.paper },
+  removeStop: { minHeight: 48, minWidth: 60, paddingHorizontal: 8, justifyContent: 'center', alignItems: 'center', borderRadius: 16, backgroundColor: colors.paper },
   removeLabel: { fontSize: 12, color: colors.ink, fontWeight: '600' },
   selectionNote: { paddingHorizontal: 8, gap: 6 },
   statusShade: { position: 'absolute', top: 0, left: 0, right: 0, experimental_backgroundImage: 'linear-gradient(180deg, rgba(5,15,30,0.78) 0%, rgba(5,15,30,0.55) 65%, rgba(5,15,30,0) 100%)' },
   screen: { flex: 1, minHeight: 0 },
   content: { paddingHorizontal: 16, paddingTop: 0, paddingBottom: 12, gap: 8 },
   toolbar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  toolbarButton: { minHeight: 44, minWidth: 44, alignItems: 'center', justifyContent: 'center', borderRadius: 22, backgroundColor: '#EDF1F8' },
+  toolbarButton: { minHeight: 48, minWidth: 48, alignItems: 'center', justifyContent: 'center', borderRadius: 22, backgroundColor: '#EDF1F8' },
   toolbarText: { color: '#18243B', fontSize: 22 },
   story: { padding: 14, gap: 6, borderRadius: 22, backgroundColor: '#F0F3F9', borderWidth: 1, borderColor: '#FFFFFF' },
   compactTitle: { flex: 1, minWidth: 0, minHeight: 44, justifyContent: 'center', paddingHorizontal: 8 },
@@ -153,18 +154,18 @@ const styles = StyleSheet.create({
   people: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 44 },
   creator: { width: '34%', minWidth: 0 },
   preview: { marginHorizontal: -16, borderBottomLeftRadius: 28, borderBottomRightRadius: 28, overflow: 'hidden', backgroundColor: '#080F1E' },
-  mapOptions: { position: 'absolute', top: 58, right: 8, minHeight: 44, minWidth: 44, borderRadius: 22, backgroundColor: colors.paper, alignItems: 'center', justifyContent: 'center' },
-  expand: { position: 'absolute', top: 4, right: 6, height: 44, width: 44, justifyContent: 'center', alignItems: 'center' },
+  mapOptions: { position: 'absolute', top: 58, right: 8, minHeight: 48, minWidth: 48, borderRadius: 22, backgroundColor: colors.paper, alignItems: 'center', justifyContent: 'center' },
+  expand: { position: 'absolute', top: 4, right: 6, height: 48, width: 48, justifyContent: 'center', alignItems: 'center' },
   expandLabel: { color: colors.ink, fontWeight: '700', fontSize: 12 },
   mapCaption: { paddingTop: 6, flexShrink: 0 }, selectedStop: { minHeight: 48, justifyContent: 'center', gap: 2 },
   routeNote: { color: colors.muted, fontSize: 10, lineHeight: 14, paddingTop: 6, flexShrink: 0 },
-  start: { minHeight: 48, marginTop: 8, paddingVertical: 6, paddingHorizontal: 16, borderRadius: 16, backgroundColor: '#6555CF', experimental_backgroundImage: 'linear-gradient(110deg, #AA54DB 0%, #246BE0 100%)', flexShrink: 0, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
-  startLabel: { color: colors.white, fontSize: 14, fontWeight: '700' }, startHint: { color: colors.paper, fontSize: 10, flexShrink: 1 },
+  start: { minHeight: 48, marginTop: 8, paddingVertical: 6, paddingHorizontal: 16, borderRadius: 16, backgroundColor: primaryControl.backgroundColor, experimental_backgroundImage: primaryControl.experimental_backgroundImage, flexShrink: 0, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
+  startLabel: { color: colors.white, fontSize: 14, fontWeight: '700' }, startHint: { color: colors.white, fontSize: 10, flexShrink: 1 },
   stopName: { color: colors.ink, fontSize: 18, lineHeight: 24, fontWeight: '600' },
   eyebrow: { color: colors.green, fontSize: 11, lineHeight: 17, fontWeight: '700' },
   note: { color: colors.muted, fontSize: 11, lineHeight: 18 },
-  textAction: { minHeight: 44, justifyContent: 'center', paddingVertical: 8 }, link: { color: colors.ink, fontSize: 13, fontWeight: '600', lineHeight: 20 },
-  refreshStatus: { position: 'absolute', top: 14, right: 70, width: 44, height: 44, borderRadius: 22, backgroundColor: colors.paper, alignItems: 'center', justifyContent: 'center' },
+  textAction: { minHeight: 48, justifyContent: 'center', paddingVertical: 8 }, link: { color: colors.ink, fontSize: 13, fontWeight: '600', lineHeight: 20 },
+  refreshStatus: { position: 'absolute', top: 14, right: 70, width: 48, height: 48, borderRadius: 22, backgroundColor: colors.paper, alignItems: 'center', justifyContent: 'center' },
   unavailable: { flex: 1 }, loading: { flex: 1, gap: 16, padding: 20 },
   coverPlaceholder: { flex: 1, maxHeight: 240, borderRadius: 24, backgroundColor: colors.line }, message: { paddingHorizontal: 22 },
 });

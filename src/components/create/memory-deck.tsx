@@ -84,7 +84,7 @@ export function MemoryDeck({ stops, selectedId, onSelect, renderMemory, actions,
 const s = StyleSheet.create({
   heading: { flex: 1, minWidth: 0 }, headingTitle: { color: theme.text, fontSize: 16, lineHeight: 22, fontWeight: '600' },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }, progress: { color: theme.muted, fontSize: 12, lineHeight: 18 }, controls: { flexDirection: 'row' },
-  arrow: { minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' }, arrowText: { color: theme.accent, fontSize: 18 },
+  arrow: { minWidth: 48, minHeight: 48, alignItems: 'center', justifyContent: 'center' }, arrowText: { color: theme.accent, fontSize: 18 },
   stack: { paddingTop: 12 }, rear: { position: 'absolute', borderRadius: 22, backgroundColor: theme.lavender, overflow: 'hidden' },
   actions: { position: 'absolute', right: 8, top: 24 }, empty: { minHeight: 160, padding: 16, borderRadius: 22, backgroundColor: theme.surface, flexDirection: 'row', gap: 8, alignItems: 'center' }, emptyCopy: { flex: 1, gap: 8 },
   title: { color: theme.text, fontSize: 18, fontWeight: '700' }, note: { color: theme.muted, fontSize: 12, lineHeight: 18 },

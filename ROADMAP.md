@@ -1,3 +1,38 @@
+Publication request 2026-10-31: owner authorized committing/pushing the completed R5 snapshot on feature/backlog-phase1 and updating draft PR https://github.com/jithu810/Travel_Mvp_Mobile/pull/29. Earlier local/unpublished notes are historical checkpoints. Merge and production deployment remain unauthorized; confirmed revision/publication status belongs to the PR.
+
+## R5 completed on tested Android scope - 2026-10-31
+
+Code complete, final Outdoor APK installed/hash verified, and physical CPH2813/Android16 portrait checks complete across nine R5 areas; TalkBack removed by owner. Normal/2.0 text,contrast/targets,motion,keyboard/safe areas,Buddy overlap,scroll/maps and bounded resource sampling recorded. Temporary owner-approved private test draft deleted; no memories/photos uploaded/saved. Original font/motion1.0,density480 retained. Focused tests/type/lint and independent code/evidence reviews pass. Backlog17/24 complete,7 open; R4 GPS/network next. Single-device scope and high measured memory footprint remain limits,not platform certification. All work local/unpublished. See docs/qa/r5-final-qa-2026-10-31.md. Earlier R5 pending/build notes below are historical.
+
+## Updated R5 APK build - 2026-10-31
+
+Offline ARM64 Outdoor build passed with freshly regenerated configured JS bundle; package/signature verified against installed app. Installation confirmed at10:23:50; on-device APK hash matches verified build. Outdoor launches and populated Home/account avatar verified. Updated-build physical checks remain unverified, R5 open,16/24. Details: docs/qa/r5-updated-build-2026-10-31.md. Local/unpublished; no app data clear or hosted writes.
+
+## Owner scope update - 2026-10-31
+
+Owner scope decision (2026-10-31): TalkBack/screen-reader testing is removed from the planned backlog and R5 acceptance criteria; no replacement task is planned. Earlier TalkBack pending/deferred notes below are historical and no longer requirements. Existing accessibility labels remain in the app. R5 stays open for its other pending checks; completion remains 16/24.
+
+## Home motion / scoped contrast — 2026-10-31
+- Home reduced-motion sample passed on installed Outdoor; settings restored. One local destination-caption contrast correction passes analytical check and10 Search regressions; not yet in APK/JBuild. Batch into later approved build. Broad R5/R4 remain open,16/24; docs/qa/r5-motion-contrast-2026-10-31.md.
+
+## Outdoor Story/settings large-text check — 2026-10-31
+- Story/options/About/Account settings verified readable and reachable by scrolling at2.0 text on installed release;1.0 restored. No code/build change. Selected bounds measured but broad touch-target/contrast/reduced-motion/TalkBack and GPS/network checks remain. R5 stays open,16/24; docs/qa/r5-outdoor-story-settings-2026-10-31.md.
+
+## Updated standalone Outdoor comparison — 2026-10-31
+- Updated local ARM64 APK built/installed without EAS,matching certificate and exact installed hash verified. Metro-off Home visible by5.8s first cold/by3.1s repeat; prolonged dev blank not reproduced. QA and independent review completed; source/build evidence in docs/qa/outdoor-local-build-2026-10-31.md. No publication,deployment or data clear. R5 stays open,16/24; remaining accessibility/reliability and sustained performance checks pending.
+
+## R5 startup trace — 2026-10-31
+- Bundle/entry/root tracing narrowed delay to largely before app entry in the diagnostic run; cause unproven. Probes removed and original Metro restored. Next: approved preview APK build/install comparison; same package replaces dev client. R5 stays open,16/24 complete; see performance QA note.
+
+## R5 development performance sample — 2026-10-31
+- Cold-start blank period reproduced before branded loader, eventually recovered; warm return quick. Dev frame/memory measurements and limitations recorded in docs/qa/r5-performance-2026-10-31.md. Garbled loader text corrected (5 tests/scoped lint pass). R5 remains open; startup tracing and an approved release/profile-build comparison are pending. Local/unpublished, 16/24 complete.
+
+## R5 keyboard/footer slice — 2026-10-31
+- Shared place-result footer now wraps at large text; phone keyboard checks and limitations in docs/qa/r5-keyboard-2026-10-31.md. 82 tests/scoped lint pass, original text restored. Local/unpublished. R5 remains open (16/24); next performance/startup investigation should account for the observed prolonged blank dev reload before claiming reliability.
+
+## R5 Home large-text slice — 2026-10-31
+- Home search placeholder and Create banner now fit at 2.0 text scale; physical CPH2813 verification and normal-text restoration complete. 82 affected tests, final 17 Home regressions, TypeScript/scoped lint and self-review pass. Local/unpublished; broader R5 remains open (16/24 complete). Next bounded check: keyboard/safe-area visibility; TalkBack remains deferred. See docs/qa/r5-home-large-text-2026-10-31.md.
+
 ## Completed local update set reviewed - 2026-10-30
 - B2 preferences, B3 Saved continuation, U8 first-outcome guidance and completed R5/R6 UI slices reviewed together. 225/225 affected tests, TypeScript, scoped ESLint and whitespace checks pass; independent Code Reviewer found no actionable issues in the stable combined snapshot.
 - Prepared for local commit only; no GitHub push, merge, deployment or hosted write. Pilot documents already committed as c1ed4d5. Overall 16/24 complete, 8 open; E2 prepared but deferred for lack of participants, broader R4/R5/R6 and B4/E1/U4/E4 remain open. Existing phone evidence and limits are in docs/qa; full suite not repeated for this bounded combined review.

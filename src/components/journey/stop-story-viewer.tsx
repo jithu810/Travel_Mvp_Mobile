@@ -1,6 +1,6 @@
 import { theme } from '@/theme/mobile-theme';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Modal, PanResponder, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { AccessibilityInfo, Modal, PanResponder, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { JourneyPhoto } from '@/components/discovery/journey-photo';
@@ -15,6 +15,19 @@ const circleTop = 12, circleBottomGap = 8;
 export function StopStoryViewer({ journey, selectedId, onSelect, onClose, onMap }: {
   journey: PublicJourney; selectedId: string | null; onSelect: (id: string) => void; onClose: () => void; onMap: () => void;
 }) {
+  const [reduceMotion, setReduceMotion] = useState(true);
+  useEffect(() => {
+    let active = true;
+    let receivedChange = false;
+    const subscription = AccessibilityInfo.addEventListener('reduceMotionChanged', value => {
+      receivedChange = true;
+      if (active) setReduceMotion(value);
+    });
+    void AccessibilityInfo.isReduceMotionEnabled().then(value => {
+      if (active && !receivedChange) setReduceMotion(value);
+    }).catch(() => { /* Keep the motion-safe default if the platform query fails. */ });
+    return () => { active = false; subscription.remove(); };
+  }, []);
   const { height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const [notesId, setNotesId] = useState<string | null>(null);
@@ -64,7 +77,7 @@ export function StopStoryViewer({ journey, selectedId, onSelect, onClose, onMap 
     onPanResponderRelease: finishSwipe,
     onPanResponderTerminationRequest: () => true,
   }), [shouldSwipe, finishSwipe]);
-  return <Modal visible animationType="fade" presentationStyle="fullScreen" onRequestClose={() => expanded ? setNotesId(null) : onClose()}>
+  return <Modal visible animationType={reduceMotion ? 'none' : 'fade'} presentationStyle="fullScreen" onRequestClose={() => expanded ? setNotesId(null) : onClose()}>
     <View style={styles.screen} testID="stop-story-viewer">
       <StatusBar style="dark" />
       {stop && <View style={styles.photo}><JourneyPhoto uri={stop.photo} label={stop.name + ' photo'} fill onError={() => setFailedPhoto(stop.photo)}
@@ -116,15 +129,15 @@ const styles = StyleSheet.create({
   progress: { flexDirection: 'row', gap: 3, height: 3 }, segment: { flex: 1, backgroundColor: theme.border, borderRadius: 2 }, completed: { backgroundColor: theme.accent }, current: { backgroundColor: theme.navigation },
   topRow: { flexDirection: 'row', alignItems: 'center', gap: 12 }, context: { flex: 1, minWidth: 0, gap: 3 },
   journeyName: { color: theme.text, fontSize: 14, lineHeight: 20, fontWeight: '600' }, position: { color: theme.muted, fontSize: 11, lineHeight: 17 },
-  close: { width: 44, minHeight: 44, borderRadius: 22, backgroundColor: theme.lavender, alignItems: 'center', justifyContent: 'center' }, closeLabel: { color: theme.text, fontSize: 18 },
+  close: { width: 48, minHeight: 48, borderRadius: 22, backgroundColor: theme.lavender, alignItems: 'center', justifyContent: 'center' }, closeLabel: { color: theme.text, fontSize: 18 },
   circle: { position: 'absolute', right: 12 },
   imageArea: { flex: 1, minHeight: 44 }, tapAreas: { flex: 1, flexDirection: 'row' }, tapZone: { flex: 1 },
   caption: { paddingHorizontal: 18, paddingTop: 14, paddingBottom: 10, gap: 6, backgroundColor: theme.surface },
   title: { color: theme.text, fontSize: 26, lineHeight: 32, letterSpacing: -0.6, fontWeight: '700' }, destination: { color: theme.muted, fontSize: 12, lineHeight: 18 },
-  readDescription: { minHeight: 44, gap: 4, paddingVertical: 4 }, excerpt: { color: theme.text, fontSize: 14, lineHeight: 21 }, readMore: { color: theme.accent, fontSize: 12, lineHeight: 18, fontWeight: '600' },
-  navigation: { flexDirection: 'row', justifyContent: 'space-between', gap: 4 }, navigationButton: { minWidth: 44, minHeight: 44, justifyContent: 'center', paddingHorizontal: 8 }, navigationLabel: { color: theme.text, fontSize: 12, lineHeight: 19, fontWeight: '600' }, disabled: { opacity: 0.4 },
+  readDescription: { minHeight: 48, gap: 4, paddingVertical: 4 }, excerpt: { color: theme.text, fontSize: 14, lineHeight: 21 }, readMore: { color: theme.accent, fontSize: 12, lineHeight: 18, fontWeight: '600' },
+  navigation: { flexDirection: 'row', justifyContent: 'space-between', gap: 4 }, navigationButton: { minWidth: 48, minHeight: 48, justifyContent: 'center', paddingHorizontal: 8 }, navigationLabel: { color: theme.text, fontSize: 12, lineHeight: 19, fontWeight: '600' }, disabled: { opacity: 0.4 },
   notes: { position: 'absolute', left: 0, right: 0, bottom: 0, backgroundColor: colors.paper, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 18 },
   notesHeader: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 12 }, notesTitle: { flex: 1, color: colors.ink, fontSize: 19, lineHeight: 25, fontWeight: '700' },
-  notesClose: { minHeight: 44, paddingHorizontal: 14, justifyContent: 'center', backgroundColor: colors.pale, borderRadius: 22 }, notesCloseLabel: { color: colors.ink, fontSize: 13, fontWeight: '600' },
+  notesClose: { minHeight: 48, paddingHorizontal: 14, justifyContent: 'center', backgroundColor: colors.pale, borderRadius: 22 }, notesCloseLabel: { color: colors.ink, fontSize: 13, fontWeight: '600' },
   notesContent: { paddingBottom: 12, gap: 14 }, fullDescription: { color: colors.ink, fontSize: 15, lineHeight: 25 },
 });

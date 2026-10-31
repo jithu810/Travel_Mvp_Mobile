@@ -25,7 +25,7 @@ export function DeleteDraftAction({ draft, onDeleted }: { draft: { id: string; t
     <Pressable accessibilityRole="button" accessibilityLabel={'Delete draft: ' + draft.title} disabled={!ownerId || busy} onPress={() => { setMessage(''); setConfirm(true); }} style={({ pressed }) => [s.trigger, (pressed || busy || !ownerId) && s.dimmed]}>
       <View accessible={false} style={s.bin}><View style={s.binLid} /><View style={s.binBody} /></View><Text style={s.triggerText}>Delete draft</Text>
     </Pressable>
-    <Modal visible={confirm} transparent animationType="fade" onRequestClose={() => { if (!lock.current) setConfirm(false); }}>
+    <Modal visible={confirm} transparent animationType="none" onRequestClose={() => { if (!lock.current) setConfirm(false); }}>
       <View style={s.shade}>
         <View accessibilityViewIsModal style={s.dialog}>
           <ScrollView contentContainerStyle={s.dialogContent} keyboardShouldPersistTaps="handled">
@@ -44,7 +44,7 @@ export function DeleteDraftAction({ draft, onDeleted }: { draft: { id: string; t
 }
 
 const s = StyleSheet.create({
-  trigger: { minHeight: 44, paddingHorizontal: 10, paddingVertical: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderRadius: 13 },
+  trigger: { minHeight: 48, paddingHorizontal: 10, paddingVertical: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderRadius: 13 },
   triggerText: { color: '#9D493D', fontSize: 11, lineHeight: 17, fontWeight: '600' },
   bin: { width: 13, height: 15, alignItems: 'center', justifyContent: 'center' },
   binLid: { width: 12, height: 2, backgroundColor: '#9D493D', borderRadius: 1, marginBottom: 2 },
@@ -55,6 +55,6 @@ const s = StyleSheet.create({
   error: { color: '#9D493D', fontSize: 13, lineHeight: 20 },
   confirm: { minHeight: 48, borderRadius: 16, backgroundColor: '#A54135', alignItems: 'center', justifyContent: 'center', padding: 12 },
   confirmText: { color: '#FFFFFF', fontSize: 14, lineHeight: 20, fontWeight: '600', textAlign: 'center' },
-  cancel: { minHeight: 44, borderRadius: 16, alignItems: 'center', justifyContent: 'center', padding: 10, backgroundColor: '#E8ECE3' },
+  cancel: { minHeight: 48, borderRadius: 16, alignItems: 'center', justifyContent: 'center', padding: 10, backgroundColor: '#E8ECE3' },
   cancelText: { color: colors.ink, fontSize: 14, lineHeight: 20, fontWeight: '600' }, dimmed: { opacity: 0.6 },
 });

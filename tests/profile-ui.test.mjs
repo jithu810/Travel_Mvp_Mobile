@@ -31,7 +31,7 @@ test('reference profile composition retains real identity/avatar, owner-only fun
     const tree=components.ProfileIdentity({name:'Real traveler',username:'real_user',bio:'Real bio',avatar:'https://test/avatar',count:1,owner:true});
     assert.equal(tree.props.style.overflow,'hidden');assert.equal(all(tree,'DiscoveryGlobe').length,0);assert.equal(all(tree,'JourneyPhoto')[0].props.uri,'https://test/avatar');
     assert.ok(all(tree,'Text').some(n=>n.props.children==='Real bio'));assert.ok(all(tree,'Text').some(n=>[n.props.children].flat().join('')==='@real_user'));
-    const button=all(tree,'Pressable')[0];assert.equal(button.props.disabled,undefined);assert.equal(typeof button.props.onPress,'function');button.props.onPress();assert.equal(routes.at(-1),'/profile/edit');assert.equal(button.props.style({pressed:false})[0].minHeight,44);
+    const button=all(tree,'Pressable')[0];assert.equal(button.props.disabled,undefined);assert.equal(typeof button.props.onPress,'function');button.props.onPress();assert.equal(routes.at(-1),'/profile/edit');assert.ok(button.props.style({pressed:false})[0].minHeight>=48);
     const avatar=all(tree,'View').find(n=>Array.isArray(n.props.style)&&n.props.style[1]?.width);assert.equal(avatar.props.style[1].width,width<360?56:60);
   }
   const visitor=components.ProfileIdentity({name:'Visitor',count:0});assert.equal(all(visitor,'Pressable').length,0);assert.equal(all(visitor,'JourneyPhoto').length,0);

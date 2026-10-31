@@ -18,6 +18,7 @@ function harness() {
   return { hooks, reset(){slots.forEach(slot=>slot?.cleanup?.());slots.length=0;}, render(fn, props) { cursor=0;effects=[];const result=fn(props);effects.forEach(fn=>fn());return result; } };
 }
 const native = Object.fromEntries(['Image','View','Text','TextInput','Pressable','ScrollView','KeyboardAvoidingView','ActivityIndicator','Modal'].map(name=>[name,name]));
+native.AccessibilityInfo={isReduceMotionEnabled:async()=>true,addEventListener:()=>({remove(){}})};
 native.useWindowDimensions=()=>({width:390,height:844,fontScale:1});
 native.AppState={addEventListener(){return {remove(){}};}};native.Animated={View:'AnimatedView'};native.Keyboard={dismiss(){},addListener(){return {remove(){}};}};native.StyleSheet={create:value=>value};native.Platform={OS:'android'};
 const ui = { colors: {}, ui: {}, Action:'Action', Message:'Message', ScreenHeader:'ScreenHeader' };
@@ -63,7 +64,7 @@ const photoSave=load('src/lib/create/photo-save.ts', {'./model':model,'../discov
 const memory=load('src/lib/create/memory.ts', {'./model':model});
 const editor=load('src/lib/create/editor-model.ts', {'../discovery/model':{},'./model':model});
 const place={name:'Varkala',label:'Varkala, Kerala',latitude:8.7,longitude:76.7,mapboxId:'place'};
-function screenHarness(initial, photoState = {}, buddyEvents = [], recoveryStorage = null, guide = undefined) {
+function screenHarness(initial, photoState = {}, buddyEvents = [], recoveryStorage = null, guide = undefined, nativeOverrides = {}) {
   photoState.candidates ??= {}; photoState.errors ??= {};
   photoState.candidates=Object.fromEntries(Object.entries(photoState.candidates).map(([key,p])=>[key,{width:800,height:600,size:1000,mime:'image/png',...p}]));
   const h=harness(), writes=[],routes=[],alerts=[],uploads=[],celebrations=[];let fail=false, uncertain=true, pending=null, prevented=null, canGoBack=true, focusCleanup=null; const dispatches=[];
@@ -79,7 +80,7 @@ function screenHarness(initial, photoState = {}, buddyEvents = [], recoveryStora
     '@/lib/discovery/model':{safePhoto:path=>path.startsWith('https:')?path:null},
     '@/lib/create/memory':memory,'@/components/create/memory-row':{MemoryRow:'MemoryRow'},'@/components/create/memory-editor-sheet':{MemoryEditorSheet:'MemoryEditorSheet'},
     'expo-router':{useLocalSearchParams:()=>({draft:initial?.id,guide}),useNavigation:()=>({dispatch:action=>dispatches.push(action)}),useRouter:()=>({canGoBack:()=>canGoBack,back:()=>routes.push('back'),push:route=>routes.push(route),replace:route=>routes.push(route)}),useFocusEffect:fn=>h.hooks.useEffect(()=>{const cleanup=fn();focusCleanup=cleanup;return cleanup;},[fn])},
-    'react-native':{Alert:{alert:(...args)=>alerts.push(args)}},'react-native-safe-area-context':{SafeAreaView:'SafeAreaView'},
+    'react-native':{Alert:{alert:(...args)=>alerts.push(args)},...nativeOverrides},'react-native-safe-area-context':{SafeAreaView:'SafeAreaView'},
     '@/components/discovery/ui':ui,'@/components/create/place-picker':{PlacePicker:'PlacePicker',formStyles:{}},
     '@/components/create/quick-journey-setup':{QuickJourneySetup:'QuickJourneySetup'},'@/lib/create/editor-model':editor,
     '@/components/journey/map/journey-map':{JourneyMap:'JourneyMap'},'@/hooks/session-context':{useSessionState:()=>({loading:false,session:{user:{id:uid}}})},'@/hooks/use-load':{useLoad:()=>({data:{'journey-media/raw/stop.png':'https://signed.test/stop'},error:null})},'@/lib/remix/queries':{},
@@ -89,7 +90,7 @@ function screenHarness(initial, photoState = {}, buddyEvents = [], recoveryStora
   if(recoveryStorage){const recovery=load('src/lib/create/recovery.ts',{});modules['@/hooks/use-creation-recovery']=load('src/hooks/use-creation-recovery.ts',{...modules,'@/lib/create/recovery':recovery,'@/lib/create/recovery-store':{creationRecovery:recovery.createCreationRecovery(recoveryStorage)}},h.hooks,{setTimeout:()=>0,clearTimeout(){}});}
   const {NewJourneyEditor,RemixDraftMap,default:CreateScreen}=load('src/app/create.tsx',modules,h.hooks);
   let reloads=0;
-  return {celebrations,blur:()=>focusCleanup?.(),mountChild:node=>{h.reset();return h.render(node.type,node.props);},renderRemixMap:props=>h.render(RemixDraftMap,props),renderEntry:()=>h.render(CreateScreen,{}),setCanGoBack:value=>{canGoBack=value;},render:(props={})=>h.render(NewJourneyEditor,{ownerId:uid,initial,onReload:()=>reloads++,...props}),writes,routes,alerts,uploads,setFailure:(value=true,ambiguous=true)=>{fail=value;uncertain=ambiguous;},setPending:value=>{pending=value;},prevented:()=>prevented,dispatches,reloads:()=>reloads};
+  return {celebrations,dispose:()=>h.reset(),blur:()=>focusCleanup?.(),mountChild:node=>{h.reset();return h.render(node.type,node.props);},renderRemixMap:props=>h.render(RemixDraftMap,props),renderEntry:()=>h.render(CreateScreen,{}),setCanGoBack:value=>{canGoBack=value;},render:(props={})=>h.render(NewJourneyEditor,{ownerId:uid,initial,onReload:()=>reloads++,...props}),writes,routes,alerts,uploads,setFailure:(value=true,ambiguous=true)=>{fail=value;uncertain=ambiguous;},setPending:value=>{pending=value;},prevented:()=>prevented,dispatches,reloads:()=>reloads};
 }
 test('actual editor quick-start saves privately with zero stops and routes to the saved editable journey',async()=>{
   const h=screenHarness();let tree=h.render();let setup=all(tree,'QuickJourneySetup')[0];
@@ -413,11 +414,11 @@ test('reference form keeps compact controls and a scrollable CTA when globe head
   const controls=all(tree,'ScrollView')[0], footer=controls.props.children.at(-1), [destination,details]=controls.props.children;
   const [title,traveler,duration]=details.props.children;
   const inputStyle=all(title,'TextInput')[0].props.style.at(-1);
-  const chips=all(traveler,'Pressable');assert.equal(chips.length,4);assert.ok(chips.every(n=>n.props.style[0].minHeight>=44));
+  const chips=all(traveler,'Pressable');assert.equal(chips.length,4);assert.ok(chips.every(n=>n.props.style[0].minHeight>=48));
   assert.equal(traveler.props.children[1].props.style.flexWrap,'wrap');assert.equal(duration.props.style.flexWrap,'wrap');
   // Conservative normal-text vertical budget using rendered component styles (not a native layout measurement).
-  const destinationHeight=destination.props.style.padding*2+44+destination.props.style.gap+23;
-  const detailsHeight=details.props.style.padding*2+2+inputStyle.minHeight+(18+4+44)+44+2*details.props.style.gap;
+  const destinationHeight=destination.props.style.padding*2+48+destination.props.style.gap+23;
+  const detailsHeight=details.props.style.padding*2+2+inputStyle.minHeight+(18+4+48)+48+2*details.props.style.gap;
   const formHeight=destinationHeight+controls.props.contentContainerStyle.gap+detailsHeight+tree.props.style.gap+shared.ui.action.minHeight;
   for(const [width,height] of [[320,568],[360,640],[393,851],[412,915]]) {
     const banner=Math.max(112,Math.min(240,(width-16)*0.62,height-590));
@@ -426,7 +427,7 @@ test('reference form keeps compact controls and a scrollable CTA when globe head
     if(width>=393)assert.ok(formHeight+2*tree.props.style.padding+2<=available,'Tall portrait accommodates normal-text form estimate');
   }
   assert.equal(footer.props.style.flexShrink,0,'CTA keeps its touch target inside scroll content');
-  assert.equal(controls.props.style.flexShrink,1);assert.equal(shared.ui.compactBack.width,44);
+  assert.equal(controls.props.style.flexShrink,1);assert.ok(shared.ui.compactBack.width>=48);
   assert.equal(shared.ui.header.minHeight,76,'Other screen header default retained');
 });
 
@@ -451,7 +452,7 @@ test('compact header retains back navigation and discover fallback with unchange
   for(const compact of [false,true]) {
     const tree=ScreenHeader({title:'Plan your journey',back:true,compact});
     const button=all(tree,'Pressable')[0];button.props.onPress();assert.equal(routes.at(-1),back?'back':'/discover');
-    if(compact) { assert.equal(tree.props.style[1].minHeight,56);assert.equal(button.props.style[1].width,44); }
+    if(compact) { assert.equal(tree.props.style[1].minHeight,56);assert.ok(button.props.style[1].width>=48); }
     else assert.equal(tree.props.style[1],false);
     back=false;
   }
@@ -511,10 +512,13 @@ test('draft editor puts map first, cover below and publish confirmation outside 
   const h=screenHarness({...privateForm(),coverPath:'https://saved.test/cover.jpg'},state);
   let tree=h.render();const scroll=all(tree,'ScrollView')[0];
   assert.equal(all(tree,'PhotoField').length,0);
+  assert.equal(scroll.props.children[0],all(scroll,'DraftMap')[0],'Draft map stays first in scroll content');
   all(tree,'Pressable').find(n=>n.props.accessibilityLabel==='Edit cover photo').props.onPress();tree=h.render();
   assert.equal(all(tree,'PhotoField')[0].props.candidate.uri,'file:///unsaved-cover.jpg');
   assert.equal(all(scroll,'SwipeAction').length,0);
-  const footer=tree.props.children[1];assert.equal(footer.props.style.flexShrink,0);
+  const footer=tree.props.children.flat(Infinity).find(node=>node?.type==='View' && node.props.style?.flexShrink===0);
+  assert.ok(footer,'Editor retains a nonshrinking footer outside the scroll');
+  assert.equal(all(scroll,'View').includes(footer),false);
   assert.equal(all(footer,'SwipeAction').length,0);
   assert.ok(all(tree,'Pressable').some(n=>n.props.accessibilityLabel==='Save Draft'));
   assert.ok(all(tree,'Pressable').some(n=>n.props.accessibilityLabel==='Add your first stop'));
@@ -686,7 +690,7 @@ test('Create passes selected destination/version and outside-dismiss state witho
     const editorTree=screenHarness().render({keyboardOpen:true});assert.equal(all(editorTree,'DraftShortcuts')[0].props.keyboardHidden,true);
   } finally {native.Keyboard.addListener=old;}
   const shared=load('src/components/discovery/ui.tsx',{'expo-router':{useRouter:()=>({})}});
-  const compact=shared.Action({label:'Create my journey',compact:true,onPress(){}});assert.equal(compact.props.style({pressed:false}).at(-1).minHeight,44);assert.equal(shared.ui.action.minHeight,48,'Other screen buttons retain default size');
+  const compact=shared.Action({label:'Create my journey',compact:true,onPress(){}});assert.ok(compact.props.style({pressed:false}).at(-1).minHeight>=48);assert.equal(shared.ui.action.minHeight,48,'Other screen buttons retain default size');
 });
 
 
@@ -795,7 +799,11 @@ test('private memory deck preserves order and edit semantics without moving publ
  const stops=[memoryRow(sid,'First',{day:'1',rating:'0'}),memoryRow(uid,'Second')];
  const h=screenHarness({...privateForm(),stops});let tree=h.render();
  const deck=all(tree,'MemoryDeck')[0];assert.deepEqual(deck.props.stops.map(s=>s.id),stops.map(s=>s.id));
- assert.equal(all(tree.props.children[1],'SwipeAction').length,1);
+ const scroll=all(tree,'ScrollView')[0];
+ const footer=tree.props.children.flat(Infinity).find(node=>node?.type==='View' && all(node,'SwipeAction').length===1);
+ assert.ok(footer,'Publish confirmation belongs to a direct footer sibling of the scroll');
+ assert.equal(footer.props.style.flexShrink,0);assert.equal(all(scroll,'SwipeAction').length,0);
+ assert.equal(all(tree,'SwipeAction').length,1);
  deck.props.onSelect(uid);tree=h.render();assert.equal(all(tree,'MemoryRow')[1].props.selected,true);
  all(tree,'MemoryRow')[1].props.onEdit();tree=h.render();assert.equal(all(tree,'MemoryEditorSheet')[0].props.value.id,uid);
  assert.equal(h.writes.length,0);
@@ -879,6 +887,40 @@ test('journey settings popup retains edits on close and saves the full draft thr
   tree=h.render();all(tree,'Modal')[0].props.onRequestClose();tree=h.render();assert.equal(all(tree,'Modal').length,0);assert.equal(h.writes.length,0);
   all(tree,'Pressable').find(n=>n.props.accessibilityLabel==='Journey settings').props.onPress();tree=h.render();assert.equal(all(tree,'QuickJourneySetup')[0].props.form.title,'Updated journey');
   all(tree,'QuickJourneySetup')[0].props.onStart();await tick();tree=h.render();assert.equal(h.writes.length,1);assert.equal(all(tree,'Modal').length,0);
+});
+
+test('editor cover/settings modals follow live motion preferences without a stale query override', async () => {
+  let resolve, listener, removed = 0;
+  const h = screenHarness(privateForm(), {}, [], null, undefined, { AccessibilityInfo: {
+    isReduceMotionEnabled: () => new Promise(done => { resolve = done; }),
+    addEventListener: (event, callback) => { assert.equal(event, 'reduceMotionChanged'); listener = callback; return { remove() { removed++; } }; },
+  } });
+  let tree = h.render();
+  const button = label => all(tree, 'Pressable').find(node => node.props.accessibilityLabel === label);
+  button('Edit cover photo').props.onPress(); tree = h.render();
+  assert.equal(all(tree, 'Modal')[0].props.animationType, 'none');
+  listener(false); tree = h.render();
+  assert.equal(all(tree, 'Modal')[0].props.animationType, 'slide');
+  resolve(true); await Promise.resolve(); tree = h.render();
+  assert.equal(all(tree, 'Modal')[0].props.animationType, 'slide');
+  all(tree, 'Modal')[0].props.onRequestClose(); tree = h.render();
+  button('Journey settings').props.onPress(); tree = h.render();
+  assert.equal(all(tree, 'Modal')[0].props.animationType, 'slide');
+  listener(true); tree = h.render();
+  assert.equal(all(tree, 'Modal')[0].props.animationType, 'none');
+  assert.equal(all(tree, 'StatusBar')[0].props.style, 'light');
+  h.dispose(); listener(false);
+  assert.equal(removed, 1); assert.equal(h.writes.length, 0);
+});
+
+test('editor modal preference query failure keeps transitions disabled', async () => {
+  const h = screenHarness(privateForm(), {}, [], null, undefined, { AccessibilityInfo: {
+    isReduceMotionEnabled: async () => { throw Error('Unavailable'); },
+    addEventListener: () => ({ remove() {} }),
+  } });
+  let tree = h.render(); await Promise.resolve(); await Promise.resolve();
+  all(tree, 'Pressable').find(node => node.props.accessibilityLabel === 'Journey settings').props.onPress(); tree = h.render();
+  assert.equal(all(tree, 'Modal')[0].props.animationType, 'none'); h.dispose();
 });
 
 test('journey settings keeps validation failures open and creation controls expose the existing description',async()=>{

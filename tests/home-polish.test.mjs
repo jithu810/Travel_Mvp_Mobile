@@ -144,7 +144,7 @@ test('Home embeds place search; Account and navigation retain existing routes an
   assert.equal(header.props.children[1].props.accessibilityLabel, 'Choose a starting point');
   assert.equal(search.props.style.flex, 1);
   assert.equal(search.props.style.minWidth, 0);
-  assert.equal(search.props.style.minHeight, 44);
+  assert.ok(search.props.style.minHeight >= 48);
   const picker = search.props.children;
   assert.equal(picker.type, 'PlacePicker');
   assert.equal(picker.props.label, 'Search places');

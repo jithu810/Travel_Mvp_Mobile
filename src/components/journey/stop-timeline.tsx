@@ -147,7 +147,7 @@ const styles = StyleSheet.create({
   deckText: { position: 'relative', backgroundColor: theme.surface, paddingVertical: 6 },
   deckCarousel: { height: 230, flexGrow: 0, borderRadius: 22 },
   stackEdge: { position: 'absolute', top: 19, left: 10, right: 10, height: 230, borderRadius: 22, backgroundColor: '#D6DFF2', transform: [{ rotate: '2deg' }] },
-  deckControl: { minHeight: 44, minWidth: 100, paddingHorizontal: 14, borderRadius: 18, backgroundColor: '#E7EDF9', alignItems: 'center', justifyContent: 'center' },
+  deckControl: { minHeight: 48, minWidth: 100, paddingHorizontal: 14, borderRadius: 18, backgroundColor: '#E7EDF9', alignItems: 'center', justifyContent: 'center' },
   section: { flex: 1, minHeight: 0, gap: 6 },
   timeline: { flexGrow: 0, flexShrink: 0, height: 62 },
   thumbnailContent: { alignItems: 'center' }, thumbnailSlot: { width: 66, height: 60, justifyContent: 'center' },
