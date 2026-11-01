@@ -1,3 +1,4 @@
+import { lightPilotTheme } from './helpers/dark-pilot-harness.mjs';
 import { buddyGeometryStub } from './helpers/buddy-geometry-stub.mjs';
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
@@ -35,7 +36,7 @@ function harness() {
   dependencies={'@/hooks/use-buddy-geometry':buddyGeometryStub,...dependencies};
     const exports = {};
     const compiled = ts.transpileModule(readFileSync(path, 'utf8'), { compilerOptions: { jsx: ts.JsxEmit.ReactJSX, module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
-    new Function('require', 'exports', compiled)(name => {
+    new Function('require', 'exports', compiled)(name => { if (name === '@/theme/dark-pilot') return lightPilotTheme;
       if (name === 'react') return react;
       if (name === 'react-native') return rn;
       if (name === 'react/jsx-runtime') return { jsx, jsxs: jsx };

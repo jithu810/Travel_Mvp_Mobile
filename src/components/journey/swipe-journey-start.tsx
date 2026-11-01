@@ -1,9 +1,11 @@
+import { darkPilotStyles } from '@/theme/dark-pilot';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AccessibilityInfo, ActivityIndicator, Animated, AppState, PanResponder, StyleSheet, Text, View } from 'react-native';
 
 type SwipeProps = { active: boolean; label?: string; accessibilityLabel?: string; hint?: string; accessibilityHint?: string; openingLabel?: string; resetKey?: string } & ({ onStart: () => void; onComplete?: never } | { onComplete: () => void; onStart?: never });
 // The caller owns the result. Dragging never invokes a write; only completed confirmation does.
 export function SwipeAction({ active, onStart, onComplete, label = 'Swipe to start journey', accessibilityLabel = 'Start Journey', hint = 'Begin Trip enables GPS', accessibilityHint = 'Swipe right or double tap to open Travel Mode. Begin Trip enables location tracking.', openingLabel = 'Opening Travel Mode…', resetKey }: SwipeProps) {
+  const s = lightStyles_s;
   const action = onComplete ?? onStart;
   const [width, setWidth] = useState(280);
   const [opening, setOpening] = useState(false);
@@ -78,7 +80,7 @@ export function SwipeAction({ active, onStart, onComplete, label = 'Swipe to sta
 }
 // Compatibility export preserves the existing Travel Mode entry defaults.
 export const SwipeJourneyStart = SwipeAction;
-const s = StyleSheet.create({
+const lightStyles_s = darkPilotStyles(StyleSheet.create({
   disabled: { opacity: 0.5 },
   shell: { minHeight: 56, borderRadius: 28, borderWidth: 1, borderColor: '#D6DCEC', overflow: 'hidden', backgroundColor: '#F8F9FD' },
   fill: { position: 'absolute', top: 0, bottom: 0, left: 0, backgroundColor: '#DDE5FC' },
@@ -86,4 +88,4 @@ const s = StyleSheet.create({
   thumb: { position: 'absolute', left: 4, top: 4, width: 46, height: 46, borderRadius: 23, alignItems: 'center', justifyContent: 'center', backgroundColor: '#6555CF', experimental_backgroundImage: 'linear-gradient(110deg, #AA54DB 0%, #246BE0 100%)' },
   arrow: { color: '#FFFFFF', fontSize: 24 }, label: { minHeight: 54, paddingLeft: 56, paddingRight: 44, justifyContent: 'center', alignItems: 'center' },
   title: { color: '#243E68', fontSize: 13, lineHeight: 19, fontWeight: '700' }, hint: { color: '#596778', fontSize: 10, lineHeight: 15 }, loader: { position: 'absolute', right: 15 },
-});
+}));

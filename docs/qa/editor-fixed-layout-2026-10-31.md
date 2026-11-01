@@ -1,0 +1,30 @@
+# Editor fixed layout ? 2026-10-31
+
+Focused local/unpublished UI fix. Existing Story changes preserved; no Git publication or live writes authorized/performed.
+
+## Backend assessment before implementation
+
+Inspected src/app/create.tsx, src/components/create/memory-deck.tsx, memory-row.tsx, editor-action-icon.tsx, discovery/thumbnail-photo.tsx and remix/source-attribution.tsx. Changes only presentation, measured sizing and caption arrangement. Save/edit/reorder/remove/publish handlers, authentication/authorization, API/query/RPC contracts, persistence, Storage/media operations and GPS are unchanged. UI-only gate released; live Supabase preflight is not required.
+
+## Result
+
+Loaded editor uses a measured viewport, footer, optional photo hint and deck header/credit/retry to decide whether a portrait fixed layout fits. Default-font fitted cards match Story proportions:328dp card,202dp photo,76dp caption and48dp edit tools plus borders. Name, description and combined metadata use equal line slots. Four48dp actions form a transparent right-hand column; dark ink on pale stop art and white/shadowed labels over shaded photos. Existing actions remain accessible and separate from card swiping.
+
+Short screens, large fonts, keyboard, errors/feedback, busy/uncertain states and empty onboarding retain scrolling. Original and remix drafts share the fixed path when measured space permits. No data mutations are required for verification.
+
+## Verification
+
+Existing73 create-flow/deck tests pass; added viewport and keyboard fallback assertions. TypeScript and scoped lint are checked on the final snapshot. Primary owns physical screenshots and independent review; append their final outcomes before completion. No dependency/native changes; full suite/native rebuild omitted for this focused JS layout fix.
+
+Architect physical evidence: CPH2813 Android16,1080x2344, expected Mobile checkout Metro8081. Final editor-sized.png shows328dp card with all four rail buttons, reorder/remove controls and publish/footer navigation visible; vertical drag does not scroll. Earlier editor-large.png documents the corrected oversized intermediate layout. Screenshots owner-local scratch files. Independent reviewer found no major issue; conservative40dp gap budget addresses the optional-photo-hint margin concern. Primary verifies final swipe/selection. No saves/uploads/publish/GPS actions performed.
+
+Final primary phone check after conservative40dp reserve: editor-final.png in C:/Users/sreej/AppData/Local/Temp shows memory2 Palode after horizontal swipe from memory1. Same328dp card bounds, four transparent right-side controls, reorder/remove and publish slider visible. Vertical drag in preceding size snapshot did not scroll. No save, publish, reorder, removal, upload or GPS actions used. Independent review found no blocking issues; its2dp hint-budget observation was addressed by increasing reserve to40dp. Earlier size snapshot editor-sized.png and before editor-before.png remain scratch device evidence. Enlarged-font/keyboard/error fallbacks verified through affected automated checks/code review, not physical device in this task. Local/unpublished.
+
+Small UI follow-up (2026-10-31): owner requested photo-hint space be given to the map. Baseline retained all prior local changes. Inspected create.tsx viewport calculation/MemoryDeck measured minimum. Moved optional remix photo guidance from below the card into Cover modal; removed its height reservation and let fitted map consume remaining budget with32dp conservative spacing. No contracts/auth/persistence/API/Storage changes; UI-only assessment released. Card remains328dp. Scoped ESLint and whitespace checks pass; physical CPH2813 Android16 Metro8081 screenshot editor-map-stretch.png in scratch confirms taller map, unchanged card and visible footer. Self-review only for small layout adjustment; no broad suite repeated. No live writes/publication.
+
+Owner correction (2026-10-31): keep photo hint visible and use only unwanted gap for map. Supersedes preceding Cover relocation: hint restored as compact14dp line above publish slider, included in measured footer. Removed fitted body bottom padding, reduced footer top padding12 to4, and budgeted measured deck/footer plus12dp (10dp body gap+2dp tolerance), returning28dp to map. Card remains328dp; text stays visible. UI-only inspected create.tsx; baseline earlier edits preserved. Scoped ESLint/whitespace pass, primary self-review; no suite repeat for small spacing correction. Physical CPH2813 Android16 screenshot editor-gap-tight.png confirms taller map, compact card-to-text gap and fully visible hint/slider/nav. No live writes/publication.
+
+Status-bar follow-up (2026-10-31): owner requested map behind phone status bar like original Journey. Baseline retained all local changes; inspected create.tsx and Journey route safe-area/shade. Both already exclude top safe-area edge; editor opaque top overlay caused solid band. Replaced it with existing translucent statusShade above content and removed duplicate scrolling shade. Small UI-only, unchanged contracts/auth/persistence/API/Storage; no backend preflight needed. Scoped ESLint and diff whitespace pass; self-reviewed. Physical CPH2813 Android16 screenshot editor-status-map.png confirms map behind readable status icons, card/hint/footer preserved. No live writes/publication; no broad tests repeated for cosmetic overlay.
+
+
+Final owner acceptance (2026-10-31): owner reports verifying the current pages. The canonical approved design and future UI preservation rules are in [Approved Mobile UI baseline](../approved-mobile-ui.md). Its final geometry supersedes intermediate values in this chronological report. No new scrolling, position/card/map-shape changes or layout redesign during button/icon/image/animation edits without explicit owner approval. Broad multi-phone compatibility has not been physically verified. Documentation-only update; prior code preserved, no backend impact, no app tests repeated. Links/instruction consistency/whitespace checked; local/unpublished.

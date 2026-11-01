@@ -1,3 +1,4 @@
+import { darkPilotStyles } from '@/theme/dark-pilot';
 import { useRouter } from 'expo-router';
 import { validHandle } from '@/lib/profile/model';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
@@ -8,6 +9,7 @@ import { JourneyArt } from '@/components/art/journey-art';
 import { artSeed } from '@/lib/art/journey-art';
 
 export function StoryHeader({ journey, height, onAbout }: { journey: PublicJourney; height: number; onAbout: () => void }) {
+  const styles = lightStyles_styles;
   const router = useRouter();
   return <View style={[styles.cover, { height }]}>
     <JourneyPhoto uri={journey.cover} label={journey.title + ' cover photo'} fill
@@ -24,6 +26,7 @@ export function StoryHeader({ journey, height, onAbout }: { journey: PublicJourn
   </View>;
 }
 export function StoryCreator({ journey }: { journey: PublicJourney }) {
+  const styles = lightStyles_styles;
   const router = useRouter();
   const handle = journey.creatorUsername && validHandle(journey.creatorUsername) ? journey.creatorUsername : null;
   return <Pressable accessibilityRole={handle ? 'button' : undefined} accessibilityLabel={handle ? 'View creator profile: ' + journey.creatorName : 'Shared by ' + journey.creatorName} disabled={!handle}
@@ -34,7 +37,7 @@ export function StoryCreator({ journey }: { journey: PublicJourney }) {
     {handle && <Text style={styles.profileLink}>↗</Text>}
   </Pressable>;
 }
-const styles = StyleSheet.create({
+const lightStyles_styles = darkPilotStyles(StyleSheet.create({
   cover: { borderRadius: 24, overflow: 'hidden', backgroundColor: colors.pale },
   shade: { position: 'absolute', top: 0, bottom: 0, left: 0, right: 0, backgroundColor: 'rgba(5,28,24,0.38)' },
   controls: { position: 'absolute', top: 8, left: 10, right: 10, flexDirection: 'row', justifyContent: 'space-between' },
@@ -49,4 +52,4 @@ const styles = StyleSheet.create({
   initial: { fontSize: 13, fontWeight: '600', color: colors.ink },
   name: { color: colors.ink, fontSize: 12, lineHeight: 18, flexShrink: 1, fontWeight: '600' },
   profileLink: { color: colors.green, fontSize: 14 },
-});
+}));

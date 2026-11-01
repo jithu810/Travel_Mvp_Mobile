@@ -1,3 +1,4 @@
+import { darkPilotStyles } from '@/theme/dark-pilot';
 import { useState, type ReactNode } from 'react';
 import { ActivityIndicator, Image, StyleSheet, Text, View } from 'react-native';
 import { StaticMapLayer, useStaticMap, type MapFallback } from './static-map-photo';
@@ -22,7 +23,7 @@ export function JourneyPhoto({ uri, label, ratio = 1.9, fill = false, thumbnail 
     </View>}
   </View>;
 }
-const styles = StyleSheet.create({
+const styles = darkPilotStyles(StyleSheet.create({
   frame: { width: '100%', backgroundColor: colors.pale, overflow: 'hidden' },
   image: { width: '100%', height: '100%' },
   map: { flex: 1 },
@@ -30,4 +31,4 @@ const styles = StyleSheet.create({
   fallback: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 12, padding: 20 },
   symbol: { color: colors.green, fontSize: 38 },
   label: { color: colors.ink, fontWeight: '500', fontSize: 13 },
-});
+}));

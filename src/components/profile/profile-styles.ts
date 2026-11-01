@@ -1,8 +1,9 @@
+import { darkPilotStyles } from '@/theme/dark-pilot';
 import { theme, primaryControl } from '@/theme/mobile-theme';
 import { StyleSheet } from 'react-native';
 import { colors } from '@/components/discovery/ui';
 
-export const profileStyles = StyleSheet.create({
+export const profileStyles = darkPilotStyles(StyleSheet.create({
   content: { paddingHorizontal: 16, paddingTop: 6, paddingBottom: 16 },
   section: { paddingTop: 12, paddingBottom: 10, gap: 8 },
   sectionTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
@@ -13,8 +14,8 @@ export const profileStyles = StyleSheet.create({
   sheet: { maxHeight: '85%', backgroundColor: colors.paper, borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 20, gap: 12 },
   settingsRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   close: { minWidth: 48, minHeight: 48, alignItems: 'center', justifyContent: 'center' },
-});
-export const profileUIStyles = StyleSheet.create({
+}));
+export const profileUIStyles = darkPilotStyles(StyleSheet.create({
   headerSafe: { backgroundColor: colors.paper },
   toolbar: { minHeight: 52, paddingHorizontal: 10, paddingBottom: 4, flexDirection: 'row', alignItems: 'center', gap: 6 },
   tool: { minWidth: 48, minHeight: 48, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
@@ -69,4 +70,4 @@ export const profileUIStyles = StyleSheet.create({
   draftFooter: { borderTopWidth: 1, borderColor: theme.border, paddingLeft: 16, paddingRight: 6, paddingVertical: 2, flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 4 },
   privateLabel: { color: colors.muted, fontSize: 11, lineHeight: 17 },
   remixCredit: { color: colors.muted, fontSize: 11, lineHeight: 16, fontWeight: '600' },
-});
+}));

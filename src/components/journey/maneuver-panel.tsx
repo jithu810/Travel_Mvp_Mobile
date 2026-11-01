@@ -1,3 +1,4 @@
+import { darkPilotStyles } from '@/theme/dark-pilot';
 import { theme } from '@/theme/mobile-theme';
 import { StyleSheet, Text, View } from 'react-native';
 import { colors } from '@/components/discovery/ui';
@@ -19,11 +20,11 @@ export function ManeuverPanel({ guidance, message }: { guidance?: Guidance | nul
     </View>
   </View>;
 }
-const styles = StyleSheet.create({
+const styles = darkPilotStyles(StyleSheet.create({
   panel: { flexDirection: 'row', gap: 10, padding: 12, borderRadius: 18, backgroundColor: theme.navigation, alignItems: 'center' },
   content: { flex: 1, minWidth: 0, gap: 2 },
   icon: { color: colors.white, fontSize: 30, width: 34, textAlign: 'center' },
   distance: { color: colors.white, fontSize: 12, lineHeight: 17, fontWeight: '700' },
   instruction: { color: colors.white, fontSize: 15, lineHeight: 21, fontWeight: '600' },
   note: { color: colors.white, fontSize: 11, lineHeight: 16 },
-});
+}));

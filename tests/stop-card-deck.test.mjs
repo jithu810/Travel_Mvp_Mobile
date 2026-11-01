@@ -1,3 +1,4 @@
+import { lightPilotTheme } from './helpers/dark-pilot-harness.mjs';
 import { buddyGeometryStub } from './helpers/buddy-geometry-stub.mjs';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -44,7 +45,7 @@ function load(path, modules, hooks = harness(false).hooks, timers = globalThis) 
   }).outputText;
   const module = { exports: {} };
   const require = name => {
-    if (name === '@/theme/mobile-theme') return mobileTheme;
+    if (name === '@/theme/dark-pilot') return lightPilotTheme; if (name === '@/theme/mobile-theme') return mobileTheme;
     if(name==='@/lib/journey/nearby')return load('src/lib/journey/nearby.ts',{}); if(name.endsWith('/nearby-locations'))return {NearbyLocations:'NearbyLocations'}; if (name === 'react/jsx-runtime') return { jsx, jsxs: jsx };
     if (name === './stop-card-deck') return { StopCardDeck: 'StopCardDeck' };
     if (name === 'react') return hooks;
@@ -101,7 +102,7 @@ test('deck browses forward/back with swipe dominance, bounded buttons and immedi
   t.pending.pop().fn({finished:true});assert.deepEqual(t.calls,['b']);
   t.props.selectedId='b';tree=t.render();t.reduce();tree=t.render();
   all(tree,'View').find(n=>n.props.testID==='stop-photo-swipe').props.onPanResponderRelease(null,{dx:80,dy:0});assert.equal(t.calls.at(-1),'a');
-  t.props.selectedId='c';tree=t.render();assert.equal(button(tree,'Next memory').props.disabled,true);
+  t.props.selectedId='c';tree=t.render();assert.equal(button(tree,'Return to first stop').props.disabled,false);
   t.props.stops=[t.props.stops[0]];t.props.selectedId='a';tree=t.render();assert.equal(button(tree,'Next memory').props.disabled,true);
   t.props.stops=[];tree=t.render();assert.equal(all(tree,'Pressable').length,0);t.h.dispose();
 });
@@ -167,4 +168,17 @@ test('deck photo button says View stop without a usable photo, including after t
  const failed=[button(tree,'View stop 2: b').props.children].flat().find(n=>n?.type?.name==='StopPhoto');
  assert.equal(failed.props.failed,true);assert.equal(all(failed.type(failed.props),'StopArt').length,1);
  t.h.dispose();
+});
+
+test('last card loops once by forward swipe or accessible button and rejects busy or canceled completions', async()=>{
+ for(const mode of ['normal','reduced','background','blur','map','unmount']) {
+  const t=setup(),loops=[];t.props.onLoop=(id,reduced)=>loops.push([id,reduced]);t.props.selectedId='c';t.render();await Promise.resolve();let tree=t.render();
+  if(mode==='reduced'){t.reduce();tree=t.render();}
+  const go=button(tree,'Return to first stop');assert.equal(go.props.disabled,false);go.props.onPress();go.props.onPress();
+  if(mode==='reduced'){assert.deepEqual(loops,[['a',true]]);assert.equal(t.pending.length,0);t.h.dispose();continue;}
+  assert.equal(t.pending.length,1);const completion=t.pending.pop().fn;
+  if(mode==='background')t.background();if(mode==='blur'){t.props.active=false;t.render();}if(mode==='map'){t.props.selectedId='b';t.render();}if(mode==='unmount')t.h.dispose();
+  completion({finished:true});assert.deepEqual(loops,mode==='normal'?[['a',false]]:[]);assert.deepEqual(t.calls,[]);if(mode!=='unmount')t.h.dispose();
+ }
+ const t=setup();t.props.selectedId='c';t.render();await Promise.resolve();const tree=t.render();all(tree,'View').find(n=>n.props.testID==='stop-photo-swipe').props.onPanResponderRelease(null,{dx:-80,dy:0});t.pending.pop().fn({finished:true});assert.deepEqual(t.calls,['a']);t.h.dispose();
 });

@@ -1,3 +1,4 @@
+import { darkPilotStyles } from '@/theme/dark-pilot';
 import { useEffect, useRef } from 'react';
 import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { colors } from '@/components/discovery/ui';
@@ -8,6 +9,7 @@ const stride = 166;
 
 // Public detail already supplies creator sequence order. Never reorder by day or name.
 export function MapItinerary({ stops, selectedId, onSelect, completedStopIds = [], destinationId }: { stops: JourneyStop[]; selectedId: string | null; onSelect: (id: string) => void; completedStopIds?: readonly string[]; destinationId?: string | null }) {
+  const styles = lightStyles_styles;
   const list = useRef<FlatList<JourneyStop>>(null);
   const index = stops.findIndex(stop => stop.id === selectedId);
   useEffect(() => {
@@ -37,7 +39,7 @@ export function MapItinerary({ stops, selectedId, onSelect, completedStopIds = [
   </View>;
 }
 
-const styles = StyleSheet.create({
+const lightStyles_styles = darkPilotStyles(StyleSheet.create({
   section: { height: 82, flexShrink: 0, gap: 6, paddingTop: 6 },
   progressSection: { height: 100 },
   heading: { flexDirection: 'row', justifyContent: 'space-between', gap: 8 },
@@ -53,4 +55,4 @@ const styles = StyleSheet.create({
   numberText: { color: colors.ink, fontSize: 11, fontWeight: '700' }, selectedText: { color: colors.paper },
   details: { flex: 1, minWidth: 0, gap: 2 }, name: { color: colors.ink, fontSize: 12, lineHeight: 17, fontWeight: '600' },
   meta: { color: colors.muted, fontSize: 10, lineHeight: 15 },
-});
+}));

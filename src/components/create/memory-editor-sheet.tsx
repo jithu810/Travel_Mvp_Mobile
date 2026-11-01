@@ -1,3 +1,5 @@
+import { theme as appTheme } from '@/theme/mobile-theme';
+import { darkPilotStyles } from '@/theme/dark-pilot';
 import { useEffect, useState, type ReactNode } from 'react';
 import { AccessibilityInfo, KeyboardAvoidingView, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -51,16 +53,16 @@ export function MemoryEditorSheet({ value, isNew, proximity, busy, blocked, erro
             }} />
             {value.latitude !== null && value.longitude !== null && <View style={s.selectedPlace}><Text style={s.placeTitle}>{value.name || 'Selected location'}</Text><Text style={s.note}>Location selected · {value.latitude.toFixed(4)}, {value.longitude.toFixed(4)}</Text></View>}
             {(nameOpen || !!value.name) && <View style={s.field}><Text style={s.label}>Place or memory name · required</Text>
-              <TextInput accessibilityLabel="Memory name" value={value.name} editable={!disabled} onChangeText={name => { setNameEdited(true); onChange({ name }); }} maxLength={200} placeholder="A quiet beach, a roadside café…" style={s.input} /></View>}
+              <TextInput placeholderTextColor={appTheme.muted} selectionColor={appTheme.accent} keyboardAppearance="dark" accessibilityLabel="Memory name" value={value.name} editable={!disabled} onChangeText={name => { setNameEdited(true); onChange({ name }); }} maxLength={200} placeholder="A quiet beach, a roadside café…" style={s.input} /></View>}
             {value.latitude === null && <Text style={s.note}>{nameOpen || value.name ? 'This named memory stays private until you add a location and publish.' : 'Search for a place, or choose Name only to capture a moment.'}</Text>}
             {(nameOpen || !!value.name) && photoControl}
             {(nameOpen || !!value.name) && <Pressable accessibilityRole="button" accessibilityLabel="Add note" accessibilityState={{ expanded: noteOpen }} onPress={() => setNoteOpen(open => !open)} style={s.textAction}><Text style={s.link}>{noteOpen ? 'Note · optional' : '+ Add note'}</Text></Pressable>}
-            {noteOpen && <TextInput accessibilityLabel="Memory note" value={value.description} editable={!disabled} multiline maxLength={1000} onChangeText={description => onChange({ description })} placeholder="What would you like to remember?" style={[s.input, s.noteInput]} />}
+            {noteOpen && <TextInput placeholderTextColor={appTheme.muted} selectionColor={appTheme.accent} keyboardAppearance="dark" accessibilityLabel="Memory note" value={value.description} editable={!disabled} multiline maxLength={1000} onChangeText={description => onChange({ description })} placeholder="What would you like to remember?" style={[s.input, s.noteInput]} />}
             {noteOpen && <Text style={s.counter}>{value.description.length}/1000</Text>}
             {(nameOpen || !!value.name) && <Pressable accessibilityRole="button" accessibilityLabel="More memory details" accessibilityState={{ expanded: detailsOpen }} onPress={() => setDetailsOpen(open => !open)} style={s.textAction}><Text style={s.link}>More details{value.day ? ' · Day ' + value.day : ''}{value.rating ? ' · ' + value.rating + '/5' : ''} {detailsOpen ? '⌃' : '⌄'}</Text></Pressable>}
             {detailsOpen && <View style={s.details}>
-              <Text style={s.label}>Day · optional</Text><TextInput accessibilityLabel="Memory day" value={value.day} editable={!disabled} keyboardType="number-pad" maxLength={3} onChangeText={day => onChange({ day })} placeholder="Within journey duration" style={s.input} />
-              <Text style={s.label}>Rating · optional</Text><TextInput accessibilityLabel="Memory rating" value={value.rating} editable={!disabled} keyboardType="decimal-pad" maxLength={5} onChangeText={rating => onChange({ rating })} placeholder="0–5" style={s.input} />
+              <Text style={s.label}>Day · optional</Text><TextInput placeholderTextColor={appTheme.muted} selectionColor={appTheme.accent} keyboardAppearance="dark" accessibilityLabel="Memory day" value={value.day} editable={!disabled} keyboardType="number-pad" maxLength={3} onChangeText={day => onChange({ day })} placeholder="Within journey duration" style={s.input} />
+              <Text style={s.label}>Rating · optional</Text><TextInput placeholderTextColor={appTheme.muted} selectionColor={appTheme.accent} keyboardAppearance="dark" accessibilityLabel="Memory rating" value={value.rating} editable={!disabled} keyboardType="decimal-pad" maxLength={5} onChangeText={rating => onChange({ rating })} placeholder="0–5" style={s.input} />
             </View>}
           </ScrollView>
           <View style={s.footer}>
@@ -76,7 +78,7 @@ export function MemoryEditorSheet({ value, isNew, proximity, busy, blocked, erro
 }
 const raised = { borderWidth: 1, borderColor: '#FFFFFF', backgroundColor: '#F7F8FC', boxShadow: '0 3px 7px rgba(39, 54, 85, 0.12)' };
 const shortcut = { ...raised, flex: 1, minWidth: 0, minHeight: 68, paddingHorizontal: 4, paddingVertical: 8, borderRadius: 20, gap: 4 };
-const s = StyleSheet.create({
+const s = darkPilotStyles(StyleSheet.create({
   overlay: { flex: 1, backgroundColor: 'rgba(15, 24, 43, 0.38)' }, avoid: { flex: 1, justifyContent: 'flex-end' },
   panel: { maxHeight: '98%', width: '100%', maxWidth: 560, alignSelf: 'center', backgroundColor: '#EDF1F8', experimental_backgroundImage: 'linear-gradient(135deg, #FFF8F1 0%, #EDF1F8 55%, #E2EAF6 100%)', borderWidth: 1, borderColor: '#FFFFFF', borderTopLeftRadius: 30, borderTopRightRadius: 30, overflow: 'hidden' },
   handle: { width: 36, height: 4, borderRadius: 2, backgroundColor: '#B5BED0', alignSelf: 'center', marginTop: 8, marginBottom: 2 },
@@ -100,4 +102,4 @@ const s = StyleSheet.create({
   footer: { flexShrink: 0, paddingHorizontal: 18, paddingVertical: 10, gap: 7, backgroundColor: '#EAF0F9', borderTopWidth: 1, borderTopColor: '#FFFFFF' },
   textAction: { minHeight: 48, justifyContent: 'center' }, link: { color: '#4858AF', fontSize: 13, lineHeight: 19, fontWeight: '600' },
   note: { color: '#505D73', fontSize: 11, lineHeight: 16 }, noteInput: { minHeight: 88, textAlignVertical: 'top' },
-});
+}));

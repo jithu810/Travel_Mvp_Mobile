@@ -1,3 +1,5 @@
+import { theme as appTheme } from '@/theme/mobile-theme';
+import { darkPilotStyles } from '@/theme/dark-pilot';
 import { useLinkingURL } from 'expo-linking';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
@@ -24,7 +26,7 @@ export default function GoogleCallbackScreen() {
     {failed || !url ? <>
       <Text accessibilityRole="alert" style={styles.text}>We could not complete Google sign-in. Please start again.</Text>
       <Pressable accessibilityRole="button" onPress={() => router.dismissTo('/auth')} style={styles.button}><Text style={styles.text}>Back to sign in</Text></Pressable>
-    </> : <><ActivityIndicator /><Text accessibilityLiveRegion="polite" style={styles.text}>Completing Google sign-in…</Text></>}
+    </> : <><ActivityIndicator color={appTheme.accent} /><Text accessibilityLiveRegion="polite" style={styles.text}>Completing Google sign-in…</Text></>}
   </View></SafeAreaView>;
 }
-const styles = StyleSheet.create({ page: { flex: 1, backgroundColor: '#F5F3EC' }, content: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24, gap: 20 }, text: { color: '#153E35', fontSize: 16, textAlign: 'center' }, button: { minHeight: 48, justifyContent: 'center', padding: 16, borderWidth: 1, borderColor: '#153E35', borderRadius: 12 } });
+const styles = darkPilotStyles(StyleSheet.create({ page: { flex: 1, backgroundColor: '#F5F3EC' }, content: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24, gap: 20 }, text: { color: '#153E35', fontSize: 16, textAlign: 'center' }, button: { minHeight: 48, justifyContent: 'center', padding: 16, borderWidth: 1, borderColor: '#153E35', borderRadius: 12 } }));

@@ -1,3 +1,4 @@
+import { darkPilotStyles } from '@/theme/dark-pilot';
 import { theme, raisedSurface } from '@/theme/mobile-theme';
 import { useMemo, useState, type ReactNode } from 'react';
 import { PanResponder, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
@@ -8,6 +9,7 @@ import { useBuddyProtectedBounds, useBuddyScroll } from '@/hooks/use-buddy-geome
 export function ItinerarySheet({ title, subtitle, children, footer, compact = false, maxDetailsHeight, maxSheetHeight, onHeightChange }: {
   title: string; subtitle: string; children: ReactNode; footer?: ReactNode; compact?: boolean; maxDetailsHeight?: number; maxSheetHeight?: number; onHeightChange?: (height: number) => void;
 }) {
+  const styles = lightStyles_styles;
   const [expanded, setExpanded] = useState(false);
   const protection = useBuddyProtectedBounds(), scroll = useBuddyScroll();
   const [headerHeight, setHeaderHeight] = useState(68);
@@ -33,7 +35,7 @@ export function ItinerarySheet({ title, subtitle, children, footer, compact = fa
     {footer && <View style={[styles.footer, compact && styles.compactFooter]} onLayout={event => setFooterHeight(event.nativeEvent.layout.height)}>{footer}</View>}
   </View>;
 }
-const styles = StyleSheet.create({
+const lightStyles_styles = darkPilotStyles(StyleSheet.create({
   sheet: { ...raisedSurface, flexShrink: 0, borderRadius: 24, backgroundColor: theme.surface, borderWidth: 1, borderColor: colors.line, overflow: 'hidden', elevation: 8, shadowColor: colors.ink, shadowOpacity: 0.15, shadowRadius: 16, shadowOffset: { width: 0, height: 4 } },
   handle: { minHeight: 68, paddingHorizontal: 16, paddingTop: 7, paddingBottom: 10, gap: 6 },
   grip: { alignSelf: 'center', width: 32, height: 4, borderRadius: 2, backgroundColor: colors.line },
@@ -47,4 +49,4 @@ const styles = StyleSheet.create({
   compactTitle: { fontSize: 15, lineHeight: 20 },
   compactSubtitle: { fontSize: 11, lineHeight: 16 },
   compactFooter: { paddingHorizontal: 12, paddingBottom: 10 },
-});
+}));

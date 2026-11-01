@@ -1,8 +1,9 @@
+import { lightPilotTheme } from './helpers/dark-pilot-harness.mjs';
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
 import {readFileSync} from 'node:fs';
 import ts from 'typescript';
-function load(file,modules={},timers=globalThis){const exports={};new Function('require','exports','setTimeout','clearTimeout',ts.transpileModule(readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX}}).outputText)(id=>{assert.ok(id in modules,id);return modules[id];},exports,timers.setTimeout,timers.clearTimeout);return exports;}
+function load(file,modules={},timers=globalThis){const exports={};new Function('require','exports','setTimeout','clearTimeout',ts.transpileModule(readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX}}).outputText)(id => { if (id === '@/theme/dark-pilot') return lightPilotTheme;assert.ok(id in modules,id);return modules[id];},exports,timers.setTimeout,timers.clearTimeout);return exports;}
 const discovery=load('src/lib/discovery/model.ts',{'../../types/journey':load('src/types/journey.ts')});
 const sharing=load('src/lib/social/sharing.ts',{'../discovery/model':discovery});
 const model=load('src/lib/social/share-artwork.ts',{'../discovery/model':discovery,'./sharing':sharing});
@@ -42,7 +43,7 @@ test('Share tap freezes the visible memory and compact Like shows zero and autho
  all(tree,'Pressable').find(n=>n.props.accessibilityLabel==='Share public journey').props.onPress();selected='first';tree=render();assert.equal(all(tree,'JourneyShareSheet')[0].props.artwork.memoryId,'third');
  layout='rail';tree=render();
  const railButtons=all(tree,'Pressable').filter(n=>['Unlike journey','Save journey','Share public journey'].includes(n.props.accessibilityLabel));assert.equal(railButtons.length,3);
- for(const b of railButtons){const style=Object.assign({},...b.props.style({pressed:false}).filter(Boolean));assert.equal(style.width,44);assert.ok(style.minHeight>=44);}
+ for(const b of railButtons){const style=Object.assign({},...b.props.style({pressed:false}).filter(Boolean));assert.ok(style.width>=48);assert.ok(style.minHeight>=48);}
  assert.equal(all(tree,'JourneyActionIcon').length,3);assert.ok(all(tree,'JourneyActionIcon').some(n=>n.props.name==='bookmark'));assert.equal(all(tree,'Text').some(n=>String(n.props.children).includes('Share')),false);
  social.error='Offline';tree=render();all(tree,'Pressable').find(n=>n.props.accessibilityLabel?.startsWith('View journey action feedback')).props.onPress();tree=render();assert.equal(all(tree,'StorySheet')[0].props.visible,true);
  social.busy='save';tree=render();assert.equal(all(tree,'Pressable').find(n=>n.props.accessibilityLabel==='Save journey').props.disabled,true);

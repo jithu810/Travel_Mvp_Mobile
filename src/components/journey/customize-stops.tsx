@@ -1,3 +1,4 @@
+import { darkPilotStyles } from '@/theme/dark-pilot';
 import { theme } from '@/theme/mobile-theme';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { useFocusEffect, useRouter } from 'expo-router';
@@ -100,7 +101,7 @@ export function CustomizeStops({ journey }: { journey: PublicJourney }) {
   </>;
 }
 
-const styles = StyleSheet.create({
+const styles = darkPilotStyles(StyleSheet.create({
   content: { paddingHorizontal: 18, paddingTop: 6, paddingBottom: 20, gap: 16 },
   deckStep: { flex: 1, minHeight: 0, overflow: 'hidden', paddingHorizontal: 18, paddingTop: 2, paddingBottom: 6, gap: 8 },
   intro: { gap: 5 },
@@ -134,4 +135,4 @@ const styles = StyleSheet.create({
   notice: { color: colors.ink, fontSize: 13, lineHeight: 20, padding: 14, borderRadius: 16, backgroundColor: '#F4E8D5' },
   loading: { gap: 8, alignItems: 'center' }, ready: { alignItems: 'center', paddingVertical: 12, paddingHorizontal: 12, gap: 10 }, center: { textAlign: 'center' },
   readySymbol: { fontSize: 36, color: colors.ink, backgroundColor: colors.pale, padding: 16, borderRadius: 40 },
-});
+}));

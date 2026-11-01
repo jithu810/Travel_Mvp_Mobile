@@ -1,10 +1,11 @@
+import { appMobileTheme, lightPilotTheme } from './helpers/dark-pilot-harness.mjs';
 import assert from 'node:assert/strict';
 import { readFileSync, existsSync } from 'node:fs';
 import { test } from 'node:test';
 import ts from 'typescript';
 function load(file, modules = {}, timers = globalThis) {
   const exports = {}, source = ts.transpileModule(readFileSync(file, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX } }).outputText;
-  new Function('require', 'exports', 'setTimeout', 'clearTimeout', source)(id => { assert.ok(id in modules, id); return modules[id]; }, exports, timers.setTimeout, timers.clearTimeout); return exports;
+  new Function('require', 'exports', 'setTimeout', 'clearTimeout', source)(id => { if (id === '@/theme/dark-pilot') return lightPilotTheme; assert.ok(id in modules, id); return modules[id]; }, exports, timers.setTimeout, timers.clearTimeout); return exports;
 }
 const model = load('src/lib/buddy/model.ts'), geometry = load('src/lib/buddy/geometry.ts', { './model': model });
 const globeStyle = load('src/lib/discovery/globe-style.ts');
@@ -98,7 +99,7 @@ test('200 animated layout events defer native measurements until one settled bat
 });
 test('Home globe failure protects its actual Retry map button and tracks fallback scrolling without adding a wrapper', () => {
   let retries = 0; const jsx = (type, props) => ({ type, props }), protection = { onLayout() {}, ref: 'retry-control', collapsable: false }, scroll = { onScroll() {} };
-  const { GlobeFallback } = load('src/components/discovery/globe/fallback.tsx', { 'react/jsx-runtime': { jsx, jsxs: jsx }, 'react-native': { View: 'View', ScrollView: 'ScrollView', Pressable: 'Pressable', Text: 'Text', StyleSheet: { create: value => value } }, '@/components/branded-loading': {}, '@/lib/discovery/presentation': {}, '../ui': { colors: {} }, '@/hooks/use-buddy-geometry': { useBuddyProtectedBounds: () => protection, useBuddyScroll: () => scroll } });
+  const { GlobeFallback } = load('src/components/discovery/globe/fallback.tsx', { '@/theme/mobile-theme': appMobileTheme, 'react/jsx-runtime': { jsx, jsxs: jsx }, 'react-native': { View: 'View', ScrollView: 'ScrollView', Pressable: 'Pressable', Text: 'Text', StyleSheet: { create: value => value } }, '@/components/branded-loading': {}, '@/lib/discovery/presentation': {}, '../ui': { colors: {} }, '@/hooks/use-buddy-geometry': { useBuddyProtectedBounds: () => protection, useBuddyScroll: () => scroll } });
   const tree = GlobeFallback({ message: 'Unavailable', retry: () => retries++, bottomInset: 200 });
   assert.equal(tree.type, 'View'); const content = tree.props.children; assert.equal(content.type, 'ScrollView'); assert.equal(content.props.onScroll, scroll.onScroll);
   const button = content.props.children.find(child => child?.type === 'Pressable'); assert.equal(button.props.ref, protection.ref); assert.equal(button.props.collapsable, false); button.props.onPress(); assert.equal(retries, 1);

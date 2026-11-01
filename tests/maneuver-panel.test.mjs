@@ -1,3 +1,4 @@
+import { appMobileTheme, lightPilotTheme } from './helpers/dark-pilot-harness.mjs';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
@@ -6,7 +7,7 @@ function load(path, dependencies = {}) {
   const module = { exports: {} };
   new Function('require', 'module', 'exports', ts.transpileModule(readFileSync(path, 'utf8'), {
     compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX },
-  }).outputText)(name => { assert.ok(name in dependencies, name); return dependencies[name]; }, module, module.exports);
+  }).outputText)(name => { if (name === '@/theme/dark-pilot') return lightPilotTheme; if (name === '@/theme/mobile-theme') return appMobileTheme;  assert.ok(name in dependencies, name); return dependencies[name]; }, module, module.exports);
   return module.exports;
 }
 const guidanceModel = load('src/lib/journey/turn-guidance.ts');

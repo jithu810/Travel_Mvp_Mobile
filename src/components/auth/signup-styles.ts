@@ -24,7 +24,7 @@ export const signupStyles = StyleSheet.create({
   input: { minHeight: 44, paddingVertical: 10, paddingHorizontal: 14, fontSize: 16, lineHeight: 20, includeFontPadding: false, borderRadius: 13, borderColor: 'rgba(255,255,255,0.85)', backgroundColor: 'rgba(255,255,255,0.20)', color: '#FFFFFF', boxShadow: '0 0 10px rgba(255,255,255,0.12), inset 0 1px 3px rgba(255,255,255,0.25)' },
   feedback: { color: '#FFFFFF' },
   emailButton: { minHeight: 48, borderRadius: 14, borderWidth: 1, borderColor: '#FFA37B', backgroundColor: '#FF663F', experimental_backgroundImage: 'linear-gradient(110deg, #FF6052 0%, #FF702D 100%)', boxShadow: '0 4px 14px rgba(255,96,65,0.3)' },
-  emailLabel: { fontSize: 16, lineHeight: 22, fontWeight: '600', textShadowColor: '#8A301C', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 },
+  emailLabel: { color: '#27140F', fontSize: 16, lineHeight: 22, fontWeight: '600', textShadowColor: '#8A301C', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 },
   googleOption: { alignItems: 'center' },
   googleButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, maxWidth: '100%', minHeight: 48, paddingVertical: 6, paddingHorizontal: 16, borderRadius: 12, borderWidth: 1, borderColor: '#DADCE0', backgroundColor: '#FFFFFF' },
   googleLogo: { width: 22, height: 22 },

@@ -1,3 +1,5 @@
+import { theme as appTheme } from '@/theme/mobile-theme';
+import { darkPilotStyles } from '@/theme/dark-pilot';
 import { FirstOutcomeHint } from '@/components/first-outcome-hint';
 import { CompactSearchInput } from '@/components/discovery/compact-search-input';
 import { useBuddyScreen } from '@/hooks/use-journey-buddy';
@@ -21,7 +23,8 @@ import { invalidatePublicJourneys, loadDiscoveryEntries } from '@/lib/discovery/
 export default function SearchScreen() {
   const state = useLoad(loadDiscoveryEntries);
   const controlsProtection = useBuddyProtectedBounds(), resultsProtection = useBuddyProtectedBounds(), scroll = useBuddyScroll();
-  const refreshPublic = () => { invalidatePublicJourneys(); state.refresh(); };
+  const [photoRetry, setPhotoRetry] = useState(0);
+  const refreshPublic = () => { setPhotoRetry(value => value + 1); invalidatePublicJourneys(); state.refresh(); };
   const { view, guide } = useLocalSearchParams<{ view?: string; guide?: string }>();
   // Story opens the existing public collection without inheriting a Search filter.
   // Keep the Search query intact when returning from the Story entry point.
@@ -39,12 +42,18 @@ export default function SearchScreen() {
   const savedLoader = useCallback((signal: AbortSignal) => canLoadSaved && userId && token
     ? loadSavedJourneys(userId, signal) : Promise.resolve([]), [canLoadSaved, userId, token]);
   const saved = useLoad(savedLoader);
+  const refreshSavedPhotos = () => { setPhotoRetry(value => value + 1); saved.refresh(); };
   const refreshSaved = saved.refresh;
   const reloadPublic = state.refresh;
-  useFocusEffect(useCallback(() => { if (showSaved) { if (canLoadSaved) refreshSaved(); } else reloadPublic(); }, [showSaved, canLoadSaved, refreshSaved, reloadPublic]));
+  const focused = useRef(false);
+  useFocusEffect(useCallback(() => {
+    focused.current = true;
+    if (showSaved) { if (canLoadSaved) refreshSaved(); } else reloadPublic();
+    return () => { focused.current = false; };
+  }, [showSaved, canLoadSaved, refreshSaved, reloadPublic]));
   useEffect(() => {
     if (showSaved && !canLoadSaved) return;
-    const listener = AppState.addEventListener('change', next => { if (next === 'active') { if (showSaved) refreshSaved(); else reloadPublic(); } });
+    const listener = AppState.addEventListener('change', next => { if (next === 'active' && focused.current) { if (showSaved) refreshSaved(); else reloadPublic(); } });
     return () => listener.remove();
   }, [showSaved, canLoadSaved, refreshSaved, reloadPublic]);
   const collection = showSaved ? saved : state;
@@ -76,7 +85,7 @@ export default function SearchScreen() {
           <Pressable accessibilityRole="button" accessibilityLabel={savedOnly ? 'Show all public journeys' : 'Show saved journeys'} accessibilityState={{ selected: savedOnly }}
             onPress={() => setSavedOnly(value => !value)} style={[styles.savedToggle, savedOnly && styles.savedSelected]}><JourneyActionIcon name="bookmark" selected={savedOnly} /><Text style={[styles.savedLabel, savedOnly && styles.savedLabelSelected]}>Saved</Text></Pressable>
         </View> : <View style={styles.inputRow}>
-          <TextInput accessibilityLabel="Search journeys, places, stops or creators" placeholder="Try a place, stop or creator"
+          <TextInput selectionColor={appTheme.accent} keyboardAppearance="dark" accessibilityLabel="Search journeys, places, stops or creators" placeholder="Try a place, stop or creator"
             placeholderTextColor={colors.muted} value={query} onChangeText={changeQuery} maxLength={120}
             autoCapitalize="none" autoCorrect={false} returnKeyType="search" submitBehavior="blurAndSubmit" style={styles.input}
             clearButtonMode="never" />
@@ -84,16 +93,20 @@ export default function SearchScreen() {
         </View>}
         {!explore && <Text style={styles.hint}>Search titles, destinations, stops and creators in the latest 100 public journeys.</Text>}
       </View>
-      <FlatList key={explore ? 'explore' : 'stories'} {...scroll} numColumns={explore ? 3 : 1} data={results} keyExtractor={item => item.id} renderItem={({ item }) => explore ? <ExploreTile journey={item} /> : <JourneyCard journey={item} />}
-        // FlatList counts rows when numColumns is set: four rows = twelve tiles.
-        initialNumToRender={explore ? 4 : undefined} maxToRenderPerBatch={explore ? 2 : undefined} windowSize={explore ? 3 : undefined} updateCellsBatchingPeriod={explore ? 50 : undefined}
+      <FlatList key={explore ? 'explore' : 'stories'} {...scroll} numColumns={explore ? 2 : 1} data={results} keyExtractor={item => item.id} renderItem={({ item }) => explore ? <ExploreTile key={item.id + ':' + photoRetry} journey={item} /> : <JourneyCard key={item.id + ':' + photoRetry} journey={item} />}
+        // FlatList counts rows with numColumns: start with six tiles, then four per batch.
+        initialNumToRender={explore ? 3 : undefined} maxToRenderPerBatch={explore ? 2 : undefined} windowSize={explore ? 3 : undefined} updateCellsBatchingPeriod={explore ? 50 : undefined}
+        columnWrapperStyle={explore ? styles.gridRow : undefined}
+        // Retry failed tile images on explicit refresh without changing signed URLs
+        // or remounting the list (which would lose its scroll position).
+        extraData={photoRetry}
         contentContainerStyle={explore ? styles.grid : ui.list} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag" showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={collection.refreshing} onRefresh={showSaved ? saved.refresh : refreshPublic} tintColor={colors.ink} />}
+        refreshControl={<RefreshControl refreshing={collection.refreshing} onRefresh={showSaved ? refreshSavedPhotos : refreshPublic} tintColor={colors.ink} />}
         ListHeaderComponent={<View {...resultsProtection} style={[styles.resultsHeader, explore && styles.exploreResults]}>
           {guide === 'find' && <FirstOutcomeHint visible={!showSaved} title="Find a place you would like to explore">Search a destination above or open a journey tile to see its story and stops. Browsing does not need an account.</FirstOutcomeHint>}
           {!explore && !query.trim() && places.length > 0 && <View style={styles.places}>{places.map(place => <Pressable key={place} accessibilityRole="button" accessibilityLabel={'Search ' + place} onPress={() => changeQuery(place)} style={styles.chip}><Text style={styles.chipText}>{place}</Text></Pressable>)}</View>}
           {!collection.loading && !holding && (!explore || Boolean(query.trim()) || showSaved) && <Text accessibilityLiveRegion="polite" style={ui.body}>{query.trim() ? results.length + (results.length === 1 ? ' journey found' : ' journeys found') : showSaved ? 'Saved journeys' : 'Explore recent journeys'}</Text>}
-          {collection.error && results.length > 0 && <Message title="Couldn’t refresh results" body={collection.error} retry={showSaved ? saved.refresh : refreshPublic} />}
+          {collection.error && results.length > 0 && <Message title="Couldn’t refresh results" body={collection.error} retry={showSaved ? refreshSavedPhotos : refreshPublic} />}
         </View>}
         ListEmptyComponent={<View style={styles.emptyWrap}>{showSaved && (auth.loading || auth.error || !userId) ? <Message title={auth.loading ? 'Checking your account...' : auth.error ? 'Account unavailable' : 'Your saved journeys'}
           body={auth.loading ? 'Please wait while your session is restored.' : auth.error ? 'Your session could not be restored. Reopen the app to retry.' : 'Sign in to browse journeys you have saved.'}
@@ -107,7 +120,7 @@ export default function SearchScreen() {
     </KeyboardAvoidingView>
   </SafeAreaView>;
 }
-const styles = StyleSheet.create({
+const styles = darkPilotStyles(StyleSheet.create({
   compactRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   compactField: { flex: 1, minWidth: 0 },
   compactClear: { minWidth: 48, minHeight: 48, alignItems: 'center', justifyContent: 'center' },
@@ -115,10 +128,11 @@ const styles = StyleSheet.create({
   savedSelected: { backgroundColor: colors.pale, borderWidth: 1, borderColor: colors.green },
   savedLabel: { color: colors.ink, fontSize: 12, fontWeight: '600' },
   savedLabelSelected: { color: colors.green },
-  grid: { flexGrow: 1, paddingBottom: 20 },
+  grid: { flexGrow: 1, paddingHorizontal: 12, paddingBottom: 20 },
+  gridRow: { justifyContent: 'space-between' },
   emptyWrap: { paddingHorizontal: 22, paddingTop: 8 },
   exploreControls: { paddingHorizontal: 12, paddingTop: 8, paddingBottom: 10 },
-  exploreResults: { paddingHorizontal: 12, paddingBottom: 0 },
+  exploreResults: { paddingHorizontal: 0, paddingBottom: 0 },
   controls: { paddingHorizontal: 22, paddingBottom: 14, gap: 10 },
   inputRow: { flexDirection: 'row', backgroundColor: colors.white, borderWidth: 1, borderColor: colors.line, borderRadius: 16, alignItems: 'center', minHeight: 56 },
   input: { flex: 1, minWidth: 0, paddingHorizontal: 16, paddingVertical: 16, fontSize: 15, color: colors.ink },
@@ -129,4 +143,4 @@ const styles = StyleSheet.create({
   places: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
   chip: { minWidth: 48, minHeight: 48, justifyContent: 'center', paddingHorizontal: 14, borderRadius: 14, backgroundColor: colors.pale },
   chipText: { color: colors.ink, fontSize: 12, fontWeight: '500' },
-});
+}));

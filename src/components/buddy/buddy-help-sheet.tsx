@@ -1,3 +1,4 @@
+import { darkPilotStyles } from '@/theme/dark-pilot';
 import { BackHandler, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useEffect } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -57,7 +58,7 @@ function HelpAction({ label, onPress, secondary = false }: { label: string; onPr
     <View style={[s.pill, secondary && s.ghost]}><Text style={[s.actionText, secondary && s.secondaryText]}>{label}</Text></View>
   </Pressable>;
 }
-const s = StyleSheet.create({
+const s = darkPilotStyles(StyleSheet.create({
   scrim: { flex: 1, padding: 24, alignItems: 'center', justifyContent: 'center', backgroundColor: '#10231F66' },
   dialog: { position: 'relative', left: undefined, top: undefined, maxWidth: '100%' },
   bubble: { position: 'absolute', borderRadius: 20, backgroundColor: '#FFFCF3', borderWidth: 1, borderColor: '#A9C9BB', padding: 8, gap: 6, zIndex: 40, elevation: 24,
@@ -75,4 +76,4 @@ const s = StyleSheet.create({
   pressed: { opacity: 0.62 },
   tail: { position: 'absolute', width: 14, height: 14, backgroundColor: '#FFFCF3', borderColor: '#A9C9BB', transform: [{ rotate: '45deg' }] },
   tailBelow: { bottom: -8, borderRightWidth: 1, borderBottomWidth: 1 }, tailAbove: { top: -8, borderLeftWidth: 1, borderTopWidth: 1 },
-});
+}));

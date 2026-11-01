@@ -1,3 +1,4 @@
+import { darkPilotStyles } from '@/theme/dark-pilot';
 import { useEffect, useState } from 'react';
 import { AccessibilityInfo, Animated, StyleSheet, Text, View } from 'react-native';
 import { BuddySprite } from '@/components/buddy/buddy-sprite';
@@ -32,8 +33,8 @@ export function DeckBuddy({ mood, beat, reduced }: { mood: DeckMood; beat: numbe
     </Animated.View>
   </View>;
 }
-const s = StyleSheet.create({
+const s = darkPilotStyles(StyleSheet.create({
   row: { flex: 1, minWidth: 0, alignSelf: 'stretch', flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'center', gap: 2, paddingBottom: 4 },
   bubble: { flexShrink: 1, minWidth: 0, marginBottom: 6, paddingHorizontal: 8, paddingVertical: 5, borderRadius: 14, borderBottomRightRadius: 4, backgroundColor: theme.white, borderWidth: 1, borderColor: theme.border, boxShadow: theme.shadow },
   line: { color: theme.text, fontSize: 12, lineHeight: 16, fontWeight: '600' },
-});
+}));

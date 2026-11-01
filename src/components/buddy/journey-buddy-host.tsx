@@ -1,3 +1,4 @@
+import { darkPilotStyles } from '@/theme/dark-pilot';
 import { useTravelPreferences } from '@/hooks/use-travel-preferences';
 import { travelPreferenceTip } from '@/lib/buddy/travel-preferences';
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
@@ -370,8 +371,8 @@ function BuddyActor({ api, path, geometry, screen, interacting }: { api: Api; pa
       onAddMemory={() => { if (!alive.current || !api.preference.get().enabled || !help) return; const captured = help; setHelp(null); api.store.act(captured.owner, path, 'addMemory'); }} />}
   </>;
 }
-const s = StyleSheet.create({
+const s = darkPilotStyles(StyleSheet.create({
   // Raise the global host above native screen/map layers; startup remains above at z100/elevation30.
   host: { zIndex: 30, elevation: 20 },
   character: { position: 'absolute', left: 0, top: 0, width: 64, height: 64, zIndex: 25 }, touch: { width: 64, height: 64 },
-});
+}));

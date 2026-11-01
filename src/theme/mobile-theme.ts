@@ -1,11 +1,18 @@
-// Shared presentation tokens for non-auth Mobile screens. Map guidance keeps its blue palette.
-export const theme = {
+// Immutable app-wide dark presentation. lightTheme is reserved for fixed artwork and light map controls.
+export const lightTheme = {
   background: '#EDF1F8', surface: '#F7F8FC', inset: '#F1F3F8', lavender: '#EBEEFF',
   text: '#101B2E', muted: '#505D73', accent: '#4B46A2', border: '#D1D8EE',
   white: '#FFFFFF', navigation: '#246BE0',
   primaryGradient: 'linear-gradient(110deg, #9344C8 0%, #6546CD 38%, #2460CE 100%)',
   backgroundGradient: 'linear-gradient(135deg, #F8F7FF 0%, #EDF1F8 55%, #E2EAF6 100%)',
   shadow: '0 3px 7px rgba(39, 54, 85, 0.12)',
+} as const;
+export const theme = {
+  ...lightTheme,
+  background: '#0B1220', surface: '#152238', inset: '#1C2D46', lavender: '#1C2D46',
+  text: '#F1F5FC', muted: '#B5C3D8', accent: '#C1ADFF', border: '#3E526F',
+  backgroundGradient: 'linear-gradient(135deg, #101C30 0%, #0B1220 100%)',
+  shadow: '0 3px 7px rgba(0, 0, 0, 0.28)',
 } as const;
 export const primaryControl = {
   backgroundColor: '#6546CD', experimental_backgroundImage: theme.primaryGradient,

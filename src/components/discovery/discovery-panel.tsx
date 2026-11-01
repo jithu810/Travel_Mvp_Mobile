@@ -1,3 +1,4 @@
+import { usePilotColor, darkPilotStyles } from '@/theme/dark-pilot';
 import { useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, Animated, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import type { PublicJourney } from '@/types/journey';
@@ -8,11 +9,13 @@ import { colors } from './ui';
 import { useBuddyProtectedBounds, useBuddyScroll } from '@/hooks/use-buddy-geometry';
 
 export function DiscoveryPanel({ journeys, selectedId, onLocate, onOpen, notice, onClear, onRetrySelection,
-  loading, refreshing, error, emptyText, onRefresh, onHeight, onInteraction, availableHeight, availableWidth, bottomClearance = 0, topClearance = 0 }: {
+  loading, refreshing, error, emptyText, onRefresh, onHeight, onInteraction, availableHeight, availableWidth, bottomClearance = 0, topClearance = 0, photoRetry = 0 }: {
   journeys: PublicJourney[]; selectedId: string | null; onLocate: (id: string) => void; onOpen: (id: string) => void;
   notice: string; onClear: () => void; onRetrySelection?: () => void; loading: boolean; refreshing: boolean;
-  error: string | null; emptyText?: string; onRefresh: () => void; onHeight: (height: number) => void; onInteraction: (active: boolean) => void; availableHeight: number; availableWidth: number; bottomClearance?: number; topClearance?: number;
+  error: string | null; emptyText?: string; onRefresh: () => void; onHeight: (height: number) => void; onInteraction: (active: boolean) => void; availableHeight: number; availableWidth: number; bottomClearance?: number; topClearance?: number; photoRetry?: number;
 }) {
+  const pilotColor = usePilotColor();
+  const s = lightStyles_s;
   // Keep the peek handle and compact cards above the fixed pill. Expanded content
   // scrolls underneath it, with enough trailing space to expose the final actions.
   const clearance = Math.min(Math.max(0, bottomClearance), Math.max(0, availableHeight - 44));
@@ -50,7 +53,7 @@ export function DiscoveryPanel({ journeys, selectedId, onLocate, onOpen, notice,
       </Pressable>
       <Pressable accessibilityRole="button" accessibilityLabel="Refresh journeys" disabled={loading || refreshing}
         accessibilityState={{ disabled: loading || refreshing }} onPress={onRefresh} style={s.refresh}>
-        {refreshing ? <ActivityIndicator color={colors.ink} /> : <Text style={s.refreshText}>↻ Refresh</Text>}
+        {refreshing ? <ActivityIndicator color={pilotColor(colors.ink)} /> : <Text style={s.refreshText}>↻ Refresh</Text>}
       </Pressable>
       </View>
     </View>
@@ -67,12 +70,13 @@ export function DiscoveryPanel({ journeys, selectedId, onLocate, onOpen, notice,
       initialNumToRender={listExpanded ? 3 : 2} maxToRenderPerBatch={2} windowSize={3} updateCellsBatchingPeriod={50}
       onScroll={event => { if (listExpanded) { scroll.onScroll(); sheet.offset.current = event.nativeEvent.contentOffset.y; } }} scrollEventThrottle={16}
       data={expanded === listExpanded ? journeys.slice(0, visible) : []} keyExtractor={item => item.id} style={s.list}
+      extraData={photoRetry}
       showsHorizontalScrollIndicator={false} showsVerticalScrollIndicator={listExpanded}
       contentContainerStyle={[s.items, listExpanded && s.expandedItems, listExpanded && { paddingBottom: clearance + 10 }]}
-      renderItem={({ item }) => <HomeJourneyCard journey={item} expanded={listExpanded} width={discoveryCardWidth(availableWidth, listExpanded)}
+      renderItem={({ item }) => <HomeJourneyCard key={item.id + ':' + photoRetry} journey={item} expanded={listExpanded} width={discoveryCardWidth(availableWidth, listExpanded)}
         selected={selectedId === item.id} onOpen={onOpen} onLocate={onLocate} onHeight={listExpanded ? undefined : measureCard} />}
       ListEmptyComponent={expanded !== listExpanded ? null : <View style={s.empty}>
-        {loading ? <><ActivityIndicator color={colors.ink} /><Text style={s.hint}>Finding your next journey…</Text></>
+        {loading ? <><ActivityIndicator color={pilotColor(colors.ink)} /><Text style={s.hint}>Finding your next journey…</Text></>
           : <Text style={s.emptyText}>{error ? 'A small detour. Tap Refresh to try again.' : emptyText || 'The next story is still to come. No public journeys yet.'}</Text>}
       </View>}
       ListFooterComponent={expanded !== listExpanded ? null : visible < journeys.length
@@ -82,7 +86,7 @@ export function DiscoveryPanel({ journeys, selectedId, onLocate, onOpen, notice,
     </View>
   </Animated.View>;
 }
-const s = StyleSheet.create({
+const lightStyles_s = darkPilotStyles(StyleSheet.create({
   sheet: { position: 'absolute', left: 0, right: 0, bottom: 0, borderTopLeftRadius: 32, borderTopRightRadius: 32,
     backgroundColor: 'rgba(232, 239, 252, 0.97)', overflow: 'hidden', borderWidth: 1, borderBottomWidth: 0, borderColor: '#FFFFFF66' },
   handleButton: { minHeight: 44, alignItems: 'center', justifyContent: 'center', gap: 4 },
@@ -106,4 +110,4 @@ const s = StyleSheet.create({
   emptyText: { color: colors.ink, fontSize: 12, lineHeight: 18 },
   more: { minHeight: 44, minWidth: 120, padding: 16, alignItems: 'center', justifyContent: 'center' },
   end: { color: colors.muted, fontSize: 11, paddingVertical: 16 },
-});
+}));

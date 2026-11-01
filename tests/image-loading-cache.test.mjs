@@ -30,13 +30,28 @@ const row={id,title:'Public',is_demo:false,traveler_type:'solo',cover_image_path
 const model=load('src/lib/discovery/model.ts',{'../../types/journey':{travelerTypes:['solo','couple','friends','family']}});
 function queries(options={}){
  const calls=[],signs=[];let active=0,peak=0;
- const client={rpc(name,args){calls.push({name,args});return {abortSignal:async()=>({data:args.journey_filter ? (options.withdrawn ? []:[row]):[row],error:null})};},storage:{from(){return {async createSignedUrls(paths){signs.push(paths);active++;peak=Math.max(peak,active);await options.wait?.();active--;return {data:paths.map(path=>options.fail?.(path)?{error:'missing'}:{signedUrl:'https://test.invalid/'+path}),error:null};}};}}};
- const api=load('src/lib/discovery/queries.ts',{'../supabase/public':{publicSupabase:client},'./model':model,'./request-cache':{createRequestCache},'../media/image-variants':load('src/lib/media/image-variants.ts')},options.timers);
+ const client={rpc(name,args){calls.push({name,args});return {abortSignal:async()=>({data:args.journey_filter ? (options.withdrawn ? []:[row]):options.rows?.()??[row],error:null})};},storage:{from(){return {async createSignedUrls(paths){signs.push(paths);const token=signs.length;active++;peak=Math.max(peak,active);await options.wait?.();active--;return {data:paths.map(path=>options.fail?.(path)?{error:'missing'}:{signedUrl:'https://test.invalid/'+path+'?token='+token}),error:null};}};}}};
+ const api=load('src/lib/discovery/queries.ts',{'../supabase/public':{publicSupabase:client},'./model':model,'./request-cache':{createRequestCache:(max,ttl)=>createRequestCache(max,ttl,options.clock)},'../media/image-variants':load('src/lib/media/image-variants.ts')},options.timers);
  return {api,calls,signs,peak:()=>peak};
 }
-test('public collection and simultaneous per-path signing reused; explicit refresh bypasses both',async()=>{
- const h=queries();await Promise.all([h.api.loadPublicJourneys(signal()),h.api.loadPublicJourneys(signal())]);assert.equal(h.calls.length,1);assert.equal(h.signs.flat().length,1);
- await h.api.loadPublicJourneys(signal());assert.equal(h.calls.length,1);h.api.invalidatePublicJourneys();await h.api.loadPublicJourneys(signal());assert.equal(h.calls.length,2);assert.equal(h.signs.length,2);
+test('public refresh updates collection while reusing identical signed URL and simultaneous requests',async()=>{
+ const h=queries();const [first]=await Promise.all([h.api.loadPublicJourneys(signal()),h.api.loadPublicJourneys(signal())]);assert.equal(h.calls.length,1);assert.equal(h.signs.flat().length,1);
+ await h.api.loadPublicJourneys(signal());assert.equal(h.calls.length,1);h.api.invalidatePublicJourneys();const refreshed=await h.api.loadPublicJourneys(signal());assert.equal(h.calls.length,2);assert.equal(h.signs.length,1);assert.equal(refreshed[0].cover,first[0].cover);
+});
+
+test('collection expiry and refresh preserve signatures; signature expiry renews before one-hour grant ends',async()=>{
+ let now=0;const h=queries({clock:()=>now});const first=await h.api.loadPublicJourneys(signal());
+ now=45001;const returned=await h.api.loadPublicJourneys(signal());assert.equal(h.calls.length,2);assert.equal(h.signs.length,1);assert.equal(returned[0].cover,first[0].cover);
+ now=3299999;h.api.invalidatePublicJourneys();assert.equal((await h.api.loadPublicJourneys(signal()))[0].cover,first[0].cover);assert.equal(h.signs.length,1);
+ now=3300001;const renewed=await h.api.loadPublicJourneys(signal());assert.equal(h.signs.length,2);assert.notEqual(renewed[0].cover,first[0].cover);
+});
+
+test('refresh retains in-flight signing and only newly referenced objects require additional signatures',async()=>{
+ const pending=deferred();let rows=[row];const h=queries({wait:()=>pending.promise,rows:()=>rows});
+ const first=h.api.loadPublicJourneys(signal());await tick();assert.equal(h.signs.length,1);
+ h.api.invalidatePublicJourneys();const second=h.api.loadPublicJourneys(signal());await tick();assert.equal(h.calls.length,2);assert.equal(h.signs.length,1);
+ pending.resolve();const [a,b]=await Promise.all([first,second]);assert.equal(a[0].cover,b[0].cover);
+ rows=[{...row,cover_image_path:'journey-media/user/journey/new-cover.jpg'}];h.api.invalidatePublicJourneys();const changed=await h.api.loadPublicJourneys(signal());assert.equal(h.signs.flat().length,2);assert.notEqual(changed[0].cover,a[0].cover);
 });
 test('hung signing transport releases worker slots at deadline and late response cannot replace fresh signatures',async()=>{
  const deadlines=[];let calls=0;const hanging=deferred();

@@ -1,3 +1,4 @@
+import { appMobileTheme, lightPilotTheme } from './helpers/dark-pilot-harness.mjs';
 import assert from 'node:assert/strict';
 import { Buffer } from 'node:buffer';
 import { readFileSync } from 'node:fs';
@@ -33,7 +34,7 @@ function fixture(image = { ready: false, failed: false, version: 0 }) {
   const module = { exports: {} };
   new Function('require', 'module', 'exports', ts.transpileModule(readFileSync('src/components/journey/map/native-map.tsx', 'utf8'), {
     compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX },
-  }).outputText)(name => { assert.ok(name in mocks, name); return mocks[name]; }, module, module.exports);
+  }).outputText)(name => { if (name === '@/theme/dark-pilot') return lightPilotTheme; if (name === '@/theme/mobile-theme') return appMobileTheme;  assert.ok(name in mocks, name); return mocks[name]; }, module, module.exports);
   const nodes = node => !node || typeof node !== 'object' ? [] : [node, ...[node.props?.children].flat(Infinity).flatMap(nodes)];
   return (position, extra = {}) => nodes(module.exports.NativeJourneyMap({ data: { markers: [] }, stops: [], presentation: 'expanded', navigationMode: true,
     currentPosition: position, navigationRoute: { type: 'LineString', coordinates: [[0, 0], [0.01, 0]] }, ...extra }));

@@ -6,14 +6,16 @@ import { resolveBuddyAnimation, spriteFrame } from '@/lib/buddy/animations';
 import type { StoryBuddyPlayback } from '@/lib/journey/story-buddy-playback';
 
 const idle = resolveBuddyAnimation('idle')!;
+const jump = resolveBuddyAnimation('jump')!;
 export function StoryWalkingBuddy({ playback, active, reducedMotion, size, motionKnown = true, motion = 'walk' }: { playback: StoryBuddyPlayback; active: boolean; reducedMotion: boolean; size: number; motionKnown?: boolean; motion?: 'walk' | 'run' }) {
   const moving = resolveBuddyAnimation(motion)!;
   const position = useSyncExternalStore(playback.subscribe, playback.get, playback.get);
   const [decoded, setDecoded] = useState({ idle: false, moving: null as typeof moving | null, layout: false });
   const [failed, setFailed] = useState(false);
-  const ready = decoded.idle && decoded.moving === moving && decoded.layout && !failed;
+  const [jumpDecoded, setJumpDecoded] = useState(false), [jumpFailed, setJumpFailed] = useState(false);
+  const ready = decoded.idle && decoded.moving === moving && decoded.layout && jumpDecoded && !failed;
   const buddy = useMapBuddy(active && motionKnown && ready && !!position.coordinate);
-  const clip = position.moving ? moving : idle;
+  const clip = position.loopPhase === 'jump' && !jumpFailed ? jump : position.moving ? moving : idle;
   const [sprite, setSprite] = useState({ clip: idle, frame: 0 });
   const frame = sprite.clip === clip ? sprite.frame : 0;
   useEffect(() => {
@@ -30,7 +32,7 @@ export function StoryWalkingBuddy({ playback, active, reducedMotion, size, motio
   useEffect(() => {
     if (!buddy.visible || buddy.helping || reducedMotion) return;
     let index = 0;
-    const timer = setInterval(() => { index = (index + 1) % clip.frames; setSprite({ clip, frame: index }); }, 1000 / clip.fps);
+    const timer = setInterval(() => { index = clip === jump ? Math.min(clip.frames - 1, index + 1) : (index + 1) % clip.frames; setSprite({ clip, frame: index }); }, clip === jump ? 100 : 1000 / clip.fps);
     return () => clearInterval(timer);
   }, [clip, buddy.visible, buddy.helping, reducedMotion]);
   if (!position.coordinate || failed) return null;
@@ -38,8 +40,8 @@ export function StoryWalkingBuddy({ playback, active, reducedMotion, size, motio
     <Pressable collapsable={false} accessibilityRole="button" accessibilityLabel="Journey Buddy messages" accessibilityHint="Opens Journey Buddy guidance" disabled={!buddy.visible || !buddy.canHelp} accessibilityState={{ disabled: !buddy.visible || !buddy.canHelp }} onPress={event => { if (buddy.visible && buddy.canHelp) buddy.openHelp({ x: event.nativeEvent.pageX, y: event.nativeEvent.pageY }); }} onLayout={event => {
       if (event.nativeEvent.layout.width > 0 && event.nativeEvent.layout.height > 0) setDecoded(old => old.layout ? old : { ...old, layout: true });
     }} style={{ width: size, height: size, overflow: 'hidden', opacity: buddy.visible ? 1 : 0, transform: [{ scaleX: position.facing === clip.facing ? 1 : -1 }] }}>
-      {([idle, moving] as const).map(sheet => <Image key={sheet === idle ? 'idle' : motion} source={sheet.source} accessible={false}
-        fadeDuration={0} resizeMode="stretch" resizeMethod="scale" onLoad={() => setDecoded(old => sheet === idle ? old.idle ? old : { ...old, idle: true } : old.moving === sheet ? old : { ...old, moving: sheet })} onError={() => setFailed(true)}
+      {([idle, moving, jump] as const).map(sheet => <Image key={sheet === idle ? 'idle' : sheet === jump ? 'jump' : motion} source={sheet.source} accessible={false}
+        fadeDuration={0} resizeMode="stretch" resizeMethod="scale" onLoad={() => { if (sheet === jump) { setJumpDecoded(true); return; } setDecoded(old => sheet === idle ? old.idle ? old : { ...old, idle: true } : old.moving === sheet ? old : { ...old, moving: sheet }); }} onError={() => { if (sheet === jump) { setJumpFailed(true); setJumpDecoded(true); } else setFailed(true); }}
         style={{ position: 'absolute', ...spriteFrame(sheet, frame, size), opacity: clip === sheet ? 1 : 0 }} />)}
     </Pressable>
   </Mapbox.MarkerView>;

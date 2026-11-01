@@ -1,3 +1,4 @@
+import { darkPilotStyles } from '@/theme/dark-pilot';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
@@ -29,10 +30,10 @@ export function ExploreTile({ journey }: { journey: PublicJourney }) {
     </View>}
   </Pressable>;
 }
-const styles = StyleSheet.create({
-  tile: { width: '33.333333%', aspectRatio: 1, padding: 1, minHeight: 44 },
+const styles = darkPilotStyles(StyleSheet.create({
+  tile: { width: '48.5%', aspectRatio: 0.92, marginBottom: 10, minHeight: 44, borderRadius: 18, overflow: 'hidden' },
   pressed: { opacity: 0.75 },
-  caption: { position: 'absolute', left: 1, right: 1, bottom: 1, paddingHorizontal: 6, paddingTop: 4, paddingBottom: 5, backgroundColor: 'rgba(17, 17, 17, 0.62)' },
-  title: { color: '#fff', fontSize: 11, lineHeight: 14, fontWeight: '700' },
-  destination: { color: '#fff', fontSize: 10, lineHeight: 13, fontWeight: '500' },
-});
+  caption: { position: 'absolute', left: 0, right: 0, bottom: 0, paddingHorizontal: 10, paddingTop: 10, paddingBottom: 11, gap: 3, backgroundColor: 'rgba(17, 17, 17, 0.72)' },
+  title: { color: '#fff', fontSize: 13, lineHeight: 17, fontWeight: '700' },
+  destination: { color: '#fff', fontSize: 11, lineHeight: 15, fontWeight: '500' },
+}));

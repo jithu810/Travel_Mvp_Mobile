@@ -1,7 +1,8 @@
+import { darkPilotStyles } from '@/theme/dark-pilot';
 import { useCallback } from 'react';
 import { useRouter } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { Action, ui } from '@/components/discovery/ui';
+import { Action, ui as lightUi } from '@/components/discovery/ui';
 import { useLoad } from '@/hooks/use-load';
 import { loadPublicJourneyCard } from '@/lib/discovery/queries';
 import { remixCredit, unavailableSourceCopy } from '@/lib/remix/model';
@@ -12,7 +13,9 @@ import { theme } from '@/theme/mobile-theme';
 // - draft: private draft screen, credit plus the View original action
 // - editor: one compact line in the draft editor header, no navigation away
 // - published: "Remixed from" link on a published journey
-export function SourceAttribution({ id, variant = 'draft' }: { id: string; variant?: 'draft' | 'editor' | 'published' }) {
+export function SourceAttribution({ id, variant = 'draft', compact = false }: { id: string; variant?: 'draft' | 'editor' | 'published'; compact?: boolean }) {
+  const s = lightStyles_s;
+  const ui = lightUi;
   const router = useRouter();
   const loader = useCallback((signal: AbortSignal) => loadPublicJourneyCard(id, signal), [id]);
   const source = useLoad(loader);
@@ -30,18 +33,19 @@ export function SourceAttribution({ id, variant = 'draft' }: { id: string; varia
   }
   const text = source.loading ? 'Checking the original journey…' : remixCredit('Remixed from', source.data);
   return source.data
-    ? <Pressable accessibilityRole="link" accessibilityLabel={text} accessibilityHint="Opens the original journey" onPress={open} style={({ pressed }) => [s.published, pressed && { opacity: 0.7 }]}>
-      <Text numberOfLines={2} style={s.publishedText}>{text} <Text style={s.link}>↗</Text></Text>
+    ? <Pressable accessibilityRole="link" accessibilityLabel={text} accessibilityHint="Opens the original journey" onPress={open} style={({ pressed }) => [s.published, compact && s.compactPublished, pressed && { opacity: 0.7 }]}>
+      <Text numberOfLines={2} style={[s.publishedText, compact && s.compactText]}>{text} <Text style={s.link}>↗</Text></Text>
     </Pressable>
-    : <View style={s.published}>
-      <Text numberOfLines={2} style={s.publishedText}>{text}</Text>
+    : <View style={[s.published, compact && s.compactPublished]}>
+      <Text numberOfLines={2} style={[s.publishedText, compact && s.compactText]}>{text}</Text>
       {source.error && !source.loading && <Pressable accessibilityRole="button" accessibilityLabel="Retry source attribution" onPress={source.retry} style={s.retry}><Text style={s.link}>Retry ↻</Text></Pressable>}
     </View>;
 }
-const s = StyleSheet.create({
+const lightStyles_s = darkPilotStyles(StyleSheet.create({
   editor: { color: theme.accent, fontSize: 11, lineHeight: 16, fontWeight: '600' },
   retry: { minHeight: 32, justifyContent: 'center' },
   published: { minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 4 },
+  compactPublished: { minHeight: 32 }, compactText: { fontSize: 10, lineHeight: 14 },
   publishedText: { flex: 1, minWidth: 0, color: theme.muted, fontSize: 12, lineHeight: 18 },
   link: { color: theme.accent, fontSize: 12, lineHeight: 18, fontWeight: '600' },
-});
+}));

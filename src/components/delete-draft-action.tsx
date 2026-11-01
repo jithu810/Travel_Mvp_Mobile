@@ -1,3 +1,4 @@
+import { darkPilotStyles } from '@/theme/dark-pilot';
 import { useRef, useState } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { colors, ui } from '@/components/discovery/ui';
@@ -43,7 +44,7 @@ export function DeleteDraftAction({ draft, onDeleted }: { draft: { id: string; t
   </View>;
 }
 
-const s = StyleSheet.create({
+const s = darkPilotStyles(StyleSheet.create({
   trigger: { minHeight: 48, paddingHorizontal: 10, paddingVertical: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderRadius: 13 },
   triggerText: { color: '#9D493D', fontSize: 11, lineHeight: 17, fontWeight: '600' },
   bin: { width: 13, height: 15, alignItems: 'center', justifyContent: 'center' },
@@ -57,4 +58,4 @@ const s = StyleSheet.create({
   confirmText: { color: '#FFFFFF', fontSize: 14, lineHeight: 20, fontWeight: '600', textAlign: 'center' },
   cancel: { minHeight: 48, borderRadius: 16, alignItems: 'center', justifyContent: 'center', padding: 10, backgroundColor: '#E8ECE3' },
   cancelText: { color: colors.ink, fontSize: 14, lineHeight: 20, fontWeight: '600' }, dimmed: { opacity: 0.6 },
-});
+}));

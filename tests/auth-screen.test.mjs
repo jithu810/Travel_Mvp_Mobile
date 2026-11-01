@@ -1,3 +1,4 @@
+import { appMobileTheme, lightPilotTheme } from './helpers/dark-pilot-harness.mjs';
 import { buddyGeometryStub } from './helpers/buddy-geometry-stub.mjs';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -13,7 +14,7 @@ const compile = path => ts.transpileModule(readFileSync(path, 'utf8'), { compile
 function load(path, modules) {
   modules={'@/hooks/use-buddy-geometry':buddyGeometryStub,...modules};
   const module = { exports: {} };
-  new Function('require', 'module', 'exports', compile(path))(name => { if (name === '@/theme/mobile-theme') return mobileTheme; if (name === '@/components/auth/legacy-ui') return load('src/components/auth/legacy-ui.ts', { 'react-native': native });
+  new Function('require', 'module', 'exports', compile(path))(name => { if (name === '@/theme/dark-pilot') return lightPilotTheme; if (name === '@/theme/mobile-theme') return appMobileTheme;  if (name === '@/theme/mobile-theme') return mobileTheme; if (name === '@/components/auth/legacy-ui') return load('src/components/auth/legacy-ui.ts', { 'react-native': native });
     if (name.endsWith('.png')) return name;
     assert.ok(name in modules, `Unexpected dependency ${name}`);
     return modules[name];

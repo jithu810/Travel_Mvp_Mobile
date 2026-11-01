@@ -1,3 +1,4 @@
+import { appMobileTheme, lightPilotTheme } from './helpers/dark-pilot-harness.mjs';
 import { buddyGeometryStub, buddyMapPinsStub } from './helpers/buddy-geometry-stub.mjs';
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
@@ -11,16 +12,16 @@ new Function('exports', ts.transpileModule(readFileSync('src/theme/mobile-theme.
 function load(file, dependencies, state = null, hookOverrides = {}) {
   dependencies={'@/hooks/use-buddy-geometry':buddyGeometryStub,'@/hooks/use-trip-recovery':{useTripRecovery:()=>({checking:false,notice:null}),useUnfinishedTrip:()=>null},...dependencies};
   const exports = {};
-  const jsx = (type, props) => ({ type, props });
+  const jsx = (type, props, key) => ({ type, props, key });
   const react = { useRef:()=>({current:null}),useEffect:()=>{}, memo: fn => fn, useState: initial => typeof state === 'function' ? state(initial) : [state ?? initial, () => {}], useMemo: fn => fn(), useCallback: fn => fn, ...hookOverrides };
   const rn = { StyleSheet: { create: value => value }, Platform: { OS: 'web' }, StatusBar: {} };
   for (const name of ['View', 'Text', 'Pressable', 'Image', 'TextInput']) rn[name] = name;
   const source = ts.transpileModule(readFileSync(file, 'utf8'), { compilerOptions: { jsx: ts.JsxEmit.ReactJSX, module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
-  new Function('require', 'exports', source)(name => { if(name==='@/components/first-outcome-hint')return {FirstOutcomeHint:'FirstOutcomeHint'};
+  new Function('require', 'exports', source)(name => { if (name === '@/theme/dark-pilot') return lightPilotTheme; if (name === '@/theme/mobile-theme') return appMobileTheme;  if(name==='@/components/first-outcome-hint')return {FirstOutcomeHint:'FirstOutcomeHint'};
     if(name==='@/lib/first-outcome')return load('src/lib/first-outcome.ts',{});
     if(name==='@/components/first-outcome-hint')return {FirstOutcomeHint:'FirstOutcomeHint'};
     if(name==='@/lib/first-outcome')return load('src/lib/first-outcome.ts',{});
-    if (name === '@/theme/mobile-theme') return mobileTheme;
+    if (name === '@/theme/dark-pilot') return lightPilotTheme; if (name === '@/theme/mobile-theme') return mobileTheme;
     if(name==='@/hooks/use-journey-buddy')return {useBuddyScreen(){}};
     if(name==='@/hooks/use-buddy-map-pins')return buddyMapPinsStub;
     if(name==='@/lib/buddy/map-controls')return load('src/lib/buddy/map-controls.ts',{'../discovery/globe-style':load('src/lib/discovery/globe-style.ts',{})});
@@ -61,7 +62,7 @@ function nodes(tree) {
 }
 const colors = { paper: '#fff' };
 test('shared Search route highlights only its selected entry point and Story detail stays on Story', () => {
-  for (const [path, view, active] of [['/search', undefined, 'search'], ['/search', 'search', 'search'], ['/search', 'stories', 'story'], ['/journey/a', undefined, 'story'], ['/account', undefined, 'account']]) {
+  for (const [path, view, active] of [['/search', undefined, 'search'], ['/search', 'search', 'search'], ['/search', 'stories', 'story'], ['/journey/a', undefined, 'story'], ['/customized/a', undefined, 'story'], ['/account', undefined, 'account']]) {
     const nav = load('src/components/floating-navigation.tsx', {
       'expo-router': { usePathname: () => path, useGlobalSearchParams: () => ({ view }) },
       'react-native-safe-area-context': {},
@@ -175,7 +176,7 @@ test('Home embeds place search; Account and navigation retain existing routes an
   const explore = all.find(n => n.props?.accessibilityLabel === 'Explore');
   const count = pushed.length; explore.props.onPress(); assert.equal(pushed.length, count);
   assert.equal(explore.props.accessibilityState.selected, true);
-  assert.equal(explore.props.style({ pressed: false })[1].backgroundColor, '#C9DFFF');
+  assert.equal(explore.props.style({ pressed: false })[1].backgroundColor, '#263F65');
   const nav = all.find(n => [n.props?.children].flat(Infinity).includes(explore));
   assert.equal(nav.props.children.length, 5);
   assert.equal(nav.props.style[0].position, 'absolute');
@@ -296,13 +297,13 @@ test('Home image failure falls back, a new URI recovers and card measurement rem
     const glyph = nodes(icon).find(n => n.type === (label.startsWith('Locate') ? 'Ionicons' : 'MaterialCommunityIcons'));
     assert.equal(glyph.props.name, label.startsWith('Locate') ? 'locate-outline' : 'book-outline');
     assert.equal(glyph.props.size, 28);
-    assert.equal(glyph.props.color, label.startsWith('Locate') ? '#6555CF' : '#3873CE');
+    assert.equal(glyph.props.color, label.startsWith('Locate') ? '#C1ADFF' : '#91BEFF');
     const box = Object.assign({}, ...[icon.props.style].flat().filter(Boolean));
     assert.equal(box.width, 28); assert.equal(box.height, 28, 'Glyph space is reserved before the icon font loads');
     if (!label.startsWith('Locate')) assert.equal(action.props.accessibilityHint, 'Opens Journey Story');
   }
   const unselectedLocate = nodes(component.HomeJourneyCard({ ...props, selected: false })).find(n => n.props?.accessibilityLabel === 'Locate journey: Coastal weekend');
-  assert.equal(nodes(unselectedLocate).find(n => n.type === 'Ionicons').props.color, '#3873CE');
+  assert.equal(nodes(unselectedLocate).find(n => n.type === 'Ionicons').props.color, '#91BEFF');
   nodes(tree).find(n => n.type === 'Image').props.onError();
   assert.equal(failedUri, journey.cover);
   assert.ok(nodes(component.HomeJourneyCard(props)).some(n => n.type === 'JourneyArt'));
@@ -397,12 +398,12 @@ test('shared navigation selects each destination and frame includes only standar
       else assert.equal(routes.at(-1), ['/discover', '/search?view=search', '/create', '/search?view=stories', '/account'][i]);
     }
     assert.equal(tree.props.style[1].bottom, 32);
-    assert.equal(tree.props.style[0].backgroundColor, 'rgba(242, 246, 255, 0.97)');
+    assert.equal(tree.props.style[0].backgroundColor, 'rgba(21, 34, 56, 0.98)');
   }
-  for (const path of ['/search', '/create', '/account', '/journey/a', '/profile/traveler', '/', '/discover', '/auth', '/draft/a', '/travel/a']) {
+  for (const path of ['/search', '/create', '/account', '/journey/a', '/customized/a', '/profile/traveler', '/', '/discover', '/auth', '/draft/a', '/travel/a', '/customize/a']) {
     const nav = load('src/components/floating-navigation.tsx', { 'expo-router': { usePathname: () => path }, 'react-native-safe-area-context': {} });
     const tree = nav.MainNavigationFrame({ children: 'screen' });
-    const expected = ['/search', '/create', '/account', '/journey/a', '/profile/traveler'].includes(path);
+    const expected = ['/search', '/create', '/account', '/journey/a', '/customized/a', '/profile/traveler'].includes(path);
     assert.equal(Boolean(tree.props.children[1]), expected, path);
     assert.equal(Boolean(tree.props.children[0].props.style[1]), expected);
     if (expected) assert.equal(tree.props.children[0].props.style[1].paddingBottom, 72);
@@ -435,7 +436,7 @@ test('Home retains navigation and its live globe through loading, refreshing and
   collection={data:null,loading:false,error:'Offline'};assert.ok(!nodes(home.default()).some(n=>n.type==='BrandedLoading'));
 });
 
-test('Home assigns native-screen dark loading icons then light globe icons without a competing component owner',()=>{
+test('Home retains light native-screen status icons during dark loading and globe display',()=>{
  let cursor=0,collection={data:null,loading:true};const slots=[];
  const memo=(fn,deps)=>{const i=cursor++;if(!slots[i]||deps.some((v,j)=>v!==slots[i].deps[j]))slots[i]={deps,value:fn()};return slots[i].value;};
  const hooks={useState:initial=>{const i=cursor++;if(!(i in slots))slots[i]=initial;return [slots[i],v=>{slots[i]=typeof v==='function'?v(slots[i]):v;}];},useCallback:(fn,deps)=>memo(()=>fn,deps),useMemo:memo};
@@ -448,7 +449,7 @@ test('Home assigns native-screen dark loading icons then light globe icons witho
   '@/hooks/use-load':{useLoad:()=>({refresh(){},...collection})},'@/lib/discovery/map':{worldCamera:{centerCoordinate:[35,18]},discoveryPoints:()=>({features:[]})},'@/lib/discovery/travel':{discoveryRoute:()=>null},'@/lib/discovery/presentation':{spaceColor:'#080F1E'},'@/lib/discovery/queries':{loadDiscoveryEntries(){},loadPublicJourney(){}},
  },null,hooks).default;
  const render=()=>{cursor=0;return Home();};
- let tree=render();assert.ok(nodes(tree).some(n=>n.type==='BrandedLoading'));assert.equal(nodes(tree).find(n=>n.type==='StackScreen').props.options.statusBarStyle,'dark');
+ let tree=render();assert.ok(nodes(tree).some(n=>n.type==='BrandedLoading'));assert.equal(nodes(tree).find(n=>n.type==='StackScreen').props.options.statusBarStyle,'light');
  collection={data:[],loading:false};tree=render();assert.ok(!nodes(tree).some(n=>n.type==='BrandedLoading'));assert.equal(nodes(tree).find(n=>n.type==='StackScreen').props.options.statusBarStyle,'light');
  tree=render();assert.equal(nodes(tree).filter(n=>n.type==='StackScreen').length,1);
  assert.equal(nodes(tree).filter(n=>n.type==='StatusBar').length,0,'Native route owns transition style without a competing Expo status component');slots.forEach(s=>s?.cleanup?.());
@@ -465,6 +466,34 @@ test('Home image lists expose data only in active layout and More keeps every jo
   const lists=render(),active=lists.find(n=>n.props.horizontal===!expanded),hidden=lists.find(n=>n!==active);assert.equal(active.props.data.length,size);assert.equal(hidden.props.data.length,0);assert.equal(hidden.props.ListFooterComponent,null);assert.equal(hidden.props.ListEmptyComponent,null);
   if(size<61){active.props.ListFooterComponent.props.onPress();expanded=!expanded;}
  }
+});
+
+test('Home explicit refresh retries failed cached images without resetting panel, list or More state',()=>{
+ const state=()=>{let cursor=0;const slots=[];return {reset(){cursor=0;},hook:initial=>{const i=cursor++;if(!(i in slots))slots[i]=initial;return [slots[i],value=>{slots[i]=typeof value==='function'?value(slots[i]):value;}];}};};
+ const homeState=state(),panelState=state();let expanded=false;const offset={current:87};
+ const photo={...journey,coverThumbnail:'https://example.invalid/thumb.jpg'};
+ const rows=Array.from({length:61},(_,i)=>({...photo,id:String(i)}));
+ const Home=load('src/app/discover.tsx',{
+  '@/components/floating-navigation':{FloatingNavigation:'Navigation'},'expo-router':{useRouter:()=>({}),useFocusEffect(){}},
+  'react-native-safe-area-context':{SafeAreaView:'SafeAreaView',useSafeAreaInsets:()=>({bottom:24})},
+  '@/components/discovery/globe/discovery-globe':{DiscoveryGlobe:'Globe'},'@/components/discovery/discovery-panel':{DiscoveryPanel:'Panel'},
+  '@/hooks/use-load':{useLoad:()=>({data:rows.map(journey=>({journey})),loading:false,refresh(){}})},
+  '@/lib/discovery/map':{discoveryPoints:()=>({features:[]})},'@/lib/discovery/travel':{discoveryRoute:()=>null},
+  '@/lib/discovery/presentation':{spaceColor:'#080F1E'},'@/lib/discovery/queries':{loadPublicJourney(){},loadDiscoveryEntries(){}},
+ },homeState.hook).default;
+ const Panel=load('src/components/discovery/discovery-panel.tsx',{
+  'react-native':{Animated:{View:'AnimatedView',add:(a,b)=>a+b},FlatList:'FlatList'},
+  '@/lib/discovery/presentation':{discoveryCardWidth:()=>300},'@/hooks/use-discovery-sheet':{useDiscoverySheet:()=>({height:200,expanded,offset,responders:{handle:{},content:{}}})},'./home-journey-card':{HomeJourneyCard:'Card'},'./ui':{colors},
+ },panelState.hook).DiscoveryPanel;
+ const props=()=>{homeState.reset();return nodes(Home()).find(n=>n.type==='Panel').props;};
+ let panelProps=props();const list=()=>{panelState.reset();return nodes(Panel({...panelProps,availableHeight:720,availableWidth:360})).find(n=>n.type==='FlatList'&&n.props.horizontal===!expanded);};
+ list().props.ListFooterComponent.props.onPress();expanded=true;assert.equal(list().props.data.length,48);
+ let key,cardState,Card;
+ const image=()=>{const cell=list().props.renderItem({item:rows[0]});if(key!==cell.key){key=cell.key;cardState=state();Card=load('src/components/discovery/home-journey-card.tsx',{'@/lib/discovery/model':{journeyFacts:()=>''},'./ui':{colors}},cardState.hook).HomeJourneyCard;}cardState.reset();return nodes(Card(cell.props)).find(n=>n.type==='Image');};
+ assert.equal(image().props.source.uri,photo.coverThumbnail);image().props.onError();assert.equal(image().props.source.uri,photo.cover);image().props.onError();assert.equal(image(),undefined);
+ const failedKey=key,listKey=list().key;panelProps.onRefresh();panelProps=props();assert.equal(panelProps.photoRetry,1);
+ assert.equal(image().props.source.uri,photo.coverThumbnail,'Retry retains the same cacheable signed URL');assert.notEqual(key,failedKey);
+ assert.equal(list().key,listKey);assert.equal(list().props.extraData,1);assert.equal(list().props.data.length,48);assert.equal(expanded,true);assert.equal(offset.current,87);
 });
 test('R2: Home shows "Unfinished trip" with Resume for the signed-in user copy and keeps the panel clear',()=>{
   const routes=[];let trip=null;

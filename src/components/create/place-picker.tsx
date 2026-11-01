@@ -1,11 +1,15 @@
+import { theme as appTheme , theme } from '@/theme/mobile-theme';
+import { darkPilotStyles } from '@/theme/dark-pilot';
 import { CompactSearchInput } from '@/components/discovery/compact-search-input';
-import { theme } from '@/theme/mobile-theme';
+
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Keyboard, Modal, ScrollView, Pressable, StyleSheet, Text, TextInput, useWindowDimensions, View } from 'react-native';
-import { colors, ui } from '../discovery/ui';
+import { colors, ui as lightUi } from '../discovery/ui';
 import { searchPlaces } from '@/lib/create/places';
 import type { Place } from '@/lib/create/model';
 export function PlacePicker({ label, memorySheet = false, premium = false, homeSearch = false, destinationOnly = false, autoSuggest = false, compact = false, embeddedSuggestions = false, dismissVersion = 0, inlineSearch = false, proximity = null, disabled, onSelect }: { label: string; memorySheet?: boolean; premium?: boolean; homeSearch?: boolean; destinationOnly?: boolean; autoSuggest?: boolean; compact?: boolean; embeddedSuggestions?: boolean; dismissVersion?: number; inlineSearch?: boolean; proximity?: Place | null; disabled: boolean; onSelect: (place: Place) => void }) {
+  const styles = lightStyles_styles;
+  const ui = lightUi;
   const input = useRef<TextInput>(null);
   const dense = compact || inlineSearch;
   const { fontScale } = useWindowDimensions();
@@ -50,7 +54,7 @@ export function PlacePicker({ label, memorySheet = false, premium = false, homeS
       onFocus={() => setFocusEpoch(dismissVersion)} maxLength={200} placeholder={fontScale > 1.3 ? 'Search places' : 'Search destinations & places...'}
       autoCorrect={false} returnKeyType="search" submitBehavior="submit" onSubmitEditing={() => { void search(); }} />
     {focusEpoch === dismissVersion && <View style={styles.homeResults}>
-      {visibleBusy && <ActivityIndicator accessibilityLabel="Searching places" />}
+      {visibleBusy && <ActivityIndicator color={appTheme.accent} accessibilityLabel="Searching places" />}
       {visibleError && <Text accessibilityRole="alert" style={ui.body}>{visibleError}</Text>}
       {query.trim().length < 3 && <Text style={styles.note}>Enter at least 3 characters to search cities and addresses.</Text>}
       <ScrollView nestedScrollEnabled keyboardShouldPersistTaps="handled" accessibilityLabel="Place search results" style={styles.embeddedList}>{resultRows()}</ScrollView>
@@ -62,8 +66,8 @@ export function PlacePicker({ label, memorySheet = false, premium = false, homeS
     <View style={dense && !stackedSearch ? styles.searchRow : styles.searchStack}>
     {embeddedSuggestions ? <View style={[styles.inputWrap, premium && styles.raisedInput, stackedSearch && styles.fullInputRow]}>
       <View pointerEvents="none" accessible={false} style={styles.searchIcon}><Text style={styles.searchGlyph}>⌕</Text></View>
-      <TextInput accessibilityLabel={label} editable={!disabled} value={query} onChangeText={change} onFocus={() => setFocusEpoch(dismissVersion)} maxLength={200} placeholder={largeMemory ? 'Find a place' : largeDestination ? 'Destination' : compact ? 'Search destinations' : destinationOnly ? 'Search a town, region or country' : 'Search a town, street or address'} style={[styles.input, dense && styles.compactInput, premium && styles.premiumInput, memorySheet && styles.memoryInput, styles.embeddedInput]} returnKeyType="search" onSubmitEditing={() => { void search(); }} />
-    </View> : <TextInput accessibilityLabel={label} editable={!disabled} value={query} onChangeText={change} maxLength={200} placeholder={largeMemory ? 'Find a place' : compact ? 'Search destinations' : destinationOnly ? 'Search a town, region or country' : 'Search a town, street or address'} style={[styles.input, dense && styles.compactInput, memorySheet && styles.memoryInput, largeMemory && styles.fullInputRow]} returnKeyType="search" onSubmitEditing={() => { void search(); }} />}
+      <TextInput placeholderTextColor={appTheme.muted} selectionColor={appTheme.accent} keyboardAppearance="dark" accessibilityLabel={label} editable={!disabled} value={query} onChangeText={change} onFocus={() => setFocusEpoch(dismissVersion)} maxLength={200} placeholder={largeMemory ? 'Find a place' : largeDestination ? 'Destination' : compact ? 'Search destinations' : destinationOnly ? 'Search a town, region or country' : 'Search a town, street or address'} style={[styles.input, dense && styles.compactInput, premium && styles.premiumInput, memorySheet && styles.memoryInput, styles.embeddedInput]} returnKeyType="search" onSubmitEditing={() => { void search(); }} />
+    </View> : <TextInput placeholderTextColor={appTheme.muted} selectionColor={appTheme.accent} keyboardAppearance="dark" accessibilityLabel={label} editable={!disabled} value={query} onChangeText={change} maxLength={200} placeholder={largeMemory ? 'Find a place' : compact ? 'Search destinations' : destinationOnly ? 'Search a town, region or country' : 'Search a town, street or address'} style={[styles.input, dense && styles.compactInput, memorySheet && styles.memoryInput, largeMemory && styles.fullInputRow]} returnKeyType="search" onSubmitEditing={() => { void search(); }} />}
     <Pressable accessibilityRole="button" accessibilityLabel={'Search ' + label.toLowerCase()} disabled={disabled || visibleBusy} accessibilityState={{ disabled: disabled || visibleBusy }} onPress={() => { void search(); }} style={[styles.search, dense && styles.compactSearch, premium && styles.premiumSearch, memorySheet && styles.memorySearch, premium && disabled && { opacity: 0.5 }]}>
       {visibleBusy ? <ActivityIndicator color={memorySheet ? '#FFFFFF' : undefined} /> : <Text style={[styles.label, memorySheet && styles.memorySearchLabel]}>{dense ? 'Search' : 'Search places'}</Text>}
     </Pressable>
@@ -89,11 +93,11 @@ export function PlacePicker({ label, memorySheet = false, premium = false, homeS
     <Text style={styles.label}>{place.name}</Text><Text style={ui.body}>{place.label}</Text>
   </Pressable>); }
 }
-export const formStyles = StyleSheet.create({
+export const formStyles = darkPilotStyles(StyleSheet.create({
   label: { color: colors.ink, fontSize: 14, fontWeight: '600' },
   input: { minHeight: 52, borderRadius: 14, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.white, padding: 14, color: colors.ink, fontSize: 16 },
-});
-const styles = StyleSheet.create({ ...formStyles,
+}));
+const lightStyles_styles = darkPilotStyles(StyleSheet.create({ ...formStyles,
   memoryInput: { backgroundColor: '#F5F6FB', borderColor: '#FFFFFF', borderWidth: 2, borderRadius: 20, boxShadow: 'inset 0 2px 4px rgba(35, 48, 78, 0.10), 0 3px 6px rgba(39, 54, 85, 0.10)', color: '#202C43', fontSize: 14 },
   memorySearch: { backgroundColor: '#3566D8', borderColor: '#FFFFFF', experimental_backgroundImage: 'linear-gradient(135deg, #526DCD 0%, #2865DA 100%)', boxShadow: '0 3px 7px rgba(47, 91, 190, 0.22)' },
   memorySearchLabel: { color: '#FFFFFF' },
@@ -121,4 +125,4 @@ const styles = StyleSheet.create({ ...formStyles,
   search: { minHeight: 48, borderRadius: 12, backgroundColor: colors.pale, justifyContent: 'center', alignItems: 'center', padding: 12 },
   result: { minHeight: 52, padding: 14, gap: 6, borderRadius: 12, backgroundColor: colors.white, borderWidth: 1, borderColor: colors.line },
   note: { maxWidth: '100%', color: colors.muted, fontSize: 11, lineHeight: 17 },
-});
+}));

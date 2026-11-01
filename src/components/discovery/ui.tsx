@@ -1,3 +1,4 @@
+import { usePilotColor, darkPilotStyles } from '@/theme/dark-pilot';
 import { theme, primaryControl } from '@/theme/mobile-theme';
 import type { ReactNode } from 'react';
 import { useRouter } from 'expo-router';
@@ -7,6 +8,7 @@ import { useBuddyProtectedBounds } from '@/hooks/use-buddy-geometry';
 export const colors = { paper: theme.background, ink: theme.text, muted: theme.muted, green: theme.accent, line: theme.border, white: theme.white, pale: theme.lavender };
 
 export function ScreenHeader({ title, back = false, right, compact = false }: { title: string; back?: boolean; right?: ReactNode; compact?: boolean }) {
+  const ui = lightUi;
   const router = useRouter();
   const protection = useBuddyProtectedBounds();
   return <View {...protection} style={[ui.header, compact && ui.compactHeader]}>
@@ -18,24 +20,29 @@ export function ScreenHeader({ title, back = false, right, compact = false }: { 
   </View>;
 }
 export function Action({ label, onPress, disabled = false, accessibilityLabel, secondary = false, compact = false, vibrant = false, memorySheet = false }: { label: string; onPress: () => void; disabled?: boolean; accessibilityLabel?: string; secondary?: boolean; compact?: boolean; vibrant?: boolean; memorySheet?: boolean }) {
+  const ui = lightUi;
+  const color = usePilotColor();
   const protection = useBuddyProtectedBounds();
-  return <Pressable {...protection} accessibilityRole="button" accessibilityLabel={accessibilityLabel ?? label} disabled={disabled} accessibilityState={{ disabled }} onPress={onPress} style={({ pressed }) => [ui.action, vibrant && ui.vibrantAction, memorySheet && ui.memoryAction, secondary && { backgroundColor: colors.pale, experimental_backgroundImage: 'none', borderColor: colors.line, boxShadow: 'none' }, (pressed || disabled) && { opacity: 0.75 }, compact && { minWidth: 48, minHeight: memorySheet ? 50 : 48, paddingHorizontal: 14 }]}>
-    <Text style={[ui.actionLabel, vibrant && ui.vibrantLabel, memorySheet && ui.memoryLabel, secondary && { color: colors.ink }]}>{label}</Text>
+  return <Pressable {...protection} accessibilityRole="button" accessibilityLabel={accessibilityLabel ?? label} disabled={disabled} accessibilityState={{ disabled }} onPress={onPress} style={({ pressed }) => [ui.action, vibrant && ui.vibrantAction, memorySheet && ui.memoryAction, secondary && { backgroundColor: color(colors.pale, 'background'), experimental_backgroundImage: 'none', borderColor: color(colors.line, 'border'), boxShadow: 'none' }, (pressed || disabled) && { opacity: 0.75 }, compact && { minWidth: 48, minHeight: memorySheet ? 50 : 48, paddingHorizontal: 14 }]}>
+    <Text style={[ui.actionLabel, vibrant && ui.vibrantLabel, memorySheet && ui.memoryLabel, secondary && { color: color(colors.ink) }]}>{label}</Text>
   </Pressable>;
 }
 export function Message({ title, body, retry, action = 'Try again' }: { title: string; body: string; retry?: () => void; action?: string }) {
+  const ui = lightUi;
   return <View style={ui.message} accessibilityLiveRegion="polite">
     <Text style={ui.messageTitle}>{title}</Text><Text style={ui.body}>{body}</Text>
     {retry && <Action label={action} onPress={retry} />}
   </View>;
 }
 export function LoadingCards() {
+  const pilotColor = usePilotColor();
+  const ui = lightUi;
   return <View accessibilityLabel="Loading public journeys" accessibilityRole="progressbar" style={ui.loading}>
-    <ActivityIndicator color={colors.ink} /><Text style={ui.body}>Finding your next journey…</Text>
+    <ActivityIndicator color={pilotColor(colors.ink)} /><Text style={ui.body}>Finding your next journey…</Text>
     {[0, 1].map(item => <View key={item} style={ui.skeleton}><View style={ui.skeletonImage} /><View style={ui.skeletonLine} /><View style={[ui.skeletonLine, { width: '55%' }]} /></View>)}
   </View>;
 }
-export const ui = StyleSheet.create({
+const lightUi = darkPilotStyles(StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.paper, experimental_backgroundImage: theme.backgroundGradient },
   page: { width: '100%', maxWidth: 560, flex: 1, alignSelf: 'center' },
   list: { paddingHorizontal: 22, paddingBottom: 30, flexGrow: 1 },
@@ -64,4 +71,6 @@ export const ui = StyleSheet.create({
   skeletonImage: { aspectRatio: 1.9, backgroundColor: colors.line },
   skeletonLine: { height: 14, width: '80%', backgroundColor: colors.line, marginHorizontal: 18, borderRadius: 7 },
   footer: { paddingVertical: 24, gap: 14 },
-});
+}));
+
+export const ui = lightUi;

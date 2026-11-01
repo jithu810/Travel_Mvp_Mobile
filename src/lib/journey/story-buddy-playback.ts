@@ -3,7 +3,7 @@ import { hasCoordinates, type Coordinate } from './map-data';
 import { travelLegs, travelPosition, type TravelLeg } from '../discovery/travel';
 
 type Clock = { now: () => number; set: (fn: () => void, delay: number) => unknown; clear: (handle: unknown) => void };
-type Snapshot = { coordinate: Coordinate | null; moving: boolean; facing: 'left' | 'right'; revision: number };
+type Snapshot = { coordinate: Coordinate | null; moving: boolean; facing: 'left' | 'right'; revision: number; loopPhase: 'jump' | 'return' | null; loopCameraRevision: number; loopTarget: Coordinate | null; loopSelectionId: string | null; loopCameraDuration: 0 | 1600 };
 const defaultClock: Clock = { now: Date.now, set: setTimeout, clear: handle => clearTimeout(handle as ReturnType<typeof setTimeout>) };
 const normalized = ([longitude, latitude]: Coordinate): Coordinate => [((longitude + 180) % 360 + 360) % 360 - 180, latitude];
 
@@ -11,7 +11,7 @@ const normalized = ([longitude, latitude]: Coordinate): Coordinate => [((longitu
 // retargets the current position; expansion never restarts a journey preview.
 export function createStoryBuddyPlayback(stops: JourneyStop[], clock: Clock = defaultClock) {
   const ordered = [...stops].sort((a, b) => a.sequence - b.sequence), listeners = new Set<() => void>();
-  let snapshot: Snapshot = { coordinate: null, moving: false, facing: 'left', revision: 0 };
+  let snapshot: Snapshot = { coordinate: null, moving: false, facing: 'left', revision: 0, loopPhase: null, loopCameraRevision: 0, loopTarget: null, loopSelectionId: null, loopCameraDuration: 0 };
   let selected: string | null = null, cursor = -1, direction = 0, ready = false, reduced = true;
   let timer: unknown = null, generation = 0, started = 0;
   let route: { leg: TravelLeg; index: number }[] = [];
@@ -26,6 +26,7 @@ export function createStoryBuddyPlayback(stops: JourneyStop[], clock: Clock = de
     publish({ coordinate: normalized(travelPosition(step.leg, progress)), moving: progress < 1, facing: step.leg.bearing >= 0 ? 'right' : 'left' });
     if (progress >= 1) {
       cursor = step.index; route.shift();
+      if (!route.length && snapshot.loopPhase) publish({ loopPhase: null, loopTarget: null });
       if (route.length) timer = clock.set(() => { if (version === generation) { started = clock.now(); tick(version); } }, 250);
       return;
     }
@@ -42,6 +43,7 @@ export function createStoryBuddyPlayback(stops: JourneyStop[], clock: Clock = de
     if (selected === id) return;
     const previous = ordered.findIndex(stop => stop.id === selected), target = ordered.findIndex(stop => stop.id === id);
     selected = id; cancel();
+    if (snapshot.loopSelectionId) publish({ loopPhase: null, loopTarget: null, loopSelectionId: null, loopCameraDuration: 0 });
     const destination = coordinate(target);
     const oldRoute = route; route = [];
     if (!destination) { cursor = target; direction = 0; publish({ coordinate: null, moving: false }); return; }
@@ -68,19 +70,46 @@ export function createStoryBuddyPlayback(stops: JourneyStop[], clock: Clock = de
     if (!route.length) { cursor = target; publish({ coordinate: destination, moving: false }); return; }
     publish({ moving: false }); resume();
   }
+  function settleLoop() {
+    if (!snapshot.loopPhase) return;
+    route = []; direction = 0; cursor = ordered.findIndex(stop => stop.id === selected);
+    publish({ coordinate: coordinate(cursor), moving: false, loopPhase: null, loopTarget: null });
+  }
+  function restart(reduceMotion = reduced) {
+    if (ordered.length < 2 || selected !== ordered[ordered.length - 1].id || snapshot.loopPhase) return;
+    selected = ordered[0].id; cancel(); route = []; direction = 0;
+    const destination = coordinate(0), origin = coordinate(ordered.length - 1);
+    if (!ready || reduced || reduceMotion || !origin || !destination) {
+      cursor = 0; publish({ coordinate: destination, moving: false, loopPhase: null, loopTarget: null, loopSelectionId: selected, loopCameraDuration: 0 }); return;
+    }
+    publish({ coordinate: origin, moving: false, loopPhase: 'jump', loopTarget: destination, loopSelectionId: selected, loopCameraDuration: 1600 });
+    const version = generation;
+    // Eight existing jump frames play once at10fps, then return directly to stop1.
+    timer = clock.set(() => {
+      if (version !== generation || !ready || reduced) return;
+      timer = null;
+      const leg = travelLegs([[origin, destination]])[0];
+      route = leg ? [{ leg: { ...leg, duration: 1600 }, index: 0 }] : [];
+      publish({ coordinate: route.length ? origin : destination, moving: route.length > 0, loopPhase: 'return', loopCameraRevision: snapshot.loopCameraRevision + 1 });
+      if (route.length) { started = clock.now(); tick(version); }
+      else { cursor = 0; publish({ loopPhase: null, loopTarget: null }); }
+    }, 800);
+  }
   return {
     get: () => snapshot,
     subscribe(fn: () => void) { listeners.add(fn); return () => { listeners.delete(fn); }; },
-    select,
+    select, restart,
+    cancelLoop() { if (snapshot.loopPhase) { cancel(); settleLoop(); } },
     configure(active: boolean, reduceMotion: boolean) {
       if (ready === active && reduced === reduceMotion) return;
       ready = active; reduced = reduceMotion; cancel();
+      if (!active || reduced) settleLoop();
       if (reduced) {
         const index = ordered.findIndex(stop => stop.id === selected); cursor = index; route = []; direction = 0;
         publish({ coordinate: coordinate(index), moving: false });
       } else { publish({ moving: false }); resume(); }
     },
-    pause() { ready = false; cancel(); publish({ moving: false }); },
+    pause() { ready = false; cancel(); settleLoop(); publish({ moving: false }); },
     dispose() { ready = false; cancel(); route = []; listeners.clear(); },
   };
 }

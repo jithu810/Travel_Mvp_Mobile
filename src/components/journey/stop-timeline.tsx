@@ -1,3 +1,4 @@
+import { darkPilotStyles } from '@/theme/dark-pilot';
 import { StopCardDeck } from './stop-card-deck';
 import { theme } from '@/theme/mobile-theme';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
@@ -13,7 +14,7 @@ import { artSeed, validGeoPoint } from '@/lib/art/journey-art';
 // Photo-less (or failed-photo) stops show generated stop art instead of map images:
 // no network requests, and each stop looks distinct (its own highlight and tint).
 
-type CarouselProps = { stops: JourneyStop[]; horizontal: true; selectedId: string | null; onSelect: (id: string) => void; onDetails: (id: string) => void; stacked?: boolean; compact?: boolean; active?: boolean; photoActions?: ReactNode; optionsActions?: ReactNode; creator?: ReactNode };
+type CarouselProps = { stops: JourneyStop[]; horizontal: true; selectedId: string | null; onSelect: (id: string) => void; onDetails: (id: string) => void; onLoop?: (id: string, reducedMotion: boolean) => void; stacked?: boolean; fitted?: boolean; textScale?: number; compact?: boolean; active?: boolean; photoActions?: ReactNode; optionsActions?: ReactNode; creator?: ReactNode };
 export function StopTimeline(props: CarouselProps | { stops: JourneyStop[]; horizontal?: false }) {
   return props.horizontal ? props.stacked ? <StopCardDeck {...props} /> : <HorizontalStopTimeline {...props} /> : <VerticalStopTimeline stops={props.stops} />;
 }
@@ -33,7 +34,7 @@ function VerticalStopTimeline({ stops }: { stops: JourneyStop[] }) {
     </View>
   </View>)}</View>;
 }
-const vertical = StyleSheet.create({
+const vertical = darkPilotStyles(StyleSheet.create({
   heading: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 8 }, rule: { height: 1, width: 24, backgroundColor: colors.green },
   stopHeader: { minHeight: 30, gap: 4 }, empty: { padding: 20, gap: 10, borderRadius: 20, backgroundColor: colors.white },
   ratingLabel: { color: colors.muted, fontWeight: '400', fontSize: 11 },
@@ -44,7 +45,7 @@ const vertical = StyleSheet.create({
   stop: { flex: 1, minWidth: 0, padding: 14, gap: 12, backgroundColor: colors.white, borderRadius: 20, borderWidth: 1, borderColor: colors.line },
   day: { fontSize: 11, fontWeight: '700', letterSpacing: 1.3, color: colors.green }, name: { fontSize: 19, lineHeight: 26, color: colors.ink, fontWeight: '600' },
   photo: { borderRadius: 18, overflow: 'hidden' }, art: { aspectRatio: 2 }, description: { color: colors.muted, fontSize: 14, lineHeight: 23 }, rating: { fontSize: 12, color: colors.ink, lineHeight: 20, fontWeight: '600' },
-});
+}));
 
 function HorizontalStopTimeline({ stops, selectedId, onSelect, onDetails, stacked = false, compact = false }: {
   stops: JourneyStop[]; selectedId: string | null; onSelect: (id: string) => void; onDetails: (id: string) => void; stacked?: boolean; compact?: boolean;
@@ -141,7 +142,7 @@ function HorizontalStopTimeline({ stops, selectedId, onSelect, onDetails, stacke
     </View>}
   </View>;
 }
-const styles = StyleSheet.create({
+const styles = darkPilotStyles(StyleSheet.create({
   deck: { gap: 8, position: 'relative' },
   deckPhoto: { height: 140, backgroundColor: '#101B2E' },
   deckText: { position: 'relative', backgroundColor: theme.surface, paddingVertical: 6 },
@@ -168,4 +169,4 @@ const styles = StyleSheet.create({
   excerpt: { color: '#F3F3EA', fontSize: 12, lineHeight: 18 },
   readMore: { color: '#E4ECD8', fontSize: 10, lineHeight: 16 },
   empty: { flex: 1, justifyContent: 'center', gap: 8, padding: 16 }, name: { fontSize: 18, fontWeight: '600', color: colors.ink }, note: { fontSize: 14, lineHeight: 22, color: colors.muted },
-});
+}));

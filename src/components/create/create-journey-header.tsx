@@ -1,3 +1,4 @@
+import { darkPilotStyles } from '@/theme/dark-pilot';
 import { useState } from 'react';
 import { StyleSheet, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -24,7 +25,7 @@ export function CreateJourneyHeader({ destination = null, destinationVersion = 0
     <View pointerEvents="none" testID="create-status-shade" style={[s.statusShade, { height: topInset + 12 }]} />
   </View>;
 }
-const s = StyleSheet.create({
+const s = darkPilotStyles(StyleSheet.create({
   hero: { marginBottom: 8, borderBottomLeftRadius: 24, borderBottomRightRadius: 24, overflow: 'hidden', backgroundColor: '#0B1823', flexShrink: 0, alignSelf: 'stretch' },
   statusShade: { position: 'absolute', top: 0, left: 0, right: 0, experimental_backgroundImage: 'linear-gradient(180deg, rgba(5,15,30,0.98) 0%, rgba(5,15,30,0.94) 75%, rgba(5,15,30,0) 100%)' },
-});
+}));

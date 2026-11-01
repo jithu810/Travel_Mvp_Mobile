@@ -53,6 +53,25 @@ test('backfill refuses overwrites and preserves prior review outputs', () => fix
   assert.equal(sha(join(root, 'output/review-plan.json')), before);
 }));
 
+test('backfill preserves JPEG-compatible MPO bytes and thumbnails only its primary frame', () => fixture(({ root, manifest, execute }) => {
+  const image = spawnSync('python', ['-c', 'from PIL import Image; import sys; Image.new("RGB",(900,600),(20,220,40)).save(sys.argv[1],format="MPO",save_all=True,append_images=[Image.new("RGB",(900,600),(220,20,40))])', join(root, 'source.jpg')], { encoding: 'utf8' });
+  assert.equal(image.status, 0, image.stderr);
+  const sourceHash = sha(join(root, 'source.jpg'));
+  const value = { ...manifest, items: [{ storagePath: object.replace('.png', '.jpg'), source: 'source.jpg' }] };
+  const result = execute(value);
+  assert.equal(result.status, 0, result.stderr);
+  const plan = JSON.parse(readFileSync(join(root, 'output/review-plan.json'), 'utf8'));
+  const item = plan.items[0];
+  assert.equal(sha(join(root, 'output', item.localOriginal)), sourceHash);
+  assert.equal(sha(join(root, 'source.jpg')), sourceHash);
+  assert.deepEqual(item.thumbnailDimensions, [512, 341]);
+  const verify = spawnSync('python', ['-c', 'from PIL import Image; import sys; im=Image.open(sys.argv[1]); assert im.format=="JPEG" and getattr(im,"n_frames",1)==1; r,g,b=im.getpixel((256,170)); assert g>r+100, "Thumbnail must use primary green frame"', join(root, 'output', item.localThumbnail)], { encoding: 'utf8' });
+  assert.equal(verify.status, 0, verify.stderr);
+  const invalid = execute({ ...value, items: [{ storagePath: object, source: 'source.jpg' }] }, 'wrong-mpo-type');
+  assert.notEqual(invalid.status, 0);
+  assert.equal(existsSync(join(root, 'wrong-mpo-type')), false);
+}));
+
 test('backfill rejects traversal, URL sources, malformed paths, duplicate objects and encoding mismatches', () => fixture(({ root, manifest, execute }) => {
   const cases = [
     { ...manifest, items: [{ ...manifest.items[0], source: '../source.png' }] },

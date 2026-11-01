@@ -1,3 +1,4 @@
+import { lightPilotTheme } from './helpers/dark-pilot-harness.mjs';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
@@ -7,7 +8,7 @@ function load(file, modules = {}, clock = globalThis) {
   modules = { '@/hooks/use-travel-preferences': { useTravelPreferences: () => ({loaded:false,value:{interests:[],pace:null}}) }, '@/lib/buddy/travel-preferences': { travelPreferenceTip: () => undefined }, ...modules };
   const exports = {};
   const code = ts.transpileModule(readFileSync(file, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true } }).outputText;
-  new Function('require', 'exports', 'setTimeout', 'clearTimeout', 'setInterval', 'clearInterval', code)(name => {
+  new Function('require', 'exports', 'setTimeout', 'clearTimeout', 'setInterval', 'clearInterval', code)(name => { if (name === '@/theme/dark-pilot') return lightPilotTheme;
     if (name.endsWith('.png')) return name;
     assert.ok(name in modules, name); return modules[name];
   }, exports, clock.setTimeout, clock.clearTimeout, clock.setInterval, clock.clearInterval);

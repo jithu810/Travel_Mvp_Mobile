@@ -1,3 +1,4 @@
+import { darkPilotStyles } from '@/theme/dark-pilot';
 import { theme } from '@/theme/mobile-theme';
 import type { ReactNode } from 'react';
 import { useCallback, useState } from 'react';
@@ -12,6 +13,7 @@ import { useBuddyProtectedBounds } from '@/hooks/use-buddy-geometry';
 
 type Destination = 'explore' | 'search' | 'create' | 'story' | 'account' | null;
 function AccountAvatar() {
+  const styles = lightStyles_styles;
   const { session } = useSessionState();
   const userId = session?.user.id;
   const loader = useCallback((signal: AbortSignal) => userId ? loadOwnProfile(userId, signal) : Promise.resolve(null), [userId]);
@@ -25,6 +27,7 @@ function AccountAvatar() {
     : <View style={styles.accountIcon}><View style={styles.accountHead} /><View style={styles.accountBody} /></View>;
 }
 function NavigationIcon({ name }: { name: Exclude<Destination, null> }) {
+  const styles = lightStyles_styles;
   if (name === 'account') return <AccountAvatar />;
   if (name === 'create') return <View style={styles.createIcon}><View style={styles.plusHorizontal} /><View style={styles.plusVertical} /></View>;
   if (name === 'search') return <View style={styles.searchIcon}><View style={styles.searchHandle} /></View>;
@@ -32,6 +35,7 @@ function NavigationIcon({ name }: { name: Exclude<Destination, null> }) {
   return <View style={styles.globe}><View style={styles.meridian} /><View style={styles.equator} /></View>;
 }
 export function FloatingNavigation({ active, onHeight }: { active: Destination; onHeight?: (height: number) => void }) {
+  const styles = lightStyles_styles;
   const protection = useBuddyProtectedBounds();
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -56,17 +60,18 @@ export function FloatingNavigation({ active, onHeight }: { active: Destination; 
 // Home owns sheet clearance; other main pages reserve a measured bottom slot.
 // Native Story modals remain above this shell. Travel/auth/private editing stay unchanged.
 export function MainNavigationFrame({ children }: { children: ReactNode }) {
+  const styles = lightStyles_styles;
   const path = usePathname();
   const { view } = useGlobalSearchParams<{ view?: string }>();
   const [height, setHeight] = useState(56);
-  const visible = path === '/search' || path === '/create' || path === '/account' || path.startsWith('/journey/') || path.startsWith('/profile/');
-  const active: Destination = path === '/search' ? view === 'stories' ? 'story' : 'search' : path === '/create' ? 'create' : path === '/account' ? 'account' : path.startsWith('/journey/') ? 'story' : null;
+  const visible = path === '/search' || path === '/create' || path === '/account' || path.startsWith('/journey/') || path.startsWith('/customized/') || path.startsWith('/profile/');
+  const active: Destination = path === '/search' ? view === 'stories' ? 'story' : 'search' : path === '/create' ? 'create' : path === '/account' ? 'account' : (path.startsWith('/journey/') || path.startsWith('/customized/')) ? 'story' : null;
   return <View style={[styles.frame, styles.backdrop]}>
     <View style={[styles.frame, visible && { paddingBottom: height + 16 }]}>{children}</View>
     {visible && <FloatingNavigation active={active} onHeight={setHeight} />}
   </View>;
 }
-const styles = StyleSheet.create({
+const lightStyles_styles = darkPilotStyles(StyleSheet.create({
   frame: { flex: 1 },
   backdrop: { backgroundColor: theme.background, experimental_backgroundImage: theme.backgroundGradient },
   bar: { position: 'absolute', zIndex: 20, elevation: 5, alignSelf: 'center',
@@ -94,4 +99,4 @@ const styles = StyleSheet.create({
   icon: { fontSize: 21, lineHeight: 23, color: '#48554F' },
   label: { fontSize: 10, lineHeight: 14, color: '#48554F', textAlign: 'center', fontWeight: '500' },
   active: { color: '#276392', fontWeight: '700' },
-});
+}));

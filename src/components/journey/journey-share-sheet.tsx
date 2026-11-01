@@ -1,4 +1,5 @@
-import { theme } from '@/theme/mobile-theme';
+import { usePilotColor } from '@/theme/dark-pilot';
+import { lightTheme as theme } from '@/theme/mobile-theme';
 import { useEffect, useRef, useState } from 'react';
 import { Image, Platform, Text, View, useWindowDimensions } from 'react-native';
 import { StorySheet } from './story-sheet';
@@ -7,6 +8,7 @@ import type { ShareArtwork } from '@/lib/social/share-artwork';
 import { shareArtworkImage } from '@/lib/social/share-image';
 
 export function JourneyShareSheet({ artwork, onClose, onShareLink, message }: { artwork: ShareArtwork; message?: string | null; onClose: () => void; onShareLink: () => Promise<void> }) {
+  const pilotColor = usePilotColor();
   const canvas = useRef<View>(null), active = useRef(true), lock = useRef(false);
   const [photoReady, setPhotoReady] = useState(false), [logoReady, setLogoReady] = useState(false);
   const [failed, setFailed] = useState(false), [busy, setBusy] = useState(false), [error, setError] = useState<string | null>(null);
@@ -46,11 +48,11 @@ export function JourneyShareSheet({ artwork, onClose, onShareLink, message }: { 
       <Text allowFontScaling={false} numberOfLines={3} style={{ color: theme.accent, fontSize: 10 * scale, lineHeight: 13 * scale, marginTop: 10 * scale }}>{artwork.url}</Text>
     </View>
     {!!artwork.photo && Platform.OS !== 'web' && <Action memorySheet label={busy ? 'Preparing share…' : 'Share image'} disabled={busy || !photoReady || !logoReady || failed} onPress={() => { void shareImage(); }} />}
-    {!artwork.photo && <Text>This memory has no photo. You can share the journey link.</Text>}
+    {!artwork.photo && <Text style={{ color: pilotColor(theme.muted) }}>This memory has no photo. You can share the journey link.</Text>}
     <Action secondary label="Share journey link" disabled={busy} onPress={() => { void shareLink(); }} />
-    <Text selectable>{artwork.url}</Text>
-    <Text>The image includes a readable URL. Share the link separately for a clickable link, or add a link sticker in your story app.</Text>
-    {message && <Text accessibilityLiveRegion="polite">{message}</Text>}
-    {error && <Text accessibilityRole="alert">{error}</Text>}
+    <Text selectable style={{ color: pilotColor(theme.text) }}>{artwork.url}</Text>
+    <Text style={{ color: pilotColor(theme.muted) }}>The image includes a readable URL. Share the link separately for a clickable link, or add a link sticker in your story app.</Text>
+    {message && <Text accessibilityLiveRegion="polite" style={{ color: pilotColor(theme.text) }}>{message}</Text>}
+    {error && <Text accessibilityRole="alert" style={{ color: pilotColor(theme.text) }}>{error}</Text>}
   </StorySheet>;
 }

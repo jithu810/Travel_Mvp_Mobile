@@ -1,3 +1,4 @@
+import { lightPilotTheme } from './helpers/dark-pilot-harness.mjs';
 import assert from 'node:assert/strict';
 import { test, after } from 'node:test';
 import { mkdtempSync, rmSync, readFileSync } from 'node:fs';
@@ -277,7 +278,7 @@ const text = tree => nodes(tree).filter(n => n.type === 'Text').map(n => [n.prop
 function component(path, modules) {
   const exports = {};
   const code = ts.transpileModule(readFileSync(path, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX } }).outputText;
-  new Function('require', 'exports', code)(name => { assert.ok(name in modules, 'Unexpected dependency: ' + name); return modules[name]; }, exports);
+  new Function('require', 'exports', code)(name => { if (name === '@/theme/dark-pilot') return lightPilotTheme; assert.ok(name in modules, 'Unexpected dependency: ' + name); return modules[name]; }, exports);
   return exports;
 }
 const native = { StyleSheet: { create: value => value }, View: 'View', Text: 'Text', Pressable: 'Pressable' };
@@ -340,7 +341,7 @@ test('screens wire the credits and the optional, non-blocking photo hint', () =>
   assert.match(create, /\{photoHint && <Text testID="remix-photo-hint"/);
   const swipe = create.slice(create.indexOf('<SwipeAction'), create.indexOf('/>', create.indexOf('<SwipeAction')));
   assert.ok(swipe.includes('!readiness') && !swipe.includes('photoHint'), 'Publishing is not gated by photos');
-  assert.match(readFileSync('src/app/journey/[id].tsx', 'utf8'), /\{!temporary && journey\.sourceId && <SourceAttribution [^>]*variant="published" \/>\}/);
+  assert.match(readFileSync('src/app/journey/[id].tsx', 'utf8'), /\{!temporary && journey\.sourceId && <SourceAttribution [^>]*variant="published"[^>]* \/>\}/);
 });
 
 test('Account draft card shows the direct-source credit only for remixes', () => {

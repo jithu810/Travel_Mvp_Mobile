@@ -1,3 +1,4 @@
+import { darkPilotStyles } from '@/theme/dark-pilot';
 import { useCallback, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState, type ReactNode, type Ref } from 'react';
 import { AccessibilityInfo, Animated, AppState, PanResponder, Platform, StyleSheet, Text, View } from 'react-native';
 import type { JourneyStop } from '@/types/journey';
@@ -182,7 +183,7 @@ export function StopDeck({ ref, stops, cursor, decisions, disabled, active = tru
     </View>
   </View>;
 }
-const s = StyleSheet.create({
+const s = darkPilotStyles(StyleSheet.create({
   root: { flex: 1, minHeight: 0 },
   slot: { position: 'absolute', borderRadius: 24, overflow: 'hidden' },
   top: { backgroundColor: theme.surface, borderWidth: 1, borderColor: theme.white, boxShadow: '0 4px 10px rgba(21,62,53,0.12)' },
@@ -203,4 +204,4 @@ const s = StyleSheet.create({
   miniNumber: { color: theme.accent, fontSize: 14, fontWeight: '700' },
   placeholder: { width: MINI_W, height: MINI_H, borderRadius: 7, borderWidth: 1.5, borderStyle: 'dashed', borderColor: theme.border },
   pileLabel: { color: theme.muted, fontSize: 11, lineHeight: 16, fontWeight: '600' },
-});
+}));

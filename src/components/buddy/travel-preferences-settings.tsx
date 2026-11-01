@@ -1,3 +1,4 @@
+import { darkPilotStyles } from '@/theme/dark-pilot';
 import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useTravelPreferences } from '@/hooks/use-travel-preferences';
@@ -42,9 +43,9 @@ function PreferenceEditor({ preferences: p }: { preferences: PreferenceHook }) {
 function Control({ label, selected, disabled = false, onPress }: { label: string; selected?: boolean; disabled?: boolean; onPress: () => void }) {
   return <Pressable accessibilityRole="button" accessibilityLabel={label} accessibilityState={{ selected, disabled }} disabled={disabled} onPress={onPress} style={[s.control, selected && s.selected, disabled && s.disabled]}><Text style={s.body}>{label}</Text></Pressable>;
 }
-const s = StyleSheet.create({
+const s = darkPilotStyles(StyleSheet.create({
   section: { gap: 10, marginVertical: 10 }, title: { color: colors.ink, fontSize: 15, lineHeight: 21, fontWeight: '700' },
   body: { color: colors.ink, fontSize: 13, lineHeight: 19 }, choices: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   control: { minWidth: 48, minHeight: 48, maxWidth: '100%', flexShrink: 1, padding: 10, justifyContent: 'center', borderWidth: 1, borderColor: colors.line, borderRadius: 16 },
   selected: { backgroundColor: colors.pale, borderColor: colors.green }, disabled: { opacity: 0.5 },
-});
+}));

@@ -1,3 +1,4 @@
+import { appMobileTheme, lightPilotTheme } from './helpers/dark-pilot-harness.mjs';
 import { buddyGeometryStub, buddyMapPinsStub } from './helpers/buddy-geometry-stub.mjs';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -26,11 +27,11 @@ function load(file, modules, hooks=harness().hooks, timers=globalThis) {
   modules={'@/components/journey/story-sheet':{StorySheet:'StorySheet'},'@/components/journey/journey-action-icon':{JourneyActionIcon:'JourneyActionIcon'},'@/hooks/use-buddy-geometry':buddyGeometryStub,'@/components/art/journey-art':{StopArt:'StopArt'},'@/lib/art/journey-art':{artSeed:(_id,stops)=>'stop:'+stops[0]?.id},...modules};
   const exports={}; const jsx=(type,props)=>({type,props});
   const code=ts.transpileModule(readFileSync(file,'utf8'), {compilerOptions:{module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX,target:ts.ScriptTarget.ES2022}}).outputText;
-  new Function('require','exports','setTimeout','clearTimeout',code)(name=>{ if(name==='@/components/first-outcome-hint')return {FirstOutcomeHint:'FirstOutcomeHint'};
+  new Function('require','exports','setTimeout','clearTimeout',code)(name=>{ if (name === '@/theme/dark-pilot') return lightPilotTheme; if (name === '@/theme/mobile-theme') return appMobileTheme;  if(name==='@/components/first-outcome-hint')return {FirstOutcomeHint:'FirstOutcomeHint'};
     if(name==='@/lib/first-outcome')return load('src/lib/first-outcome.ts',{});
     if(name==='@/components/first-outcome-hint')return {FirstOutcomeHint:'FirstOutcomeHint'};
     if(name==='@/lib/first-outcome')return load('src/lib/first-outcome.ts',{});
-    if (name === '@/theme/mobile-theme') return mobileTheme;
+    if (name === '@/theme/dark-pilot') return lightPilotTheme; if (name === '@/theme/mobile-theme') return mobileTheme;
     if(name==='@/hooks/use-journey-buddy')return {useBuddyCelebration:()=>()=>{},useBuddyScreen(){},...modules[name]};
     if(name==='@/hooks/use-buddy-map-pins')return buddyMapPinsStub;
     if(name==='@/hooks/use-creation-recovery')return modules[name]||{useCreationRecovery:()=>()=>{}};
@@ -69,6 +70,7 @@ function screenHarness(initial, photoState = {}, buddyEvents = [], recoveryStora
   photoState.candidates=Object.fromEntries(Object.entries(photoState.candidates).map(([key,p])=>[key,{width:800,height:600,size:1000,mime:'image/png',...p}]));
   const h=harness(), writes=[],routes=[],alerts=[],uploads=[],celebrations=[];let fail=false, uncertain=true, pending=null, prevented=null, canGoBack=true, focusCleanup=null; const dispatches=[];
   const modules={
+    '@/theme/dark-pilot': lightPilotTheme,
     '@/hooks/use-journey-buddy':{useBuddyCelebration:()=> (animation,operation)=>celebrations.push({animation,operation}),useBuddyScreen:(state,actions)=>buddyEvents.push({state,actions})},
     '@/lib/create/photo-save':photoSave,
     '@/lib/create/photo-queries':{checkPhotoDraft:async()=>({ownerId:uid,stopIds:(writes.at(-1)?.stops||initial?.stops||[]).map(s=>s.id)}),uploadJourneyPhoto:async(name,photo)=>{uploads.push({name,photo});if(photoState.uploadFailure)throw new model.SaveFailure(photoState.uploadFailure);}},
@@ -321,7 +323,8 @@ test('new GPS memory still requires a name before explicit save',async()=>{
 });
 test('actual memory sheet capture reveals the name, keeps search independent, locks Save and cancels on close',()=>{
   const h=harness();let busy=false,reveal,cancelled=0,patches=[],saves=0,closes=0;
-  const modules={'@/hooks/use-memory-location':{useMemoryLocation:(_value,_disabled,change,open)=>{reveal=()=>{change({latitude:0,longitude:0,mapboxId:null});open();};return {busy,error:busy?null:'Retry or search.',start:()=>{busy=true;},cancel:()=>{busy=false;cancelled++;},isBusy:()=>busy};}},'../discovery/ui':ui,'./place-picker':{PlacePicker:'PlacePicker',formStyles:{}},'react-native-safe-area-context':{SafeAreaView:'SafeAreaView'}};
+  const modules={
+    '@/theme/dark-pilot': lightPilotTheme,'@/hooks/use-memory-location':{useMemoryLocation:(_value,_disabled,change,open)=>{reveal=()=>{change({latitude:0,longitude:0,mapboxId:null});open();};return {busy,error:busy?null:'Retry or search.',start:()=>{busy=true;},cancel:()=>{busy=false;cancelled++;},isBusy:()=>busy};}},'../discovery/ui':ui,'./place-picker':{PlacePicker:'PlacePicker',formStyles:{}},'react-native-safe-area-context':{SafeAreaView:'SafeAreaView'}};
   const {MemoryEditorSheet}=load('src/components/create/memory-editor-sheet.tsx',modules,h.hooks);
   const props={value:memory.emptyMemory(sid),isNew:true,proximity:null,busy:false,blocked:false,error:null,onChange:p=>patches.push(p),onSave:()=>saves++,onClose:()=>closes++};
   let tree=h.render(MemoryEditorSheet,props);const staleSave=all(tree,'Action').find(n=>n.props.label==='Save memory');
@@ -373,6 +376,7 @@ test('private history resumes actual drafts and keeps all-drafts, empty, loading
   let state={data:[{id,title:'Coastal escape'},{id:uid,title:'Family trip'},{id:sid,title:'Weekend'},{id:'fourth',title:'Older'}]}, refreshes=0;
   const routes=[];
   const modules={
+    '@/theme/dark-pilot': lightPilotTheme,
     '@/lib/create/photo-save':{},'@/lib/create/photo-queries':{},'@/hooks/use-editor-photos':{},'@/hooks/use-local-photos':{},
     '@/components/create/photo-field':{},'@/components/create/memory-editor-sheet':{},'@/components/create/memory-row':{},'@/lib/create/memory':{},
     '@/lib/discovery/model':{},'expo-router/react-navigation':{},'@/components/create/quick-journey-setup':{},'@/lib/create/editor-model':{},
@@ -597,6 +601,7 @@ test('static horizontal history keeps a centered heading, every draft, and no sh
   const h=harness(), routes=[];
   const entries=Array.from({length:8},(_,i)=>({id:'draft-'+i,title:'Actual draft '+i}));
   const modules={
+    '@/theme/dark-pilot': lightPilotTheme,
     '@/lib/create/photo-save':{},'@/lib/create/photo-queries':{},'@/hooks/use-editor-photos':{},'@/hooks/use-local-photos':{},
     '@/components/create/photo-field':{},'@/components/create/memory-editor-sheet':{},'@/components/create/memory-row':{},'@/lib/create/memory':{},
     '@/lib/discovery/model':{},'expo-router/react-navigation':{},'@/components/create/quick-journey-setup':{},'@/lib/create/editor-model':{},
@@ -684,7 +689,7 @@ test('Create passes selected destination/version and outside-dismiss state witho
     assert.deepEqual(tree.props.edges,['left','right','bottom']);assert.equal(all(tree,'StackScreen')[0].props.options.statusBarStyle,'light');
     all(tree,'View').find(n=>n.props.onTouchStart).props.onTouchStart();tree=h.renderEntry();assert.equal(all(tree,'NewJourneyEditor')[0].props.dismissSearchVersion,1);
     listeners.keyboardDidShow();tree=h.renderEntry();assert.equal(all(tree,'CreateJourneyHeader')[0].props.keyboardOpen,true);assert.equal(all(tree,'NewJourneyEditor')[0].props.keyboardOpen,true);
-    const draftHarness=screenHarness(privateForm()),draft=draftHarness.renderEntry();assert.deepEqual(draft.props.edges,['left','right','bottom']);assert.equal(all(draft,'StackScreen')[0].props.options.statusBarStyle,'dark');
+    const draftHarness=screenHarness(privateForm()),draft=draftHarness.renderEntry();assert.deepEqual(draft.props.edges,['left','right','bottom']);assert.equal(all(draft,'StackScreen')[0].props.options.statusBarStyle,'light');
     assert.equal(all(draft,'DraftEditorEntry')[0].props.keyboardOpen,false);listeners.keyboardDidShow();const draftEntry=all(draftHarness.renderEntry(),'DraftEditorEntry')[0];assert.equal(draftEntry.props.keyboardOpen,true);
     assert.equal(all(draftHarness.mountChild(draftEntry),'NewJourneyEditor')[0].props.keyboardOpen,true,'Hydrated draft entry forwards actual route keyboard state to the editor');
     const editorTree=screenHarness().render({keyboardOpen:true});assert.equal(all(editorTree,'DraftShortcuts')[0].props.keyboardHidden,true);
@@ -799,6 +804,12 @@ test('private memory deck preserves order and edit semantics without moving publ
  const stops=[memoryRow(sid,'First',{day:'1',rating:'0'}),memoryRow(uid,'Second')];
  const h=screenHarness({...privateForm(),stops});let tree=h.render();
  const deck=all(tree,'MemoryDeck')[0];assert.deepEqual(deck.props.stops.map(s=>s.id),stops.map(s=>s.id));
+ assert.equal(all(tree,'ScrollView')[0].props.scrollEnabled,false,'Normal portrait editor fits without vertical scrolling');
+ tree.props.onLayout({nativeEvent:{layout:{height:500}}});tree=h.render();
+ assert.equal(all(tree,'ScrollView')[0].props.scrollEnabled,true,'Short viewport keeps editor controls reachable');
+ tree.props.onLayout({nativeEvent:{layout:{height:800}}});tree=h.render();
+ assert.equal(all(tree,'ScrollView')[0].props.scrollEnabled,false,'Portrait restores fixed composition');
+ tree=h.render({keyboardOpen:true});assert.equal(all(tree,'ScrollView')[0].props.scrollEnabled,true,'Keyboard enables safe scroll fallback');tree=h.render();
  const scroll=all(tree,'ScrollView')[0];
  const footer=tree.props.children.flat(Infinity).find(node=>node?.type==='View' && all(node,'SwipeAction').length===1);
  assert.ok(footer,'Publish confirmation belongs to a direct footer sibling of the scroll');

@@ -1,3 +1,4 @@
+import { appMobileTheme, lightPilotTheme } from './helpers/dark-pilot-harness.mjs';
 import { buddyGeometryStub } from './helpers/buddy-geometry-stub.mjs';
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
@@ -11,7 +12,7 @@ function load(file, modules) {
   modules={'@/hooks/use-buddy-geometry':buddyGeometryStub,...modules};
   const exports = {};
   const code = ts.transpileModule(readFileSync(file, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, target: ts.ScriptTarget.ES2022 } }).outputText;
-  new Function('require', 'exports', code)(name => { if (name === '@/theme/mobile-theme') return mobileTheme;  if (name in modules) return modules[name]; throw new Error(name); }, exports);
+  new Function('require', 'exports', code)(name => { if (name === '@/theme/dark-pilot') return lightPilotTheme; if (name === '@/theme/mobile-theme') return appMobileTheme;  if (name === '@/theme/mobile-theme') return mobileTheme;  if (name in modules) return modules[name]; throw new Error(name); }, exports);
   return exports;
 }
 const coordinates = stop => Number.isFinite(stop.latitude) && Math.abs(stop.latitude) <= 90 && Number.isFinite(stop.longitude) && Math.abs(stop.longitude) <= 180;

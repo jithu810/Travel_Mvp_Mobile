@@ -1,3 +1,4 @@
+import { appMobileTheme, lightPilotTheme } from './helpers/dark-pilot-harness.mjs';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
@@ -18,7 +19,7 @@ function harness({ url = 'journeycreator://auth/callback?code=synthetic', result
   };
   const module = { exports: {} };
   const output = ts.transpileModule(readFileSync('src/app/auth/callback.tsx', 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX } }).outputText;
-  new Function('require', 'module', 'exports', output)(name => { assert.ok(name in modules); return modules[name]; }, module, module.exports);
+  new Function('require', 'module', 'exports', output)(name => { if (name === '@/theme/dark-pilot') return lightPilotTheme; if (name === '@/theme/mobile-theme') return appMobileTheme;  assert.ok(name in modules); return modules[name]; }, module, module.exports);
   return { calls, navigation, render() { index = 0; effects.length = 0; const tree = module.exports.default(); if (!cleanup) cleanup = effects[0](); return tree; }, unmount() { cleanup?.(); } };
 }
 function nodes(tree) { return !tree || typeof tree !== 'object' ? [] : [tree, ...[tree.props?.children].flat(Infinity).flatMap(nodes)]; }

@@ -1,3 +1,4 @@
+import { darkPilotStyles } from '@/theme/dark-pilot';
 import { theme } from '@/theme/mobile-theme';
 import { useEffect, useState } from 'react';
 import { AccessibilityInfo, ActivityIndicator, Animated, AppState, Image, StyleSheet, Text, View } from 'react-native';
@@ -5,6 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 // A presentation only loader: callers own readiness, errors and retries.
 export function BrandedLoading({ message = 'Preparing your journey...', compact = false, overlay = false }: { message?: string; compact?: boolean; overlay?: boolean }) {
+  const s = lightStyles_s;
   const [pulse] = useState(() => new Animated.Value(1));
   const [reduceMotion, setReduceMotion] = useState(true);
   const [active, setActive] = useState(AppState.currentState === 'active');
@@ -36,7 +38,7 @@ export function BrandedLoading({ message = 'Preparing your journey...', compact 
     </View>
   </SafeAreaView>;
 }
-const s = StyleSheet.create({
+const lightStyles_s = darkPilotStyles(StyleSheet.create({
   screen: { flex: 1, backgroundColor: theme.background, justifyContent: 'center', alignItems: 'center' },
   overlay: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, zIndex: 100, elevation: 30 },
   compact: { minHeight: 72, padding: 8 },
@@ -48,4 +50,4 @@ const s = StyleSheet.create({
   label: { color: theme.text, fontSize: 14, lineHeight: 21, textAlign: 'center' },
   smallLabel: { flexShrink: 1, fontSize: 11, lineHeight: 16 },
   stillIndicator: { width: 24, height: 3, borderRadius: 2, backgroundColor: theme.accent },
-});
+}));

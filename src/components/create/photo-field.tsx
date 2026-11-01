@@ -1,3 +1,4 @@
+import { darkPilotStyles } from '@/theme/dark-pilot';
 import { theme } from '@/theme/mobile-theme';
 import { useState } from 'react';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
@@ -33,7 +34,7 @@ export function PhotoField({ label, candidate, savedUri, busy, disabled, error, 
     {!!error && <Text accessibilityRole="alert" style={s.note}>{error}</Text>}
   </View>;
 }
-const s = StyleSheet.create({
+const s = darkPilotStyles(StyleSheet.create({
   memoryField: { backgroundColor: '#F3F5FB', borderColor: '#FFFFFF', padding: 10, boxShadow: '0 3px 7px rgba(39, 54, 85, 0.10)' },
   memoryButton: { backgroundColor: '#FAFBFF', borderColor: '#FFFFFF', borderRadius: 17, minHeight: 68, boxShadow: '0 3px 5px rgba(39, 54, 85, 0.14)' },
   memoryIcon: { color: '#5360C5', fontSize: 26, lineHeight: 30 },
@@ -53,4 +54,4 @@ const s = StyleSheet.create({
   compactButton: { minHeight: 48, flexGrow: 1, flexBasis: 70, minWidth: 64, padding: 6, borderRadius: 12, backgroundColor: colors.pale, alignItems: 'center', justifyContent: 'center', gap: 2 },
   icon: { color: colors.ink, fontSize: 22, lineHeight: 24 }, link: { color: colors.ink, fontSize: 11, lineHeight: 15, textAlign: 'center' },
   note: { color: colors.muted, fontSize: 12, lineHeight: 18 },
-});
+}));

@@ -1,3 +1,4 @@
+import { lightPilotTheme } from './helpers/dark-pilot-harness.mjs';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
@@ -5,7 +6,7 @@ import { test } from 'node:test';
 const ts = createRequire(import.meta.url)('typescript');
 function load(file, modules = {}, timers = globalThis) {
   const exports = {}, code = ts.transpileModule(readFileSync(file, 'utf8'), { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true } }).outputText;
-  new Function('require', 'exports', 'setTimeout', 'clearTimeout', 'setInterval', 'clearInterval', code)(name => { assert.ok(name in modules, name); return modules[name]; }, exports, timers.setTimeout, timers.clearTimeout, timers.setInterval, timers.clearInterval); return exports;
+  new Function('require', 'exports', 'setTimeout', 'clearTimeout', 'setInterval', 'clearInterval', code)(name => { if (name === '@/theme/dark-pilot') return lightPilotTheme; assert.ok(name in modules, name); return modules[name]; }, exports, timers.setTimeout, timers.clearTimeout, timers.setInterval, timers.clearInterval); return exports;
 }
 const map = load('src/lib/journey/map-data.ts'), travel = load('src/lib/discovery/travel.ts', { '../journey/map-data': map });
 const { createStoryBuddyPlayback } = load('src/lib/journey/story-buddy-playback.ts', { './map-data': map, '../discovery/travel': travel });
@@ -67,6 +68,7 @@ test('Story wires one shared controller into36dp compact and64dp expanded maps w
 test('actual StorySheet releases its blocker only for the explicitly opted-in expanded map', () => {
   const blocked = [], jsx = (type, props) => ({ type, props });
   const { StorySheet } = load('src/components/journey/story-sheet.tsx', {
+    react: { useState: initial => [initial, () => {}], useEffect() {} },
     'react/jsx-runtime': { jsx, jsxs: jsx }, 'expo-status-bar': { StatusBar: 'StatusBar' },
     '@/theme/mobile-theme': { theme: {} }, 'react-native': { Modal: 'Modal', Pressable: 'Pressable', ScrollView: 'ScrollView', View: 'View', Text: 'Text', StyleSheet: { create: value => value } },
     'react-native-safe-area-context': { SafeAreaView: 'SafeAreaView' }, '@/components/discovery/ui': { colors: {} },
@@ -89,7 +91,7 @@ for (const motion of ['walk','run']) test(`actual ${motion} annotation decodes i
   const { model, time } = playback(), h = hooks(), intervals = new Map(), timeouts = new Map(), ownership = []; let id = 0, opened = 0;
   const delays=[];
   const timers = { setInterval(fn,delay) { delays.push(delay);intervals.set(++id, fn); return id; }, clearInterval(key) { intervals.delete(key); }, setTimeout(fn) { timeouts.set(++id, fn); return id; }, clearTimeout(key) { timeouts.delete(key); } };
-  const clips = Object.fromEntries(['idle', 'walk','run'].map(name => [name, { source: name, frames: 8, fps: name==='run'?12:10, facing: 'left' }])); const jsx = (type, props) => ({ type, props });
+  const clips = Object.fromEntries(['idle', 'walk','run','jump'].map(name => [name, { source: name, frames: 8, fps: name==='run'?12:10, facing: 'left' }])); const jsx = (type, props) => ({ type, props });
   const { StoryWalkingBuddy } = load('src/components/journey/map/story-walking-buddy.tsx', { react: h.react, 'react/jsx-runtime': { jsx, jsxs: jsx }, '@rnmapbox/maps': { MarkerView: 'MarkerView' }, 'react-native': { Image: 'Image', View: 'View', Pressable: 'Pressable' }, '@/hooks/use-map-buddy': { useMapBuddy(available) { ownership.push(available); return { visible: available, canHelp: true, openHelp() { opened++; } }; } }, '@/lib/buddy/animations': { resolveBuddyAnimation: name => clips[name], spriteFrame: (_clip, frame, size) => ({ left: -frame * size }) } }, timers);
   model.select('b'); time.advance(640); const retained = [...model.get().coordinate];
   const props = { playback: model, active: true, reducedMotion: true, motionKnown: false, size: 36,...(motion==='run'?{motion}:{}) }, render = () => h.render(StoryWalkingBuddy, props);
@@ -103,16 +105,47 @@ for (const motion of ['walk','run']) test(`actual ${motion} annotation decodes i
   assert.equal(tree.props.children.props.children[1].props.source,motion);assert.equal(delays.at(-1),1000/clips[motion].fps);
   [...intervals.values()][0](); tree = render(); assert.equal(tree.props.children.props.children[1].props.style.left, -36);
   props.size = 64; tree = render(); assert.equal(tree.props.children.props.style.width, 64); assert.equal(tree.props.children.props.children[1].props.style.left, -64);
+  model.select('c');time.advance(4200);model.restart();tree=render();
+  assert.equal(tree.props.children.props.children[2].props.source,'jump');assert.equal(tree.props.children.props.children[2].props.style.opacity,1);
+  assert.equal(delays.at(-1),100);for(let frame=0;frame<12;frame++)[...intervals.values()][0]();tree=render();assert.equal(tree.props.children.props.children[2].props.style.left,-7*64,'Jump holds its final frame instead of looping');
+  time.advance(800);tree=render();assert.equal(tree.props.children.props.children[2].props.style.opacity,0);
   tree.props.children.props.children[1].props.onError(); assert.equal(render(), null); assert.equal(ownership.at(-1), false); assert.equal(intervals.size, 0); assert.equal(time.jobs.size, 0); h.dispose(); model.dispose(); assert.equal(timeouts.size, 0);
 });
 
 test('run annotation rests on idle after arrival and reduced motion never starts sprite or route timers',()=>{
   const {model,time}=playback(),h=hooks(),intervals=new Map();let id=0;
   const timers={setInterval(fn){intervals.set(++id,fn);return id;},clearInterval(key){intervals.delete(key);},setTimeout:()=>++id,clearTimeout(){}};
-  const clips=Object.fromEntries(['idle','run'].map(source=>[source,{source,frames:8,fps:12,facing:'left'}])),jsx=(type,props)=>({type,props});
+  const clips=Object.fromEntries(['idle','run','jump'].map(source=>[source,{source,frames:8,fps:12,facing:'left'}])),jsx=(type,props)=>({type,props});
   const {StoryWalkingBuddy}=load('src/components/journey/map/story-walking-buddy.tsx',{react:h.react,'react/jsx-runtime':{jsx,jsxs:jsx},'@rnmapbox/maps':{MarkerView:'MarkerView'},'react-native':{Image:'Image',View:'View'},'@/hooks/use-map-buddy':{useMapBuddy:available=>({visible:available})},'@/lib/buddy/animations':{resolveBuddyAnimation:name=>clips[name],spriteFrame:()=>({})}},timers);
   const props={playback:model,active:true,reducedMotion:false,motion:'run',size:36},render=()=>h.render(StoryWalkingBuddy,props);
   let tree=render();tree.props.children.props.children.forEach(image=>image.props.onLoad());tree.props.children.props.onLayout({nativeEvent:{layout:{width:36,height:36}}});render();render();model.select('b');time.advance(1856);tree=render();
   assert.equal(model.get().moving,false);assert.equal(tree.props.children.props.children[0].props.source,'idle');assert.equal(tree.props.children.props.children[0].props.style.opacity,1);assert.equal(tree.props.children.props.children[1].props.style.opacity,0);
   props.reducedMotion=true;render();model.select('a');render();assert.equal(intervals.size,0);assert.equal(time.jobs.size,0);assert.deepEqual(model.get().coordinate,[0,0]);h.dispose();model.dispose();
+});
+
+test('last-to-first restart jumps once then returns directly without intermediate-stop pauses',()=>{
+ const {model,time}=playback();model.select('c');time.advance(4200);assert.deepEqual(model.get().coordinate,[2,0]);model.restart();
+ assert.equal(model.get().loopPhase,'jump');assert.equal(model.get().moving,false);model.select('a');model.restart();assert.equal(time.jobs.size,1);
+ time.advance(799);assert.deepEqual(model.get().coordinate,[2,0]);time.advance(1);assert.equal(model.get().loopPhase,'return');assert.equal(model.get().loopCameraRevision,1);
+ time.advance(800);assert.ok(model.get().coordinate[0]>0.95&&model.get().coordinate[0]<1.05);assert.equal(model.get().moving,true);
+ time.advance(832);assert.deepEqual(model.get().coordinate,[0,0]);assert.equal(model.get().loopPhase,null);assert.equal(time.jobs.size,0);model.dispose();
+});
+test('restart cancels safely on pause, reduced motion, selection and disposal without replay',()=>{
+ for(const phase of ['jump','return'])for(const action of ['pause','reduced','select','dispose']){
+  const {model,time}=playback();model.select('c');time.advance(4200);model.restart();if(phase==='return')time.advance(1000);
+  if(action==='pause')model.pause();if(action==='reduced')model.configure(true,true);if(action==='select')model.select('b');if(action==='dispose')model.dispose();
+  const revision=model.get().loopCameraRevision;time.advance(5000);assert.equal(model.get().loopCameraRevision,revision);assert.equal(time.jobs.size,0);
+  if(action==='pause'){model.configure(true,false);time.advance(3000);assert.deepEqual(model.get().coordinate,[0,0]);assert.equal(time.jobs.size,0);}
+  model.dispose();
+ }
+ for(const stops of [[],[stop('only',0)],[stop('a',0,null),stop('b',1)],[stop('a',0),stop('b',1,null)]]){const {model,time}=playback(stops);model.select(stops.at(-1)?.id??null);model.restart();assert.equal(time.jobs.size,0);assert.equal(model.get().loopPhase,null);model.dispose();}
+ const {model,time}=playback();model.configure(true,true);model.select('c');model.restart();assert.deepEqual(model.get().coordinate,[0,0]);assert.equal(time.jobs.size,0);model.dispose();
+});
+
+test('canceling a loop for map exploration keeps subsequent normal selection playback enabled',()=>{
+ for(const phase of ['jump','return']){const {model,time}=playback();model.select('c');time.advance(4200);model.restart();if(phase==='return')time.advance(1000);model.cancelLoop();assert.equal(model.get().loopPhase,null);assert.equal(time.jobs.size,0);model.select('b');assert.equal(model.get().moving,true);time.advance(1856);assert.deepEqual(model.get().coordinate,[1,0]);model.dispose();}
+});
+
+test('rapid last-card loop anchors its jump visibly at the last stop before direct return',()=>{
+ const {model,time}=playback();model.select('c');time.advance(64);assert.ok(model.get().coordinate[0]<1);model.restart();assert.deepEqual(model.get().coordinate,[2,0]);assert.equal(model.get().loopPhase,'jump');time.advance(2432);assert.deepEqual(model.get().coordinate,[0,0]);model.dispose();
 });
