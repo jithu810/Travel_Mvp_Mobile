@@ -6,18 +6,27 @@
   "build": {
     "development": {
       "developmentClient": true,
-      "distribution": "internal"
+      "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_STORED_THUMBNAILS_ENABLED": "true"
+      }
     },
     "preview": {
       "distribution": "internal",
       "developmentClient": false,
       "environment": "preview",
+      "env": {
+        "EXPO_PUBLIC_STORED_THUMBNAILS_ENABLED": "true"
+      },
       "android": {
         "buildType": "apk"
       }
     },
     "production": {
-      "autoIncrement": true
+      "autoIncrement": true,
+      "env": {
+        "EXPO_PUBLIC_STORED_THUMBNAILS_ENABLED": "true"
+      }
     }
   },
   "submit": {

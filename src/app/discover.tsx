@@ -34,7 +34,8 @@ export default function DiscoverScreen() {
   const state = useLoad(loadDiscoveryEntries);
   const viewer = useDiscoveryViewer();
   const reloadPublic = state.refresh;
-  const refreshPublic = () => { invalidatePublicJourneys(); state.refresh(); };
+  const [photoRetry, setPhotoRetry] = useState(0);
+  const refreshPublic = () => { setPhotoRetry(value => value + 1); invalidatePublicJourneys(); state.refresh(); };
   useFocusEffect(useCallback(() => { reloadPublic(); }, [reloadPublic]));
   // The first-use intro belongs to the visible Home only, never over a screen pushed above it.
   const [focused, setFocused] = useState(false);
@@ -108,7 +109,7 @@ export default function DiscoverScreen() {
         setLayout(previous => previous.width === width && previous.height === height ? previous : { width, height });
       }}>
         <View style={s.map}><DiscoveryGlobe points={points} route={route} onOpen={open} bottomInset={railHeight} headerInset={headerClearance} viewport={layout} selectionId={selectedId} locateVersion={locateVersion} sheetInteracting={sheetInteracting} homeSearch destinationMode={!!place} destination={place} destinationVersion={placeVersion} onCenterChange={mapCenter} /></View>
-        <DiscoveryPanel journeys={journeys} selectedId={selectedId} onLocate={locate} onOpen={open}
+        <DiscoveryPanel journeys={journeys} selectedId={selectedId} onLocate={locate} onOpen={open} photoRetry={photoRetry}
           notice={notice} onClear={() => setSelectedId(null)} onRetrySelection={selection.error ? selection.retry : undefined}
           loading={state.loading || (viewer.pending && !state.error)} emptyText={onlyOwn ? onlyViewerJourneysCopy : undefined} refreshing={state.refreshing} error={state.error} onRefresh={refreshPublic}
           onInteraction={setSheetInteracting} onHeight={setRailHeight} availableHeight={layout.height} availableWidth={layout.width} bottomClearance={navClearance + bannerHeight + 12 + (trip ? tripHeight + 8 : 0)} topClearance={headerClearance} />

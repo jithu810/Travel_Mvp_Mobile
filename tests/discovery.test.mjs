@@ -139,7 +139,9 @@ test('withdrawn journey detail cannot render and public loading errors remain re
   assert.deepEqual(await queries.loadPublicJourneys(signal()), []);
 });
 test('unavailable media preserves the real journey and gives a neutral photo fallback', async () => {
-  setup([{ data: [row], error: null }], true);
+  // A previously cached signature remains reusable on refresh. Use a new object
+  // here so this case exercises an actual signing failure, not a cache hit.
+  setup([{ data: [{ ...row, cover_image_path: 'journey-media/user/journey/unavailable.jpg' }], error: null }], true);
   const journeys = await queries.loadPublicJourneys(signal());
   assert.equal(journeys.length, 1);
   assert.equal(journeys[0].cover, null);
