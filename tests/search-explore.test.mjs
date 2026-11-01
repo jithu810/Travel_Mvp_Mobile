@@ -13,32 +13,40 @@ function load(path, modules) {
   new Function('require', 'exports', ts.transpileModule(readFileSync(path, 'utf8'), {compilerOptions: {jsx: ts.JsxEmit.ReactJSX, module: ts.ModuleKind.CommonJS}}).outputText)(id => { if (id === '@/theme/dark-pilot') return lightPilotTheme; if (id === '@/theme/mobile-theme') return appMobileTheme;  if (id === '@/theme/dark-pilot') return lightPilotTheme; assert.ok(id in modules, id); return modules[id]; }, exports);
   return exports;
 }
-const jsx = (type, props) => ({type, props});
+const jsx = (type, props, key) => ({type, props, key});
 const runtime = {jsx, jsxs: jsx};
 const native = Object.fromEntries(['View','Text','Pressable','FlatList','TextInput','KeyboardAvoidingView','RefreshControl','Image'].map(x => [x,x]));
 native.StyleSheet = {create: x => x}; native.Platform = {OS:'android'};
 const all = tree => !tree || typeof tree !== 'object' ? [] : [tree, ...[tree.props?.children].flat(Infinity).flatMap(all)];
-function screen({ signedIn = false } = {}) {
-  let view, cursor = 0;
+function screen({ signedIn = false, savedJourneys } = {}) {
+  let view, cursor = 0, focusEffect, blurEffect, foreground, refreshes = 0;
   const routes = [];
   const slots = [];
+  const publicLoader = () => {};
   const rows = Array.from({length:19}, (_,i) => ({journey:{id:String(i),destination:i%2 ? 'Coast':'Hill'},creatorId:null}));
-  let state = {data:rows, loading:false, refreshing:false, refresh(){},retry(){}};
+  let state = {data:rows, loading:false, refreshing:false, refresh(){refreshes++;},retry(){}};
   const component = load('src/app/search.tsx', {
-    react: {useCallback:fn=>fn,useEffect(){},useRef:()=>({current:null}),useMemo:fn=>fn(),useState:initial=>{const i=cursor++;if(!(i in slots))slots[i]=initial;return [slots[i],x=>{slots[i]=typeof x==='function'?x(slots[i]):x;}];}},
+    react: {useCallback:fn=>fn,useEffect:fn=>fn(),useRef:initial=>{const i=cursor++;return slots[i]??={current:initial};},useMemo:fn=>fn(),useState:initial=>{const i=cursor++;if(!(i in slots))slots[i]=initial;return [slots[i],x=>{slots[i]=typeof x==='function'?x(slots[i]):x;}];}},
     '@/components/discovery/compact-search-input':{CompactSearchInput:'TextInput'},'@/components/journey/journey-action-icon':{JourneyActionIcon:'Icon'},'@/hooks/session-context':{useSessionState:()=>({session:signedIn?{user:{id:'owner'},access_token:'token'}:null,loading:false})},'@/lib/social/saved-queries':{loadSavedJourneys:async()=>[]},
-    'react/jsx-runtime':runtime,'react-native':native,'react-native-safe-area-context':{SafeAreaView:'SafeAreaView'},
-    'expo-router':{useLocalSearchParams:()=>({view}),useRouter:()=>({push:route=>routes.push(route)}),useFocusEffect(){}},'@/components/branded-loading':{BrandedLoading:'BrandedLoading'},
+    'react/jsx-runtime':runtime,'react-native':{...native,AppState:{addEventListener:(_name,fn)=>{foreground=fn;return {remove(){}};}}},'react-native-safe-area-context':{SafeAreaView:'SafeAreaView'},
+    'expo-router':{useLocalSearchParams:()=>({view}),useRouter:()=>({push:route=>routes.push(route)}),useFocusEffect:fn=>{focusEffect=fn;}},'@/components/branded-loading':{BrandedLoading:'BrandedLoading'},
     '@/components/discovery/explore-tile':{ExploreTile:'ExploreTile'},'@/components/discovery/journey-card':{JourneyCard:'JourneyCard'},
     '@/components/discovery/ui':{colors:{},ui:{},ScreenHeader:'ScreenHeader',Message:'Message',LoadingCards:'LoadingCards'},
-    '@/hooks/use-load':{useLoad:()=>state},'@/lib/discovery/queries':{invalidatePublicJourneys(){},loadDiscoveryEntries(){}},'@/hooks/use-discovery-viewer':{useDiscoveryViewer:()=>({pending:false,id:null})},
+    '@/hooks/use-load':{useLoad:loader=>loader===publicLoader||!savedJourneys?state:{...state,data:savedJourneys}},'@/lib/discovery/queries':{invalidatePublicJourneys(){},loadDiscoveryEntries:publicLoader},'@/hooks/use-discovery-viewer':{useDiscoveryViewer:()=>({pending:false,id:null})},
     '@/lib/discovery/model':{hideViewerJourneys:rows=>rows.map(r=>r.journey),discoveryJourneys:rows=>rows.map(r=>r.journey),searchJourneys:(rows,q)=>rows.filter(x=>x.destination.includes(q))},
   }).default;
-  return {routes,render(){cursor=0;return all(component());},view(v){view=v;},state(s){state={...state,...s};}};
+  return {routes,render(){cursor=0;return all(component());},view(v){view=v;},state(s){state={...state,...s};},focus(){blurEffect=focusEffect();},blur(){blurEffect?.();},foreground(next){foreground(next);},refreshes:()=>refreshes};
 }
-test('Search uses three columns, all 19 results, no title/back/place chips; Story retains its independent list',()=>{
+
+test('foreground refresh is limited to focused Search; returning still refreshes the collection',()=>{
+  const s=screen();s.render();s.foreground('active');assert.equal(s.refreshes(),0);
+  s.focus();assert.equal(s.refreshes(),1);s.foreground('background');assert.equal(s.refreshes(),1);
+  s.foreground('active');assert.equal(s.refreshes(),2);s.blur();s.foreground('active');assert.equal(s.refreshes(),2);
+  s.focus();assert.equal(s.refreshes(),3);
+});
+test('Explore virtualizes two columns with six initial tiles and preserves all results and independent Story list',()=>{
   const s=screen();let tree=s.render();let list=tree.find(n=>n.type==='FlatList');
-  assert.equal(list.props.numColumns,3);assert.equal(list.props.data.length,19);assert.equal(list.props.initialNumToRender,4);assert.equal(list.props.maxToRenderPerBatch,2);assert.equal(list.props.windowSize,3);
+  assert.equal(list.props.numColumns,2);assert.equal(list.props.data.length,19);assert.equal(list.props.initialNumToRender*list.props.numColumns,6);assert.equal(list.props.maxToRenderPerBatch,2);assert.equal(list.props.windowSize,3);
   assert.equal(list.props.renderItem({item:list.props.data[18]}).type,'ExploreTile');
   assert.ok(!tree.some(n=>n.type==='ScreenHeader'));
   assert.ok(!all(list.props.ListHeaderComponent).some(n=>n.type==='Pressable'));
@@ -144,6 +152,32 @@ test('Home and Explore prefer thumbnails, retry original once on failure then de
   let tree=render();assert.equal(uri(remote(tree)),journey.coverThumbnail);remote(tree).props.onError();tree=render();assert.equal(uri(remote(tree)),journey.cover);remote(tree).props.onError();tree=render();assert.equal(remote(tree),undefined);assert.equal(tree.filter(n=>n.type==='JourneyArt').length,1,'Both variants failed: journey art, never the stock photo');assert.equal(journey.cover,'https://example.test/full.jpg');
   journey.coverThumbnail='https://example.test/new-thumb.jpg';tree=render();assert.equal(uri(remote(tree)),journey.coverThumbnail);remote(tree).props.onError();journey.cover='https://example.test/new-full.jpg';tree=render();assert.equal(uri(remote(tree)),journey.cover);h.dispose();
  }
+});
+
+test('public and Saved explicit refresh retry failed image URLs without remounting the list or changing search',()=>{
+ for(const saved of [false,true]) {
+  const journey={id:'a',title:'Coast',destination:'Coast',creatorName:'Owner',cover:'https://example.test/full.jpg',coverThumbnail:'https://example.test/thumb.jpg',stops:[]};
+  const s=screen({signedIn:true,savedJourneys:[journey]});s.state({data:[{journey,creatorId:null}]});
+  let tree=s.render();if(saved){tree.find(n=>n.props.accessibilityLabel==='Show saved journeys').props.onPress();tree=s.render();}
+  tree.find(n=>n.type==='TextInput').props.onChangeText('Coast');tree=s.render();
+  const list=t=>t.find(n=>n.type==='FlatList');let previousKey,h,Tile;
+  const mount=()=>{const cell=list(tree).props.renderItem({item:journey});if(cell.key!==previousKey){h?.dispose();h=stateHarness();previousKey=cell.key;Tile=load('src/components/discovery/explore-tile.tsx',{'react/jsx-runtime':runtime,react:h.hooks,'react-native':native,'expo-router':{useRouter:()=>({push(){}})},'./journey-photo':{JourneyPhoto:'JourneyPhoto'},...artModules}).ExploreTile;}return h.render(()=>Tile(cell.props));};
+  const remote=t=>t.find(n=>n.type==='JourneyPhoto');
+  let tile=mount();assert.equal(remote(tile).props.uri,journey.coverThumbnail);remote(tile).props.onError();tile=mount();assert.equal(remote(tile).props.uri,journey.cover);remote(tile).props.onError();assert.equal(remote(mount()),undefined);
+  const listKey=list(tree).key,cellKey=previousKey;list(tree).props.refreshControl.props.onRefresh();tree=s.render();
+  assert.equal(list(tree).key,listKey,'Refresh preserves the FlatList identity and native scroll state');assert.equal(tree.find(n=>n.type==='TextInput').props.value,'Coast');
+  assert.equal(remote(mount()).props.uri,journey.coverThumbnail,'Retry uses the existing signed URL');assert.notEqual(previousKey,cellKey);assert.equal(list(tree).props.extraData,1);h.dispose();
+ }
+});
+
+test('Story-list explicit refresh retries inner journey cards while retaining list identity, query and image URLs',()=>{
+ const journey={id:'a',title:'Coast',destination:'Coast',cover:'https://example.test/full.jpg',coverThumbnail:'https://example.test/thumb.jpg'};
+ const s=screen();s.state({data:[{journey,creatorId:null}]});s.view('stories');let tree=s.render();
+ tree.find(n=>n.type==='TextInput').props.onChangeText('Coast');tree=s.render();
+ const list=t=>t.find(n=>n.type==='FlatList'),before=list(tree),cell=before.props.renderItem({item:journey});
+ assert.equal(cell.type,'JourneyCard');before.props.refreshControl.props.onRefresh();tree=s.render();const after=list(tree),retried=after.props.renderItem({item:journey});
+ assert.notEqual(retried.key,cell.key);assert.equal(after.key,before.key);assert.equal(after.props.extraData,1);assert.equal(after.props.numColumns,1);
+ assert.equal(tree.find(n=>n.type==='TextInput').props.value,'Coast');assert.equal(retried.props.journey.cover,journey.cover);assert.equal(retried.props.journey.coverThumbnail,journey.coverThumbnail);
 });
 
 

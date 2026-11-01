@@ -9,10 +9,10 @@ import { colors } from './ui';
 import { useBuddyProtectedBounds, useBuddyScroll } from '@/hooks/use-buddy-geometry';
 
 export function DiscoveryPanel({ journeys, selectedId, onLocate, onOpen, notice, onClear, onRetrySelection,
-  loading, refreshing, error, emptyText, onRefresh, onHeight, onInteraction, availableHeight, availableWidth, bottomClearance = 0, topClearance = 0 }: {
+  loading, refreshing, error, emptyText, onRefresh, onHeight, onInteraction, availableHeight, availableWidth, bottomClearance = 0, topClearance = 0, photoRetry = 0 }: {
   journeys: PublicJourney[]; selectedId: string | null; onLocate: (id: string) => void; onOpen: (id: string) => void;
   notice: string; onClear: () => void; onRetrySelection?: () => void; loading: boolean; refreshing: boolean;
-  error: string | null; emptyText?: string; onRefresh: () => void; onHeight: (height: number) => void; onInteraction: (active: boolean) => void; availableHeight: number; availableWidth: number; bottomClearance?: number; topClearance?: number;
+  error: string | null; emptyText?: string; onRefresh: () => void; onHeight: (height: number) => void; onInteraction: (active: boolean) => void; availableHeight: number; availableWidth: number; bottomClearance?: number; topClearance?: number; photoRetry?: number;
 }) {
   const pilotColor = usePilotColor();
   const s = lightStyles_s;
@@ -70,9 +70,10 @@ export function DiscoveryPanel({ journeys, selectedId, onLocate, onOpen, notice,
       initialNumToRender={listExpanded ? 3 : 2} maxToRenderPerBatch={2} windowSize={3} updateCellsBatchingPeriod={50}
       onScroll={event => { if (listExpanded) { scroll.onScroll(); sheet.offset.current = event.nativeEvent.contentOffset.y; } }} scrollEventThrottle={16}
       data={expanded === listExpanded ? journeys.slice(0, visible) : []} keyExtractor={item => item.id} style={s.list}
+      extraData={photoRetry}
       showsHorizontalScrollIndicator={false} showsVerticalScrollIndicator={listExpanded}
       contentContainerStyle={[s.items, listExpanded && s.expandedItems, listExpanded && { paddingBottom: clearance + 10 }]}
-      renderItem={({ item }) => <HomeJourneyCard journey={item} expanded={listExpanded} width={discoveryCardWidth(availableWidth, listExpanded)}
+      renderItem={({ item }) => <HomeJourneyCard key={item.id + ':' + photoRetry} journey={item} expanded={listExpanded} width={discoveryCardWidth(availableWidth, listExpanded)}
         selected={selectedId === item.id} onOpen={onOpen} onLocate={onLocate} onHeight={listExpanded ? undefined : measureCard} />}
       ListEmptyComponent={expanded !== listExpanded ? null : <View style={s.empty}>
         {loading ? <><ActivityIndicator color={pilotColor(colors.ink)} /><Text style={s.hint}>Finding your next journey…</Text></>

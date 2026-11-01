@@ -12,7 +12,7 @@ new Function('exports', ts.transpileModule(readFileSync('src/theme/mobile-theme.
 function load(file, dependencies, state = null, hookOverrides = {}) {
   dependencies={'@/hooks/use-buddy-geometry':buddyGeometryStub,'@/hooks/use-trip-recovery':{useTripRecovery:()=>({checking:false,notice:null}),useUnfinishedTrip:()=>null},...dependencies};
   const exports = {};
-  const jsx = (type, props) => ({ type, props });
+  const jsx = (type, props, key) => ({ type, props, key });
   const react = { useRef:()=>({current:null}),useEffect:()=>{}, memo: fn => fn, useState: initial => typeof state === 'function' ? state(initial) : [state ?? initial, () => {}], useMemo: fn => fn(), useCallback: fn => fn, ...hookOverrides };
   const rn = { StyleSheet: { create: value => value }, Platform: { OS: 'web' }, StatusBar: {} };
   for (const name of ['View', 'Text', 'Pressable', 'Image', 'TextInput']) rn[name] = name;
@@ -466,6 +466,34 @@ test('Home image lists expose data only in active layout and More keeps every jo
   const lists=render(),active=lists.find(n=>n.props.horizontal===!expanded),hidden=lists.find(n=>n!==active);assert.equal(active.props.data.length,size);assert.equal(hidden.props.data.length,0);assert.equal(hidden.props.ListFooterComponent,null);assert.equal(hidden.props.ListEmptyComponent,null);
   if(size<61){active.props.ListFooterComponent.props.onPress();expanded=!expanded;}
  }
+});
+
+test('Home explicit refresh retries failed cached images without resetting panel, list or More state',()=>{
+ const state=()=>{let cursor=0;const slots=[];return {reset(){cursor=0;},hook:initial=>{const i=cursor++;if(!(i in slots))slots[i]=initial;return [slots[i],value=>{slots[i]=typeof value==='function'?value(slots[i]):value;}];}};};
+ const homeState=state(),panelState=state();let expanded=false;const offset={current:87};
+ const photo={...journey,coverThumbnail:'https://example.invalid/thumb.jpg'};
+ const rows=Array.from({length:61},(_,i)=>({...photo,id:String(i)}));
+ const Home=load('src/app/discover.tsx',{
+  '@/components/floating-navigation':{FloatingNavigation:'Navigation'},'expo-router':{useRouter:()=>({}),useFocusEffect(){}},
+  'react-native-safe-area-context':{SafeAreaView:'SafeAreaView',useSafeAreaInsets:()=>({bottom:24})},
+  '@/components/discovery/globe/discovery-globe':{DiscoveryGlobe:'Globe'},'@/components/discovery/discovery-panel':{DiscoveryPanel:'Panel'},
+  '@/hooks/use-load':{useLoad:()=>({data:rows.map(journey=>({journey})),loading:false,refresh(){}})},
+  '@/lib/discovery/map':{discoveryPoints:()=>({features:[]})},'@/lib/discovery/travel':{discoveryRoute:()=>null},
+  '@/lib/discovery/presentation':{spaceColor:'#080F1E'},'@/lib/discovery/queries':{loadPublicJourney(){},loadDiscoveryEntries(){}},
+ },homeState.hook).default;
+ const Panel=load('src/components/discovery/discovery-panel.tsx',{
+  'react-native':{Animated:{View:'AnimatedView',add:(a,b)=>a+b},FlatList:'FlatList'},
+  '@/lib/discovery/presentation':{discoveryCardWidth:()=>300},'@/hooks/use-discovery-sheet':{useDiscoverySheet:()=>({height:200,expanded,offset,responders:{handle:{},content:{}}})},'./home-journey-card':{HomeJourneyCard:'Card'},'./ui':{colors},
+ },panelState.hook).DiscoveryPanel;
+ const props=()=>{homeState.reset();return nodes(Home()).find(n=>n.type==='Panel').props;};
+ let panelProps=props();const list=()=>{panelState.reset();return nodes(Panel({...panelProps,availableHeight:720,availableWidth:360})).find(n=>n.type==='FlatList'&&n.props.horizontal===!expanded);};
+ list().props.ListFooterComponent.props.onPress();expanded=true;assert.equal(list().props.data.length,48);
+ let key,cardState,Card;
+ const image=()=>{const cell=list().props.renderItem({item:rows[0]});if(key!==cell.key){key=cell.key;cardState=state();Card=load('src/components/discovery/home-journey-card.tsx',{'@/lib/discovery/model':{journeyFacts:()=>''},'./ui':{colors}},cardState.hook).HomeJourneyCard;}cardState.reset();return nodes(Card(cell.props)).find(n=>n.type==='Image');};
+ assert.equal(image().props.source.uri,photo.coverThumbnail);image().props.onError();assert.equal(image().props.source.uri,photo.cover);image().props.onError();assert.equal(image(),undefined);
+ const failedKey=key,listKey=list().key;panelProps.onRefresh();panelProps=props();assert.equal(panelProps.photoRetry,1);
+ assert.equal(image().props.source.uri,photo.coverThumbnail,'Retry retains the same cacheable signed URL');assert.notEqual(key,failedKey);
+ assert.equal(list().key,listKey);assert.equal(list().props.extraData,1);assert.equal(list().props.data.length,48);assert.equal(expanded,true);assert.equal(offset.current,87);
 });
 test('R2: Home shows "Unfinished trip" with Resume for the signed-in user copy and keeps the panel clear',()=>{
   const routes=[];let trip=null;

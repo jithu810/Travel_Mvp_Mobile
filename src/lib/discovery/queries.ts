@@ -51,7 +51,9 @@ function signedPhoto(path: string, signal: AbortSignal) {
     if (!signingScheduled) { signingScheduled = true; queueMicrotask(flushSigning); }
   }));
 }
-export function invalidatePublicJourneys() { collections.clear(); signed.clear(); }
+// Refresh membership/ordering without changing valid image URLs. Stable URLs let
+// the native image pipeline reuse its memory/disk entries until signature expiry.
+export function invalidatePublicJourneys() { collections.clear(); }
 
 function client() {
   if (!publicSupabase) throw new Error('Public journey browsing is not configured yet.');

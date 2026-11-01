@@ -48,7 +48,11 @@ def prepare(manifest_path, output):
         with Image.open(source) as image:
             width, height = image.size
             expected = {'jpg': 'JPEG', 'png': 'PNG', 'webp': 'WEBP'}[match.group(6)]
-            if image.format != expected or width * height > 50_000_000 or max(width, height) > 12000:
+            # MPO is a JPEG-compatible multi-picture container used by phone
+            # cameras. Keep its original bytes; only its primary frame becomes
+            # the preview. Do not accept MPO under non-JPEG filename types.
+            allowed_formats = {'JPEG', 'MPO'} if expected == 'JPEG' else {expected}
+            if image.format not in allowed_formats or width * height > 50_000_000 or max(width, height) > 12000:
                 raise ValueError('Source encoding/dimensions do not match the approved original.')
             image.verify()
         base, ext = original.rsplit('.', 1)
@@ -68,6 +72,7 @@ def prepare(manifest_path, output):
         if digest(full_file) != source_hash or digest(source) != source_hash:
             raise ValueError('Source changed during preparation. Discard this unapproved plan.')
         with Image.open(full_file) as image:
+            image.seek(0)
             oriented = ImageOps.exif_transpose(image)
             oriented.thumbnail((512, 512), Image.Resampling.LANCZOS)
             rgb = oriented.convert('RGB')
