@@ -55,12 +55,13 @@ function readForm(value: unknown): CreateForm | null {
   if (!f || !id(f.id) || !str(f.title) || !str(f.description) || !str(f.days, 20) || !nullableStr(f.updatedAt, 100)
     || !(['', 'solo', 'couple', 'friends', 'family'] as unknown[]).includes(f.traveler) || !Array.isArray(f.stops) || f.stops.length > 50
     || !(f.destinationSlug === undefined || str(f.destinationSlug)) || !(f.coverPath === undefined || nullableStr(f.coverPath))
+    || !(f.editingPublished === undefined || typeof f.editingPublished === 'boolean')
     || !(f.descriptionWasNull === undefined || typeof f.descriptionWasNull === 'boolean')) return null;
   const destination = readPlace(f.destination), stops = f.stops.map(readStop);
   if (destination === undefined || stops.some(stop => !stop)) return null;
   return { id: f.id, title: f.title, description: f.description, destination, traveler: f.traveler as CreateForm['traveler'], days: f.days, updatedAt: f.updatedAt, stops: stops as StopInput[],
     ...(f.destinationSlug !== undefined ? { destinationSlug: f.destinationSlug } : {}), ...(f.coverPath !== undefined ? { coverPath: f.coverPath } : {}),
-    ...(f.descriptionWasNull !== undefined ? { descriptionWasNull: f.descriptionWasNull } : {}) };
+    ...(f.editingPublished ? { editingPublished: true } : {}), ...(f.descriptionWasNull !== undefined ? { descriptionWasNull: f.descriptionWasNull } : {}) };
 }
 // Anything unexpected (other user, other journey, old version, damaged JSON) reads as null.
 export function parseSnapshot(raw: string | null, userId: string, formId?: string): RecoverySnapshot | null {
@@ -84,9 +85,18 @@ export function parseSnapshot(raw: string | null, userId: string, formId?: strin
 // older saved version is stale (the journey was saved since) and restoring it would hide
 // those newer saved changes, so it is never offered.
 export function hasSameBaseVersion(snapshot: RecoverySnapshot, form: CreateForm) {
+  if (Boolean(snapshot.form.editingPublished) !== Boolean(form.editingPublished)) return false;
   if (form.updatedAt === null || snapshot.baseUpdatedAt === null) return form.updatedAt === null && snapshot.baseUpdatedAt === null;
-  const base = Date.parse(snapshot.baseUpdatedAt), saved = Date.parse(form.updatedAt);
-  return Number.isFinite(base) && base === saved;
+  // Date.parse truncates PostgreSQL microseconds. Normalize the whole second and
+  // timezone separately, retaining every fractional digit for version equality.
+  const exactVersion = (value: string) => {
+    const parts = /^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})(?:\.(\d+))?(Z|[+-]\d{2}:\d{2})$/i.exec(value);
+    if (!parts) return null;
+    const second = Date.parse(parts[1] + parts[3]);
+    return Number.isFinite(second) ? String(second) + ':' + (parts[2] ?? '').replace(/0+$/, '') : null;
+  };
+  const base = exactVersion(snapshot.baseUpdatedAt), saved = exactVersion(form.updatedAt);
+  return base !== null && base === saved;
 }
 // The loaded identity, version and remix credit always win; only the user's edits come back.
 // A never-saved journey may still have reached the server (an unconfirmed first save), so its
@@ -96,6 +106,8 @@ export function restoredState(snapshot: RecoverySnapshot, loaded: CreateForm, uu
   const fresh = loaded.updatedAt === null;
   const form: CreateForm = { ...snapshot.form, id: loaded.id, updatedAt: loaded.updatedAt, stops: fresh ? snapshot.form.stops.map(stop => ({ ...stop, id: uuid() })) : snapshot.form.stops };
   delete form.sourceId;
+  delete form.editingPublished;
+  if (loaded.editingPublished) form.editingPublished = true;
   if (loaded.sourceId) form.sourceId = loaded.sourceId;
   const edit = fresh ? null : snapshot.memoryEdit, exists = !!edit && form.stops.some(stop => stop.id === edit.value.id);
   const memoryEdit = edit && edit.value.id === edit.baseline.id && (edit.isNew ? !exists : exists) ? edit : null;

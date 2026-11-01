@@ -39,13 +39,14 @@ export async function configureMap(token: string) {
   await Mapbox.setAccessToken(token);
   configuredToken = token;
 }
-export const NativeJourneyMap = memo(function NativeJourneyMap({ data, stops, retry, selectedId, onSelect, presentation = 'story', onExpand, currentPosition, navigationRoute, navigationMode = false, navigationPadding, destinationId, travelCamera, memoryPhotos, animateMemoryRoute = true, playRouteWithSelection = false, controlTopInset = 0, liveBuddy = false, storyBuddy, storyBuddySize = 36, storyBuddyMotion = 'walk' }: {
+export const NativeJourneyMap = memo(function NativeJourneyMap({ data, stops, retry, selectedId, onSelect, presentation = 'story', onExpand, currentPosition, navigationRoute, navigationMode = false, navigationPadding, destinationId, travelCamera, memoryPhotos, animateMemoryRoute = true, playRouteWithSelection = false, controlTopInset = 0, liveBuddy = false, storyBuddy, storyBuddySize = 36, storyBuddyMotion = 'walk', preserveEditorMarkers = false }: {
   data: JourneyMapData; stops: JourneyStop[]; retry: () => void; selectedId?: string | null; onSelect?: (id: string) => void;
 } & MapDisplayProps) {
   const camera = useRef<Camera>(null);
   const bottom = navigationPadding?.bottom ?? 220;
   const fitProtection = useBuddyProtectedBounds(), locationProtection = useBuddyProtectedBounds();
   const memoryPreview = memoryPhotos !== undefined && !navigationMode;
+  const compactMemoryMarkers = memoryPreview && !!storyBuddy && !preserveEditorMarkers;
   const [focused, setFocused] = useState(true);
   const [memoryIdle, setMemoryIdle] = useState(false);
   const [nearby, setNearby] = useState<NearbyPoint[]>([]);
@@ -260,9 +261,9 @@ export const NativeJourneyMap = memo(function NativeJourneyMap({ data, stops, re
             if (typeof id === 'string' && data.markers.some(marker => marker.id === id)) { selectMemory(id); if (presentation === 'preview') onExpand?.(); }
           }}>
           <Mapbox.CircleLayer id="stop-circles" style={{
-            circleRadius: navigationMode ? 10 : ['case', ['get', 'selected'], presentation === 'preview' || (memoryPreview && storyBuddy) ? 12 : 18, presentation === 'preview' || (memoryPreview && storyBuddy) ? 10 : 14],
+            circleRadius: navigationMode ? 10 : ['case', ['get', 'selected'], presentation === 'preview' || compactMemoryMarkers ? 12 : 18, presentation === 'preview' || compactMemoryMarkers ? 10 : 14],
             circleColor: ['case', ['get', 'destination'], '#2677D9', ['get', 'selected'], lightTheme.text, lightTheme.accent],
-            circleStrokeWidth: ['case', ['get', 'selected'], memoryPreview && storyBuddy ? 2 : 4, 2], circleStrokeColor: '#FFFFFF',
+            circleStrokeWidth: ['case', ['get', 'selected'], compactMemoryMarkers ? 2 : 4, 2], circleStrokeColor: '#FFFFFF',
           }} />
           <Mapbox.SymbolLayer id="stop-numbers" style={{ textField: ['get', 'number'], textSize: 12, textColor: '#FFFFFF', textAllowOverlap: true, textIgnorePlacement: true }} />
         </Mapbox.ShapeSource>
@@ -278,7 +279,7 @@ export const NativeJourneyMap = memo(function NativeJourneyMap({ data, stops, re
           <Mapbox.SymbolLayer id="travel-buddy-companion-icon" style={{ iconImage: 'journey-map-buddy', iconSize: 0.25, iconAnchor: 'bottom', iconRotationAlignment: 'viewport', iconPitchAlignment: 'viewport', iconTranslate: [...LIVE_BUDDY_OFFSET], iconTranslateAnchor: 'viewport', iconAllowOverlap: true, iconIgnorePlacement: true }} />
         </Mapbox.ShapeSource>}
         {ready && storyBuddy && <StoryWalkingBuddy playback={storyBuddy} active={!failed && focused && appActive && nearby.length === 0} motionKnown={motionKnown} reducedMotion={reduceMotion} size={storyBuddySize} motion={storyBuddyMotion} />}
-        {ready && memoryPreview && <JourneyOverlays photoPinSize={storyBuddy ? 28 : 42} points={memoryPoints} route={data.line.geometry.coordinates} onOpen={selectMemory}
+        {ready && memoryPreview && <JourneyOverlays photoPinSize={compactMemoryMarkers ? 28 : 42} points={memoryPoints} route={data.line.geometry.coordinates} onOpen={selectMemory}
           drawRoute={false} durationScale={3} selectedId={selectedId} playbackKey={JSON.stringify(data.line.geometry.coordinates)}
           playing={!storyBuddy && nearby.length === 0 && animateMemoryRoute && focused && appActive && !reduceMotion && memoryIdle && (!selectedId || playRouteWithSelection)} />}
       </Mapbox.MapView>}

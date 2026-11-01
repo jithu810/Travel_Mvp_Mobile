@@ -13,9 +13,9 @@ function optionalNumeric(value: unknown, min: number, max: number, integer = fal
 }
 // This is an editor projection, never the signed-photo display projection.
 // Fail closed rather than silently filtering stops or discarding media/versions.
-export function hydrateDraft(value: unknown, values: unknown, id: string, owner: string): CreateForm {
+export function hydrateDraft(value: unknown, values: unknown, id: string, owner: string, editingPublished = false): CreateForm {
   const row = object(value);
-  if (!row || row.id !== id || !isJourneyId(id) || row.user_id !== owner || row.status !== 'draft' || row.is_demo !== false
+  if (!row || row.id !== id || !isJourneyId(id) || row.user_id !== owner || row.status !== (editingPublished ? 'published' : 'draft') || row.is_demo !== false
     || typeof row.updated_at !== 'string' || !Number.isFinite(Date.parse(row.updated_at))
     || typeof row.title !== 'string' || !nullableText(row.description, 5000) || !nullableText(row.cover_image_path, 2000)
     || !nullableText(row.destination_slug, 200) || !nullableText(row.destination_name, 200)
@@ -44,7 +44,7 @@ export function hydrateDraft(value: unknown, values: unknown, id: string, owner:
     ? { name: row.destination_name, label: row.destination_name, latitude: row.destination_latitude as number, longitude: row.destination_longitude as number, mapboxId: null } : null;
   // Lineage is display-only attribution; a missing or malformed value just omits the credit.
   const source = typeof row.copied_from_journey_id === 'string' && isJourneyId(row.copied_from_journey_id) && row.copied_from_journey_id !== id ? row.copied_from_journey_id : null;
-  return { ...(source ? { sourceId: source } : {}), id, title: row.title, description: row.description ?? '', descriptionWasNull: row.description === null,
+  return { ...(editingPublished ? { editingPublished: true } : {}), ...(source ? { sourceId: source } : {}), id, title: row.title, description: row.description ?? '', descriptionWasNull: row.description === null,
     destination, destinationSlug: row.destination_slug ?? undefined, traveler: (row.traveler_type ?? '') as CreateForm['traveler'],
     days: String(row.duration_days), updatedAt: row.updated_at, coverPath: row.cover_image_path, stops };
 }

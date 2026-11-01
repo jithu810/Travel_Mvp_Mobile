@@ -11,7 +11,7 @@ import { useActionIntent } from '@/hooks/action-intent';
 import { remixStore } from '@/lib/remix/model';
 import { StorySheet } from './story-sheet';
 import { remixJourney } from '@/lib/remix/queries';
-export function JourneyOptions({ id, onUse, inlineFeedback = false, menu, presentation, onAbout }: { id: string; onUse: () => void; inlineFeedback?: boolean; presentation?: 'rail'; onAbout?: () => void; menu?: { visible: boolean; onClose: () => void; onAbout: () => void } }) {
+export function JourneyOptions({ id, creatorId, onUse, inlineFeedback = false, menu, presentation, onAbout }: { id: string; creatorId?: string; onUse: () => void; inlineFeedback?: boolean; presentation?: 'rail'; onAbout?: () => void; menu?: { visible: boolean; onClose: () => void; onAbout: () => void } }) {
   const pilotColor = usePilotColor();
   const styles = lightStyles_styles;
   const ui = lightUi;
@@ -22,6 +22,8 @@ export function JourneyOptions({ id, onUse, inlineFeedback = false, menu, presen
   const auth = useSessionState();
   const intent = useActionIntent();
   const userId = auth.session?.user.id;
+  const isOwner = !auth.loading && !!userId && userId === creatorId;
+  const editJourney = () => { if (isOwner && focus.current.active && focus.current.userId === userId) { menu?.onClose(); router.push({ pathname: '/create', params: { editPublished: id } }); } };
   useFocusEffect(useCallback(() => {
     focus.current.active = true;
     focus.current.generation++;
@@ -32,11 +34,12 @@ export function JourneyOptions({ id, onUse, inlineFeedback = false, menu, presen
   const get = useCallback(() => remixStore.get(key), [key]);
   const state = useSyncExternalStore(remixStore.subscribe, get, get);
   const copy = useCallback(async () => {
+    if (isOwner || auth.loading) return;
     if (!userId) { if (intent.begin(id, 'remix')) router.push('/auth'); return; }
     const generation = focus.current.generation;
     const copyId = await remixStore.run(key, () => remixJourney(id, userId));
     if (copyId && focus.current.active && generation === focus.current.generation) router.push({ pathname: '/create', params: { draft: copyId } });
-  }, [id, intent, key, router, userId]);
+  }, [id, intent, key, router, userId, isOwner, auth.loading]);
   useFocusEffect(useCallback(() => {
     if (userId && !auth.loading && intent.pending?.journeyId === id && intent.pending.action === 'remix') {
       if (intent.consume(intent.pending.token)) void copy();
@@ -45,7 +48,7 @@ export function JourneyOptions({ id, onUse, inlineFeedback = false, menu, presen
   const remixDisabled = auth.loading || state.busy || (state.blocked && !state.copyId);
   // One entry point explains the choice: a temporary stop selection versus a saved private draft.
   if (presentation === 'rail') return <View style={styles.rail}>
-    <Pressable accessibilityRole="button" accessibilityLabel="Make it yours" accessibilityHint="Choose stops for this trip or save an editable copy." accessibilityState={{ busy: state.busy }} onPress={() => setChoiceOpen(true)} style={styles.railButton}>{state.busy ? <ActivityIndicator color={pilotColor(colors.ink)} /> : <JourneyActionIcon name="remix" />}<Text style={styles.railLabel}>Make it yours</Text></Pressable>
+    <Pressable accessibilityRole="button" accessibilityLabel={isOwner ? 'Edit journey' : 'Make it yours'} accessibilityHint={isOwner ? 'Edit your published journey, then republish your changes.' : 'Choose stops for this trip or save an editable copy.'} disabled={auth.loading} accessibilityState={{ busy: state.busy, disabled: auth.loading }} onPress={isOwner ? editJourney : () => setChoiceOpen(true)} style={styles.railButton}>{state.busy ? <ActivityIndicator color={pilotColor(colors.ink)} /> : <JourneyActionIcon name={isOwner ? 'edit' : 'remix'} />}<Text style={styles.railLabel}>{isOwner ? 'Edit journey' : 'Make it yours'}</Text></Pressable>
     <Pressable accessibilityRole="button" accessibilityLabel="About this journey" onPress={onAbout} style={styles.railButton}><JourneyActionIcon name="info" /><Text style={styles.railLabel}>About</Text></Pressable>
     {/* A rail item of its own, so it never covers the only route to Customize. */}
     {(state.error || state.blocked) && <Pressable accessibilityRole="button" accessibilityLabel={state.error || 'Check your Account drafts before retrying Remix'} onPress={() => setFeedbackOpen(true)} style={styles.railFeedback}><Text accessibilityLiveRegion="polite" style={styles.remixLabel}>!</Text></Pressable>}
@@ -71,8 +74,8 @@ export function JourneyOptions({ id, onUse, inlineFeedback = false, menu, presen
     <View style={styles.buttons}>
     <Pressable accessibilityRole="button" accessibilityLabel="Use This Journey" accessibilityHint="Use all stops. Opens Travel Mode. Begin Trip starts the timer and location tracking." onPress={onUse} style={({ pressed }) => [styles.use, pressed && { opacity: 0.7 }]}><Text style={styles.useLabel}>↗ Use all stops</Text></Pressable>
     <Pressable accessibilityRole="button" disabled={auth.loading || state.busy || (state.blocked && !state.copyId)} accessibilityState={{ disabled: auth.loading || state.busy || (state.blocked && !state.copyId) }}
-      onPress={() => { if (state.copyId) router.push({ pathname: '/create', params: { draft: state.copyId } }); else void copy(); }} accessibilityLabel={state.copyId ? "Open private copy" : "Remix This Journey"} accessibilityHint="Requires sign-in. Creates or opens your private draft." style={({ pressed }) => [styles.remix, (auth.loading || state.busy || (state.blocked && !state.copyId) || pressed) && { opacity: 0.65 }]}>
-      {state.busy ? <ActivityIndicator color={pilotColor(colors.ink)} /> : <Text style={styles.remixLabel}>{state.copyId ? 'My draft ↗' : '↻ Remix'}</Text>}
+      onPress={() => { if (isOwner) editJourney(); else if (state.copyId) router.push({ pathname: '/create', params: { draft: state.copyId } }); else void copy(); }} accessibilityLabel={isOwner ? 'Edit journey' : state.copyId ? "Open private copy" : "Remix This Journey"} accessibilityHint={isOwner ? 'Edit and republish your journey.' : 'Requires sign-in. Creates or opens your private draft.'} style={({ pressed }) => [styles.remix, (auth.loading || state.busy || (state.blocked && !state.copyId) || pressed) && { opacity: 0.65 }]}>
+      {state.busy ? <ActivityIndicator color={pilotColor(colors.ink)} /> : <Text style={styles.remixLabel}>{isOwner ? 'Edit journey' : state.copyId ? 'My draft ↗' : '↻ Remix'}</Text>}
     </Pressable>
     {!inlineFeedback && (state.error || state.blocked) && <Pressable accessibilityRole="button" accessibilityLabel={state.error || 'Check your Account drafts before retrying Remix'} onPress={() => setFeedbackOpen(true)} style={styles.feedback}><Text accessibilityLiveRegion="polite" style={styles.remixLabel}>!</Text></Pressable>}
     </View>

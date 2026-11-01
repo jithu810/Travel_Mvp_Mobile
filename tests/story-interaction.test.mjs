@@ -1790,6 +1790,24 @@ test('Story Buddy card selection moves the camera to the selected stop and never
     h.dispose();
   }
 });
+test('original editor selection Buddy preserves existing photo pins and circle sizes while Story defaults stay compact', () => {
+  const h = nativeMapHarness([mappedStop('a', 0, 76, 8), mappedStop('b', 1, 77, 9)]);
+  Object.assign(h.props, { memoryPhotos: { a: 'https://signed.test/photo' }, storyBuddy: storyPlayback(), storyBuddySize: 36, animateMemoryRoute: false });
+  let tree = h.measure(); find(tree, 'MapView').props.onDidFinishLoadingMap(); tree = h.render();
+  let circles = all(tree, 'CircleLayer').find(node => node.props.id === 'stop-circles');
+  assert.deepEqual(circles.props.style.circleRadius, ['case', ['get', 'selected'], 12, 10]);
+  assert.deepEqual(circles.props.style.circleStrokeWidth, ['case', ['get', 'selected'], 2, 2]);
+  assert.equal(find(tree, 'JourneyOverlays').props.photoPinSize, 28);
+  h.props.preserveEditorMarkers = true; tree = h.render();
+  circles = all(tree, 'CircleLayer').find(node => node.props.id === 'stop-circles');
+  assert.deepEqual(circles.props.style.circleRadius, ['case', ['get', 'selected'], 18, 14]);
+  assert.deepEqual(circles.props.style.circleStrokeWidth, ['case', ['get', 'selected'], 4, 2]);
+  assert.equal(find(tree, 'JourneyOverlays').props.photoPinSize, 42);
+  assert.equal(find(tree, 'JourneyOverlays').props.points.features[0].properties.photo, 'https://signed.test/photo');
+  assert.equal(find(tree, 'JourneyOverlays').props.playing, false, 'No competing idle plane appears');
+  assert.equal(find(tree, 'StoryWalkingBuddy').props.size, 36); h.dispose();
+});
+
 test('Story walker map omits the separate Buddy help button', () => {
   const h = nativeMapHarness([mappedStop('a', 0, 76, 8), mappedStop('b', 1, 77, 9)], { Image: 'DecodedImage' }, globalThis, sessionModel.createTripStore(), {
     '@/hooks/use-map-buddy': { useMapBuddy: () => ({ enabled: true, owned: true, visible: false, canHelp: true, openHelp() {} }) },

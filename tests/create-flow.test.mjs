@@ -90,9 +90,9 @@ function screenHarness(initial, photoState = {}, buddyEvents = [], recoveryStora
   };
   // Optional: wire the real on-device recovery hook to a synthetic storage port.
   if(recoveryStorage){const recovery=load('src/lib/create/recovery.ts',{});modules['@/hooks/use-creation-recovery']=load('src/hooks/use-creation-recovery.ts',{...modules,'@/lib/create/recovery':recovery,'@/lib/create/recovery-store':{creationRecovery:recovery.createCreationRecovery(recoveryStorage)}},h.hooks,{setTimeout:()=>0,clearTimeout(){}});}
-  const {NewJourneyEditor,RemixDraftMap,default:CreateScreen}=load('src/app/create.tsx',modules,h.hooks);
+  const {NewJourneyEditor,RemixDraftMap,DraftMap,default:CreateScreen}=load('src/app/create.tsx',modules,h.hooks);
   let reloads=0;
-  return {celebrations,dispose:()=>h.reset(),blur:()=>focusCleanup?.(),mountChild:node=>{h.reset();return h.render(node.type,node.props);},renderRemixMap:props=>h.render(RemixDraftMap,props),renderEntry:()=>h.render(CreateScreen,{}),setCanGoBack:value=>{canGoBack=value;},render:(props={})=>h.render(NewJourneyEditor,{ownerId:uid,initial,onReload:()=>reloads++,...props}),writes,routes,alerts,uploads,setFailure:(value=true,ambiguous=true)=>{fail=value;uncertain=ambiguous;},setPending:value=>{pending=value;},prevented:()=>prevented,dispatches,reloads:()=>reloads};
+  return {celebrations,dispose:()=>h.reset(),blur:()=>focusCleanup?.(),mountChild:node=>{h.reset();return h.render(node.type,node.props);},renderDraftMap:props=>h.render(DraftMap,props),renderRemixMap:props=>h.render(RemixDraftMap,props),renderEntry:()=>h.render(CreateScreen,{}),setCanGoBack:value=>{canGoBack=value;},render:(props={})=>h.render(NewJourneyEditor,{ownerId:uid,initial,onReload:()=>reloads++,...props}),writes,routes,alerts,uploads,setFailure:(value=true,ambiguous=true)=>{fail=value;uncertain=ambiguous;},setPending:value=>{pending=value;},prevented:()=>prevented,dispatches,reloads:()=>reloads};
 }
 test('actual editor quick-start saves privately with zero stops and routes to the saved editable journey',async()=>{
   const h=screenHarness();let tree=h.render();let setup=all(tree,'QuickJourneySetup')[0];
@@ -114,6 +114,16 @@ test('existing editor saves changed stop metadata and version without changing m
   all(tree,'MemoryEditorSheet')[0].props.onSave();await new Promise(setImmediate);tree=h.render();
   assert.equal(all(tree,'MemoryEditorSheet').length,0);
   assert.ok(all(tree,'Text').some(n=>n.props.children==='Memory saved privately.'));
+  assert.equal(all(tree,'ScrollView')[0].props.scrollEnabled,false,'Saving a memory keeps the portrait editor fitted');
+  const confirmation=all(tree,'Text').find(n=>n.props.children==='Memory saved privately.');
+  const mapBefore=all(tree,'DraftMap')[0].props.height;
+  confirmation.props.onLayout({nativeEvent:{layout:{height:22}}});tree=h.render();
+  assert.equal(all(tree,'DraftMap')[0].props.height,mapBefore-22,'Measured confirmation space comes from the flexible map');
+  assert.equal(all(tree,'MemoryDeck')[0].props.fitted,true);
+  tree.props.onLayout({nativeEvent:{layout:{height:500}}});tree=h.render();
+  assert.equal(all(tree,'ScrollView')[0].props.scrollEnabled,true,'Confirmation still leaves controls reachable on short screens');
+  tree.props.onLayout({nativeEvent:{layout:{height:800}}});tree=h.render();
+  assert.equal(all(tree,'ScrollView')[0].props.scrollEnabled,false,'Normal portrait restores the fitted editor with confirmation');
   assert.equal(h.writes[0].updated_at,initial.updatedAt);assert.equal(h.writes[0].cover_image_path,initial.coverPath);
   assert.deepEqual(h.writes[0].stops[0],{id:sid,sequence:1,name:'Beach',description:'New memory',latitude:0,longitude:0,mapbox_place_id:'original-id',photo_path:'journey-media/raw/stop.png',rating:0,day_number:1});
   all(tree,'Pressable').find(n=>n.props.accessibilityLabel==='Save Draft').props.onPress();await new Promise(setImmediate);
@@ -820,6 +830,100 @@ test('private memory deck preserves order and edit semantics without moving publ
  assert.equal(h.writes.length,0);
 });
 
+const publishedEditForm=()=>({...privateForm(),editingPublished:true,stops:[memoryRow(sid,'Published stop',{latitude:place.latitude,longitude:place.longitude})]});
+test('published editor stages memory/settings/save-rail changes locally and keeps its republish guide fitted', async () => {
+ const initial=publishedEditForm();const photoState={candidates:{cover:{uri:'file:///pending-cover.jpg'}}};
+ const h=screenHarness(initial,photoState);let tree=h.render();
+ assert.equal(all(tree,'ScrollView')[0].props.scrollEnabled,false);
+ assert.equal(all(tree,'SwipeAction')[0].props.accessibilityLabel,'Republish Journey');
+ assert.ok(all(tree,'Text').some(n=>n.props.children==='Review your edits. Swipe below to republish.'));
+ all(tree,'MemoryRow')[0].props.onEdit();tree=h.render();
+ all(tree,'MemoryEditorSheet')[0].props.onChange({description:'Staged memory'});tree=h.render();
+ all(tree,'MemoryEditorSheet')[0].props.onSave();await tick();tree=h.render();
+ assert.equal(all(tree,'MemoryEditorSheet').length,0);
+ assert.equal(all(tree,'MemoryRow')[0].props.stop.description,'Staged memory');
+ all(tree,'Pressable').find(n=>n.props.accessibilityLabel==='Journey settings').props.onPress();tree=h.render();
+ all(tree,'QuickJourneySetup')[0].props.onTitle('Staged title');tree=h.render();
+ all(tree,'QuickJourneySetup')[0].props.onStart();await tick();tree=h.render();
+ assert.equal(all(tree,'Modal').length,0);
+ all(tree,'Pressable').find(n=>n.props.accessibilityLabel==='Keep edits on this device').props.onPress();await tick();tree=h.render();
+ assert.equal(h.writes.length,0);assert.equal(h.uploads.length,0);
+ assert.equal(photoState.candidates.cover.uri,'file:///pending-cover.jpg');
+ assert.equal(all(tree,'MemoryDeck')[0].props.title,'Staged title');
+ assert.equal(all(tree,'ScrollView')[0].props.scrollEnabled,false,'Staged edit confirmation must not enable portrait scrolling');
+ assert.equal(h.prevented().enabled,true,'Leaving retains the existing unsaved-change guard');
+});
+
+test('published republish requests explicit confirmation once, cancel writes nothing, confirming writes the same published journey once', async()=>{
+ const h=screenHarness(publishedEditForm());let tree=h.render();
+ let swipe=all(tree,'SwipeAction')[0];swipe.props.onComplete();swipe.props.onComplete();
+ assert.equal(h.alerts.length,1);assert.equal(h.alerts[0][0],'Republish journey?');assert.equal(h.writes.length,0);
+ h.alerts[0][2].find(button=>button.text==='Keep editing').onPress();await tick();assert.equal(h.writes.length,0);
+ tree=h.render();swipe=all(tree,'SwipeAction')[0];swipe.props.onComplete();
+ const confirm=h.alerts.at(-1)[2].find(button=>button.text==='Republish').onPress;
+ confirm();confirm();await tick();
+ assert.equal(h.writes.length,1);assert.equal(h.writes[0].status,'published');assert.equal(h.writes[0].id,privateForm().id);
+ assert.equal(h.writes[0].updated_at,privateForm().updatedAt);
+ assert.equal('editingPublished' in h.writes[0],false);
+ assert.deepEqual(h.routes.at(-1),{pathname:'/journey/[id]',params:{id:privateForm().id}});
+});
+
+test('published edit adds a new photographed memory locally without any metadata checkpoint or upload',async()=>{
+ const initial={...publishedEditForm(),stops:[{...publishedEditForm().stops[0],id:uid}]};
+ const photoState={candidates:{[sid]:{uri:'file:///new-staged-memory.jpg'}}};const h=screenHarness(initial,photoState);let tree=h.render();
+ all(tree,'Pressable').find(n=>n.props.accessibilityLabel==='Add memory').props.onPress();tree=h.render();
+ assert.equal(all(tree,'MemoryEditorSheet')[0].props.isNew,true);
+ all(tree,'MemoryEditorSheet')[0].props.onChange({name:'New staged stop',latitude:place.latitude+0.1,longitude:place.longitude});tree=h.render();
+ all(tree,'MemoryEditorSheet')[0].props.onSave();await tick();tree=h.render();
+ assert.equal(all(tree,'MemoryDeck')[0].props.stops.length,2);
+ assert.equal(all(tree,'MemoryDeck')[0].props.stops[1].id,sid);
+ assert.equal(all(tree,'MemoryDeck')[0].props.stops[1].name,'New staged stop');
+ assert.equal(h.writes.length,0);assert.equal(h.uploads.length,0);
+ assert.equal(photoState.candidates[sid].uri,'file:///new-staged-memory.jpg');
+});
+
+test('a local settings patch cannot clear the published edit mode',()=>{
+ const h=screenHarness(publishedEditForm());let tree=h.render();
+ all(tree,'Pressable').find(n=>n.props.accessibilityLabel==='Journey settings').props.onPress();tree=h.render();
+ all(tree,'QuickJourneySetup')[0].props.onChange({description:'Local change',editingPublished:false});tree=h.render();
+ assert.equal(all(tree,'QuickJourneySetup')[0].props.form.editingPublished,true);
+ assert.equal(h.writes.length,0);
+});
+
+test('republish confirmations become inert after blur, edits or cancelled prompts', async()=>{
+ for(const mode of ['blur','edit','cancel']) {
+  const h=screenHarness(publishedEditForm());let tree=h.render();
+  all(tree,'SwipeAction')[0].props.onComplete();
+  const alert=h.alerts.at(-1),confirm=alert[2].find(button=>button.text==='Republish').onPress;
+  if(mode==='blur')h.blur();
+  else if(mode==='cancel')alert[2].find(button=>button.text==='Keep editing').onPress();
+  else {all(tree,'Pressable').find(n=>n.props.accessibilityLabel==='Journey settings').props.onPress();tree=h.render();all(tree,'QuickJourneySetup')[0].props.onTitle('Changed after prompt');tree=h.render();}
+  confirm();await tick();assert.equal(h.writes.length,0,'Stale confirmation must not write after '+mode);
+ }
+});
+
+test('cancelling or dismissing Republish resets the completed swipe control for another attempt',()=>{
+ for(const cancel of ['button','dismiss']) {
+  const h=screenHarness(publishedEditForm());let tree=h.render();const previous=all(tree,'SwipeAction')[0].props.resetKey;
+  all(tree,'SwipeAction')[0].props.onComplete();
+  const alert=h.alerts.at(-1);
+  if(cancel==='button')alert[2].find(button=>button.text==='Keep editing').onPress();else alert[3].onDismiss();
+  tree=h.render();assert.notEqual(all(tree,'SwipeAction')[0].props.resetKey,previous,'Cancellation must reset the swipe opening/busy state');
+  assert.equal(h.writes.length,0);
+ }
+});
+
+test('old republish alert callbacks cannot consume a newer alert or publish its edits',async()=>{
+ const h=screenHarness(publishedEditForm());let tree=h.render();all(tree,'SwipeAction')[0].props.onComplete();
+ const old=h.alerts.at(-1);old[2].find(button=>button.text==='Keep editing').onPress();
+ tree=h.render();all(tree,'SwipeAction')[0].props.onComplete();const current=h.alerts.at(-1);
+ old[3].onDismiss();old[2].find(button=>button.text==='Republish').onPress();
+ await tick();assert.equal(h.writes.length,0);
+ tree=h.render();all(tree,'SwipeAction')[0].props.onComplete();assert.equal(h.alerts.length,2,'Old dismissal cannot clear the active newer prompt');
+ current[2].find(button=>button.text==='Republish').onPress();current[2].find(button=>button.text==='Republish').onPress();await tick();
+ assert.equal(h.writes.length,1);assert.equal(h.writes[0].status,'published');
+});
+
 test('photo memory card shows real day, zero rating, notes and unsaved photo status while busy locks every action', () => {
   const {MemoryRow}=load('src/components/create/memory-row.tsx',{'../discovery/ui':ui,'../discovery/journey-photo':{JourneyPhoto:'JourneyPhoto'}});
   const tree=MemoryRow({stop:memoryRow(sid,'Sunset',{description:'Actual note',day:'2',rating:'0'}),index:1,total:3,cardWidth:220,photo:'file:///real-local.jpg',localPhoto:true,disabled:true,onEdit(){},onMove(){},onRemove(){}});
@@ -840,6 +944,52 @@ test('memory map receives resolved photos and selection without changing geometr
   delete photos.candidates[sid];tree=h.render();assert.equal(all(tree,'DraftMap')[0].props.geometry,geometry);assert.equal(JSON.parse(all(tree,'DraftMap')[0].props.photos)[sid],'https://signed.test/stop');
   all(tree,'MemoryRow')[0].props.onEdit();tree=h.render();assert.equal(all(tree,'DraftMap')[0].props.active,false);assert.equal(all(tree,'DraftMap')[0].props.selectedId,sid);
   assert.equal(h.writes.length,0,'Map selection and photo previews do not persist anything');
+});
+
+test('original published editor Buddy follows the selected card while preserving photos, thumbnails and controller across copy changes',async()=>{
+  const photos={candidates:{}};
+  const initial={...privateForm(),editingPublished:true,stops:[memoryRow(sid,'First',{latitude:8,longitude:76,photoPath:'journey-media/raw/stop.png'}),memoryRow(uid,'Second',{latitude:9,longitude:77}),memoryRow(id,'Unlocated',{latitude:null,longitude:null})]};
+  const parent=screenHarness(initial,photos),child=screenHarness();
+  let editor=parent.render(),node=all(editor,'DraftMap')[0];
+  let tree=child.renderDraftMap(node.props),map=all(tree,'JourneyMap')[0],playback=map.props.storyBuddy;
+  assert.ok(playback,'Original editor owns a selected-route Buddy controller');
+  assert.equal(map.props.storyBuddySize,36);assert.equal(map.props.storyBuddyMotion,'run');
+  assert.equal(map.props.preserveEditorMarkers,true);assert.equal(map.props.animateMemoryRoute,false);
+  assert.equal(map.props.memoryPhotos[sid],'https://signed.test/stop');
+  assert.deepEqual(playback.get().coordinate,[76,8]);playback.configure(true,false);
+  all(editor,'MemoryDeck')[0].props.onSelect(uid);editor=parent.render();node=all(editor,'DraftMap')[0];
+  tree=child.renderDraftMap(node.props);map=all(tree,'JourneyMap')[0];
+  assert.equal(map.props.storyBuddy,playback);assert.equal(playback.get().moving,true,'Card change starts travel toward the selected place');
+  photos.candidates[sid]={uri:'file:///new-preview.jpg'};
+  editor=parent.render();node=all(editor,'DraftMap')[0];tree=child.renderDraftMap(node.props);map=all(tree,'JourneyMap')[0];
+  assert.equal(map.props.storyBuddy,playback);assert.equal(map.props.memoryPhotos[sid],'file:///new-preview.jpg');
+  const renamed=JSON.parse(node.props.geometry).map(stop=>({...stop,name:'Renamed '+stop.name}));
+  node={...node,props:{...node.props,geometry:JSON.stringify(renamed),thumbnails:JSON.stringify({[sid]:'https://signed.test/thumb'})}};
+  map=all(child.renderDraftMap(node.props),'JourneyMap')[0];
+  assert.equal(map.props.storyBuddy,playback,'Copy/photo changes never recreate route playback');
+  assert.equal(map.props.stops[0].photoThumbnail,'https://signed.test/thumb');
+  playback.configure(true,true);assert.equal(playback.get().moving,false);assert.deepEqual(playback.get().coordinate,[77,9]);
+  node={...node,props:{...node.props,selectedId:id}};child.renderDraftMap(node.props);assert.equal(playback.get().coordinate,null,'An unlocated card never invents a route');
+  node={...node,props:{...node.props,selectedId:sid}};child.renderDraftMap(node.props);assert.deepEqual(playback.get().coordinate,[76,8]);
+  playback.configure(true,false);node={...node,props:{...node.props,selectedId:uid}};child.renderDraftMap(node.props);assert.equal(playback.get().moving,true);
+  node={...node,props:{...node.props,active:false}};map=all(child.renderDraftMap(node.props),'JourneyMap')[0];assert.equal(map.props.storyBuddy,undefined);assert.equal(playback.get().moving,false);
+  node={...node,props:{...node.props,active:true}};child.renderDraftMap(node.props);playback.configure(true,false);assert.equal(playback.get().moving,true,'Reactivation resumes the selected leg');
+  node={...node,props:{...node.props,active:true,geometry:JSON.stringify([memoryRow(uid,'Only',{latitude:9,longitude:77})])}};
+  const replacement=all(child.renderDraftMap(node.props),'JourneyMap')[0].props.storyBuddy;assert.notEqual(replacement,playback);assert.deepEqual(replacement.get().coordinate,[77,9]);
+  const before=playback.get().revision;child.dispose();await new Promise(resolve=>setTimeout(resolve,45));assert.equal(playback.get().revision,before,'Old route timers are disposed');
+  assert.equal(parent.writes.length,0);assert.equal(parent.uploads.length,0);parent.dispose();
+});
+
+test('original published Buddy pauses behind keyboard, settings, cover, memory editor and blur without saving',()=>{
+  const initial={...privateForm(),editingPublished:true,stops:[memoryRow(sid,'First',{latitude:8,longitude:76}),memoryRow(uid,'Second',{latitude:9,longitude:77})]};
+  const h=screenHarness(initial);let tree=h.render();assert.equal(all(tree,'DraftMap')[0].props.active,true);
+  tree=h.render({keyboardOpen:true});assert.equal(all(tree,'DraftMap')[0].props.active,false);
+  tree=h.render({keyboardOpen:false});all(tree,'Pressable').find(n=>n.props.accessibilityLabel==='Journey settings').props.onPress();tree=h.render();assert.equal(all(tree,'DraftMap')[0].props.active,false);
+  all(tree,'Pressable').find(n=>n.props.accessibilityLabel==='Close journey settings').props.onPress();tree=h.render();
+  all(tree,'Pressable').find(n=>n.props.accessibilityLabel==='Edit cover photo').props.onPress();tree=h.render();assert.equal(all(tree,'DraftMap')[0].props.active,false);
+  all(tree,'Pressable').find(n=>n.props.accessibilityLabel==='Close cover photo options').props.onPress();tree=h.render();
+  all(tree,'MemoryRow')[0].props.onEdit();tree=h.render();assert.equal(all(tree,'DraftMap')[0].props.active,false);
+  h.blur();tree=h.render();assert.equal(all(tree,'DraftMap')[0].props.active,false);assert.equal(h.writes.length,0);assert.equal(h.uploads.length,0);h.dispose();
 });
 
 test('remix editor opts into running Story map and pauses it behind keyboard, settings, memory sheet and blur without writing',()=>{

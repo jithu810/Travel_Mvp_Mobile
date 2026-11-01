@@ -29,6 +29,7 @@ export function createPhotoSaveController(ports: PhotoSavePorts) {
     async save(form: CreateForm, status: 'draft' | 'published', candidates: Record<string, LocalPhoto>, signal: AbortSignal,
       progress: (message: string) => void = () => {}, checkpoint: (form: CreateForm) => void = () => {}): Promise<PhotoSaveResult> {
       if (busy || blocked) return { kind: 'blocked' };
+      if (form.editingPublished && (status !== 'published' || !form.updatedAt)) return { kind: 'error', message: 'Published journey edits can only be republished.' };
       const validation = validateForm(form,status);
       if (validation) return { kind: 'error', message: validation };
       if ([form.coverPath,...form.stops.map(stop => stop.photoPath)].some(path => path && /^(file|content|data|blob):/i.test(path))) return { kind: 'error', message: 'Local photo addresses cannot be saved as Storage paths.' };
@@ -51,9 +52,9 @@ export function createPhotoSaveController(ports: PhotoSavePorts) {
         if (!entries.length) { const result = await persist(current,status); return { kind: 'saved', ...result }; }
         // An initial metadata save makes a private journey available to INSERT RLS.
         if (!current.updatedAt) { const result = await persist(current,'draft'); current = result.form; cancelled(); checkpoint(current); }
-        progress('Checking private draft...');
+        progress(current.editingPublished ? 'Checking published journey...' : 'Checking private draft...');
         let draft = await ports.checkDraft(current,signal); cancelled();
-        if (entries.some(([key]) => key !== 'cover' && !draft.stopIds.includes(key))) {
+        if (!current.editingPublished && entries.some(([key]) => key !== 'cover' && !draft.stopIds.includes(key))) {
           const result = await persist(current,'draft'); current = result.form; cancelled(); checkpoint(current);
           draft = await ports.checkDraft(current,signal); cancelled();
           if (entries.some(([key]) => key !== 'cover' && !draft.stopIds.includes(key))) throw new SaveFailure('The selected memory could not be verified in your saved draft. Reload before continuing.',true);

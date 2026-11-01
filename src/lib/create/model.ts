@@ -2,7 +2,7 @@ import { isJourneyId } from '../discovery/model';
 import type { TravelerType, JourneyStop } from '../../types/journey';
 export type Place = { name: string; label: string; latitude: number; longitude: number; mapboxId: string | null };
 export type StopInput = { id: string; name: string; description: string; latitude: number | null; longitude: number | null; mapboxId: string | null; day: string; rating: string; photoPath?: string | null; descriptionWasNull?: boolean };
-export type CreateForm = { id: string; title: string; description: string; destination: Place | null; traveler: TravelerType | ''; days: string; updatedAt: string | null; stops: StopInput[]; destinationSlug?: string; coverPath?: string | null; descriptionWasNull?: boolean; /** Read-only remix parent; never sent by save_journey. */ sourceId?: string };
+export type CreateForm = { id: string; title: string; description: string; destination: Place | null; traveler: TravelerType | ''; days: string; updatedAt: string | null; stops: StopInput[]; destinationSlug?: string; coverPath?: string | null; descriptionWasNull?: boolean; /** Local editor mode, never sent by save_journey. */ editingPublished?: boolean; /** Read-only remix parent; never sent by save_journey. */ sourceId?: string };
 export type SavePayload = ReturnType<typeof savePayload>;
 export type Saved = { id: string; status: 'draft' | 'published'; updated_at: string };
 export function newForm(id: string): CreateForm { return { id, title: '', description: '', destination: null, traveler: '', days: '1', updatedAt: null, stops: [] }; }
@@ -64,6 +64,7 @@ export function createSaveController(port: (payload: SavePayload, signal?: Abort
     getResult: () => result, isUncertain: () => uncertain,
     async save(form: CreateForm, status: 'draft' | 'published', signal?: AbortSignal) {
       if (busy || uncertain) return { kind: 'blocked' as const };
+      if (form.editingPublished && (status !== 'published' || !form.updatedAt)) return { kind: 'error' as const, message: 'Published journey edits can only be republished.' };
       const error = validateForm(form, status);
       if (error) return { kind: 'error' as const, message: error };
       busy = true;
