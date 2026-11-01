@@ -1,28 +1,30 @@
-# PR preparation (local only)
+﻿Explore tiles previously displayed large originals and refresh discarded reusable signed URLs. This change adds larger two-column tiles while preserving valid URLs and the existing native image cache.
 
-Title: Improve Explore grid and preserve native image-cache reuse
+## Changes
 
-Head: `codex/explore-image-optimization`
+- Keep the existing FlatList virtualization: six initial tiles, bounded batches and a three-viewport buffer. No new pagination or caching dependency.
+- Preserve valid signed URLs on refresh; retry failed images without resetting Explore, Home or Story list state. Skip unfocused Search foreground reloads.
+- Prefer available 512px thumbnails, retaining original/art fallback and existing search, Saved, ordering and navigation.
+- Explicitly enable thumbnail generation in all EAS build profiles for future builds.
+- Add bounded, manifest-checked create-only upload and optimistic activation/rollback helpers, with JPEG-compatible MPO preparation support. Helpers are manual maintenance tools and do not run on merge/build.
 
-Base: `codex/app-wide-dark-theme` (dependent PR; reassess before retargeting main)
+## Completed live rollout and measured results
 
-## Description
+The owner separately approved and completed the nine-cover live backfill: 18 new objects were SHA256-verified and nine cover references activated, canary first. Original objects, other journey fields and stop records/timestamps were preserved. Receipt-bound rollback was verified beforehand and prepared with actual activation versions; it was not needed. No schema/policy change or app deployment occurred.
 
-Explore now shows larger rounded two-column tiles, starts with six tiles and continues using the existing bounded FlatList virtualization. Refresh reloads collection membership while retaining valid signed image URLs. Explicit image retries preserve list/scroll state across Explore, Home and Story, and unfocused Search skips foreground reloads. Search, Saved, ordering, navigation and original fallback remain in place; no new dependencies, pagination or backend API changes.
-
-The existing local backfill preparer now handles JPEG-compatible MPO primary frames without changing original bytes. EAS profiles explicitly enable the existing thumbnail flag. Nine real legacy covers were locally prepared and verified; originals6,029,211bytes versus thumbnails208,442bytes (96.54% smaller). No private photos/manifests are included, and no live uploads or reference transitions were executed.
+On the CPH2813 Android16 phone, the same creator search and nine-photo traversal measured **6,029,211 → 208,442 image response-body bytes (96.54% less)**. Both runs made nine image GETs; warm refresh/reopen added zero. All after-run GETs were thumbnails, with no tagged full-size GETs. Counts use successful Supabase edge response Content-Length, excluding protocol overhead, maintenance traffic and daily billing projections. All nine photos displayed correctly.
 
 ## Validation
 
-- TypeScript and repository-wide lint pass. Lint excludes only generated `.local-tests/**` artifacts in addition to existing exclusions.
-- Full suite1,011/1,013pass; the two sandbox PostgreSQL startup failures passed in the isolated rerun6/6. Final affected preparer/cache regressions9/9pass. Independent review has no remaining actionable findings.
-- CPH2813Android16 phone: Explore loading/scroll/refresh/reopen, Journey Story navigation and Saved empty-state checks.
-- Controlled same-grid native URL-churn comparison using real Supabase originals:12GET/6,807,943edge-recorded response-body bytes →9GET/6,029,211bytes, saving778,732bytes (11.44%) in this test. Refresh3GET→0; initial/scroll unchanged; warm reopen0both. This isolates caching and is not a complete old-release comparison or packet-level/billing measurement.
+- TypeScript and repository-wide lint passed. ESLint excludes generated `.local-tests/**` artifacts; source/test rules remain unchanged.
+- Full app suite: 1,011/1,013 passed; the two sandbox PostgreSQL startup failures passed their isolated rerun (6/6). Subsequent affected preparation/cache tests passed.
+- Final backfill helper suite: 10/10 passed, including SQL preservation/rollback, concurrency drift, manifest binding, collisions, uncertain writes and SDK missing-object classification. Scoped lint and diff checks passed.
+- Independent implementation review and QA found no remaining actionable findings. Physical phone checks covered rendering, scrolling, refresh/reopen, search, Saved empty state and journey navigation.
 
-## Remaining limits
+## Review scope and limitations
 
-Current live covers remain legacy originals. Live backfill/reference/media-authorization activation requires separate approval and review of the exact private manifest. Thumbnail compression is measured locally, not deployed egress savings. Production configuration is explicit for future builds; no hosted environment, installed production bundle, actual production upload, build or deployment was changed/verified. No frame-rate or broad-device profiling.
+This is a dependent PR against `codex/app-wide-dark-theme`, isolating Explore from its two pending theme/layout commits. Reassess the base before retargeting main. Existing installed production bundles need the thumbnail capability flag enabled; no new build or deployment is included. No frame-rate or broad-device profiling is claimed.
 
-Evidence: `docs/qa/explore-completion-2026-11-01.md`, `explore-bandwidth-2026-11-01.md`, `explore-thumbnail-dry-run-2026-11-01.md`, `explore-final-qa-2026-11-01.md`; rollout procedure `docs/explore-thumbnail-backfill-procedure.md`.
+Private photos, signed URLs, credentials, per-object manifests and real rollback SQL/receipts are excluded from Git. No further live backfill is required by this PR. Merge and deployment still need separate owner approval.
 
-Publication status: local commit/description only. No push, GitHub PR, merge or deployment authorized or performed.
+Evidence: [live results](docs/qa/explore-live-results-2026-11-01.md), [execution and rollback](docs/qa/explore-live-backfill-2026-11-01.md), [helper QA](docs/qa/explore-live-qa-2026-11-01.md), [application QA](docs/qa/explore-final-qa-2026-11-01.md), [rollout procedure](docs/explore-thumbnail-backfill-procedure.md).
