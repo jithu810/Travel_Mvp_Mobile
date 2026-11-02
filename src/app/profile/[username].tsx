@@ -10,6 +10,7 @@ import { ProfileHeader, ProfileIdentity, ProfileJourneyCard as JourneyCard, Prof
 import { useSessionState } from '@/hooks/session-context';
 import { useLoad } from '@/hooks/use-load';
 import { loadPublicProfile } from '@/lib/profile/queries';
+import { ProfileConnections } from '@/components/profile/profile-connections';
 
 export default function CreatorProfileScreen() {
   const params = useLocalSearchParams<{ username: string | string[] }>();
@@ -18,7 +19,8 @@ export default function CreatorProfileScreen() {
   const loader = useCallback((signal: AbortSignal) => loadPublicProfile(handle, signal), [handle]);
   const state = useLoad(loader), value = state.data;
   const scroll = useBuddyScroll();
-  useBuddyScreen({ floating: true, suppressed: state.loading || !value });
+  // Temporary profile-only hiding while the memory collections are designed.
+  useBuddyScreen({ floating: true, suppressed: true });
   const refresh = state.refresh;
   useFocusEffect(useCallback(() => { refresh(); }, [refresh]));
   const owner = Boolean(value && auth.session?.user.id === value.profile.id);
@@ -26,14 +28,15 @@ export default function CreatorProfileScreen() {
     <ProfileHeader onSettings={() => router.push('/account')} />
     {state.loading ? <BrandedLoading message="Opening this travel journal…" /> : !value
       ? <View style={s.content}><Message title={state.error ? 'A small detour' : 'Creator unavailable'} body={state.error || 'This public creator profile could not be found.'} retry={state.retry} /></View>
-      : <FlatList {...scroll} data={value.journeys} keyExtractor={journey => journey.id} contentContainerStyle={s.content} showsVerticalScrollIndicator={false}
+      : <FlatList {...scroll} key="journey-grid-3" numColumns={3} columnWrapperStyle={s.gridRow} data={value.journeys} keyExtractor={journey => journey.id} contentContainerStyle={s.content} showsVerticalScrollIndicator={false}
         renderItem={({ item }) => <JourneyCard journey={item} />}
         refreshControl={<RefreshControl refreshing={state.refreshing} onRefresh={state.refresh} tintColor={colors.ink} />}
         ListHeaderComponent={<View>
           {state.error && <Message title="Couldn’t refresh this profile" body={state.error} retry={state.refresh} />}
           <ProfileIdentity name={value.profile.displayName || value.profile.username} username={value.profile.username} bio={value.profile.bio} avatar={value.profile.avatar} count={value.journeys.length} owner={owner} />
-          <View style={s.section}><Text accessibilityRole="header" style={s.heading}>Published journeys</Text>
-            <ProfileTabs selected="published" drafts={owner} onSelect={tab => { if (tab === 'drafts' && owner) router.push('/account'); }} />
+          <ProfileConnections key={value.profile.id} targetId={value.profile.id} name={value.profile.displayName || value.profile.username} />
+          <View style={s.section}><Text accessibilityRole="header" style={s.heading}>Journeys</Text>
+            <ProfileTabs selected="published" drafts={owner} onSelect={tab => { if (tab === 'drafts' && owner) router.push({ pathname: '/account', params: { collection: 'drafts' } }); }} />
           </View>
         </View>}
         ListEmptyComponent={<Message title="No public journeys yet" body="This creator hasn’t shared a public journey here yet." />} />}

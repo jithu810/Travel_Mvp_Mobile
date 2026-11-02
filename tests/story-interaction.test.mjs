@@ -1687,7 +1687,7 @@ test('popup JourneyOptions preserves Use, sign-in Remix, private copy reuse and 
       assert.equal(remix.props.disabled, true);
       assert.ok(all(tree, 'Text').some(n => n.props.accessibilityRole === 'alert'));
       find(tree, 'Action').props.onPress();
-      assert.equal(routes.at(-1), '/account');
+      assert.deepEqual(routes.at(-1), { pathname: '/account', params: { collection: 'drafts' } });
     } else {
       remix.props.onPress(); await new Promise(resolve => setImmediate(resolve));
       if (mode === 'anonymous') { assert.deepEqual(intents, [[journeyId, 'remix']]); assert.equal(routes.at(-1), '/auth'); }
@@ -1865,10 +1865,10 @@ test('rail JourneyOptions explains Customize vs Remix in one choice sheet and pr
     assert.equal(remix.props.accessibilityHint.startsWith('Requires sign-in'), mode === 'anonymous');
     if (mode === 'blocked') {
       assert.equal(remix.props.disabled, true); assert.equal(remix.props.accessibilityState.disabled, true);
-      all(sheet(tree,'Make this journey yours'),'Action')[0].props.onPress();assert.equal(routes.at(-1), '/account','In-sheet recovery opens Account drafts');
+      all(sheet(tree,'Make this journey yours'),'Action')[0].props.onPress();assert.deepEqual(routes.at(-1), { pathname: '/account', params: { collection: 'drafts' } },'In-sheet recovery opens Account drafts');
       button(tree,'Check your drafts').props.onPress();tree=h.render(component.JourneyOptions,props);assert.equal(sheet(tree,'Remix journey').props.visible,true);
       all(sheet(tree,'Remix journey'),'Action')[0].props.onPress();
-      assert.equal(routes.at(-1), '/account');
+      assert.deepEqual(routes.at(-1), { pathname: '/account', params: { collection: 'drafts' } });
     } else {
       remix.props.onPress(); await new Promise(resolve => setImmediate(resolve));
       if (mode === 'anonymous') { assert.deepEqual(intents, [[journeyId, 'remix']]); assert.equal(routes.at(-1), '/auth'); }
