@@ -8,7 +8,7 @@ import { JourneyArt } from '@/components/art/journey-art';
 import { artSeed } from '@/lib/art/journey-art';
 import { useBuddyProtectedBounds } from '@/hooks/use-buddy-geometry';
 
-export function ExploreTile({ journey }: { journey: PublicJourney }) {
+export function ExploreTile({ journey, onOpen }: { journey: PublicJourney; onOpen?: () => void }) {
   const router = useRouter();
   const protection = useBuddyProtectedBounds();
   const [failedUri, setFailedUri] = useState<string | null>(null);
@@ -19,7 +19,7 @@ export function ExploreTile({ journey }: { journey: PublicJourney }) {
   const title = journey.title.trim(), destination = journey.destination.trim();
   return <Pressable {...protection} accessibilityRole="button" accessibilityLabel={'Open journey: ' + journey.title + ', ' + journey.destination + ', by ' + journey.creatorName}
     accessibilityHint="Opens the journey story and save action"
-    onPress={() => router.push({ pathname: '/journey/[id]', params: { id: journey.id, source: 'search' } })}
+    onPress={onOpen || (() => router.push({ pathname: '/journey/[id]', params: { id: journey.id, source: 'search' } }))}
     style={({ pressed }) => [styles.tile, pressed && styles.pressed]}>
     {available ? <JourneyPhoto uri={cover} label={journey.title + ' cover photo'} fill thumbnail onError={() => { if (thumbnail) setFailedThumbnail(thumbnail); else setFailedUri(cover); }} />
       : <JourneyArt seed={artSeed(journey.id, journey.stops)} stops={journey.stops} destination={journey.destination} compact />}

@@ -12,11 +12,12 @@ async function viewer(expectedOwner: string, signal: AbortSignal) {
   return { client: supabase, owner: data.user.id };
 }
 export async function checkPhotoDraft(form: CreateForm, ownerId: string, signal: AbortSignal) {
+  const status = form.editingPublished ? 'published' : 'draft';
   const { client, owner } = await viewer(ownerId,signal);
   const { data, error } = await client.from('journeys').select('id,user_id,status,updated_at,is_demo')
-    .eq('id',form.id).eq('user_id',owner).eq('status','draft').abortSignal(signal).maybeSingle();
+    .eq('id',form.id).eq('user_id',owner).eq('status',status).abortSignal(signal).maybeSingle();
   if (error || signal.aborted) throw new SaveFailure('Could not verify your private draft. No new photo was uploaded. Try again.');
-  if (!data || data.id !== form.id || data.user_id !== owner || data.status !== 'draft' || data.is_demo !== false || data.updated_at !== form.updatedAt) throw new SaveFailure('This draft changed or is no longer privately editable. Reload before saving photos.',true);
+  if (!data || data.id !== form.id || data.user_id !== owner || data.status !== status || data.is_demo !== false || data.updated_at !== form.updatedAt) throw new SaveFailure('This journey changed or is no longer editable. Reload before saving photos.',true);
   const { data: stops, error: stopError } = await client.from('journey_stops').select('id').eq('journey_id',form.id).abortSignal(signal);
   if (stopError || signal.aborted || !Array.isArray(stops)) throw new SaveFailure('Could not verify every saved memory. No new photo was uploaded. Try again.');
   return { ownerId: owner, stopIds: stops.map(stop => stop.id) };

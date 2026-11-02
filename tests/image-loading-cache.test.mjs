@@ -31,7 +31,7 @@ const model=load('src/lib/discovery/model.ts',{'../../types/journey':{travelerTy
 function queries(options={}){
  const calls=[],signs=[];let active=0,peak=0;
  const client={rpc(name,args){calls.push({name,args});return {abortSignal:async()=>({data:args.journey_filter ? (options.withdrawn ? []:[row]):options.rows?.()??[row],error:null})};},storage:{from(){return {async createSignedUrls(paths){signs.push(paths);const token=signs.length;active++;peak=Math.max(peak,active);await options.wait?.();active--;return {data:paths.map(path=>options.fail?.(path)?{error:'missing'}:{signedUrl:'https://test.invalid/'+path+'?token='+token}),error:null};}};}}};
- const api=load('src/lib/discovery/queries.ts',{'../supabase/public':{publicSupabase:client},'./model':model,'./request-cache':{createRequestCache:(max,ttl)=>createRequestCache(max,ttl,options.clock)},'../media/image-variants':load('src/lib/media/image-variants.ts')},options.timers);
+ const api=load('src/lib/discovery/queries.ts',{'../supabase/public':{publicSupabase:client},'./model':model,'./journey-detail-cache':{journeyDetailCache:{clear(){}}},'./request-cache':{createRequestCache:(max,ttl)=>createRequestCache(max,ttl,options.clock)},'../media/image-variants':load('src/lib/media/image-variants.ts')},options.timers);
  return {api,calls,signs,peak:()=>peak};
 }
 test('public refresh updates collection while reusing identical signed URL and simultaneous requests',async()=>{

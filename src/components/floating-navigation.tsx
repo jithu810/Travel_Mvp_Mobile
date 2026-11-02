@@ -64,8 +64,8 @@ export function MainNavigationFrame({ children }: { children: ReactNode }) {
   const path = usePathname();
   const { view } = useGlobalSearchParams<{ view?: string }>();
   const [height, setHeight] = useState(56);
-  const visible = path === '/search' || path === '/create' || path === '/account' || path.startsWith('/journey/') || path.startsWith('/customized/') || path.startsWith('/profile/');
-  const active: Destination = path === '/search' ? view === 'stories' ? 'story' : 'search' : path === '/create' ? 'create' : path === '/account' ? 'account' : (path.startsWith('/journey/') || path.startsWith('/customized/')) ? 'story' : null;
+  const visible = path === '/search' || path === '/create' || path === '/account' || (path.startsWith('/journey/') || path === '/journey-feed') || path.startsWith('/customized/') || path.startsWith('/profile/');
+  const active: Destination = path === '/search' ? view === 'stories' ? 'story' : 'search' : path === '/create' ? 'create' : path === '/account' ? 'account' : ((path.startsWith('/journey/') || path === '/journey-feed') || path.startsWith('/customized/')) ? 'story' : null;
   return <View style={[styles.frame, styles.backdrop]}>
     <View style={[styles.frame, visible && { paddingBottom: height + 16 }]}>{children}</View>
     {visible && <FloatingNavigation active={active} onHeight={setHeight} />}

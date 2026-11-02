@@ -152,7 +152,7 @@ test('short walks stay in the same safe corridor, turn at edges, and distinguish
   assert.equal(model.buddyDragged(7, 0), false); assert.equal(model.buddyDragged(0, 8), true); assert.equal(model.buddyDragged(6, 6), true);
 });
 test('route policy excludes authentication, profile editing and unknown routes', () => {
-  for (const path of ['/discover', '/search', '/account', '/create', '/draft/id', '/journey/id', '/customized/id', '/travel/id', '/profile/explorer']) assert.equal(model.isBuddyRoute(path), true, path);
+  for (const path of ['/discover', '/search', '/account', '/create', '/draft/id', '/journey-feed', '/journey/id', '/customized/id', '/travel/id', '/profile/explorer']) assert.equal(model.isBuddyRoute(path), true, path);
   for (const path of ['/auth', '/profile/edit', '/customize/id', '/customized', '/customized/id/edit', '/unknown']) assert.equal(model.isBuddyRoute(path), false, path);
 
 });
@@ -1068,4 +1068,16 @@ test('B2 actual manual help uses explicit tips but keeps Saved and draft continu
  a.api.store.screen(a.owner,{path:'/search',state:{floating:true,savedJourney:{id:'saved',title:'Actual save'}},act(){}});a.renderHost();tree=a.renderActor();help=all(tree,'BuddyHelpSheet')[0];assert.match(help.props.contextualLine,/Actual save/);assert.doesNotMatch(help.props.contextualLine,/Nature/);assert.equal(help.props.primary.label,'Open saved journey');
  preferences.loaded=false;a.api.store.screen(a.owner,{path:'/search',state:{floating:true},act(){}});a.renderHost();tree=a.renderActor();help=all(tree,'BuddyHelpSheet')[0];assert.doesNotMatch(help.props.contextualLine,/Nature/);
  a.actorHooks.dispose();a.hostHooks.dispose();
+});
+
+
+test('feed route presents Buddy and yields to one map, sheets and background through actual host policy',async()=>{
+ const h=await hostHarness(true),map={};h.path('/journey-feed');
+ h.api.store.screen(h.owner,{path:'/journey-feed',state:{floating:true},act(){}});h.api.store.protect(h.region,'/journey-feed',[]);
+ h.renderHost();let tree=h.renderActor();assert.ok(all(tree,'BuddySprite').length,'Floating Buddy can present on Search-opened feed');
+ h.api.store.mapPresentation(map,'/journey-feed',true);assert.equal(h.renderHost().props.children,false,'Map Buddy owns presentation');
+ h.api.store.mapPresentation(map,'/journey-feed',false);h.api.store.screen(h.owner,{path:'/journey-feed',state:{floating:true,suppressed:true},act(){}});
+ assert.equal(h.renderHost().props.children,false,'Sheet suppression remains in force');
+ h.api.store.screen(h.owner,{path:'/journey-feed',state:{floating:true},act(){}});h.api.store.environment('/journey-feed',false);
+ assert.equal(h.renderHost().props.children,false,'Background never presents Buddy');h.actorHooks.dispose();h.hostHooks.dispose();
 });

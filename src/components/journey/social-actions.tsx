@@ -4,7 +4,7 @@ import { JourneyShareSheet } from './journey-share-sheet';
 import { createShareArtwork, type ShareArtwork } from '@/lib/social/share-artwork';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useActionIntent } from '@/hooks/action-intent';
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, findNodeHandle, Platform, Pressable, Share, StyleSheet, Text, View } from 'react-native';
 import type { PublicJourney } from '@/types/journey';
 import { StorySheet } from './story-sheet';
@@ -12,7 +12,7 @@ import { colors } from '@/components/discovery/ui';
 import { useJourneySocial } from '@/hooks/use-journey-social';
 import { sharePublicJourney } from '@/lib/social/sharing';
 
-export function SocialActions({ journey, compact = false, selectedMemoryId, layout, saveFirst = false }: { journey: PublicJourney; compact?: boolean; selectedMemoryId?: string | null; layout?: 'rail'; saveFirst?: boolean }) {
+export function SocialActions({ journey, compact = false, selectedMemoryId, layout, saveFirst = false, onOverlayChange }: { journey: PublicJourney; compact?: boolean; selectedMemoryId?: string | null; layout?: 'rail'; saveFirst?: boolean; onOverlayChange?: (open: boolean) => void }) {
   const pilotColor = usePilotColor();
   const styles = lightStyles_styles;
   const rail = layout === 'rail';
@@ -47,6 +47,8 @@ export function SocialActions({ journey, compact = false, selectedMemoryId, layo
     setSharing(false); shareLock.current = false;
   }
   const [feedbackOpen, setFeedbackOpen] = useState(false);
+  const overlayOpen = !!artwork || feedbackOpen || sharing;
+  useEffect(() => { onOverlayChange?.(overlayOpen); return () => onOverlayChange?.(false); }, [overlayOpen, onOverlayChange]);
   const likes = social.state?.likes;
   const feedback = <View style={styles.feedback}>
     {(social.busy === 'load' || social.auth.loading) && <Text style={styles.note}>Checking your account actions…</Text>}
@@ -84,7 +86,7 @@ export function SocialActions({ journey, compact = false, selectedMemoryId, layo
 }
 const lightStyles_styles = darkPilotStyles(StyleSheet.create({
   iconCount: { alignItems: 'center' }, count: { color: '#FFFFFF', fontSize: 9, lineHeight: 11, fontWeight: '700' },
-  railSection: { marginTop: 0, gap: 0 }, railRow: { flexDirection: 'column', flexWrap: 'nowrap', gap: 3, backgroundColor: '#101B2E', borderRadius: 14 },
+  railSection: { marginTop: 0, gap: 0 }, railRow: { flexDirection: 'column', flexWrap: 'nowrap', gap: 3, backgroundColor: 'transparent', borderRadius: 14 },
   railButton: { width: 48, minWidth: 48, minHeight: 48, flexBasis: 'auto', flexGrow: 0, paddingHorizontal: 2, paddingVertical: 3, borderRadius: 14, backgroundColor: 'transparent', borderWidth: 0 },
   railLabel: { fontSize: 10, lineHeight: 15, textAlign: 'center' }, railStatus: { position: 'absolute', right: 52, top: 0 },
   compactSection: { flex: 1, minWidth: 0, marginTop: 0 },

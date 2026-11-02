@@ -1,10 +1,18 @@
 export const googleRedirect = 'journeycreator://auth/callback';
+// Only app-owned schemes may receive a Google authorization code. Missing or
+// ambiguous configuration disables Google sign-in instead of choosing another app.
+export function resolveGoogleRedirect(scheme: unknown): string | null {
+  const configured = Array.isArray(scheme) && scheme.length === 1 ? scheme[0] : scheme;
+  return configured === 'journeycreator' || configured === 'journeyoutdoor'
+    ? `${configured}://auth/callback` : null;
+}
 const pendingKey = 'journey-google-oauth-pending-v1';
 const lifetime = 10 * 60 * 1000;
 const failure = 'We could not complete Google sign-in. Please try again.';
 export type GoogleDestination = { journeyId: string | null; returnTo?: 'create' };
 type Pending = GoogleDestination & { startedAt: number; flowId: string | null };
 type Ports = {
+  redirect?: string | null;
   storage: { getItem(key: string): Promise<string | null>; setItem(key: string, value: string): Promise<void>; removeItem(key: string): Promise<void> };
   authorize(): Promise<{ url: string | null; flowId: string | null }>;
   exchange(code: string, flowId: string | null): Promise<boolean>;
@@ -12,11 +20,12 @@ type Ports = {
   now?: () => number;
 };
 const validJourney = (value: unknown): value is string => typeof value === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
-export function parseGoogleCallback(raw: string): string {
+export function parseGoogleCallback(raw: string, expectedRedirect: string | null = googleRedirect): string {
   try {
-    if (raw.split(/[?#]/, 1)[0] !== googleRedirect) throw new Error();
+    if (!expectedRedirect || ![googleRedirect, 'journeyoutdoor://auth/callback'].includes(expectedRedirect)
+      || raw.split(/[?#]/, 1)[0] !== expectedRedirect) throw new Error();
     const url = new URL(raw);
-    if (url.protocol !== 'journeycreator:' || url.hostname !== 'auth' || url.pathname !== '/callback' || url.port || url.username || url.password || url.hash) throw new Error();
+    if (url.protocol !== new URL(expectedRedirect).protocol || url.hostname !== 'auth' || url.pathname !== '/callback' || url.port || url.username || url.password || url.hash) throw new Error();
     if (url.searchParams.has('error') || url.searchParams.has('error_code')) throw new Error();
     const codes = url.searchParams.getAll('code');
     if (codes.length !== 1 || !codes[0] || codes[0].length > 4096 || /\s/.test(codes[0])) throw new Error();
@@ -27,6 +36,7 @@ export function parseGoogleCallback(raw: string): string {
 // Both the native browser result and Router callback may receive the same link.
 // Only an explicitly initiated, unexpired PKCE transaction may exchange it.
 export function createGoogleSignIn(ports: Ports) {
+  const redirect = ports.redirect === undefined ? googleRedirect : ports.redirect;
   const now = ports.now ?? Date.now;
   let active = false;
   let exchanging = false;
@@ -47,7 +57,7 @@ export function createGoogleSignIn(ports: Ports) {
   }
   function complete(raw: string): Promise<GoogleDestination> {
     let code: string;
-    try { code = parseGoogleCallback(raw); } catch { return Promise.reject(new Error(failure)); }
+    try { code = parseGoogleCallback(raw, redirect); } catch { return Promise.reject(new Error(failure)); }
     if (active && !ready) return Promise.reject(new Error(failure));
     if (completion && (!completion.settled || now() - completion.at < 30000)) return completion.raw === raw ? completion.promise : Promise.reject(new Error(failure));
     exchanging = true;
@@ -66,6 +76,7 @@ export function createGoogleSignIn(ports: Ports) {
     if (active || exchanging) throw new Error('Google sign-in is already in progress.');
     active = true; ready = false; completion = null;
     try {
+      if (!redirect || ![googleRedirect, 'journeyoutdoor://auth/callback'].includes(redirect)) throw new Error(failure);
       // Remove stale markers before starting a new verifier.
       await clearPending();
       if (returnTo !== undefined && returnTo !== 'create') throw new Error(failure);

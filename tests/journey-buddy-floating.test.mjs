@@ -282,7 +282,7 @@ test('main-page enabled/off geometry has no Buddy spacer, padding, margin or hei
   const { MainNavigationFrame } = load('src/components/floating-navigation.tsx', { '@/theme/mobile-theme': { theme: {} }, react: { useState: initial => [initial, setHeight], useCallback: fn => fn }, 'react/jsx-runtime': { jsx, jsxs: jsx },
     'expo-router': { usePathname: () => path, useGlobalSearchParams: () => ({}), useRouter() {}, useFocusEffect() {} }, 'react-native': { StyleSheet: { create: v => v } }, 'react-native-safe-area-context': {},
     '@/hooks/session-context': {}, '@/hooks/use-load': {}, '@/lib/profile/edit-queries': {}, '@/lib/discovery/model': {}, '@/hooks/use-buddy-geometry': { useBuddyProtectedBounds: () => ({ enabled }) } });
-  for (path of ['/journey/id', '/create', '/search', '/account', '/profile/name']) {
+  for (path of ['/journey/id', '/journey-feed', '/create', '/search', '/account', '/profile/name']) {
     enabled = false; const off = MainNavigationFrame({ children: 'SCREEN' }); enabled = true; const on = MainNavigationFrame({ children: 'SCREEN' });
     assert.deepEqual(on, off, path); assert.equal(on.props.children[0].props.children, 'SCREEN'); assert.equal(on.props.children[0].props.style[1].paddingBottom, 72, 'Only pre-existing navigation clearance remains');
   }

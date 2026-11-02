@@ -43,7 +43,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Action, colors, Message, ScreenHeader, ui } from '@/components/discovery/ui';
 import { JourneyMap } from '@/components/journey/map/journey-map';
 import { useSessionState } from '@/hooks/session-context';
-import { coordinates, createSaveController, moveStop, newForm, previewStops, type CreateForm, type Place, type StopInput } from '@/lib/create/model';
+import { coordinates, createSaveController, moveStop, newForm, previewStops, validateForm, type CreateForm, type Place, type StopInput } from '@/lib/create/model';
 import { loadEditableDraft, saveNewJourney } from '@/lib/create/queries';
 import { createStoryBuddyPlayback } from '@/lib/journey/story-buddy-playback';
 
@@ -68,14 +68,21 @@ export function RemixDraftMap({ geometry, selectedId, onSelect, active, topInset
     </StorySheet>}
   </View>;
 }
-const DraftMap = memo(function DraftMap({ geometry, photos, thumbnails, selectedId, onSelect, active, height, topInset, remix = false }: { height: number; topInset: number; geometry: string; photos: string; thumbnails: string; selectedId: string | null; onSelect: (id: string) => void; active: boolean; remix?: boolean }) {
+export const DraftMap = memo(function DraftMap({ geometry, photos, thumbnails, selectedId, onSelect, active, height, topInset, remix = false }: { height: number; topInset: number; geometry: string; photos: string; thumbnails: string; selectedId: string | null; onSelect: (id: string) => void; active: boolean; remix?: boolean }) {
+  // Playback depends only on route identity/order/coordinates, never photo URLs or copy.
+  const routeGeometry = JSON.stringify((JSON.parse(geometry) as StopInput[]).map(stop => ({ id: stop.id, name: '', latitude: stop.latitude, longitude: stop.longitude })));
+  const routeStops = useMemo(() => previewStops(JSON.parse(routeGeometry) as StopInput[]), [routeGeometry]);
+  const playback = useMemo(() => remix ? null : createStoryBuddyPlayback(routeStops), [routeStops, remix]);
+  useEffect(() => () => playback?.dispose(), [playback]);
+  useEffect(() => { playback?.select(selectedId); }, [playback, selectedId]);
+  useEffect(() => { if (!active) playback?.pause(); }, [active, playback]);
   const stops = useMemo(() => { const thumbs = JSON.parse(thumbnails) as Record<string, string | null>; return previewStops(JSON.parse(geometry) as StopInput[]).map(stop => ({ ...stop, photoThumbnail: thumbs[stop.id] || null })); }, [geometry, thumbnails]);
   const memoryPhotos = useMemo(() => JSON.parse(photos) as Record<string, string | null>, [photos]);
   if (!stops.length) return <View style={[createStyles.emptyMap, { minHeight: Math.max(200, height), paddingTop: topInset + 12 }]}><DraftRouteIllustration /><Text style={createStyles.adventureTitle}>Your next adventure starts here</Text><Text style={createStyles.adventureNote}>Every journey begins with one place.</Text></View>;
   if (!stops.some(stop => coordinates(stop.latitude, stop.longitude))) return <View style={[createStyles.emptyMap, { minHeight: Math.max(145, height - 30), paddingTop: topInset + 12 }]}><Text style={createStyles.emptyMapTitle}>Your route takes shape here</Text><Text style={createStyles.emptyMapNote}>Add a location to a memory to see your route. Named moments can still be saved privately.</Text></View>;
   return <View style={{ height, marginHorizontal: -16, borderBottomLeftRadius: 28, borderBottomRightRadius: 28, overflow: 'hidden', backgroundColor: '#080F1E' }}>{remix
     ? <RemixDraftMap geometry={geometry} selectedId={selectedId} onSelect={onSelect} active={active} topInset={topInset} />
-    : <JourneyMap stops={stops} presentation="expanded" memoryPhotos={memoryPhotos} animateMemoryRoute={active} controlTopInset={topInset} selectedId={selectedId} onSelect={onSelect} />}</View>;
+    : <JourneyMap stops={stops} presentation="expanded" memoryPhotos={memoryPhotos} animateMemoryRoute={false} preserveEditorMarkers storyBuddy={active && playback ? playback : undefined} storyBuddySize={36} storyBuddyMotion="run" controlTopInset={topInset} selectedId={selectedId} onSelect={onSelect} />}</View>;
 });
 export function NewJourneyEditor({ ownerId, initial, onReload, onDestinationFocus, dismissSearchVersion = 0, keyboardOpen = false }: { ownerId: string; initial?: CreateForm; onReload?: () => void; onDestinationFocus?: (place: Place | null) => void; dismissSearchVersion?: number; keyboardOpen?: boolean }) {
   const router = useRouter(), navigation = useNavigation();
@@ -84,6 +91,7 @@ export function NewJourneyEditor({ ownerId, initial, onReload, onDestinationFocu
   const scroll = useBuddyScroll(), footerProtection = useBuddyProtectedBounds();
   const insets = useSafeAreaInsets(), window = useWindowDimensions();
   const [editorHeight, setEditorHeight] = useState(0), [footerHeight, setFooterHeight] = useState(80);
+  const [messageHeight, setMessageHeight] = useState(0);
   const [minimumDeckHeight, setMinimumDeckHeight] = useState(420);
   const [reduceMotion, setReduceMotion] = useState(true);
   useEffect(() => {
@@ -101,6 +109,9 @@ export function NewJourneyEditor({ ownerId, initial, onReload, onDestinationFocu
   const [editorFocused, setEditorFocused] = useState(true);
   const allowExit = useRef(false);
   const [form, setForm] = useState<CreateForm>(() => initial ?? newForm(randomUUID()));
+  const editingPublished = initial?.editingPublished === true;
+  const republishPrompt = useRef<object | null>(null);
+  const [republishReset, setRepublishReset] = useState(0);
   const titleEdited = useRef(Boolean(initial));
   useEffect(() => { if (!initial) onDestinationFocus?.(null); }, [initial, onDestinationFocus]);
   const [dirty, setDirty] = useState(false);
@@ -126,7 +137,7 @@ export function NewJourneyEditor({ ownerId, initial, onReload, onDestinationFocu
   useEffect(() => { memoryOpening.current = Boolean(memoryEdit); }, [memoryEdit]);
   const [publishedId, setPublishedId] = useState<string | null>(null);
   const lock = useRef(false), focus = useRef({ active: false, generation: 0 });
-  useFocusEffect(useCallback(() => { focus.current.active = true; setEditorFocused(true); focus.current.generation++; return () => { focus.current.active = false; setEditorFocused(false); focus.current.generation++; }; }, []));
+  useFocusEffect(useCallback(() => { focus.current.active = true; setEditorFocused(true); focus.current.generation++; return () => { republishPrompt.current = null; focus.current.active = false; setEditorFocused(false); focus.current.generation++; }; }, []));
   const localPhotos = useLocalPhotos();
   const photoBusy = localPhotos.busyKey !== null;
   const hasLocalPhotos = Object.keys(localPhotos.candidates).length > 0;
@@ -134,7 +145,13 @@ export function NewJourneyEditor({ ownerId, initial, onReload, onDestinationFocu
   const memoryHasPhoto = !!(memoryEdit && localPhotos.candidates[memoryEdit.value.id]);
   const selectedId = form.stops.some(stop => stop.id === selectedMemoryId) ? selectedMemoryId : form.stops[0]?.id || null;
   const geometry = JSON.stringify(form.stops.map(stop => ({ id: stop.id, name: stop.name, latitude: stop.latitude, longitude: stop.longitude })));
-  function change(patch: Partial<CreateForm>) { if (!disabled && !lock.current && !localPhotos.isBusy()) { setForm(current => ({ ...current, ...patch })); setError(null); setMessage(null); setDirty(true); } }
+  function withEditorMode(value: CreateForm): CreateForm {
+    const pinned = { ...value };
+    if (editingPublished) pinned.editingPublished = true;
+    else delete pinned.editingPublished;
+    return pinned;
+  }
+  function change(patch: Partial<CreateForm>) { if (!disabled && !lock.current && !localPhotos.isBusy()) { setForm(current => withEditorMode({ ...current, ...patch })); setError(null); setMessage(null); setDirty(true); } }
   const pathsKey = JSON.stringify([form.coverPath, ...form.stops.map(stop => stop.photoPath)].filter((path): path is string => !!path));
   const photos = useEditorPhotos(pathsKey,ownerId);
   const memoryPhotos = JSON.stringify(Object.fromEntries(form.stops.map(stop => [stop.id, localPhotos.candidates[stop.id]?.uri || (stop.photoPath ? stop.photoPath.startsWith('journey-media/') ? photos.data?.[stop.photoPath] || null : safePhoto(stop.photoPath) : null)])));
@@ -147,7 +164,7 @@ export function NewJourneyEditor({ ownerId, initial, onReload, onDestinationFocu
   function restoreRecovery(recovery: Recovery) {
     if (lock.current || localPhotos.isBusy()) return false;
     titleEdited.current = !recovery.form.destination || recovery.form.title !== suggestedTitle(recovery.form.destination);
-    setForm(recovery.form); setMemoryEdit(recovery.memoryEdit); setError(null); setMessage(null); setDirty(true);
+    setForm(withEditorMode(recovery.form)); setMemoryEdit(recovery.memoryEdit); setError(null); setMessage(null); setDirty(true);
     return true;
   }
   const clearRecovery = useCreationRecovery({ userId: ownerId, form, memoryEdit, dirty, hasLocalPhotos, onRestore: restoreRecovery });
@@ -156,7 +173,7 @@ export function NewJourneyEditor({ ownerId, initial, onReload, onDestinationFocu
     if (localPhotos.isBusy()) { Alert.alert('Preparing photo', 'Wait for photo preparation to finish before leaving.'); return; }
     if (lock.current) { Alert.alert('Saving journey', 'Wait for the save result before leaving.'); return; }
     const current = latest.current, generation = focus.current.generation;
-    Alert.alert('Discard unsaved changes?', form.updatedAt ? 'Your last saved journey stays private. Unsaved changes and local photo previews will be lost.' : 'This journey has not been saved. Your setup changes will be lost.', [
+    Alert.alert('Discard unsaved changes?', editingPublished ? 'Your published journey stays unchanged. Edits on this device and local photo previews will be lost.' : form.updatedAt ? 'Your last saved journey stays private. Unsaved changes and local photo previews will be lost.' : 'This journey has not been saved. Your setup changes will be lost.', [
       { text: 'Keep editing', style: 'cancel' }, { text: 'Discard', style: 'destructive', onPress: () => {
         if (!lock.current && !localPhotos.isBusy() && latest.current === current && focus.current.active && focus.current.generation === generation) { clearRecovery(); navigation.dispatch(data.action); }
       } },
@@ -165,7 +182,7 @@ export function NewJourneyEditor({ ownerId, initial, onReload, onDestinationFocu
   function confirmReload() {
     if (lock.current || localPhotos.isBusy() || !onReload) return;
     const current = latest.current, generation = focus.current.generation;
-    Alert.alert('Reload saved draft?', 'This discards unsaved journey and memory changes and loads the current saved version.', [
+    Alert.alert(editingPublished ? 'Reload published journey?' : 'Reload saved draft?', 'This discards unsaved journey and memory changes and loads the current saved version.', [
       { text: 'Cancel', style: 'cancel' }, { text: 'Reload', onPress: () => {
         if (!lock.current && !localPhotos.isBusy() && latest.current === current && focus.current.active && focus.current.generation === generation) { clearRecovery(); onReload(); }
       } },
@@ -183,7 +200,7 @@ export function NewJourneyEditor({ ownerId, initial, onReload, onDestinationFocu
   }
   function removeMemory(stop: StopInput) {
     const current = latest.current, generation = focus.current.generation;
-    Alert.alert('Remove this memory?', stop.name + ' will be removed when you save the journey. Existing photo files will not be deleted.', [
+    Alert.alert('Remove this memory?', stop.name + (editingPublished ? ' will be removed when you republish the journey.' : ' will be removed when you save the journey.') + ' Existing photo files will not be deleted.', [
       { text: 'Cancel', style: 'cancel' }, { text: 'Remove', style: 'destructive', onPress: () => {
         if (!disabled && !lock.current && latest.current === current && focus.current.active && focus.current.generation === generation) { change({ stops: form.stops.filter(item => item.id !== stop.id) }); localPhotos.remove(stop.id); }
       } },
@@ -191,6 +208,17 @@ export function NewJourneyEditor({ ownerId, initial, onReload, onDestinationFocu
   }
   async function save(status: 'draft' | 'published', snapshot = form, savingMemory = false, savingSettings = false) {
     if (lock.current || uncertain || localPhotos.isBusy()) return;
+    snapshot = withEditorMode(snapshot);
+    if (editingPublished && status === 'draft') {
+      const issue = validateForm(snapshot, 'draft');
+      if (issue) { setError(issue); return; }
+      // Stage edits on this device. Only confirmed Republish may write the public journey.
+      setForm({ ...snapshot, editingPublished: true }); setDirty(true); setError(null);
+      setMessage('Edits kept on this device. Republish to update your journey.');
+      if (savingMemory) setMemoryEdit(null);
+      if (savingSettings) setSettingsOpen(false);
+      return;
+    }
     lock.current = true; setBusy(true); setError(null); setMessage(null); setAttemptedStatus(status);
     const generation = focus.current.generation;
     const pendingPhotos = { ...localPhotos.candidates };
@@ -214,7 +242,7 @@ export function NewJourneyEditor({ ownerId, initial, onReload, onDestinationFocu
       if (savingMemory && focus.current.active && focus.current.generation === generation) celebrate('jump', result);
       if (savingSettings) setSettingsOpen(false);
       if (result.saved.status === 'published') setPublishedId(result.saved.id);
-      setMessage(Object.keys(pendingPhotos).length ? (result.saved.status === 'published' ? 'Journey and photos published.' : 'Journey and photos saved privately.') : savingMemory ? 'Memory saved privately.' : result.saved.status === 'draft' ? 'Draft saved. Only you can open it.' : 'Your journey is published.');
+      setMessage(editingPublished ? 'Your journey has been republished.' : Object.keys(pendingPhotos).length ? (result.saved.status === 'published' ? 'Journey and photos published.' : 'Journey and photos saved privately.') : savingMemory ? 'Memory saved privately.' : result.saved.status === 'draft' ? 'Draft saved. Only you can open it.' : 'Your journey is published.');
       if (focus.current.active && focus.current.generation === generation) {
         if (result.saved.status === 'published') { allowExit.current = true; router.push({ pathname: '/journey/[id]', params: { id: result.saved.id } }); }
         else if (!snapshot.updatedAt) { allowExit.current = true; router.replace({ pathname: '/create', params: { draft: result.saved.id, ...(guidedMemory ? { guide: 'memory' } : {}) } }); }
@@ -223,7 +251,26 @@ export function NewJourneyEditor({ ownerId, initial, onReload, onDestinationFocu
   }
   const publishSave = useRef(save);
   useEffect(() => { publishSave.current = save; });
-  const publish = useCallback(() => { void publishSave.current('published'); }, []);
+  const publish = useCallback(() => {
+    if (!editingPublished) { void publishSave.current('published'); return; }
+    if (republishPrompt.current || lock.current || !focus.current.active || lifetime.current.signal.aborted) return;
+    const dialog = {};
+    republishPrompt.current = dialog;
+    const consume = () => {
+      if (republishPrompt.current !== dialog) return false;
+      republishPrompt.current = null;
+      setRepublishReset(value => value + 1);
+      return true;
+    };
+    const current = latest.current, generation = focus.current.generation;
+    Alert.alert('Republish journey?', 'Your changes will replace this journey’s published details and stops. The existing journey stays public until you confirm.', [
+      { text: 'Keep editing', style: 'cancel', onPress: consume },
+      { text: 'Republish', onPress: () => {
+        if (!consume()) return;
+        if (focus.current.active && focus.current.generation === generation && latest.current === current && !lock.current && !lifetime.current.signal.aborted) void publishSave.current('published');
+      } },
+    ], { cancelable: true, onDismiss: consume });
+  }, [editingPublished]);
   function saveMemory() {
     if (!memoryEdit || disabled || lock.current) return;
     try { void save('draft', memorySnapshot(form, memoryEdit), true); }
@@ -240,7 +287,7 @@ export function NewJourneyEditor({ ownerId, initial, onReload, onDestinationFocu
     </View>
   </KeyboardAvoidingView>;
   if (publishedId) return <View style={[ui.list, { gap: 18 }]}>
-    <Text style={ui.heading}>Journey published.</Text><Text style={ui.body}>Your route is public and ready to share.</Text>
+    <Text style={ui.heading}>{editingPublished ? 'Journey republished.' : 'Journey published.'}</Text><Text style={ui.body}>Your route is public and ready to share.</Text>
     <Action label="View published journey" onPress={() => router.push({ pathname: '/journey/[id]', params: { id: publishedId } })} />
     <Action label="Back to Discover" onPress={() => router.replace('/discover')} />
   </View>;
@@ -257,7 +304,7 @@ export function NewJourneyEditor({ ownerId, initial, onReload, onDestinationFocu
   const editorActions = <View style={createStyles.actionRail}>
     <Pressable accessibilityRole="button" accessibilityLabel="Edit cover photo" disabled={disabled} accessibilityState={{ disabled, expanded: coverOpen }} onPress={() => { if (!disabled && !lock.current && !localPhotos.isBusy()) setCoverOpen(true); }} style={[createStyles.railButton, disabled && { opacity: 0.5 }]}><EditorActionIcon name="cover" color={selectedHasPhoto ? '#FFFFFF' : form.stops.length ? '#122036' : undefined} /><Text style={[createStyles.railLabel, form.stops.length > 0 && (selectedHasPhoto ? createStyles.photoRailLabel : { color: '#122036' })]}>Cover</Text></Pressable>
     <Pressable accessibilityRole="button" accessibilityLabel="Add memory" disabled={disabled || form.stops.length >= 50} accessibilityState={{ disabled: disabled || form.stops.length >= 50 }} onPress={addMemory} style={[createStyles.railButton, (disabled || form.stops.length >= 50) && { opacity: 0.5 }]}><EditorActionIcon name="add" color={selectedHasPhoto ? '#FFFFFF' : form.stops.length ? '#122036' : undefined} /><Text style={[createStyles.railLabel, form.stops.length > 0 && (selectedHasPhoto ? createStyles.photoRailLabel : { color: '#122036' })]}>Add stop</Text></Pressable>
-    <Pressable accessibilityRole="button" accessibilityLabel="Save Draft" disabled={disabled} accessibilityState={{ disabled, busy }} onPress={() => { void save('draft'); }} style={[createStyles.railButton, disabled && { opacity: 0.5 }]}>{busy ? <ActivityIndicator color={colors.ink} /> : <EditorActionIcon name="save" color={selectedHasPhoto ? '#FFFFFF' : form.stops.length ? '#122036' : undefined} />}<Text style={[createStyles.railLabel, form.stops.length > 0 && (selectedHasPhoto ? createStyles.photoRailLabel : { color: '#122036' })]}>Save draft</Text></Pressable>
+    <Pressable accessibilityRole="button" accessibilityLabel={editingPublished ? 'Keep edits on this device' : 'Save Draft'} accessibilityHint={editingPublished ? 'Keep editing locally. Republish is required to update the public journey.' : undefined} disabled={disabled} accessibilityState={{ disabled, busy }} onPress={() => { void save('draft'); }} style={[createStyles.railButton, disabled && { opacity: 0.5 }]}>{busy ? <ActivityIndicator color={colors.ink} /> : <EditorActionIcon name="save" color={selectedHasPhoto ? '#FFFFFF' : form.stops.length ? '#122036' : undefined} />}<Text style={[createStyles.railLabel, form.stops.length > 0 && (selectedHasPhoto ? createStyles.photoRailLabel : { color: '#122036' })]}>{editingPublished ? 'Save edits' : 'Save draft'}</Text></Pressable>
     <Pressable accessibilityRole="button" accessibilityLabel="Journey settings" disabled={disabled} accessibilityState={{ expanded: settingsOpen, disabled }} onPress={() => { if (!lock.current && !localPhotos.isBusy()) setSettingsOpen(true); }} style={[createStyles.railButton, disabled && { opacity: 0.5 }]}><EditorActionIcon name="settings" color={selectedHasPhoto ? '#FFFFFF' : form.stops.length ? '#122036' : undefined} /><Text style={[createStyles.railLabel, form.stops.length > 0 && (selectedHasPhoto ? createStyles.photoRailLabel : { color: '#122036' })]}>Settings</Text></Pressable>
   </View>;
   const firstStop = <View style={createStyles.firstStopCard}>
@@ -267,28 +314,30 @@ export function NewJourneyEditor({ ownerId, initial, onReload, onDestinationFocu
     <View style={createStyles.firstStopSecondary}>
       <Pressable accessibilityRole="button" accessibilityLabel="Edit cover photo" disabled={disabled} accessibilityState={{ disabled, expanded: coverOpen }} onPress={() => { if (!disabled && !lock.current && !localPhotos.isBusy()) setCoverOpen(true); }} style={createStyles.secondaryAction}><EditorActionIcon name="cover" /><Text style={createStyles.secondaryLabel}>Cover photo</Text></Pressable>
       <Pressable accessibilityRole="button" accessibilityLabel="Journey settings" disabled={disabled} accessibilityState={{ disabled, expanded: settingsOpen }} onPress={() => { if (!disabled && !lock.current && !localPhotos.isBusy()) setSettingsOpen(true); }} style={createStyles.secondaryAction}><EditorActionIcon name="settings" /><Text style={createStyles.secondaryLabel}>Settings</Text></Pressable>
-      <Pressable accessibilityRole="button" accessibilityLabel="Save Draft" disabled={disabled} accessibilityState={{ disabled, busy }} onPress={() => { void save('draft'); }} style={createStyles.secondaryAction}>{busy ? <ActivityIndicator color={colors.ink} /> : <EditorActionIcon name="save" />}<Text style={createStyles.secondaryLabel}>Save draft</Text></Pressable>
+      <Pressable accessibilityRole="button" accessibilityLabel={editingPublished ? 'Keep edits on this device' : 'Save Draft'} accessibilityHint={editingPublished ? 'Keep editing locally. Republish is required to update the public journey.' : undefined} disabled={disabled} accessibilityState={{ disabled, busy }} onPress={() => { void save('draft'); }} style={createStyles.secondaryAction}>{busy ? <ActivityIndicator color={colors.ink} /> : <EditorActionIcon name="save" />}<Text style={createStyles.secondaryLabel}>{editingPublished ? 'Save edits' : 'Save draft'}</Text></Pressable>
     </View>
   </View>;
   const availableHeight = editorHeight || window.height - insets.bottom - 80;
-  const fitted = form.stops.length > 0 && !keyboardOpen && !error && !message && !uncertain && !busy && !photoBusy && !photos.error
-    && window.fontScale <= 1 && availableHeight >= minimumDeckHeight + footerHeight + 157;
+  // Save confirmations use measured room without switching the whole editor to scrolling.
+  const confirmationHeight = message ? messageHeight + 10 : 0;
+  const fitted = form.stops.length > 0 && !keyboardOpen && !error && !uncertain && !busy && !photoBusy && !photos.error
+    && window.fontScale <= 1 && availableHeight >= minimumDeckHeight + footerHeight + confirmationHeight + 157;
   const previewHeight = fitted
-    ? Math.max(145, availableHeight - minimumDeckHeight - footerHeight - 12)
+    ? Math.max(145, availableHeight - minimumDeckHeight - footerHeight - confirmationHeight - 12)
     : form.sourceId ? Math.max(180, Math.min(310, window.height * 0.33)) : Math.max(180, Math.min(270, window.height * 0.29));
   return <KeyboardAvoidingView onLayout={event => setEditorHeight(event.nativeEvent.layout.height)} style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
     {editorFocused && <><StatusBar style="light" /><View pointerEvents="none" style={[createStyles.statusShade, { height: insets.top + 20, zIndex: 100 }]} /></>}
     <ScrollView {...scroll} scrollEnabled={!fitted} bounces={!fitted} showsVerticalScrollIndicator={!fitted} style={{ flex: 1 }} contentContainerStyle={[ui.list, fitted && { flexGrow: 1, flexBasis: 0 }, { gap: 10, paddingTop: 0, paddingBottom: fitted ? 0 : 12, paddingHorizontal: 16 }]} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
-    <DraftMap geometry={geometry} photos={memoryPhotos} thumbnails={memoryThumbnails} remix={!!form.sourceId} selectedId={selectedId} onSelect={setSelectedMemoryId} active={editorFocused && !settingsOpen && !coverOpen && !memoryEdit && !busy && !photoBusy && (!form.sourceId || (!keyboardOpen && !uncertain))} height={previewHeight} topInset={insets.top} />
-      <MemoryDeck fitted={fitted} onMinimumHeight={setMinimumDeckHeight} emptyContent={firstStop} title={form.title} credit={form.sourceId ? <SourceAttribution key={form.sourceId} id={form.sourceId} variant="editor" /> : undefined} status={busy ? savePhase : photoBusy ? 'Preparing photo…' : uncertain ? 'Needs attention' : dirty ? 'Unsaved changes' : hasLocalPhotos ? 'Photos not saved' : 'Saved privately'} leading={<Pressable accessibilityRole="button" accessibilityLabel="Go back" onPress={() => router.canGoBack() ? router.back() : router.replace('/discover')} style={createStyles.heroBack}><Text accessible={false} style={createStyles.heroBackText}>‹</Text></Pressable>} stops={form.stops} selectedId={selectedId} onSelect={setSelectedMemoryId} active={editorFocused && !settingsOpen && !coverOpen && !memoryEdit && !busy && !photoBusy} actions={editorActions} renderMemory={(stop, index, cardWidth, swipe) => <MemoryRow deck fitted={fitted} textScale={window.fontScale} swipeHandlers={swipe?.handlers} canInteract={swipe?.canInteract} key={stop.id} fallback={form.sourceId ? <StopArt seed={artSeed(form.sourceId, form.stops)} stops={form.stops} index={index} name={stop.name} accessibilityLabel={'Stop art. ' + (stop.name || 'Unnamed stop')} /> : undefined} cardWidth={cardWidth} selected={selectedId === stop.id} stop={stop} index={index} total={form.stops.length} disabled={disabled}
+    <DraftMap geometry={geometry} photos={memoryPhotos} thumbnails={memoryThumbnails} remix={!!form.sourceId} selectedId={selectedId} onSelect={setSelectedMemoryId} active={editorFocused && !settingsOpen && !coverOpen && !memoryEdit && !busy && !photoBusy && !keyboardOpen && !uncertain} height={previewHeight} topInset={insets.top} />
+      <MemoryDeck fitted={fitted} onMinimumHeight={setMinimumDeckHeight} emptyContent={firstStop} title={form.title} credit={form.sourceId ? <SourceAttribution key={form.sourceId} id={form.sourceId} variant="editor" /> : undefined} status={busy ? savePhase : photoBusy ? 'Preparing photo…' : uncertain ? 'Needs attention' : dirty ? 'Unsaved changes' : hasLocalPhotos ? 'Photos not saved' : editingPublished ? 'Published - edits stay on this device' : 'Saved privately'} leading={<Pressable accessibilityRole="button" accessibilityLabel="Go back" onPress={() => router.canGoBack() ? router.back() : router.replace('/discover')} style={createStyles.heroBack}><Text accessible={false} style={createStyles.heroBackText}>‹</Text></Pressable>} stops={form.stops} selectedId={selectedId} onSelect={setSelectedMemoryId} active={editorFocused && !settingsOpen && !coverOpen && !memoryEdit && !busy && !photoBusy} actions={editorActions} renderMemory={(stop, index, cardWidth, swipe) => <MemoryRow deck fitted={fitted} textScale={window.fontScale} swipeHandlers={swipe?.handlers} canInteract={swipe?.canInteract} key={stop.id} fallback={form.sourceId ? <StopArt seed={artSeed(form.sourceId, form.stops)} stops={form.stops} index={index} name={stop.name} accessibilityLabel={'Stop art. ' + (stop.name || 'Unnamed stop')} /> : undefined} cardWidth={cardWidth} selected={selectedId === stop.id} stop={stop} index={index} total={form.stops.length} disabled={disabled}
         localPhoto={!!localPhotos.candidates[stop.id]} photoThumbnail={!localPhotos.candidates[stop.id] && stop.photoPath ? photos.data?.[thumbnailStoragePath(stop.photoPath) || ''] || null : null} photo={localPhotos.candidates[stop.id]?.uri || (stop.photoPath ? stop.photoPath.startsWith('journey-media/') ? photos.data?.[stop.photoPath] || null : safePhoto(stop.photoPath) : null)}
         onEdit={() => { if (!disabled && !lock.current && !localPhotos.isBusy()) { setSelectedMemoryId(stop.id); setError(null); setMemoryEdit({ value: { ...stop }, baseline: { ...stop }, isNew: false }); } }}
         onPhotoError={photos.refreshPreview} onMove={offset => change({ stops: moveStop(form.stops, index, offset) })} onRemove={() => removeMemory(stop)} />} />
 
       {photos.error && <Text style={ui.body}>Some photo previews are unavailable. Original photos remain preserved.</Text>}
       {error && !memoryEdit && <Text accessibilityRole="alert" style={ui.body}>{error}</Text>}
-      {message && <Text accessibilityLiveRegion="polite" style={ui.body}>{message}</Text>}
-      {uncertain && <>{onReload && <Action label="Reload saved draft" onPress={confirmReload} />}<Action label="Check Account drafts" onPress={() => router.push('/account')} />
+      {message && <Text accessibilityLiveRegion="polite" onLayout={event => setMessageHeight(event.nativeEvent.layout.height)} style={ui.body}>{message}</Text>}
+      {uncertain && <>{onReload && <Action label={editingPublished ? 'Reload published journey' : 'Reload saved draft'} onPress={confirmReload} />}<Action label="Check Account drafts" onPress={() => router.push('/account')} />
         {attemptedStatus === 'published' && <Action label="Check public journey" onPress={() => router.push({ pathname: '/journey/[id]', params: { id: form.id } })} />}
         <Text style={ui.body}>The form is preserved. Check the save result before trying again.</Text></>}
     </ScrollView>
@@ -296,7 +345,8 @@ export function NewJourneyEditor({ ownerId, initial, onReload, onDestinationFocu
       {photoHint && <Text testID="remix-photo-hint" style={createStyles.photoHint}>{remixPhotoHint}</Text>}
       {form.stops.length === 0 ? <Text style={createStyles.emptyGuidance}>Add a stop to start building your journey.</Text> : <>
       {(readiness || uncertain || busy) && <Text accessibilityLiveRegion="polite" style={createStyles.publishReason}>{readiness || (uncertain ? 'Check the save result before retrying.' : savePhase)}</Text>}
-      <SwipeAction active={editorFocused && !settingsOpen && !coverOpen && !memoryEdit && !disabled && !readiness} onComplete={publish} label="Swipe to publish journey" accessibilityLabel="Publish Journey" hint="Make this journey public" accessibilityHint="Swipe right or double tap to publish this journey and its photos publicly." openingLabel="Preparing to publish…" resetKey={JSON.stringify([ownerId, form, localPhotos.candidates, uncertain])} /></>}
+      <Text style={createStyles.photoHint}>{editingPublished ? 'Review your edits. Swipe below to republish.' : 'Swipe cards to review. Swipe below to publish.'}</Text>
+      <SwipeAction active={editorFocused && !settingsOpen && !coverOpen && !memoryEdit && !disabled && !readiness} onComplete={publish} label={editingPublished ? 'Swipe to republish journey' : 'Swipe to publish journey'} accessibilityLabel={editingPublished ? 'Republish Journey' : 'Publish Journey'} hint={editingPublished ? 'Update your published journey' : 'Make this journey public'} accessibilityHint={editingPublished ? 'Swipe right or double tap, then confirm Republish to update your published journey.' : 'Swipe right or double tap to publish this journey and its photos publicly.'} openingLabel={editingPublished ? "Preparing to republish" : "Preparing to publish…"} resetKey={JSON.stringify([ownerId, form, localPhotos.candidates, uncertain, republishReset])} /></>}
     </View>
     {coverOpen && <Modal visible transparent animationType={reduceMotion ? 'none' : 'slide'} onRequestClose={() => { if (!lock.current && !localPhotos.isBusy()) setCoverOpen(false); }}>
       <SafeAreaView style={createStyles.settingsOverlay}><KeyboardAvoidingView behavior="padding" style={createStyles.settingsAvoid}><View style={createStyles.settingsPanel} accessibilityViewIsModal>
@@ -315,8 +365,8 @@ export function NewJourneyEditor({ ownerId, initial, onReload, onDestinationFocu
             </View>
             <Text style={createStyles.settingsNote}>Update your journey details. Close keeps unsaved edits.</Text>
             <QuickJourneySetup editing form={form} disabled={disabled} saving={busy} onTitle={title => change({ title })} onDestination={destination => change(selectDestination(form, destination, true))} onChange={change} onStart={() => { void save('draft', form, false, true); }}
-              feedback={<>{error && <Text accessibilityRole="alert" style={createStyles.settingsNote}>{error}</Text>}{busy && <Text accessibilityLiveRegion="polite" style={createStyles.settingsNote}>{savePhase}</Text>}{uncertain && onReload && <Action label="Reload saved draft" onPress={confirmReload} />}</>} />
-            <Text style={createStyles.settingsNote}>Saves all current journey changes privately.</Text>
+              feedback={<>{error && <Text accessibilityRole="alert" style={createStyles.settingsNote}>{error}</Text>}{busy && <Text accessibilityLiveRegion="polite" style={createStyles.settingsNote}>{savePhase}</Text>}{uncertain && onReload && <Action label={editingPublished ? 'Reload published journey' : 'Reload saved draft'} onPress={confirmReload} />}</>} />
+            <Text style={createStyles.settingsNote}>{editingPublished ? 'Keeps changes on this device until you republish.' : 'Saves all current journey changes privately.'}</Text>
           </View>
         </KeyboardAvoidingView>
       </SafeAreaView>
@@ -356,14 +406,14 @@ export function DraftShortcuts({ ownerId, keyboardHidden = false }: { ownerId: s
       </ScrollView> : <Text style={ui.body}>Your saved drafts will appear here.</Text>}
   </View>;
 }
-function DraftEditorEntry({ id, ownerId, keyboardOpen }: { id: string; ownerId: string; keyboardOpen: boolean }) {
+function DraftEditorEntry({ id, ownerId, keyboardOpen, editingPublished = false }: { id: string; ownerId: string; keyboardOpen: boolean; editingPublished?: boolean }) {
   const [revision, setRevision] = useState(0);
-  const loader = useCallback((signal: AbortSignal) => { void revision; return loadEditableDraft(id, ownerId, signal); }, [id, ownerId, revision]);
+  const loader = useCallback((signal: AbortSignal) => { void revision; return loadEditableDraft(id, ownerId, signal, editingPublished); }, [id, ownerId, revision, editingPublished]);
   const draft = useLoad(loader);
   useBuddyScreen({ suppressed: draft.loading || !draft.data });
   if (!draft.loading && draft.data) return <NewJourneyEditor key={id + ':' + revision} ownerId={ownerId} initial={draft.data} keyboardOpen={keyboardOpen} onReload={() => setRevision(value => value + 1)} />;
   return <SafeAreaView edges={['top']} style={{ flex: 1 }}><ScreenHeader title="Your journey" back compact /><View style={ui.list}>
-    {draft.loading ? <BrandedLoading message="Opening your private journey…" /> : <Message title="Draft unavailable" body={draft.error || 'This draft is not available for editing.'} retry={draft.retry} />}
+    {draft.loading ? <BrandedLoading message={editingPublished ? 'Opening your published journey…' : 'Opening your private journey…'} /> : <Message title={editingPublished ? 'Journey unavailable' : 'Draft unavailable'} body={draft.error || 'This journey is not available for editing.'} retry={draft.retry} />}
   </View></SafeAreaView>;
 }
 export default function CreateScreen() {
@@ -377,15 +427,17 @@ export default function CreateScreen() {
     const show = Keyboard.addListener('keyboardDidShow', () => setKeyboardOpen(true)), hide = Keyboard.addListener('keyboardDidHide', () => setKeyboardOpen(false));
     return () => { show.remove(); hide.remove(); };
   }, []);
-  const params = useLocalSearchParams<{ draft?: string | string[]; guide?: string }>();
-  const draftId = typeof params.draft === 'string' ? params.draft : params.draft ? 'invalid' : null;
+  const params = useLocalSearchParams<{ draft?: string | string[]; editPublished?: string | string[]; guide?: string }>();
+  const editingPublished = params.editPublished !== undefined;
+  const requestedId = editingPublished ? params.editPublished : params.draft;
+  const draftId = typeof requestedId === 'string' && requestedId && !(editingPublished && params.draft) ? requestedId : editingPublished || requestedId ? 'invalid' : null;
   useFocusEffect(useCallback(() => {
     if (!auth.loading && !auth.session && !prompted.current) { prompted.current = true; router.push({ pathname: '/auth', params: { context: 'create' } }); }
   }, [auth.loading, auth.session, router]));
   return <SafeAreaView edges={['left', 'right', 'bottom']} style={ui.safe}><Stack.Screen options={{ statusBarStyle: 'light' }} /><View style={ui.page} onTouchStart={!draftId ? () => setDismissSearchVersion(n => n + 1) : undefined}>{draftId ? (!auth.session || auth.loading) && <SafeAreaView edges={['top']}><ScreenHeader title="Your journey" back compact /></SafeAreaView> : <CreateJourneyHeader destination={focus?.ownerId === userId ? focus?.place : null} destinationVersion={focus?.version} keyboardOpen={keyboardOpen} />}
     {params.guide === 'memory' && !auth.loading && auth.session && <FirstOutcomeHint key={draftId ?? 'new'} title={draftId ? 'Add your first memory' : 'Start with the journey behind your memory'}>{draftId ? 'Add a stop to your journey. Give the moment a name or note, then save your changes when ready. A photo and location are optional.' : 'Choose a destination and title, then create a private journey. You can add your first memory next. Photos are optional; nothing is saved until you choose to save.'}</FirstOutcomeHint>}
     {auth.loading ? <ActivityIndicator color={appTheme.accent} /> : !auth.session ? <View style={ui.list}><Message title="Make your next chapter" body="Sign in to create a journey. Nothing is created until you save or publish." retry={() => router.push({ pathname: '/auth', params: { context: 'create' } })} action="Sign in to create" /></View>
-      : draftId ? <DraftEditorEntry key={auth.session.user.id + ':' + draftId} id={draftId} ownerId={auth.session.user.id} keyboardOpen={keyboardOpen} />
+      : draftId ? <DraftEditorEntry key={auth.session.user.id + ':' + draftId + ':' + editingPublished} id={draftId} ownerId={auth.session.user.id} keyboardOpen={keyboardOpen} editingPublished={editingPublished} />
         : !idsAvailable ? <View style={ui.list}><Message title="An app update is needed" body="Update this development client before creating journeys." /></View> : <NewJourneyEditor key={auth.session.user.id} ownerId={auth.session.user.id} onDestinationFocus={focusDestination} dismissSearchVersion={dismissSearchVersion} keyboardOpen={keyboardOpen} />}
   </View></SafeAreaView>;
 }

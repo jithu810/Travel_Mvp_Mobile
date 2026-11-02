@@ -33,23 +33,28 @@ export async function saveNewJourney(payload: SavePayload, ownerId: string, sign
   } finally { clearTimeout(timer); signal.removeEventListener('abort', abort); }
 }
 
-export async function loadEditableDraft(id: string, ownerId: string, signal: AbortSignal) {
-  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) throw new Error('Invalid private draft.');
-  if (!supabase || signal.aborted) throw new Error('Draft loading is unavailable.');
+export async function loadEditableDraft(id: string, ownerId: string, signal: AbortSignal, editingPublished = false) {
+  const status = editingPublished ? 'published' : 'draft';
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) throw new Error(editingPublished ? 'Invalid published journey.' : 'Invalid private draft.');
+  if (!supabase || signal.aborted) throw new Error('Journey loading is unavailable.');
   const { data: viewer, error: authError } = await supabase.auth.getUser();
   if (signal.aborted || authError || viewer.user?.id !== ownerId) throw new Error(accountCheckMessage(authError, 'Sign in again to edit your private draft.'));
   const { data: journey, error } = await supabase.from('journeys')
     .select('id,user_id,title,description,destination_slug,destination_name,destination_latitude,destination_longitude,traveler_type,duration_days,cover_image_path,status,is_demo,updated_at,copied_from_journey_id')
-    .eq('id', id).eq('user_id', ownerId).eq('status', 'draft').abortSignal(signal).maybeSingle();
-  if (error || !journey) throw new Error('Private draft unavailable. It may have been published, deleted or belong to another account.');
+    .eq('id', id).eq('user_id', ownerId).eq('status', status).abortSignal(signal).maybeSingle();
+  if (error || !journey) throw new Error(editingPublished ? 'Published journey unavailable. It may have been deleted, changed or belong to another account.' : 'Private draft unavailable. It may have been published, deleted or belong to another account.');
   const { data: stops, error: stopError } = await supabase.from('journey_stops')
     .select('id,journey_id,sequence,name,description,latitude,longitude,mapbox_place_id,photo_path,rating,day_number')
     .eq('journey_id', id).order('sequence').abortSignal(signal);
   if (stopError || signal.aborted) throw new Error('Could not load every stop. Retry before editing.');
   const { data: version, error: versionError } = await supabase.from('journeys').select('updated_at')
-    .eq('id', id).eq('user_id', ownerId).eq('status', 'draft').abortSignal(signal).maybeSingle();
-  if (versionError || signal.aborted || version?.updated_at !== journey.updated_at) throw new Error('This draft changed while loading. Retry to get a consistent version.');
-  return hydrateDraft(journey, stops, id, ownerId);
+    .eq('id', id).eq('user_id', ownerId).eq('status', status).abortSignal(signal).maybeSingle();
+  if (versionError || signal.aborted || version?.updated_at !== journey.updated_at) throw new Error('This journey changed while loading. Retry to get a consistent version.');
+  if (editingPublished) {
+    const { data: current, error: currentError } = await supabase.auth.getUser();
+    if (signal.aborted || currentError || current.user?.id !== ownerId) throw new Error('Sign in again before editing this journey.');
+  }
+  return hydrateDraft(journey, stops, id, ownerId, editingPublished);
 }
 // Resolve display URLs separately; raw editor paths always remain in the form.
 export async function loadEditorPhotos(paths: string[], ownerId: string, signal: AbortSignal): Promise<Record<string, string>> {

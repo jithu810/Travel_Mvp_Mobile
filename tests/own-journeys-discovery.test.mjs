@@ -168,6 +168,7 @@ function load(path, modules, timers = globalThis) {
   modules={'@/hooks/use-buddy-geometry':buddyGeometryStub,'@/hooks/use-trip-recovery':{useTripRecovery:()=>({checking:false,notice:null}),useUnfinishedTrip:()=>null},...modules};
   modules = {'@/hooks/use-journey-buddy':{useBuddyScreen(){}},'@/components/buddy/buddy-space':{BuddySpace:'BuddySpace'},...modules};
   if(path!=='src/lib/buddy/model.ts' && !('@/lib/buddy/model' in modules))modules['@/lib/buddy/model']=load('src/lib/buddy/model.ts',{});
+  modules={'@/lib/discovery/journey-feed-session':{journeyFeedSessions:{create:()=>null}},...modules};
   const exports = {};
   new Function('require', 'exports', 'setTimeout', 'clearTimeout', ts.transpileModule(readFileSync(path, 'utf8'), { compilerOptions: { jsx: ts.JsxEmit.ReactJSX, module: ts.ModuleKind.CommonJS } }).outputText)(id => { if (id === '@/theme/dark-pilot') return lightPilotTheme; if (id === '@/theme/mobile-theme') return appMobileTheme;  if (id === '@/theme/dark-pilot') return lightPilotTheme; assert.ok(id in modules, id); return modules[id]; }, exports, timers.setTimeout, timers.clearTimeout);
   return exports;

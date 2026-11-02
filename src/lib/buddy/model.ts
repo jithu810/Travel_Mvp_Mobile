@@ -15,7 +15,7 @@ export type BuddyScreen = Readonly<{ floating?: boolean; geometryMoving?: boolea
 export type BuddyAction = 'addMemory';
 export type BuddyCelebrationName = 'jump' | 'run';
 export type BuddyCelebration = Readonly<{ id: number; path: string; animation: BuddyCelebrationName; expiresAt: number; claimed: boolean }>;
-export const isBuddyRoute = (path: string) => ['/', '/index', '/discover', '/search', '/create', '/account'].includes(path)
+export const isBuddyRoute = (path: string) => ['/', '/index', '/discover', '/search', '/journey-feed', '/create', '/account'].includes(path)
   || /^\/(journey|customized|travel|draft)\/[^/]+$/.test(path) || /^\/profile\/[^/]+$/.test(path) && path !== '/profile/edit';
 export function validRect(rect: BuddyRect): boolean {
   return [rect.x, rect.y, rect.width, rect.height].every(Number.isFinite) && rect.width >= BUDDY_SIZE && rect.height >= BUDDY_SIZE;
