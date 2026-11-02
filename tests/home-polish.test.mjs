@@ -10,7 +10,7 @@ new Function('exports', ts.transpileModule(readFileSync('src/theme/mobile-theme.
 
 
 function load(file, dependencies, state = null, hookOverrides = {}) {
-  dependencies={'@/hooks/use-buddy-geometry':buddyGeometryStub,'@/hooks/use-trip-recovery':{useTripRecovery:()=>({checking:false,notice:null}),useUnfinishedTrip:()=>null},...dependencies};
+  dependencies={'@/lib/discovery/journey-feed-session':{journeyFeedSessions:{create:()=>null}},'@/hooks/use-journey-social':{useJourneySocial:()=>({state:null})},'@/hooks/use-buddy-geometry':buddyGeometryStub,'@/hooks/use-trip-recovery':{useTripRecovery:()=>({checking:false,notice:null}),useUnfinishedTrip:()=>null},...dependencies};
   const exports = {};
   const jsx = (type, props, key) => ({ type, props, key });
   const react = { useRef:()=>({current:null}),useEffect:()=>{}, memo: fn => fn, useState: initial => typeof state === 'function' ? state(initial) : [state ?? initial, () => {}], useMemo: fn => fn(), useCallback: fn => fn, ...hookOverrides };
@@ -246,7 +246,7 @@ test('Home cards show a display-only like count, including 0, in compact and exp
       assert.ok(facts);
       assert.equal(facts.props.numberOfLines, 1, 'Facts truncate to one line');
       assert.equal(facts.props.style.flexShrink, 1, 'Facts shrink before the count');
-      assert.equal(count[0].props.style.flexShrink, 0, 'Count is never pushed off the card');
+      assert.equal(Object.assign({}, ...count[0].props.style.filter(Boolean)).flexShrink, 0, 'Count is never pushed off the card');
       const open = all.find(n => n.props?.accessibilityLabel === 'Open journey: Coastal weekend, Coast, ' + label);
       assert.equal(open.props.accessibilityHint, 'Opens Journey Story');
       open.props.onPress();
@@ -269,6 +269,28 @@ test('missing/failed photos retain fallback and a changed URI recovers', () => {
     assert.ok(card(uri, failed).all.some(n => n.type === 'JourneyArt'));
   }
   assert.equal(card('https://example.invalid/new.jpg', journey.cover).all.filter(n => n.type === 'Image').length, 1);
+});
+
+test('Home heart fills red only for the verified current viewer and never writes', () => {
+  for (const expanded of [false, true]) for (const state of [null, { liked: false, likes: 12 }, { liked: true, likes: 13 }]) {
+    let writes = 0;
+    const component = load('src/components/discovery/home-journey-card.tsx', {
+      '@/lib/discovery/model': { journeyFacts: () => '1 stops' }, './ui': { colors },
+      '@/hooks/use-journey-social': { useJourneySocial: (id, initialLikes) => {
+        assert.equal(id, journey.id); assert.equal(initialLikes, 12);
+        return { state, act() { writes++; } };
+      } },
+    });
+    const all = nodes(component.HomeJourneyCard({ journey: { ...journey, likes: 12 }, expanded, width: 300, selected: false, onOpen() {}, onLocate() {} }));
+    const label = state?.liked ? '13 likes, liked by you' : '12 likes';
+    const heart = all.find(n => n.props?.accessibilityLabel === label);
+    assert.ok(heart);
+    assert.equal([heart.props.children].flat().join(''), state?.liked ? '♥ 13' : '♡ 12');
+    const style = Object.assign({}, ...heart.props.style.filter(Boolean));
+    assert.equal(style.color === '#FF5364', state?.liked === true);
+    assert.equal(heart.props.onPress, undefined);
+    assert.equal(writes, 0);
+  }
 });
 
 test('Home image failure falls back, a new URI recovers and card measurement remains live', () => {
@@ -296,10 +318,10 @@ test('Home image failure falls back, a new URI recovers and card measurement rem
     assert.equal(icon.props.importantForAccessibility, 'no-hide-descendants');
     const glyph = nodes(icon).find(n => n.type === (label.startsWith('Locate') ? 'Ionicons' : 'MaterialCommunityIcons'));
     assert.equal(glyph.props.name, label.startsWith('Locate') ? 'locate-outline' : 'book-outline');
-    assert.equal(glyph.props.size, 28);
+    assert.equal(glyph.props.size, 24);
     assert.equal(glyph.props.color, label.startsWith('Locate') ? '#C1ADFF' : '#91BEFF');
     const box = Object.assign({}, ...[icon.props.style].flat().filter(Boolean));
-    assert.equal(box.width, 28); assert.equal(box.height, 28, 'Glyph space is reserved before the icon font loads');
+    assert.equal(box.width, 24); assert.equal(box.height, 24, 'Glyph space is reserved before the icon font loads');
     if (!label.startsWith('Locate')) assert.equal(action.props.accessibilityHint, 'Opens Journey Story');
   }
   const unselectedLocate = nodes(component.HomeJourneyCard({ ...props, selected: false })).find(n => n.props?.accessibilityLabel === 'Locate journey: Coastal weekend');

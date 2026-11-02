@@ -7,17 +7,21 @@ import { colors } from './ui';
 import { HomeControlIcon } from './home-control-icon';
 import { JourneyArt } from '@/components/art/journey-art';
 import { artSeed } from '@/lib/art/journey-art';
+import { useJourneySocial } from '@/hooks/use-journey-social';
 
 export const HomeJourneyCard = memo(function HomeJourneyCard({ journey, expanded, width, selected, onOpen, onLocate, onHeight }: {
   journey: PublicJourney; expanded: boolean; width: number; selected: boolean;
   onOpen: (id: string) => void; onLocate: (id: string) => void; onHeight?: (height: number) => void;
 }) {
   const s = lightStyles_s;
+  const social = useJourneySocial(journey.id, journey.likes);
+  const liked = social.state?.liked === true;
   const [failedUri, setFailedUri] = useState<string | null>(null);
   const [failedThumbnail, setFailedThumbnail] = useState<string | null>(null);
   const thumbnail = journey.coverThumbnail && journey.coverThumbnail !== failedThumbnail ? journey.coverThumbnail : null;
   const cover = thumbnail || journey.cover;
-  const likes = typeof journey.likes === 'number' && Number.isSafeInteger(journey.likes) && journey.likes >= 0 ? journey.likes : null;
+  const currentLikes = social.state?.likes ?? journey.likes;
+  const likes = typeof currentLikes === 'number' && Number.isSafeInteger(currentLikes) && currentLikes >= 0 ? currentLikes : null;
   const likesLabel = likes === null ? null : likes + (likes === 1 ? ' like' : ' likes');
   return <View style={[s.card, { width }, selected && s.selected]} onLayout={event => onHeight?.(event.nativeEvent.layout.height)}>
     <Pressable accessibilityRole="button" accessibilityLabel={'Open journey: ' + journey.title + ', ' + journey.destination + (likesLabel ? ', ' + likesLabel : '')}
@@ -33,15 +37,15 @@ export const HomeJourneyCard = memo(function HomeJourneyCard({ journey, expanded
         <Text numberOfLines={1} style={s.creator}>By {journey.creatorName}</Text>
         <View style={s.factsRow}>
           <Text numberOfLines={1} style={s.facts}>{journeyFacts(journey)}</Text>
-          {likesLabel !== null && <Text numberOfLines={1} style={s.likes} accessibilityLabel={likesLabel}>♡ {likes}</Text>}
+          {likesLabel !== null && <Text numberOfLines={1} style={[s.likes, liked && s.liked]} accessibilityLabel={likesLabel + (liked ? ', liked by you' : '')}>{liked ? '♥' : '♡'} {likes}</Text>}
         </View>
       </View>
     </Pressable>
     <View style={s.actions}>
       <Pressable accessibilityRole="button" accessibilityLabel={'Locate journey: ' + journey.title} accessibilityState={{ selected }}
-        onPress={() => onLocate(journey.id)} style={[s.locate, selected && s.selectedAction]}><HomeControlIcon name="locate" selected={selected} size={28} /><Text style={[s.actionLabel, selected && s.selectedLabel]}>Locate</Text></Pressable>
+        onPress={() => onLocate(journey.id)} style={s.locate}><View style={[s.actionPill, selected && s.selectedAction]}><HomeControlIcon name="locate" selected={selected} size={24} /><Text style={[s.actionLabel, selected && s.selectedLabel]}>Locate</Text></View></Pressable>
       <Pressable accessibilityRole="button" accessibilityLabel={'Explore journey: ' + journey.title} accessibilityHint="Opens Journey Story"
-        onPress={() => onOpen(journey.id)} style={s.locate}><HomeControlIcon name="explore" size={28} /><Text style={s.actionLabel}>Explore journey</Text></Pressable>
+        onPress={() => onOpen(journey.id)} style={s.locate}><View style={s.actionPill}><HomeControlIcon name="explore" size={24} /><Text style={s.actionLabel}>Explore journey</Text></View></Pressable>
     </View>
   </View>;
 });
@@ -61,9 +65,11 @@ const lightStyles_s = darkPilotStyles(StyleSheet.create({
   factsRow: { flexDirection: 'row', alignItems: 'center', gap: 8, minWidth: 0 },
   facts: { color: colors.muted, fontSize: 10, lineHeight: 14, flexShrink: 1 },
   likes: { color: colors.muted, fontSize: 10, lineHeight: 14, flexShrink: 0 },
+  liked: { color: '#FF5364' },
   actions: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 10, paddingBottom: 4, gap: 8 },
-  locate: { minWidth: 76, minHeight: 56, flexShrink: 1, paddingHorizontal: 10, paddingVertical: 6, gap: 4, justifyContent: 'center', alignItems: 'center', borderRadius: 16 },
-  actionLabel: { color: '#2C63AF', fontSize: 11, lineHeight: 14, fontWeight: '600', textAlign: 'center', flexShrink: 1 },
+  locate: { minWidth: 76, minHeight: 58, flexShrink: 1, paddingHorizontal: 10, paddingVertical: 6, gap: 4, justifyContent: 'center', alignItems: 'center', borderRadius: 16 },
+  actionPill: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 12, backgroundColor: '#EAF0F9', borderWidth: 1, borderColor: '#E1E8F4', maxWidth: '100%' },
+  actionLabel: { color: '#2C63AF', fontSize: 10, lineHeight: 14, fontWeight: '600', textAlign: 'center', flexShrink: 1 },
   selectedLabel: { color: '#6555CF' },
   selectedAction: { backgroundColor: '#E6E0FF' },
 }));

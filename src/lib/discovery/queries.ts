@@ -2,6 +2,7 @@ import { publicSupabase } from '../supabase/public';
 import type { PublicJourney } from '../../types/journey';
 import { discoveryLimit, isJourneyId, normalizeDiscoveryEntry, normalizePublicDetail, normalizePublicJourney, type DiscoveryEntry } from './model';
 import { createRequestCache } from './request-cache';
+import { journeyDetailCache } from './journey-detail-cache';
 import { storedThumbnailsEnabled, thumbnailStoragePath } from '../media/image-variants';
 
 // Viewer-independent: anonymous results only, filtered per viewer at render time.
@@ -53,7 +54,7 @@ function signedPhoto(path: string, signal: AbortSignal) {
 }
 // Refresh membership/ordering without changing valid image URLs. Stable URLs let
 // the native image pipeline reuse its memory/disk entries until signature expiry.
-export function invalidatePublicJourneys() { collections.clear(); }
+export function invalidatePublicJourneys() { collections.clear(); journeyDetailCache.clear(); }
 
 function client() {
   if (!publicSupabase) throw new Error('Public journey browsing is not configured yet.');
@@ -99,7 +100,7 @@ export async function loadPublicJourneys(signal: AbortSignal): Promise<PublicJou
   return (await loadDiscoveryEntries(signal)).map(entry => entry.journey);
 }
 
-export async function loadPublicJourney(id: string, signal: AbortSignal): Promise<PublicJourney | null> {
+export async function loadPublicJourneyMetadata(id: string, signal: AbortSignal): Promise<PublicJourney | null> {
   if (!isJourneyId(id)) return null;
   const api = client();
   const { data: cards, error: cardError } = await api.rpc('get_public_journeys', { journey_filter: id }).abortSignal(signal);
@@ -110,7 +111,12 @@ export async function loadPublicJourney(id: string, signal: AbortSignal): Promis
   const { data, error } = await api.rpc('get_journey_detail', { target_id: id }).abortSignal(signal);
   if (error) throw new Error('We couldn’t load this journey. Please try again.');
   const detail = normalizePublicDetail(data, card);
-  return detail ? (await resolvePhotos([{ ...detail, ...(entry?.creatorId ? { creatorId: entry.creatorId } : {}) }], signal))[0] : null;
+  return detail ? { ...detail, ...(entry?.creatorId ? { creatorId: entry.creatorId } : {}) } : null;
+}
+
+export async function loadPublicJourney(id: string, signal: AbortSignal): Promise<PublicJourney | null> {
+  const detail = await loadPublicJourneyMetadata(id, signal);
+  return detail ? (await resolvePhotos([detail], signal))[0] : null;
 }
 
 // Lightweight public card for attribution: one get_public_journeys row, normalized

@@ -9,11 +9,11 @@ import { artSeed } from '@/lib/art/journey-art';
 import { colors } from './ui';
 import { useBuddyProtectedBounds } from '@/hooks/use-buddy-geometry';
 
-export function JourneyCard({ journey }: { journey: PublicJourney }) {
+export function JourneyCard({ journey, onOpen }: { journey: PublicJourney; onOpen?: () => void }) {
   const router = useRouter();
   const protection = useBuddyProtectedBounds();
   return <Pressable {...protection} accessibilityRole="button" accessibilityLabel={'Open journey: ' + journey.title + ', ' + journey.destination}
-    onPress={() => router.push({ pathname: '/journey/[id]', params: { id: journey.id } })}
+    onPress={onOpen || (() => router.push({ pathname: '/journey/[id]', params: { id: journey.id } }))}
     style={({ pressed }) => [styles.card, pressed && { opacity: 0.85 }]}>
     <View style={styles.cover}>
       <ThumbnailPhoto uri={journey.cover} thumbnailUri={journey.coverThumbnail} label={journey.title + ' cover photo'}

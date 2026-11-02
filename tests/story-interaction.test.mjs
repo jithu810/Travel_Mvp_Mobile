@@ -45,6 +45,7 @@ function load(path, modules, hooks = harness(false).hooks, timers = globalThis) 
   }).outputText;
   const module = { exports: {} };
   const require = name => { if (name === '@/theme/dark-pilot') return lightPilotTheme; if (name === '@/theme/mobile-theme') return appMobileTheme;
+    if(name==='@/lib/discovery/journey-feed-session')return load('src/lib/discovery/journey-feed-session.ts',{'./model':{discoveryLimit:100,isJourneyId:()=>true}});
     if(name==='@/hooks/use-journey-buddy')return {useBuddyCelebration:()=>()=>{},useBuddyScreen(){},useBuddySuppression(){},...modules[name]};
     if(name==='@/hooks/use-map-buddy')return modules[name] || {useMapBuddy:()=>({enabled:false,visible:false,openHelp(){}})};
     if(name==='@/hooks/use-buddy-map-image')return modules[name] || {useBuddyMapImage:()=>({ready:true,failed:false,version:0,ref:{current:null},onLoad(){},onError(){},onLayout(){},retry(){}})};
@@ -2112,4 +2113,38 @@ test('Story loop camera waits for jump and uses one slow return without changing
  emit({loopPhase:'jump',loopTarget:[76,8]});find(tree,'MapView').props.onCameraChanged({properties:{center:[77,9],zoom:8,heading:0,pitch:0},gestures:{isGestureActive:true}});assert.equal(snapshot.loopPhase,null,'Native gestures also cancel pending loop if touch callback was missed');
  emit({loopPhase:null,loopTarget:null,loopSelectionId:'a',loopCameraDuration:0});h.props.selectedId='a';tree=h.render();assert.equal(commands.at(-1).animationDuration,0,'Immediate restart never falls back to ordinary450ms selection motion');
  h.dispose();const count=commands.length;emit({loopPhase:'return',loopCameraRevision:2,loopTarget:[76,8]});assert.equal(commands.length,count);assert.equal(listeners.size,0);
+});
+
+
+test('feed Story capture excludes map/slider, yields horizontal/multitouch and fallback while accessible paging remains',()=>{
+ const h=harness();let responder;const pages=[],drags=[];
+ const journey={id:journeyId,title:'Feed',stops:[{...stop('first'),sequence:0},{...stop('second'),sequence:1}],description:''};
+ const {JourneyStoryContent:Screen}=load('src/app/journey/[id].tsx',{
+  '@/hooks/session-context':{useSessionState:()=>({loading:false,session:null})},'expo-router':{useRouter:()=>({}),useFocusEffect(){}},
+  'react-native':{...native,PanResponder:{create:handlers=>{responder=handlers;return {panHandlers:{testID:'feed-gesture-surface'}};}}},
+  'react-native-safe-area-context':{SafeAreaView:'SafeAreaView'},'@/components/discovery/ui':ui,
+  '@/components/journey/stop-story-viewer':{StopStoryViewer:'StopStoryViewer'},'@/components/journey/journey-options':{JourneyOptions:'JourneyOptions'},
+  '@/components/journey/social-actions':{SocialActions:'SocialActions'},'@/components/journey/story-header':{StoryCreator:'StoryCreator'},
+  '@/components/journey/stop-timeline':{StopTimeline:'StopTimeline'},'@/components/journey/story-extras':{StorySnapshot:'StorySnapshot'},
+  '@/components/journey/story-sheet':{StorySheet:'StorySheet'},'@/components/journey/map/journey-map':{JourneyMap:'JourneyMap'},
+  '@/components/journey/map-itinerary':{MapItinerary:'MapItinerary'},'@/lib/journey/travel-preview':eligibility,
+  '@/hooks/use-load':{},'@/lib/discovery/queries':{},'@/lib/discovery/model':{travelerLabel:()=>''},
+  '@/lib/journey/map-data':mapData,'@/lib/journey/snapshot':{hasStory:()=>false},'@/lib/journey/story-layout':layout,
+ },h.hooks);
+ const feed={index:0,count:3,enabled:true,onAvailability(){},onStop(){},onPage:x=>pages.push(x),onDrag:x=>drags.push(x)};
+ const props={journey,refresh(){},refreshing:false,error:null,feed};let tree=h.render(Screen,props);
+ const surface=all(tree,'View').find(n=>n.props.testID==='feed-gesture-surface');assert.ok(find(surface,'StopTimeline'));assert.equal(find(surface,'JourneyMap'),null);assert.equal(find(surface,'SwipeJourneyStart'),null);
+ const start=()=>responder.onStartShouldSetPanResponderCapture({nativeEvent:{touches:[{}]}});
+ const gesture=(dx,dy,n=1)=>({dx,dy,numberActiveTouches:n});
+ start();assert.equal(responder.onMoveShouldSetPanResponderCapture({},gesture(2,-90)),true);responder.onPanResponderRelease({},gesture(2,-90));assert.deepEqual(pages,[1]);
+ start();assert.equal(responder.onMoveShouldSetPanResponderCapture({},gesture(80,10)),false);assert.equal(responder.onMoveShouldSetPanResponderCapture({},gesture(80,180)),false,'Horizontal ownership cannot be stolen later');
+ start();assert.equal(responder.onMoveShouldSetPanResponderCapture({},gesture(2,100,2)),false);responder.onPanResponderRelease({},gesture(2,100));assert.deepEqual(pages,[1]);
+ tree.props.onLayout({nativeEvent:{layout:{height:500}}});tree=h.render(Screen,props);start();assert.equal(find(tree,'ScrollView').props.scrollEnabled,true);assert.equal(responder.onMoveShouldSetPanResponderCapture({},gesture(0,-100)),false);
+ const back=all(tree,'Pressable').find(n=>n.props.accessibilityLabel==='Go back');back.props.onAccessibilityAction({nativeEvent:{actionName:'nextJourney'}});assert.deepEqual(pages,[1,1]);assert.match(back.props.accessibilityHint,/Journey 1 of 3/);
+ tree.props.onLayout({nativeEvent:{layout:{height:700}}});tree=h.render(Screen,props);find(tree,'JourneyOptions').props.onOverlayChange(true);tree=h.render(Screen,props);start();assert.equal(responder.onMoveShouldSetPanResponderCapture({},gesture(0,-100)),false);
+ find(tree,'JourneyOptions').props.onOverlayChange(false);const incoming={...props,feed:{...feed,enabled:false}};tree=h.render(Screen,incoming);
+ assert.equal(all(tree,'JourneyMap').length,1,'The sole incoming map mounts during entrance rather than after it');assert.equal(find(tree,'SwipeJourneyStart').props.active,false,'Start remains disabled during entry');
+ start();assert.equal(responder.onMoveShouldSetPanResponderCapture({},gesture(0,-100)),false,'Vertical paging remains disabled during entry');
+ find(tree,'JourneyMap').props.onExpand();tree=h.render(Screen,incoming);assert.equal(all(tree,'JourneyMap').length,1,'Expanded map still replaces preview instead of mounting a second map');assert.equal(find(tree,'StorySheet').props.visible,true);
+ h.dispose();
 });

@@ -2,7 +2,7 @@ import { usePilotColor, darkPilotStyles } from '@/theme/dark-pilot';
 import { JourneyActionIcon } from './journey-action-icon';
 import { primaryControl } from '@/theme/mobile-theme';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useCallback, useRef, useState, useSyncExternalStore } from 'react';
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Action, colors, ui as lightUi } from '../discovery/ui';
@@ -11,13 +11,15 @@ import { useActionIntent } from '@/hooks/action-intent';
 import { remixStore } from '@/lib/remix/model';
 import { StorySheet } from './story-sheet';
 import { remixJourney } from '@/lib/remix/queries';
-export function JourneyOptions({ id, creatorId, onUse, inlineFeedback = false, menu, presentation, onAbout }: { id: string; creatorId?: string; onUse: () => void; inlineFeedback?: boolean; presentation?: 'rail'; onAbout?: () => void; menu?: { visible: boolean; onClose: () => void; onAbout: () => void } }) {
+export function JourneyOptions({ id, creatorId, onUse, inlineFeedback = false, menu, presentation, onAbout, onOverlayChange }: { id: string; creatorId?: string; onUse: () => void; inlineFeedback?: boolean; presentation?: 'rail'; onAbout?: () => void; onOverlayChange?: (open: boolean) => void; menu?: { visible: boolean; onClose: () => void; onAbout: () => void } }) {
   const pilotColor = usePilotColor();
   const styles = lightStyles_styles;
   const ui = lightUi;
   const router = useRouter();
   const [feedbackOpen, setFeedbackOpen] = useState(false);
   const [choiceOpen, setChoiceOpen] = useState(false);
+  const overlayOpen = feedbackOpen || choiceOpen || !!menu?.visible;
+  useEffect(() => { onOverlayChange?.(overlayOpen); return () => onOverlayChange?.(false); }, [overlayOpen, onOverlayChange]);
   const focus = useRef({ active: false, generation: 0, userId: null as string | null });
   const auth = useSessionState();
   const intent = useActionIntent();

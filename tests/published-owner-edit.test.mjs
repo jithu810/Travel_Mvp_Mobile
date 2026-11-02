@@ -42,7 +42,7 @@ function nodes(tree, type) {
 function optionsHarness(user = owner, creatorId = owner) {
   const slots=[],routes=[],effects=[];let cursor=0,currentUser=user,loading=false;
   const memo=(fn,deps)=>{const i=cursor++;if(!slots[i]||deps.some((v,n)=>v!==slots[i].deps[n]))slots[i]={value:fn(),deps};return slots[i].value;};
-  const react={useState:initial=>{const i=cursor++;if(!(i in slots))slots[i]=initial;return [slots[i],value=>{slots[i]=typeof value==='function'?value(slots[i]):value;}];},
+  const react={useEffect:()=>{},useState:initial=>{const i=cursor++;if(!(i in slots))slots[i]=initial;return [slots[i],value=>{slots[i]=typeof value==='function'?value(slots[i]):value;}];},
     useRef:initial=>{const i=cursor++;return slots[i]??={current:initial};},useCallback:(fn,deps)=>memo(()=>fn,deps),
     useSyncExternalStore:(_,get)=>get()};
   const store={subscribe(){},get:()=>({busy:false,blocked:false,error:null}),run:async()=>{throw Error('Edit cannot create a remix');}};

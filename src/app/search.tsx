@@ -18,6 +18,7 @@ import { JourneyCard } from '@/components/discovery/journey-card';
 import { colors, LoadingCards, Message, ScreenHeader, ui } from '@/components/discovery/ui';
 import { useLoad } from '@/hooks/use-load';
 import { discoveryJourneys, hideViewerJourneys, searchJourneys } from '@/lib/discovery/model';
+import { journeyFeedSessions } from '@/lib/discovery/journey-feed-session';
 import { invalidatePublicJourneys, loadDiscoveryEntries } from '@/lib/discovery/queries';
 
 export default function SearchScreen() {
@@ -65,6 +66,10 @@ export default function SearchScreen() {
   const viewer = useDiscoveryViewer();
   const holding = !showSaved && viewer.pending;
   const results = useMemo(() => holding ? [] : searchJourneys(showSaved ? saved.data || [] : discoveryJourneys(state.data || [], viewer.id, query), query), [holding, showSaved, saved.data, state.data, viewer.id, query]);
+  const openJourney = (id: string) => {
+    const session = journeyFeedSessions.create(results.map(journey => journey.id), id, userId || 'anonymous');
+    if (session) router.push({ pathname: '/journey-feed', params: { session } });
+  };
   // Only a settled, visible Saved result supports a saved-journey claim.
   const savedJourney = showSaved && canLoadSaved && token && !saved.loading && !saved.refreshing && !saved.error ? results[0] : undefined;
   useBuddyScreen({ floating: true, suppressed: state.loading && !state.data, savedJourney: savedJourney ? { id: savedJourney.id, title: savedJourney.title } : undefined });
@@ -93,7 +98,7 @@ export default function SearchScreen() {
         </View>}
         {!explore && <Text style={styles.hint}>Search titles, destinations, stops and creators in the latest 100 public journeys.</Text>}
       </View>
-      <FlatList key={explore ? 'explore' : 'stories'} {...scroll} numColumns={explore ? 2 : 1} data={results} keyExtractor={item => item.id} renderItem={({ item }) => explore ? <ExploreTile key={item.id + ':' + photoRetry} journey={item} /> : <JourneyCard key={item.id + ':' + photoRetry} journey={item} />}
+      <FlatList key={explore ? 'explore' : 'stories'} {...scroll} numColumns={explore ? 2 : 1} data={results} keyExtractor={item => item.id} renderItem={({ item }) => explore ? <ExploreTile key={item.id + ':' + photoRetry} journey={item} onOpen={() => openJourney(item.id)} /> : <JourneyCard key={item.id + ':' + photoRetry} journey={item} onOpen={() => openJourney(item.id)} />}
         // FlatList counts rows with numColumns: start with six tiles, then four per batch.
         initialNumToRender={explore ? 3 : undefined} maxToRenderPerBatch={explore ? 2 : undefined} windowSize={explore ? 3 : undefined} updateCellsBatchingPeriod={explore ? 50 : undefined}
         columnWrapperStyle={explore ? styles.gridRow : undefined}

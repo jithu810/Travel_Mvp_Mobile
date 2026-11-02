@@ -5,6 +5,7 @@ import { test } from 'node:test';
 import { readFileSync } from 'node:fs';
 import ts from 'typescript';
 function load(path, modules) {
+  modules={'@/lib/discovery/journey-feed-session':{journeyFeedSessions:{create:()=>null}},...modules};
   modules={'@/components/first-outcome-hint':{FirstOutcomeHint:'FirstOutcomeHint'},...modules};
   modules={'@/components/first-outcome-hint':{FirstOutcomeHint:'FirstOutcomeHint'},...modules};
   modules={'@/hooks/use-buddy-geometry':buddyGeometryStub,...modules};
@@ -18,7 +19,7 @@ const runtime = {jsx, jsxs: jsx};
 const native = Object.fromEntries(['View','Text','Pressable','FlatList','TextInput','KeyboardAvoidingView','RefreshControl','Image'].map(x => [x,x]));
 native.StyleSheet = {create: x => x}; native.Platform = {OS:'android'};
 const all = tree => !tree || typeof tree !== 'object' ? [] : [tree, ...[tree.props?.children].flat(Infinity).flatMap(all)];
-function screen({ signedIn = false, savedJourneys } = {}) {
+function screen({ signedIn = false, savedJourneys, feedSessions } = {}) {
   let view, cursor = 0, focusEffect, blurEffect, foreground, refreshes = 0;
   const routes = [];
   const slots = [];
@@ -26,6 +27,7 @@ function screen({ signedIn = false, savedJourneys } = {}) {
   const rows = Array.from({length:19}, (_,i) => ({journey:{id:String(i),destination:i%2 ? 'Coast':'Hill'},creatorId:null}));
   let state = {data:rows, loading:false, refreshing:false, refresh(){refreshes++;},retry(){}};
   const component = load('src/app/search.tsx', {
+    ...(feedSessions ? {'@/lib/discovery/journey-feed-session':{journeyFeedSessions:feedSessions}} : {}),
     react: {useCallback:fn=>fn,useEffect:fn=>fn(),useRef:initial=>{const i=cursor++;return slots[i]??={current:initial};},useMemo:fn=>fn(),useState:initial=>{const i=cursor++;if(!(i in slots))slots[i]=initial;return [slots[i],x=>{slots[i]=typeof x==='function'?x(slots[i]):x;}];}},
     '@/components/discovery/compact-search-input':{CompactSearchInput:'TextInput'},'@/components/journey/journey-action-icon':{JourneyActionIcon:'Icon'},'@/hooks/session-context':{useSessionState:()=>({session:signedIn?{user:{id:'owner'},access_token:'token'}:null,loading:false})},'@/lib/social/saved-queries':{loadSavedJourneys:async()=>[]},
     'react/jsx-runtime':runtime,'react-native':{...native,AppState:{addEventListener:(_name,fn)=>{foreground=fn;return {remove(){}};}}},'react-native-safe-area-context':{SafeAreaView:'SafeAreaView'},
@@ -89,13 +91,13 @@ test('Explore tile navigates with source marker and falls back to journey art af
   journey.cover='https://example.test/b.jpg';assert.equal(media(render()).type,'JourneyPhoto');journey.cover=null;assert.equal(media(render()).type,'JourneyArt');
   journey.title='  ';tree=render();assert.deepEqual(caption(tree),['Kerala'],'A blank title leaves only the destination');
 });
-test('Search source reaches the single existing social action owner',()=>{
-  const source=readFileSync('src/app/journey/[id].tsx','utf8');assert.match(source,/saveFirst=\{params.source === 'search'\}/);assert.match(source,/<SocialActions[^>]*saveFirst=\{saveFirst\}/);assert.equal((source.match(/<SocialActions /g)||[]).length,1);
+test('Search and legacy source links retain the single heart-first social action owner',()=>{
+  const source=readFileSync('src/app/journey/[id].tsx','utf8');assert.doesNotMatch(source,/saveFirst=\{params.source === 'search'\}/);assert.match(source,/saveFirst = false/);assert.match(source,/<SocialActions[^>]*saveFirst=\{saveFirst\}/);assert.equal((source.match(/<SocialActions /g)||[]).length,1);
 });
 test('Bookmark moves first only when requested, preserving sign-in, selected, busy and retry handling',()=>{
   const calls=[], intents=[],routes=[];let social={auth:{session:null,loading:false},state:null,busy:null,act:x=>calls.push(x),load:()=>calls.push('load')};
   const {SocialActions}=load('src/components/journey/social-actions.tsx',{
-    'react/jsx-runtime':runtime,react:{useState:x=>[x,()=>{}],useRef:x=>({current:x}),useCallback:x=>x},
+    'react/jsx-runtime':runtime,react:{useEffect:()=>{},useState:x=>[x,()=>{}],useRef:x=>({current:x}),useCallback:x=>x},
     'react-native':{...native,ActivityIndicator:'ActivityIndicator',Share:{}},
     'expo-router':{useRouter:()=>({push:x=>routes.push(x)}),useFocusEffect(){}},
     '@/hooks/action-intent':{useActionIntent:()=>({begin:(id,action)=>{intents.push([id,action]);return true;}})},
@@ -104,7 +106,7 @@ test('Bookmark moves first only when requested, preserving sign-in, selected, bu
   });
   const render=saveFirst=>all(SocialActions({journey:{id:'a',likes:0},layout:'rail',saveFirst}));
   const buttons=tree=>tree.filter(n=>n.type==='Pressable');let tree=render(true);assert.equal(buttons(tree)[0].props.accessibilityLabel,'Save journey');assert.equal(tree.filter(n=>n.type==='Icon'&&n.props.name==='bookmark').length,1);buttons(tree)[0].props.onPress();assert.deepEqual(intents,[['a','save']]);assert.deepEqual(routes,['/auth']);assert.deepEqual(calls,[]);
-  assert.equal(buttons(render(false))[0].props.accessibilityLabel,'Like journey');
+  assert.equal(buttons(render(false))[0].props.accessibilityLabel,'Like journey');assert.deepEqual(buttons(render(undefined)).slice(0,3).map(n=>n.props.accessibilityLabel),['Like journey','Save journey','Share public journey']);
   social={...social,auth:{session:{},loading:false},state:{saved:true,liked:false,likes:0}};tree=render(true);assert.equal(buttons(tree)[0].props.accessibilityLabel,'Remove journey from Saved');assert.equal(buttons(tree)[0].props.accessibilityState.selected,true);buttons(tree)[0].props.onPress();assert.deepEqual(calls,['save']);
   social.busy='save';tree=render(true);assert.equal(buttons(tree)[0].props.disabled,true);assert.ok(tree.some(n=>n.type==='ActivityIndicator'));
   social.busy=null;social.error='Offline';tree=render(true);const sheet=tree.find(n=>n.type==='Sheet');all(sheet.props.children).find(n=>n.type==='Pressable').props.onPress();assert.deepEqual(calls,['save','load']);
@@ -145,6 +147,7 @@ test('Home and Explore prefer thumbnails, retry original once on failure then de
  for(const kind of ['home','explore']) {
   const h=stateHarness();const journey={id:'a',title:'Coast',destination:'Kerala',creatorName:'Owner',cover:'https://example.test/full.jpg',coverThumbnail:'https://example.test/thumb.jpg',stops:[]};
   const modules={'react/jsx-runtime':runtime,react:{...h.hooks,memo:fn=>fn},'react-native':native,'expo-router':{useRouter:()=>({push(){}})},'./journey-photo':{JourneyPhoto:'JourneyPhoto'},'@/lib/discovery/model':{journeyFacts:()=>''},'./ui':{colors:{}},'./home-control-icon':{HomeControlIcon:'Icon'},...artModules};
+  modules['@/hooks/use-journey-social']={useJourneySocial:()=>({state:null})};
   const exports=load(kind==='home'?'src/components/discovery/home-journey-card.tsx':'src/components/discovery/explore-tile.tsx',modules);
   const render=()=>h.render(()=>kind==='home'?exports.HomeJourneyCard({journey,expanded:false,width:300,onOpen(){},onLocate(){}}):exports.ExploreTile({journey}));
   const remote=tree=>tree.find(n=>n.type==='JourneyPhoto'||n.type==='Image'&&n.props.source?.uri);
@@ -203,4 +206,18 @@ test('B3 saved prompt uses only settled visible Saved results and clears on unce
   for(const patch of [{loading:true},{error:'Unavailable'},{session:null}]){const before=auth;auth={...auth,...patch};render();assert.equal(buddy.savedJourney,undefined);auth=before;}
   tree=render();tree.find(n=>n.type==='TextInput').props.onChangeText('Missing');render();assert.equal(buddy.savedJourney,undefined);
  } finally {h.dispose();}
+});
+
+
+test('Search hands off exactly filtered public/Saved order and retains query, mode and list identity on return',()=>{
+ const snapshots=[];const feedSessions={create:(ids,id,account)=>{snapshots.push({ids,id,account});return 'snapshot';}};
+ const s=screen({feedSessions});let tree=s.render();tree.find(n=>n.type==='TextInput').props.onChangeText('Coast');
+ tree=s.render();const list=tree.find(n=>n.type==='FlatList');const selected=list.props.data[3];list.props.renderItem({item:selected}).props.onOpen();
+ assert.deepEqual(snapshots[0],{ids:['1','3','5','7','9','11','13','15','17'],id:'7',account:'anonymous'});
+ assert.deepEqual(s.routes,[{pathname:'/journey-feed',params:{session:'snapshot'}}]);s.focus();s.blur();s.focus();
+ tree=s.render();assert.equal(tree.find(n=>n.type==='TextInput').props.value,'Coast');assert.equal(tree.find(n=>n.type==='FlatList').key,list.key);
+ const saved=screen({signedIn:true,feedSessions,savedJourneys:[{id:'z',destination:'Coast'},{id:'a',destination:'Hill'},{id:'b',destination:'Coast'}]});
+ tree=saved.render();tree.find(n=>n.props.accessibilityLabel==='Show saved journeys').props.onPress();tree=saved.render();tree.find(n=>n.type==='TextInput').props.onChangeText('Coast');
+ const rows=saved.render().find(n=>n.type==='FlatList');rows.props.renderItem({item:rows.props.data[1]}).props.onOpen();
+ assert.deepEqual(snapshots[1],{ids:['z','b'],id:'b',account:'owner'});assert.ok(saved.render().some(n=>n.props.accessibilityLabel==='Show all public journeys'));
 });

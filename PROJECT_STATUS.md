@@ -1,6 +1,18 @@
+## Search viewer corrections - 2026-11-01
+
+Local/unpublished: restored Buddy on the feed route and heart-first order in Search-opened stories. Loading/error feedback remains stationary during either swipe direction; one incoming map prepares during entrance with paging/Start locked. 168 affected tests, TypeScript/scoped lint and independent review pass (9 targeted checks). CPH2813 phone confirms Buddy, heart order and both transition directions; prolonged held loading is tested synthetically, not physically profiled. Existing layout/cache/backend contracts preserved. See docs/qa/journey-feed-2026-11-01.md.
+
+## Search vertical journey viewer - 2026-11-01
+
+Local/unpublished: Search opens the selected journey in its exact filtered/Saved result order. Vertical card-area swipes browse journeys; horizontal swipes browse stops. Bounded anonymous raw-detail cache (six entries/45 seconds), fresh public activation checks, next-visible-photo prefetch, one active map/Buddy and lifecycle/overlay fencing preserve existing layout and standalone/edit/customized behavior. TypeScript/scoped lint, 157 affected regressions, 14 final feed tests and 7 independent QA tests pass; independent review findings fixed and re-review clear. CPH2813/Android16 verifies main gestures, remembered stop, map pan, About, background/resume, Search query return and filtered boundary. Wider phones, screen readers and quantified native performance remain unverified. No backend/dependency/build/publication change. See docs/qa/journey-feed-2026-11-01.md and linked preflight/QA evidence.
+
 ## Published journey owner edit and republish - 2026-11-01
 
 Implemented; PR publication authorized: owner sees Edit journey in the existing Story card rail; other viewers keep Make it yours. Stop/settings/photo edits stage locally until explicit Republish confirmation updates the same journey with ownership/version checks. No draft checkpoint/unpublish, duplicate journey, backend migration or layout/style change. Prior Create scrolling fix and publish hint preserved. Buddy now follows editor card selection; 145 focused animation checks and independent review pass, with forward/reverse movement verified on the phone. 174 affected app tests + 8 isolated database tests pass; independent QA 20/20 includes two additional regressions; review findings resolved; TypeScript/scoped lint pass. CPH2813 phone confirms owner action, editor, confirmation, cancellation/reset and second swipe. Live republish/upload and broader-device testing remain unverified. See docs/qa/published-owner-edit-2026-11-01.md and linked preflight/QA evidence.
+
+## Outdoor Google callback - 2026-11-01
+
+Local/unpublished callback fix follows each app's trusted Expo scheme. Development preserved; Outdoor selects journeyoutdoor. Affected auth tests 61/61, TypeScript/scoped lint, independent QA and review pass. Outdoor end-to-end verification remains pending: separately approve/add journeyoutdoor://auth/callback and test a future updated Outdoor build. Owner requested no build now. No JBuild sync, live change, build/install or phone login. See docs/qa/outdoor-google-callback-2026-11-01.md.
 
 ## Live Explore thumbnails activated - 2026-11-01
 
