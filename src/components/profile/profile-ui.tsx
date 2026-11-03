@@ -77,28 +77,29 @@ export function ProfileIdentity({ name, username, bio, avatar, count, owner = fa
   </View>;
 }
 
-type Collection = 'published' | 'drafts';
-export function ProfileCollections({ publishedCount, draftCount, selected, onSelect }: {
-  publishedCount: number | null; draftCount: number | null; selected: Collection; onSelect: (tab: Collection) => void;
+export type ProfileCollection = 'published' | 'saved' | 'drafts';
+export function ProfileCollections({ publishedCount, draftCount, savedCount = null, selected, onSelect }: {
+  publishedCount: number | null; draftCount: number | null; savedCount?: number | null; selected: ProfileCollection; onSelect: (tab: ProfileCollection) => void;
 }) {
   const protection = useBuddyProtectedBounds();
   return <View {...protection} accessibilityRole="tablist" style={s.collections}>
-    {([{ key: 'published', count: publishedCount, title: 'Published', note: 'Shared with the world', symbol: '◎' },
-      { key: 'drafts', count: draftCount, title: 'Drafts', note: 'Only you can see', symbol: '✎' }] as const).map(item => <Pressable key={item.key}
-      accessibilityRole="tab" accessibilityLabel={(item.key === 'published' ? 'Published journeys, ' : 'Private drafts, ') + (item.count === null ? 'count unavailable' : item.count)} accessibilityState={{ selected: selected === item.key }}
-      onPress={() => onSelect(item.key)} style={({ pressed }) => [s.collection, item.key === 'drafts' && s.draftCollection, selected === item.key && s.selectedCollection, pressed && s.pressed]}>
-      <View style={s.collectionTop}><Text accessible={false} style={[s.collectionSymbol, selected === item.key && s.selectedCollectionText]}>{item.symbol}</Text><Text style={[s.collectionCount, selected === item.key && s.selectedCollectionText]}>{item.count ?? '—'}</Text><Text style={[s.collectionTitle, selected === item.key && s.selectedCollectionText]}>{item.title}</Text></View>
-      <Text style={[s.collectionNote, selected === item.key && s.selectedCollectionNote]}>{item.note}</Text>
+    {([{ key: 'published', count: publishedCount, title: 'Journeys', label: 'Published journeys' },
+      { key: 'saved', count: savedCount, title: 'Saved', label: 'Private saved journeys' },
+      { key: 'drafts', count: draftCount, title: 'Drafts', label: 'Private drafts' }] as const).map(item => <Pressable key={item.key}
+      accessibilityRole="tab" accessibilityLabel={item.label + ', ' + (item.count === null ? 'count unavailable' : item.count)} accessibilityState={{ selected: selected === item.key }}
+      onPress={() => onSelect(item.key)} style={({ pressed }) => [s.collection, selected === item.key && s.selectedCollection, pressed && s.pressed]}>
+      <Text style={[s.collectionTitle, selected === item.key && s.selectedCollectionText]}>{item.title}</Text>
+      <Text accessible={false} style={s.collectionCount}>{item.count ?? ' '}</Text>
     </Pressable>)}
   </View>;
 }
 
-export function ProfileTabs({ selected, onSelect, drafts = false }: { selected: Collection; onSelect: (tab: Collection) => void; drafts?: boolean }) {
+export function ProfileTabs({ selected, onSelect, drafts = false }: { selected: 'published' | 'drafts'; onSelect: (tab: 'published' | 'drafts') => void; drafts?: boolean }) {
   const protection = useBuddyProtectedBounds();
   return <View {...protection} accessibilityRole="tablist" style={s.tabs}>
-    {(['published', ...(drafts ? ['drafts'] : [])] as Collection[]).map(tab => <Pressable key={tab} accessibilityRole="tab" accessibilityState={{ selected: selected === tab }}
+    {(['published', ...(drafts ? ['drafts'] : [])] as ('published' | 'drafts')[]).map(tab => <Pressable key={tab} accessibilityRole="tab" accessibilityState={{ selected: selected === tab }}
       accessibilityLabel={tab === 'published' ? 'Published journeys' : 'Private drafts'} onPress={() => onSelect(tab)} style={({ pressed }) => [s.tab, selected === tab && s.activeTab, pressed && s.pressed]}>
-      <Text style={[s.tabText, selected === tab && s.activeTabText]}>{tab === 'published' ? 'Published' : 'Drafts'}</Text>
+      <Text style={[s.tabText, selected === tab && s.activeTabText]}>{tab === 'published' ? 'Journeys' : 'Drafts'}</Text>
     </Pressable>)}
   </View>;
 }
@@ -108,13 +109,12 @@ export function ProfileJourneyCard({ journey }: { journey: PublicJourney }) {
   const protection = useBuddyProtectedBounds();
   return <Pressable {...protection} accessibilityRole="button" accessibilityLabel={'Open journey: ' + journey.title + ', ' + journey.destination}
     onPress={() => router.push({ pathname: '/journey/[id]', params: { id: journey.id } })} style={({ pressed }) => [s.card, s.journeyCard, pressed && s.pressed]}>
-    <View style={s.thumbnail}><ThumbnailPhoto uri={journey.cover} thumbnailUri={journey.coverThumbnail} ratio={0.9} label={journey.title + ' cover photo'}
+    <View style={s.thumbnail}><ThumbnailPhoto uri={journey.cover} thumbnailUri={journey.coverThumbnail} ratio={1} label={journey.title + ' cover photo'}
       fallback={<JourneyArt seed={artSeed(journey.id, journey.stops)} stops={journey.stops} compact />} /></View>
-    <View style={s.cardCopy}>
+    <View style={s.gridCopy}>
       {journey.destination !== 'Destination not specified' && <Text numberOfLines={1} style={s.destination}>⌖ {journey.destination}</Text>}
-      <Text numberOfLines={2} style={s.cardTitle}>{journey.title}</Text>
-      <Text style={s.facts}>{journeyFacts(journey)}</Text>
-      <Text style={s.open}>View journey →</Text>
+      <Text numberOfLines={2} style={s.gridTitle}>{journey.title}</Text>
+      <Text numberOfLines={2} style={s.gridFacts}>{journeyFacts(journey)}</Text>
     </View>
   </Pressable>;
 }

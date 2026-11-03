@@ -399,7 +399,7 @@ test('private history resumes actual drafts and keeps all-drafts, empty, loading
   let tree=DraftShortcuts({ownerId:uid});assert.equal(refreshes,1);
   const buttons=all(tree,'Pressable');assert.equal(buttons.length,5);assert.equal(all(tree,'Action').length,0);assert.equal(all(tree,'ScrollView').length,1);assert.equal(all(tree,'ScrollView')[0].props.accessibilityLabel,'Private draft history');assert.equal(tree.props.style.flexShrink,0);assert.equal(all(tree,'ScrollView')[0].props.horizontal,true);
   buttons.find(n=>n.props.accessibilityLabel==='Continue: Coastal escape').props.onPress();assert.deepEqual(routes.at(-1),{pathname:'/create',params:{draft:id}});
-  buttons.find(n=>n.props.accessibilityLabel==='All private drafts').props.onPress();assert.equal(routes.at(-1),'/account');
+  buttons.find(n=>n.props.accessibilityLabel==='All private drafts').props.onPress();assert.deepEqual(routes.at(-1),{pathname:'/account',params:{collection:'drafts'}});
   state={data:[]};tree=DraftShortcuts({ownerId:uid});assert.ok(all(tree,'Text').some(n=>n.props.children==='Your saved drafts will appear here.'));
   state={loading:true};tree=DraftShortcuts({ownerId:uid});assert.equal(all(tree,'ActivityIndicator')[0].props.accessibilityLabel,'Loading private drafts');
   const retry=()=>{};state={error:'Offline',retry};tree=DraftShortcuts({ownerId:uid});assert.equal(all(tree,'Message')[0].props.retry,retry);
@@ -640,7 +640,7 @@ test('static horizontal history keeps a centered heading, every draft, and no sh
     const cardStyle=cards[0].props.style({pressed:false});assert.ok(cardStyle[1].width<=width-32);assert.ok(cardStyle[1].width<=320);
     assert.equal(all(tree,'Pressable').length,9,'No expand/collapse controls or drag handle');
     cards[7].props.onPress();assert.deepEqual(routes.at(-1),{pathname:'/create',params:{draft:'draft-7'}});
-    viewAll.props.onPress();assert.equal(routes.at(-1),'/account');
+    viewAll.props.onPress();assert.deepEqual(routes.at(-1),{pathname:'/account',params:{collection:'drafts'}});
   }
   const page=screenHarness().render().props.children;
   assert.equal(page.props.onLayout,undefined,'History no longer measures/resizes the form');

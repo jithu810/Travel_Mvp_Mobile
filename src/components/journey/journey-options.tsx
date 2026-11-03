@@ -65,11 +65,11 @@ export function JourneyOptions({ id, creatorId, onUse, inlineFeedback = false, m
         <View style={styles.choiceText}><Text style={styles.choiceTitle}>{state.copyId ? 'Open my editable copy' : 'Save an editable copy'}</Text><Text style={ui.body}>{state.copyId ? 'You already have a private draft of this journey. Open it to keep editing.' : 'Creates a private draft in your account that you can edit.' + (userId ? '' : ' Requires sign-in.')}</Text></View>
       </Pressable>
       {state.error && <Text accessibilityRole="alert" style={ui.body}>{state.error}</Text>}
-      {state.blocked && <Action label="Check Account drafts" onPress={() => { setChoiceOpen(false); router.push('/account'); }} />}
+      {state.blocked && <Action label="Check Account drafts" onPress={() => { setChoiceOpen(false); router.push({ pathname: '/account', params: { collection: 'drafts' } }); }} />}
     </StorySheet>
     <StorySheet visible={feedbackOpen} title="Remix journey" onClose={() => setFeedbackOpen(false)}>
       {state.error && <Text accessibilityRole="alert" style={ui.body}>{state.error}</Text>}
-      {state.blocked && <Action label="Check Account drafts" onPress={() => { setFeedbackOpen(false); router.push('/account'); }} />}
+      {state.blocked && <Action label="Check Account drafts" onPress={() => { setFeedbackOpen(false); router.push({ pathname: '/account', params: { collection: 'drafts' } }); }} />}
     </StorySheet>
   </View>;
   const actions = <View style={styles.card}>
@@ -84,11 +84,11 @@ export function JourneyOptions({ id, creatorId, onUse, inlineFeedback = false, m
     <Pressable accessibilityRole="button" accessibilityLabel="Customize stops" accessibilityHint="Choose stops for this trip. No draft is created." onPress={() => { menu?.onClose(); router.push({ pathname: '/customize/[id]', params: { id } }); }} style={styles.menuAction}><Text style={styles.remixLabel}>Customize stops →</Text></Pressable>
     {inlineFeedback && <View style={{ gap: 10 }}>
       {state.error && <Text accessibilityRole="alert" style={ui.body}>{state.error}</Text>}
-      {state.blocked && <Action label="Check Account drafts" onPress={() => router.push('/account')} />}
+      {state.blocked && <Action label="Check Account drafts" onPress={() => router.push({ pathname: '/account', params: { collection: 'drafts' } })} />}
     </View>}
     <StorySheet visible={!inlineFeedback && feedbackOpen} title="Remix journey" onClose={() => setFeedbackOpen(false)}>
       {state.error && <Text accessibilityRole="alert" style={ui.body}>{state.error}</Text>}
-      {state.blocked && <Action label="Check Account drafts" onPress={() => { setFeedbackOpen(false); router.push('/account'); }} />}
+      {state.blocked && <Action label="Check Account drafts" onPress={() => { setFeedbackOpen(false); router.push({ pathname: '/account', params: { collection: 'drafts' } }); }} />}
     </StorySheet>
 
   </View>;

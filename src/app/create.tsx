@@ -281,7 +281,7 @@ export function NewJourneyEditor({ ownerId, initial, onReload, onDestinationFocu
       <QuickJourneySetup dismissSearchVersion={dismissSearchVersion} form={form} disabled={disabled} saving={busy} onTitle={title => { titleEdited.current = true; change({ title }); }}
         onDestination={destination => { change(selectDestination(form, destination, titleEdited.current)); onDestinationFocus?.(destination); }} onChange={change} onStart={() => { void save('draft'); }} feedback={<>
         {error && <Text accessibilityRole="alert" style={ui.body}>{error}</Text>}
-        {uncertain && <><Text style={ui.body}>Save result unconfirmed. Check your drafts before retrying.</Text><Action label="Check Account drafts" onPress={() => router.push('/account')} /></>}
+        {uncertain && <><Text style={ui.body}>Save result unconfirmed. Check your drafts before retrying.</Text><Action label="Check Account drafts" onPress={() => router.push({ pathname: '/account', params: { collection: 'drafts' } })} /></>}
       </>} />
       <DraftShortcuts ownerId={ownerId} keyboardHidden={keyboardOpen} />
     </View>
@@ -337,7 +337,7 @@ export function NewJourneyEditor({ ownerId, initial, onReload, onDestinationFocu
       {photos.error && <Text style={ui.body}>Some photo previews are unavailable. Original photos remain preserved.</Text>}
       {error && !memoryEdit && <Text accessibilityRole="alert" style={ui.body}>{error}</Text>}
       {message && <Text accessibilityLiveRegion="polite" onLayout={event => setMessageHeight(event.nativeEvent.layout.height)} style={ui.body}>{message}</Text>}
-      {uncertain && <>{onReload && <Action label={editingPublished ? 'Reload published journey' : 'Reload saved draft'} onPress={confirmReload} />}<Action label="Check Account drafts" onPress={() => router.push('/account')} />
+      {uncertain && <>{onReload && <Action label={editingPublished ? 'Reload published journey' : 'Reload saved draft'} onPress={confirmReload} />}<Action label="Check Account drafts" onPress={() => router.push({ pathname: '/account', params: { collection: 'drafts' } })} />
         {attemptedStatus === 'published' && <Action label="Check public journey" onPress={() => router.push({ pathname: '/journey/[id]', params: { id: form.id } })} />}
         <Text style={ui.body}>The form is preserved. Check the save result before trying again.</Text></>}
     </ScrollView>
@@ -392,7 +392,7 @@ export function DraftShortcuts({ ownerId, keyboardHidden = false }: { ownerId: s
     <View style={createStyles.historyHeader}>
       <View accessible={false} style={createStyles.historyBalance} />
       <Text accessibilityRole="header" style={createStyles.historyHeading}>Your drafts</Text>
-      <Pressable accessibilityRole="button" accessibilityLabel="All private drafts" onPress={() => router.push('/account')} style={createStyles.allDrafts}><Text style={createStyles.allDraftsText}>View all →</Text></Pressable>
+      <Pressable accessibilityRole="button" accessibilityLabel="All private drafts" onPress={() => router.push({ pathname: '/account', params: { collection: 'drafts' } })} style={createStyles.allDrafts}><Text style={createStyles.allDraftsText}>View all →</Text></Pressable>
     </View>
     {drafts.loading ? <ActivityIndicator color={appTheme.accent} accessibilityLabel="Loading private drafts" /> : drafts.error ? <Message title="Drafts unavailable" body={drafts.error} retry={drafts.retry} />
       : drafts.data?.length ? <ScrollView {...scroll} horizontal accessibilityLabel="Private draft history" accessibilityHint="Swipe left or right to browse your drafts"

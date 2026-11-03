@@ -1,14 +1,13 @@
 import { theme as appTheme } from '@/theme/mobile-theme';
 import { TravelPreferencesSettings } from '@/components/buddy/travel-preferences-settings';
-import { BrandedLoading } from '@/components/branded-loading';
-import { useCallback, useRef, useState } from 'react';
-import { useFocusEffect, useRouter } from 'expo-router';
-import { ActivityIndicator, FlatList, Modal, Pressable, RefreshControl, ScrollView, Switch, Text, useWindowDimensions, View } from 'react-native';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
+import { ActivityIndicator, AppState, FlatList, Modal, Pressable, RefreshControl, ScrollView, Switch, Text, View } from 'react-native';
 import { useBuddyGreetingsReset, useBuddyPreference, useBuddyScreen } from '@/hooks/use-journey-buddy';
 import { useBuddyProtectedBounds, useBuddyScroll } from '@/hooks/use-buddy-geometry';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Action, colors, Message, ui } from '@/components/discovery/ui';
-import { ProfileCollections, ProfileDraftCard, ProfileHeader, ProfileIdentity, ProfileJourneyCard, profileStyles as s } from '@/components/profile/profile-ui';
+import { ProfileCollections, ProfileDraftCard, ProfileHeader, ProfileIdentity, ProfileJourneyCard, type ProfileCollection, profileStyles as s } from '@/components/profile/profile-ui';
 import { useSessionState } from '@/hooks/session-context';
 import { useActionIntent } from '@/hooks/action-intent';
 import { useLoad } from '@/hooks/use-load';
@@ -20,12 +19,26 @@ import { safePhoto } from '@/lib/discovery/model';
 import { signOutAccount } from '@/lib/auth/queries';
 import { creationRecovery } from '@/lib/create/recovery-store';
 import { tripPersistence } from '@/lib/journey/trip-recovery-store';
+import { loadSavedJourneys } from '@/lib/social/saved-queries';
+import { ProfileConnections } from '@/components/profile/profile-connections';
 import type { PublicJourney } from '@/types/journey';
 
-type Row = { kind: 'draft'; draft: PrivateDraftSummary } | { kind: 'published'; journey: PublicJourney };
+type Row = { kind: 'draft'; draft: PrivateDraftSummary } | { kind: 'published' | 'saved'; journey: PublicJourney };
 export default function AccountScreen() {
   const router = useRouter(), auth = useSessionState(), intent = useActionIntent();
+  const params = useLocalSearchParams<{ collection?: string | string[] }>();
+  const requested = params.collection === 'drafts' || params.collection === 'saved' || params.collection === 'published' ? params.collection : null;
+  const [selectedTab, setTab] = useState<ProfileCollection>(() => requested ?? 'published');
+  if (requested && selectedTab !== requested) setTab(requested);
+  const tab = requested ?? selectedTab;
+  // A deep link is a one-time collection request. Consume it so a later View all
+  // request can select Drafts again while normal Back keeps the chosen tab.
+  useEffect(() => {
+    if (params.collection === undefined) return;
+    router.setParams({ collection: undefined });
+  }, [params.collection, router]);
   const userId = auth.session?.user.id;
+  const accessToken = auth.session?.access_token;
   const metadata = auth.session?.user.user_metadata;
 
   const loader = useCallback((signal: AbortSignal) => userId ? loadPrivateDrafts(userId, signal, { lineage: true }) : Promise.resolve([]), [userId]);
@@ -38,26 +51,39 @@ export default function AccountScreen() {
     return { profile: { id: own.id, username: own.username, displayName: own.displayName, bio: own.bio, avatar: own.avatarPreview }, journeys };
   }, [userId]);
   const published = useLoad(publicLoader);
-  // Account remains a direct destination for Create's "View all" private drafts.
-  const [tab, setTab] = useState<'published' | 'drafts'>('drafts');
+  // Private Saved is loaded only when selected and the current session is settled.
+  // Loader replacement hides old results immediately on account/token changes.
+  const savedLoader = useCallback((signal: AbortSignal) => {
+    if (tab !== 'saved' || auth.loading || auth.error || !userId || !accessToken) return Promise.resolve([] as PublicJourney[]);
+    return loadSavedJourneys(userId, signal);
+  }, [tab, auth.loading, auth.error, userId, accessToken]);
+  const saved = useLoad(savedLoader);
   const [settings, setSettings] = useState(false), [busy, setBusy] = useState(false);
   const signOutLock = useRef(false);
   const [deleteMessage, setDeleteMessage] = useState('');
   const [error, setError] = useState<string | null>(null);
   const buddy = useBuddyPreference();
   const resetBuddyGreetings = useBuddyGreetingsReset();
-  const window = useWindowDimensions();
-  const buddyGridProtection = useBuddyProtectedBounds(useCallback(rect => [
-    { x: 0, y: 0, width: window.width, height: Math.max(0, rect.y - 8) },
-    { x: 0, y: rect.y + rect.height + 8, width: window.width, height: window.height },
-  ], [window.width, window.height]));
   const scroll = useBuddyScroll(), footerProtection = useBuddyProtectedBounds();
   // Only a loaded draft is offered; nothing is written and no copy is made from here.
   // A failed or running refresh may hold a deleted draft in the last-known list, so offer only a settled, successful load.
   const resumeDraft = drafts.error || drafts.refreshing ? undefined : drafts.data?.[0];
-  useBuddyScreen({ floating: true, suppressed: settings || busy || auth.loading, resume: resumeDraft ? { id: resumeDraft.id, title: resumeDraft.title } : undefined });
-  const refreshDrafts = drafts.refresh, refreshPublished = published.refresh;
-  useFocusEffect(useCallback(() => { refreshDrafts(); refreshPublished(); }, [refreshDrafts, refreshPublished]));
+  // Temporarily hidden during profile design; preference and resume context stay intact.
+  useBuddyScreen({ floating: true, suppressed: true, resume: resumeDraft ? { id: resumeDraft.id, title: resumeDraft.title } : undefined });
+  const refreshDrafts = drafts.refresh, refreshPublished = published.refresh, refreshSaved = saved.refresh;
+  const activeTab = useRef(tab);
+  useEffect(() => { activeTab.current = tab; }, [tab]);
+  useFocusEffect(useCallback(() => {
+    refreshDrafts(); refreshPublished();
+    if (activeTab.current === 'saved') refreshSaved();
+    const listener = AppState.addEventListener('change', next => {
+      if (next !== 'active') return;
+      if (activeTab.current === 'drafts') refreshDrafts();
+      else if (activeTab.current === 'saved') refreshSaved();
+      else refreshPublished();
+    });
+    return () => listener.remove();
+  }, [refreshDrafts, refreshPublished, refreshSaved]));
   async function signOut() {
     if (signOutLock.current) return;
     signOutLock.current = true;
@@ -70,31 +96,36 @@ export default function AccountScreen() {
   const metadataAvatar = safePhoto(metadata?.avatar_url);
   const avatar = profile?.avatar || (metadataAvatar?.startsWith('https:') ? metadataAvatar : null);
   const bio = profile?.bio || (typeof metadata?.bio === 'string' ? metadata.bio : null);
-  const rows: Row[] = tab === 'drafts' ? withDraftSources(drafts.data || [], credits).map(draft => ({ kind: 'draft', draft })) : (published.data?.journeys || []).map(journey => ({ kind: 'published', journey }));
-  const loading = tab === 'drafts' ? drafts.loading : published.loading;
-  const collectionError = tab === 'drafts' ? drafts.error : published.error;
-  const refresh = tab === 'drafts' ? drafts.refresh : published.refresh;
-  const retry = tab === 'drafts' ? drafts.retry : published.retry;
-  if (auth.session && loading && !drafts.data && !published.data) return <BrandedLoading message="Opening your journeys…" />;
+  const savedVisible = !auth.loading && !auth.error && userId && accessToken;
+  const rows: Row[] = tab === 'drafts' ? withDraftSources(drafts.data || [], credits).map(draft => ({ kind: 'draft', draft }))
+    : tab === 'saved' ? (savedVisible ? saved.data || [] : []).map(journey => ({ kind: 'saved', journey }))
+      : (published.data?.journeys || []).map(journey => ({ kind: 'published', journey }));
+  const collection = tab === 'drafts' ? drafts : tab === 'saved' ? saved : published;
+  const loading = collection.loading;
+  const collectionError = tab === 'saved' && !savedVisible ? auth.error || 'Sign in again to see your saved journeys.' : collection.error;
+  const refresh = collection.refresh, retry = collection.retry;
+  const collectionTitle = tab === 'drafts' ? 'Private drafts' : tab === 'saved' ? 'Saved journeys' : 'My journeys';
   return <SafeAreaView edges={['left', 'right', 'bottom']} style={ui.safe}><View style={ui.page}>
     <ProfileHeader onSettings={() => setSettings(true)} />
     <View style={{ flex: 1, minHeight: 0 }}>
     {auth.loading ? <ActivityIndicator color={appTheme.accent} accessibilityLabel="Loading account" /> : !auth.session ? <View style={s.content}><Message title="Your next chapter" body="Sign in to Like, Save, and create private journey copies." retry={() => router.push('/auth')} action="Sign in or register" />{auth.error && <Text accessibilityRole="alert" style={ui.body}>{auth.error}</Text>}</View>
-      : <FlatList {...scroll} data={rows} keyExtractor={row => row.kind + ':' + (row.kind === 'draft' ? row.draft.id : row.journey.id)} contentContainerStyle={s.content} showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={tab === 'drafts' ? drafts.refreshing : published.refreshing} onRefresh={refresh} tintColor={colors.ink} />}
+      : <FlatList {...scroll} key={tab === 'drafts' ? 'draft-list' : 'journey-grid-3'} numColumns={tab === 'drafts' ? 1 : 3} columnWrapperStyle={tab === 'drafts' ? undefined : s.gridRow}
+        data={rows} keyExtractor={row => row.kind + ':' + (row.kind === 'draft' ? row.draft.id : row.journey.id)} contentContainerStyle={s.content} showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={collection.refreshing} onRefresh={refresh} tintColor={colors.ink} />}
         renderItem={({ item }) => item.kind === 'draft' ? <ProfileDraftCard draft={item.draft} onDeleted={() => { setDeleteMessage('Draft deleted.'); refreshDrafts(); }} /> : <ProfileJourneyCard journey={item.journey} />}
         ListHeaderComponent={<View>
           {deleteMessage ? <Text accessibilityLiveRegion="polite" style={s.notice}>{deleteMessage}</Text> : null}
           <ProfileIdentity name={name} username={profile?.username || null} bio={bio} avatar={avatar} owner count={null} onCreate={() => router.push('/create')} />
-          <ProfileCollections publishedCount={published.data ? published.data.journeys.length : null} draftCount={drafts.data ? drafts.data.length : null} selected={tab} onSelect={setTab} />
-          {buddy.loaded && buddy.enabled && <View {...buddyGridProtection} testID="profile-buddy-grid" pointerEvents="none" accessible={false} style={{ height: 88 }} />}
-          <View style={s.section}><View style={s.sectionTop}><Text accessibilityRole="header" style={s.heading}>My journeys</Text><Text style={s.sectionNote}>{tab === 'drafts' ? 'Pick up where you left off' : 'Your shared stories'}</Text></View></View>
+          {userId && <ProfileConnections key={userId} targetId={userId} name={name} />}
+          <ProfileCollections publishedCount={published.data ? published.data.journeys.length : null} draftCount={drafts.data ? drafts.data.length : null} savedCount={tab === 'saved' && savedVisible && saved.data ? saved.data.length : null} selected={tab} onSelect={setTab} />
+          <View style={s.section}><View style={s.sectionTop}><Text accessibilityRole="header" style={s.heading}>{collectionTitle}</Text><Text style={s.sectionNote}>{tab === 'drafts' ? 'Only you · Continue editing' : tab === 'saved' ? 'Only you · For later' : 'Your shared stories'}</Text></View></View>
           {(error || auth.error) && <Text accessibilityRole="alert" style={ui.body}>{error || auth.error}</Text>}
           {collectionError && rows.length > 0 && <Message title="Couldn’t refresh journeys" body={collectionError} retry={retry} />}
         </View>}
-        ListEmptyComponent={loading ? <ActivityIndicator color={appTheme.accent} accessibilityLabel={tab === 'drafts' ? 'Loading private drafts' : 'Loading published journeys'} /> : collectionError ? <Message title={tab === 'drafts' ? 'Couldn’t load drafts' : 'Couldn’t load journeys'} body={collectionError} retry={retry} />
-          : <Message title={tab === 'drafts' ? 'No private drafts yet' : 'No public journeys yet'} body={tab === 'drafts' ? 'Start with a place and a title, then save your journey privately. You can return here to add stops and memories before publishing.' : 'Journeys you choose to publish will appear here. You can start a private draft and share it when you are ready.'} retry={() => router.push('/create')} action="Start a journey" />}
-        ListFooterComponent={<Pressable {...footerProtection} accessibilityRole="button" accessibilityLabel={tab === 'drafts' ? 'Refresh drafts' : 'Refresh published journeys'} onPress={refresh} style={s.close}><Text style={ui.body}>↻ Refresh {tab === 'drafts' ? 'drafts' : 'journeys'}</Text></Pressable>} />}
+        ListEmptyComponent={loading ? <ActivityIndicator color={appTheme.accent} accessibilityLabel={'Loading ' + collectionTitle.toLowerCase()} /> : collectionError ? <Message title="Couldn’t load this collection" body={collectionError} retry={retry} />
+          : tab === 'saved' ? <Message title="No saved journeys yet" body="Save a journey you love and find it here when you are ready to explore." retry={() => router.push('/search')} action="Explore journeys" />
+            : <Message title={tab === 'drafts' ? 'No private drafts yet' : 'No public journeys yet'} body={tab === 'drafts' ? 'Start with a place and a title, then save your journey privately. You can return here to add stops and memories before publishing.' : 'Journeys you choose to publish will appear here. You can start a private draft and share it when you are ready.'} retry={() => router.push('/create')} action="Start a journey" />}
+        ListFooterComponent={<Pressable {...footerProtection} accessibilityRole="button" accessibilityLabel={'Refresh ' + collectionTitle.toLowerCase()} onPress={refresh} style={s.close}><Text style={ui.body}>↻ Refresh {tab === 'drafts' ? 'drafts' : tab === 'saved' ? 'saved journeys' : 'journeys'}</Text></Pressable>} />}
     </View>
     <Modal visible={settings} transparent animationType="none" onRequestClose={() => { if (!busy) setSettings(false); }}>
       <View style={s.shade}><SafeAreaView edges={['bottom', 'left', 'right']} style={s.sheet}><ScrollView keyboardShouldPersistTaps="handled">
