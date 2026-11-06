@@ -37,13 +37,16 @@ import type { PublicJourney } from '@/types/journey';
 export default function JourneyStoryScreen() {
   const styles = lightStyles_styles;
   const ui = lightUi;
-  const params = useLocalSearchParams<{ id: string | string[]; source?: string }>();
+  const params = useLocalSearchParams<{ id: string | string[]; source?: string; stop?: string | string[] }>();
   const id = typeof params.id === 'string' ? params.id : '';
+  // Optional entry stop (profile travel map). Only a single UUID is considered, and
+  // Story still selects it only when it matches a loaded stop; otherwise the first stop.
+  const initialStop = typeof params.stop === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(params.stop) ? params.stop : undefined;
   const loader = useCallback((signal: AbortSignal) => loadPublicJourney(id, signal), [id]);
   const state = useLoad(loader);
   return <SafeAreaView style={ui.safe} edges={state.data ? ['left', 'right', 'bottom'] : ['top', 'left', 'right', 'bottom']}><View style={ui.page}>
     <Stack.Screen options={{ statusBarStyle: 'light' }} />
-    {state.data ? <JourneyStoryContent key={state.data.id} journey={state.data} refresh={state.refresh} refreshing={state.refreshing} error={state.error} /> : <View style={styles.unavailable}>
+    {state.data ? <JourneyStoryContent key={state.data.id} journey={state.data} refresh={state.refresh} refreshing={state.refreshing} error={state.error} initialStop={initialStop} /> : <View style={styles.unavailable}>
       <ScreenHeader title="Journey Story" back />
       {state.loading ? <BrandedLoading message="Opening the journey…" />
         : <View style={styles.message}><Message title={state.error ? 'A small detour' : 'Journey unavailable'} body={state.error || 'This journey may no longer be public. Explore Discover for more stories.'} retry={state.retry} /></View>}
@@ -53,7 +56,7 @@ export default function JourneyStoryScreen() {
 
 export type StoryFeed = { index: number; count: number; enabled: boolean; initialStop?: string; onStop: (id: string) => void; onAvailability: (available: boolean) => void; onPage: (direction: number) => void; onDrag: (dy: number) => void };
 type TemporaryStory = { onRemove: (stopId: string) => void; onBack: () => void; editingBlocked: boolean; error: string | null };
-export function JourneyStoryContent({ journey, refresh, refreshing, error, saveFirst = false, temporary, feed }: { journey: PublicJourney; saveFirst?: boolean; refresh: () => void; refreshing: boolean; error: string | null; temporary?: TemporaryStory; feed?: StoryFeed }) {
+export function JourneyStoryContent({ journey, refresh, refreshing, error, saveFirst = false, temporary, feed, initialStop }: { journey: PublicJourney; saveFirst?: boolean; refresh: () => void; refreshing: boolean; error: string | null; temporary?: TemporaryStory; feed?: StoryFeed; initialStop?: string }) {
   const pilotColor = usePilotColor();
   const styles = lightStyles_styles;
   const ui = lightUi;
@@ -79,7 +82,7 @@ export function JourneyStoryContent({ journey, refresh, refreshing, error, saveF
     : Math.max(180, Math.min(310, window.height * 0.33));
   const scrollRef = useRef<ScrollView>(null);
   useEffect(() => { if (fitted) scrollRef.current?.scrollTo({ y: 0, animated: false }); }, [fitted]);
-  const [requestedId, setRequestedId] = useState<string | null>(feed?.initialStop || null);
+  const [requestedId, setRequestedId] = useState<string | null>(feed?.initialStop || initialStop || null);
   const [socialOverlay, setSocialOverlay] = useState(false), [optionsOverlay, setOptionsOverlay] = useState(false);
   const available = focused && panel === null && !socialOverlay && !optionsOverlay;
   const feedActive = !!feed?.enabled && available;

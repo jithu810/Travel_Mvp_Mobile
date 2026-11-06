@@ -20,7 +20,7 @@ function hooks(){let slots=[],cursor=0,effects=[];return {
   render(fn){cursor=0;effects=[];const tree=fn();effects.forEach(f=>f());return tree;},
 };}
 function load(path,modules={},react=hooks().react){
-  modules={'@/components/profile/profile-connections':{ProfileConnections:'ProfileConnections'},'@/components/buddy/travel-preferences-settings':{TravelPreferencesSettings:'TravelPreferencesSettings'},'@/hooks/use-buddy-geometry':buddyGeometryStub,'@/lib/journey/trip-recovery-store':{tripPersistence:{clearUser:async()=>{}}},...modules};const exports={};const code=ts.transpileModule(readFileSync(path,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX}}).outputText;
+  modules={'@/components/profile/profile-connections':{ProfileConnections:'ProfileConnections'},'@/components/profile/profile-memory-map':{ProfileMemoryMap:'ProfileMemoryMap'},'@/components/buddy/travel-preferences-settings':{TravelPreferencesSettings:'TravelPreferencesSettings'},'@/hooks/use-buddy-geometry':buddyGeometryStub,'@/lib/journey/trip-recovery-store':{tripPersistence:{clearUser:async()=>{}}},...modules};const exports={};const code=ts.transpileModule(readFileSync(path,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX}}).outputText;
   modules={'@/hooks/use-journey-buddy':{useBuddyScreen(state){buddyScreens.push(state);},useBuddyGreetingsReset:()=>()=>{},useBuddyPreference:()=>({loaded:true,enabled:false,error:null,setEnabled(){}})},...modules};
   new Function('require','exports',code)(name=>{ if (name === '@/theme/dark-pilot') return lightPilotTheme; if (name === '@/theme/mobile-theme') return appMobileTheme; return name==='@/theme/mobile-theme'?mobileTheme:name==='@/components/discovery/thumbnail-photo'?{ThumbnailPhoto:'JourneyPhoto'}:name==='./profile-styles'?load('src/components/profile/profile-styles.ts',{'@/components/discovery/ui':ui}):name==='react'?react:name==='@/components/delete-draft-action'?{DeleteDraftAction:'DeleteDraftAction'}:name==='@/lib/remix/model'?{draftRemixCredit:source=>source===undefined?'Remix of another journey':source===null?'Remixed from an original journey that is currently unavailable.':'Remix of '+source.title+' · by '+source.creatorName}:name==='@/components/branded-loading'?{BrandedLoading:'BrandedLoading'}:name==='@/components/art/journey-art'?{JourneyArt:'JourneyArt',StopArt:'StopArt'}:name==='@/lib/art/journey-art'?{artSeed:(id,stops)=>'seed:'+id+':'+(stops||[]).length}:name==='react/jsx-runtime'?{jsx,jsxs:jsx,Fragment:'Fragment'}:name==='react-native'?native:name.endsWith('.png')?1:name in modules?modules[name]:(()=>{throw Error(name);})(); },exports);return exports;}
 function all(tree,type){if(!tree||typeof tree!=='object')return [];return [...(tree.type===type?[tree]:[]),...[tree.props?.children].flat(Infinity).flatMap(t=>all(t,type))];}
@@ -37,7 +37,7 @@ test('reference profile composition retains real identity/avatar, owner-only fun
     const avatar=all(tree,'View').find(n=>Array.isArray(n.props.style)&&n.props.style[1]?.width);assert.equal(avatar.props.style[1].width,width<360?56:60);
   }
   const visitor=components.ProfileIdentity({name:'Visitor',count:0});assert.equal(all(visitor,'Pressable').length,0);assert.equal(all(visitor,'JourneyPhoto').length,0);
-  const tabs=components.ProfileTabs({selected:'published',onSelect(){}});assert.equal(all(tabs,'Pressable').length,1,'No private Drafts tab for a visitor');
+  const tabs=components.ProfileTabs({selected:'published',onSelect(){}});assert.deepEqual(all(tabs,'Pressable').map(n=>n.props.accessibilityLabel),['Published journeys','Travel map of published journey stops'],'No private Drafts tab for a visitor');
   let selected;const ownerTabs=components.ProfileTabs({selected:'drafts',drafts:true,onSelect:v=>selected=v});all(ownerTabs,'Pressable')[0].props.onPress();assert.equal(selected,'published');
   assert.equal(all(ownerTabs,'Pressable')[1].props.accessibilityState.selected,true);
 });
@@ -100,13 +100,13 @@ test('public Profile exposes only published data and gates owner tab navigation'
 test('collection tiles use loaded counts, distinguish unknown from zero and select the matching list',()=>{
   const {ProfileCollections}=shared();let selected;
   const tree=ProfileCollections({publishedCount:9,draftCount:0,savedCount:2,selected:'drafts',onSelect:value=>selected=value});
-  const buttons=all(tree,'Pressable');assert.equal(buttons.length,3);assert.ok(buttons.every(n=>n.props.accessibilityRole==='tab'));
+  const buttons=all(tree,'Pressable');assert.equal(buttons.length,4);assert.ok(buttons.every(n=>n.props.accessibilityRole==='tab'));
   assert.equal(buttons[0].props.accessibilityLabel,'Published journeys, 9');
   assert.equal(buttons[2].props.accessibilityLabel,'Private drafts, 0');
   buttons[0].props.onPress();assert.equal(selected,'published');buttons[1].props.onPress();assert.equal(selected,'saved');buttons[2].props.onPress();assert.equal(selected,'drafts');
   assert.equal(buttons[2].props.accessibilityState.selected,true);
   const unknown=ProfileCollections({publishedCount:null,draftCount:null,selected:'drafts',onSelect(){}});
-  assert.ok(all(unknown,'Pressable').every(n=>n.props.accessibilityLabel.includes('count unavailable')));
+  assert.ok(all(unknown,'Pressable').slice(0,3).every(n=>n.props.accessibilityLabel.includes('count unavailable')));
 });
 test('account hero actions route correctly and deletion refreshes drafts and announces success',()=>{
   const h=accountHarness({collection:'drafts'});let list=all(h.render(),'FlatList')[0],header=list.props.ListHeaderComponent;

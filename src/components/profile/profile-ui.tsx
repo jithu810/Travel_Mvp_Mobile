@@ -77,7 +77,8 @@ export function ProfileIdentity({ name, username, bio, avatar, count, owner = fa
   </View>;
 }
 
-export type ProfileCollection = 'published' | 'saved' | 'drafts';
+export type ProfileCollection = 'published' | 'saved' | 'drafts' | 'map';
+export const travelMapTabLabel = 'Travel map of published journey stops';
 export function ProfileCollections({ publishedCount, draftCount, savedCount = null, selected, onSelect }: {
   publishedCount: number | null; draftCount: number | null; savedCount?: number | null; selected: ProfileCollection; onSelect: (tab: ProfileCollection) => void;
 }) {
@@ -85,8 +86,9 @@ export function ProfileCollections({ publishedCount, draftCount, savedCount = nu
   return <View {...protection} accessibilityRole="tablist" style={s.collections}>
     {([{ key: 'published', count: publishedCount, title: 'Journeys', label: 'Published journeys' },
       { key: 'saved', count: savedCount, title: 'Saved', label: 'Private saved journeys' },
-      { key: 'drafts', count: draftCount, title: 'Drafts', label: 'Private drafts' }] as const).map(item => <Pressable key={item.key}
-      accessibilityRole="tab" accessibilityLabel={item.label + ', ' + (item.count === null ? 'count unavailable' : item.count)} accessibilityState={{ selected: selected === item.key }}
+      { key: 'drafts', count: draftCount, title: 'Drafts', label: 'Private drafts' },
+      { key: 'map', count: null, title: 'Map', label: travelMapTabLabel }] as const).map(item => <Pressable key={item.key}
+      accessibilityRole="tab" accessibilityLabel={item.key === 'map' ? item.label : item.label + ', ' + (item.count === null ? 'count unavailable' : item.count)} accessibilityState={{ selected: selected === item.key }}
       onPress={() => onSelect(item.key)} style={({ pressed }) => [s.collection, selected === item.key && s.selectedCollection, pressed && s.pressed]}>
       <Text style={[s.collectionTitle, selected === item.key && s.selectedCollectionText]}>{item.title}</Text>
       <Text accessible={false} style={s.collectionCount}>{item.count ?? ' '}</Text>
@@ -94,12 +96,13 @@ export function ProfileCollections({ publishedCount, draftCount, savedCount = nu
   </View>;
 }
 
-export function ProfileTabs({ selected, onSelect, drafts = false }: { selected: 'published' | 'drafts'; onSelect: (tab: 'published' | 'drafts') => void; drafts?: boolean }) {
+export type ProfileTab = 'published' | 'drafts' | 'map';
+export function ProfileTabs({ selected, onSelect, drafts = false }: { selected: ProfileTab; onSelect: (tab: ProfileTab) => void; drafts?: boolean }) {
   const protection = useBuddyProtectedBounds();
   return <View {...protection} accessibilityRole="tablist" style={s.tabs}>
-    {(['published', ...(drafts ? ['drafts'] : [])] as ('published' | 'drafts')[]).map(tab => <Pressable key={tab} accessibilityRole="tab" accessibilityState={{ selected: selected === tab }}
-      accessibilityLabel={tab === 'published' ? 'Published journeys' : 'Private drafts'} onPress={() => onSelect(tab)} style={({ pressed }) => [s.tab, selected === tab && s.activeTab, pressed && s.pressed]}>
-      <Text style={[s.tabText, selected === tab && s.activeTabText]}>{tab === 'published' ? 'Journeys' : 'Drafts'}</Text>
+    {(['published', ...(drafts ? ['drafts'] : []), 'map'] as ProfileTab[]).map(tab => <Pressable key={tab} accessibilityRole="tab" accessibilityState={{ selected: selected === tab }}
+      accessibilityLabel={tab === 'published' ? 'Published journeys' : tab === 'drafts' ? 'Private drafts' : travelMapTabLabel} onPress={() => onSelect(tab)} style={({ pressed }) => [s.tab, selected === tab && s.activeTab, pressed && s.pressed]}>
+      <Text style={[s.tabText, selected === tab && s.activeTabText]}>{tab === 'published' ? 'Journeys' : tab === 'drafts' ? 'Drafts' : 'Map'}</Text>
     </Pressable>)}
   </View>;
 }
