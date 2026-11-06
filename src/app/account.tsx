@@ -21,6 +21,7 @@ import { creationRecovery } from '@/lib/create/recovery-store';
 import { tripPersistence } from '@/lib/journey/trip-recovery-store';
 import { loadSavedJourneys } from '@/lib/social/saved-queries';
 import { ProfileConnections } from '@/components/profile/profile-connections';
+import { ProfileMemoryMap } from '@/components/profile/profile-memory-map';
 import type { PublicJourney } from '@/types/journey';
 
 type Row = { kind: 'draft'; draft: PrivateDraftSummary } | { kind: 'published' | 'saved'; journey: PublicJourney };
@@ -61,6 +62,9 @@ export default function AccountScreen() {
   const [settings, setSettings] = useState(false), [busy, setBusy] = useState(false);
   const signOutLock = useRef(false);
   const [deleteMessage, setDeleteMessage] = useState('');
+  // Map loads only inside its mounted component. Focus is a soft refresh (45 s cache);
+  // foreground and pull-to-refresh force a fresh read.
+  const [mapRefresh, setMapRefresh] = useState(0), [mapReload, setMapReload] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const buddy = useBuddyPreference();
   const resetBuddyGreetings = useBuddyGreetingsReset();
@@ -76,11 +80,13 @@ export default function AccountScreen() {
   useFocusEffect(useCallback(() => {
     refreshDrafts(); refreshPublished();
     if (activeTab.current === 'saved') refreshSaved();
+    if (activeTab.current === 'map') setMapRefresh(value => value + 1);
     const listener = AppState.addEventListener('change', next => {
       if (next !== 'active') return;
       if (activeTab.current === 'drafts') refreshDrafts();
       else if (activeTab.current === 'saved') refreshSaved();
       else refreshPublished();
+      if (activeTab.current === 'map') setMapReload(value => value + 1);
     });
     return () => listener.remove();
   }, [refreshDrafts, refreshPublished, refreshSaved]));
@@ -99,12 +105,14 @@ export default function AccountScreen() {
   const savedVisible = !auth.loading && !auth.error && userId && accessToken;
   const rows: Row[] = tab === 'drafts' ? withDraftSources(drafts.data || [], credits).map(draft => ({ kind: 'draft', draft }))
     : tab === 'saved' ? (savedVisible ? saved.data || [] : []).map(journey => ({ kind: 'saved', journey }))
+      : tab === 'map' ? []
       : (published.data?.journeys || []).map(journey => ({ kind: 'published', journey }));
   const collection = tab === 'drafts' ? drafts : tab === 'saved' ? saved : published;
-  const loading = collection.loading;
-  const collectionError = tab === 'saved' && !savedVisible ? auth.error || 'Sign in again to see your saved journeys.' : collection.error;
-  const refresh = collection.refresh, retry = collection.retry;
-  const collectionTitle = tab === 'drafts' ? 'Private drafts' : tab === 'saved' ? 'Saved journeys' : 'My journeys';
+  // The map owns its own loading/error states; it refreshes alongside the published list.
+  const loading = tab === 'map' ? false : collection.loading;
+  const collectionError = tab === 'map' ? null : tab === 'saved' && !savedVisible ? auth.error || 'Sign in again to see your saved journeys.' : collection.error;
+  const refresh = tab === 'map' ? () => { refreshPublished(); setMapReload(value => value + 1); } : collection.refresh, retry = collection.retry;
+  const collectionTitle = tab === 'drafts' ? 'Private drafts' : tab === 'saved' ? 'Saved journeys' : tab === 'map' ? 'Travel map' : 'My journeys';
   return <SafeAreaView edges={['left', 'right', 'bottom']} style={ui.safe}><View style={ui.page}>
     <ProfileHeader onSettings={() => setSettings(true)} />
     <View style={{ flex: 1, minHeight: 0 }}>
@@ -118,14 +126,14 @@ export default function AccountScreen() {
           <ProfileIdentity name={name} username={profile?.username || null} bio={bio} avatar={avatar} owner count={null} onCreate={() => router.push('/create')} />
           {userId && <ProfileConnections key={userId} targetId={userId} name={name} />}
           <ProfileCollections publishedCount={published.data ? published.data.journeys.length : null} draftCount={drafts.data ? drafts.data.length : null} savedCount={tab === 'saved' && savedVisible && saved.data ? saved.data.length : null} selected={tab} onSelect={setTab} />
-          <View style={s.section}><View style={s.sectionTop}><Text accessibilityRole="header" style={s.heading}>{collectionTitle}</Text><Text style={s.sectionNote}>{tab === 'drafts' ? 'Only you · Continue editing' : tab === 'saved' ? 'Only you · For later' : 'Your shared stories'}</Text></View></View>
+          <View style={s.section}><View style={s.sectionTop}><Text accessibilityRole="header" style={s.heading}>{collectionTitle}</Text><Text style={s.sectionNote}>{tab === 'drafts' ? 'Only you · Continue editing' : tab === 'saved' ? 'Only you · For later' : tab === 'map' ? 'Public · Published stops only' : 'Your shared stories'}</Text></View></View>
           {(error || auth.error) && <Text accessibilityRole="alert" style={ui.body}>{error || auth.error}</Text>}
           {collectionError && rows.length > 0 && <Message title="Couldn’t refresh journeys" body={collectionError} retry={retry} />}
         </View>}
-        ListEmptyComponent={loading ? <ActivityIndicator color={appTheme.accent} accessibilityLabel={'Loading ' + collectionTitle.toLowerCase()} /> : collectionError ? <Message title="Couldn’t load this collection" body={collectionError} retry={retry} />
+        ListEmptyComponent={tab === 'map' ? (userId ? <ProfileMemoryMap key={userId} ownerId={userId} refreshKey={mapRefresh} reloadKey={mapReload} owner /> : null) : loading ? <ActivityIndicator color={appTheme.accent} accessibilityLabel={'Loading ' + collectionTitle.toLowerCase()} /> : collectionError ? <Message title="Couldn’t load this collection" body={collectionError} retry={retry} />
           : tab === 'saved' ? <Message title="No saved journeys yet" body="Save a journey you love and find it here when you are ready to explore." retry={() => router.push('/search')} action="Explore journeys" />
             : <Message title={tab === 'drafts' ? 'No private drafts yet' : 'No public journeys yet'} body={tab === 'drafts' ? 'Start with a place and a title, then save your journey privately. You can return here to add stops and memories before publishing.' : 'Journeys you choose to publish will appear here. You can start a private draft and share it when you are ready.'} retry={() => router.push('/create')} action="Start a journey" />}
-        ListFooterComponent={<Pressable {...footerProtection} accessibilityRole="button" accessibilityLabel={'Refresh ' + collectionTitle.toLowerCase()} onPress={refresh} style={s.close}><Text style={ui.body}>↻ Refresh {tab === 'drafts' ? 'drafts' : tab === 'saved' ? 'saved journeys' : 'journeys'}</Text></Pressable>} />}
+        ListFooterComponent={<Pressable {...footerProtection} accessibilityRole="button" accessibilityLabel={'Refresh ' + collectionTitle.toLowerCase()} onPress={refresh} style={s.close}><Text style={ui.body}>↻ Refresh {tab === 'drafts' ? 'drafts' : tab === 'saved' ? 'saved journeys' : tab === 'map' ? 'map' : 'journeys'}</Text></Pressable>} />}
     </View>
     <Modal visible={settings} transparent animationType="none" onRequestClose={() => { if (!busy) setSettings(false); }}>
       <View style={s.shade}><SafeAreaView edges={['bottom', 'left', 'right']} style={s.sheet}><ScrollView keyboardShouldPersistTaps="handled">
