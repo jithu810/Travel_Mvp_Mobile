@@ -5,6 +5,7 @@ import type { PublicJourney } from '@/types/journey';
 import { discoveryCardWidth } from '@/lib/discovery/presentation';
 import { useDiscoverySheet } from '@/hooks/use-discovery-sheet';
 import { HomeJourneyCard } from './home-journey-card';
+import { ExploreTile } from './explore-tile';
 import { colors } from './ui';
 import { useBuddyProtectedBounds, useBuddyScroll } from '@/hooks/use-buddy-geometry';
 
@@ -57,7 +58,7 @@ export function DiscoveryPanel({ journeys, selectedId, onLocate, onOpen, notice,
       </Pressable>
       </View>
     </View>
-    {expanded && <Text style={s.description}>Find a story worth following. Locate its stops or open the full journey.</Text>}
+    {expanded && <Text style={s.description}>Tap a journey to open its story. Hold a tile to locate its stops on the globe.</Text>}
     <View style={s.notice}>
       <Text accessibilityLiveRegion="polite" numberOfLines={expanded ? 3 : 1} style={s.hint}>{notice}</Text>
       {expanded && onRetrySelection && <Pressable accessibilityRole="button" accessibilityLabel="Retry located journey" onPress={onRetrySelection} style={s.refresh}><Text style={s.refreshText}>Retry</Text></Pressable>}
@@ -66,15 +67,18 @@ export function DiscoveryPanel({ journeys, selectedId, onLocate, onOpen, notice,
     <View style={[s.list, !expanded && { marginBottom: clearance }]} {...sheet.responders.content}>
     {[false, true].map(listExpanded => <View key={String(listExpanded)} style={[s.list, { display: expanded === listExpanded ? 'flex' : 'none' }]}>
     {/* Horizontal cards stay inside the protected panel; only vertical list motion changes protected content. */}
-    <FlatList {...(listExpanded ? scroll : {})} horizontal={!listExpanded}
+    <FlatList key={listExpanded ? 'home-grid-3' : 'home-horizontal'} {...(listExpanded ? scroll : {})} horizontal={!listExpanded}
+      numColumns={listExpanded ? 3 : 1} columnWrapperStyle={listExpanded ? s.gridRow : undefined}
       initialNumToRender={listExpanded ? 3 : 2} maxToRenderPerBatch={2} windowSize={3} updateCellsBatchingPeriod={50}
       onScroll={event => { if (listExpanded) { scroll.onScroll(); sheet.offset.current = event.nativeEvent.contentOffset.y; } }} scrollEventThrottle={16}
       data={expanded === listExpanded ? journeys.slice(0, visible) : []} keyExtractor={item => item.id} style={s.list}
       extraData={photoRetry}
       showsHorizontalScrollIndicator={false} showsVerticalScrollIndicator={listExpanded}
-      contentContainerStyle={[s.items, listExpanded && s.expandedItems, listExpanded && { paddingBottom: clearance + 10 }]}
-      renderItem={({ item }) => <HomeJourneyCard key={item.id + ':' + photoRetry} journey={item} expanded={listExpanded} width={discoveryCardWidth(availableWidth, listExpanded)}
-        selected={selectedId === item.id} onOpen={onOpen} onLocate={onLocate} onHeight={listExpanded ? undefined : measureCard} />}
+      contentContainerStyle={[s.items, !listExpanded && s.connectedItems, listExpanded && s.expandedItems, listExpanded && { paddingBottom: clearance + 10 }]}
+      renderItem={({ item, index }) => listExpanded ? <ExploreTile key={item.id + ':' + photoRetry} journey={item} columns={3}
+        separators={{ left: index % 3 !== 0, top: index >= 3 }} selected={selectedId === item.id} onOpen={() => onOpen(item.id)} onLocate={() => onLocate(item.id)} />
+        : <HomeJourneyCard key={item.id + ':' + photoRetry} journey={item} expanded={false} width={discoveryCardWidth(availableWidth, false)}
+          selected={selectedId === item.id} onOpen={onOpen} onLocate={onLocate} onHeight={measureCard} />}
       ListEmptyComponent={expanded !== listExpanded ? null : <View style={s.empty}>
         {loading ? <><ActivityIndicator color={pilotColor(colors.ink)} /><Text style={s.hint}>Finding your next journey…</Text></>
           : <Text style={s.emptyText}>{error ? 'A small detour. Tap Refresh to try again.' : emptyText || 'The next story is still to come. No public journeys yet.'}</Text>}
@@ -105,7 +109,9 @@ const lightStyles_s = darkPilotStyles(StyleSheet.create({
   inactiveClear: { color: '#8593A8' },
   list: { flex: 1 },
   items: { paddingHorizontal: 16, paddingTop: 4, paddingBottom: 10, gap: 12, alignItems: 'flex-start' },
-  expandedItems: { alignItems: 'center' },
+  connectedItems: { paddingHorizontal: 0, gap: 0 },
+  expandedItems: { paddingHorizontal: 0, gap: 0, alignItems: 'stretch' },
+  gridRow: { gap: 0, alignItems: 'stretch', justifyContent: 'flex-start' },
   empty: { maxWidth: 300, minHeight: 92, padding: 16, gap: 8, justifyContent: 'center' },
   emptyText: { color: colors.ink, fontSize: 12, lineHeight: 18 },
   more: { minHeight: 44, minWidth: 120, padding: 16, alignItems: 'center', justifyContent: 'center' },

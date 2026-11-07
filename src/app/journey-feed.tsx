@@ -141,7 +141,7 @@ export default function JourneyFeedScreen() {
     {active && state.data ? <Animated.View style={[styles.page, { transform: [{ translateY: offset }] }]}><JourneyStoryContent key={id} journey={state.data} refresh={refresh} refreshing={state.refreshing} error={state.error}
         feed={{ index, count: session?.ids.length || 0, enabled: active && !transitioning, initialStop: session?.stops.get(id), onStop, onAvailability, onPage: page, onDrag: drag }} /></Animated.View>
         : <View style={styles.page}><ScreenHeader title="Journey Story" back />{auth.loading || (active && state.loading) ? <BrandedLoading message="Opening the journey…" />
-          : <View style={styles.message}><Message title={!session ? 'These results have expired' : state.error ? 'A small detour' : 'Journey unavailable'} body={!session ? 'Go back to Search and open a journey again.' : state.error || 'This journey may no longer be public.'} retry={session ? refresh : undefined} />
+          : <View style={styles.message}><Message title={!session ? 'These results have expired' : state.error ? 'A small detour' : 'Journey unavailable'} body={!session ? 'Go back to the collection and open a journey again.' : state.error || 'This journey may no longer be public.'} retry={session ? refresh : undefined} />
             {session && <View style={styles.errorActions}>{[-1, 1].map(step => {
               const disabled = transitioning || index + step < 0 || index + step >= session.ids.length;
               const label = step < 0 ? 'Previous journey' : 'Next journey';
