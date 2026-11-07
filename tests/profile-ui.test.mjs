@@ -20,6 +20,8 @@ function hooks(){let slots=[],cursor=0,effects=[];return {
   render(fn){cursor=0;effects=[];const tree=fn();effects.forEach(f=>f());return tree;},
 };}
 function load(path,modules={},react=hooks().react){
+  modules={'@/lib/discovery/journey-feed-session':{journeyFeedSessions:{create:()=>null}},...modules};
+  modules={'@expo/vector-icons/Feather':{__esModule:true,default:'Feather'},...modules};
   modules={'@/components/profile/profile-connections':{ProfileConnections:'ProfileConnections'},'@/components/profile/profile-memory-map':{ProfileMemoryMap:'ProfileMemoryMap'},'@/components/buddy/travel-preferences-settings':{TravelPreferencesSettings:'TravelPreferencesSettings'},'@/hooks/use-buddy-geometry':buddyGeometryStub,'@/lib/journey/trip-recovery-store':{tripPersistence:{clearUser:async()=>{}}},...modules};const exports={};const code=ts.transpileModule(readFileSync(path,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX}}).outputText;
   modules={'@/hooks/use-journey-buddy':{useBuddyScreen(state){buddyScreens.push(state);},useBuddyGreetingsReset:()=>()=>{},useBuddyPreference:()=>({loaded:true,enabled:false,error:null,setEnabled(){}})},...modules};
   new Function('require','exports',code)(name=>{ if (name === '@/theme/dark-pilot') return lightPilotTheme; if (name === '@/theme/mobile-theme') return appMobileTheme; return name==='@/theme/mobile-theme'?mobileTheme:name==='@/components/discovery/thumbnail-photo'?{ThumbnailPhoto:'JourneyPhoto'}:name==='./profile-styles'?load('src/components/profile/profile-styles.ts',{'@/components/discovery/ui':ui}):name==='react'?react:name==='@/components/delete-draft-action'?{DeleteDraftAction:'DeleteDraftAction'}:name==='@/lib/remix/model'?{draftRemixCredit:source=>source===undefined?'Remix of another journey':source===null?'Remixed from an original journey that is currently unavailable.':'Remix of '+source.title+' · by '+source.creatorName}:name==='@/components/branded-loading'?{BrandedLoading:'BrandedLoading'}:name==='@/components/art/journey-art'?{JourneyArt:'JourneyArt',StopArt:'StopArt'}:name==='@/lib/art/journey-art'?{artSeed:(id,stops)=>'seed:'+id+':'+(stops||[]).length}:name==='react/jsx-runtime'?{jsx,jsxs:jsx,Fragment:'Fragment'}:name==='react-native'?native:name.endsWith('.png')?1:name in modules?modules[name]:(()=>{throw Error(name);})(); },exports);return exports;}
@@ -45,7 +47,12 @@ test('reference profile composition retains real identity/avatar, owner-only fun
 test('profile journey and draft cards retain their routes, truthful facts and photo fallbacks',()=>{
   const routes=[],components=shared(routes);const card=components.ProfileJourneyCard({journey});
   assert.equal(all(card,'JourneyPhoto')[0].props.uri,journey.cover);const art=all(card,'JourneyPhoto')[0].props.fallback;assert.equal(art.type,'JourneyArt');assert.equal(art.props.seed,'seed:real:2');assert.equal(art.props.compact,true);assert.equal(art.props.accessibilityLabel,undefined,'Decorative inside the labelled card');card.props.onPress();assert.deepEqual(routes.at(-1),{pathname:'/journey/[id]',params:{id:'real'}});
-  assert.ok(all(card,'Text').some(n=>n.props.children==='1 day · 2 stops'));
+  assert.ok(card.props.accessibilityLabel.includes('1 day · 2 stops'));
+  assert.deepEqual(all(card,'Feather').map(n=>n.props.name),['calendar','map-pin']);
+  assert.ok(all(card,'Text').some(n=>n.props.children===1));assert.ok(all(card,'Text').some(n=>n.props.children===2));
+  const unknown=components.ProfileJourneyCard({journey:{...journey,durationDays:null,stops:[]}});
+  assert.deepEqual(all(unknown,'Feather').map(n=>n.props.name),['map-pin'],'Unknown duration is omitted instead of displaying zero days');
+  assert.ok(all(unknown,'Text').some(n=>n.props.children===0),'An empty journey truthfully shows zero stops');
   const draft=components.ProfileDraftCard({draft:{id:'private',title:'Real private draft'}});all(draft,'Pressable')[0].props.onPress();assert.deepEqual(routes.at(-1),{pathname:'/create',params:{draft:'private'}});
   assert.equal(all(draft,'JourneyPhoto').length,0,'No fabricated cover for title-only draft projection');
   const header=components.ProfileHeader({onSettings:()=>routes.push('settings')});all(header,'Pressable')[0].props.onPress();assert.equal(routes.at(-1),'back');all(header,'Pressable')[1].props.onPress();assert.equal(routes.at(-1),'settings');
@@ -53,10 +60,11 @@ test('profile journey and draft cards retain their routes, truthful facts and ph
 });
 
 const buddyScreens=[];
-function accountHarness(initialParams={}){const h=hooks(),routes=[],loaders=[];let params=initialParams;let auth={loading:false,session:{access_token:'token-owner',user:{id:uid,email:'private@example.test',user_metadata:{display_name:'Real owner'}}}},finish,fail=false,calls=0,cancels=0;const recoveryCleared=[],tripsCleared=[];
+function accountHarness(initialParams={}){const h=hooks(),routes=[],loaders=[],feedCalls=[];let params=initialParams;let auth={loading:false,session:{access_token:'token-owner',user:{id:uid,email:'private@example.test',user_metadata:{display_name:'Real owner'}}}},finish,fail=false,calls=0,cancels=0;const recoveryCleared=[],tripsCleared=[];
   let draftRefreshes=0;const draftState={data:[{id:'draft',title:'Actual draft'}],refresh(){draftRefreshes++;},retry(){},loading:false};const publishedState={data:{profile:null,journeys:[journey]},refresh(){},retry(){},loading:false};const savedState={data:[],refresh(){},retry(){},loading:false};
-  const components=Object.fromEntries(['ProfileHeader','ProfileIdentity','ProfileCollections','ProfileDraftCard','ProfileJourneyCard','ProfileTabs'].map(n=>[n,n]));components.profileStyles={};
+  const components=Object.fromEntries(['ProfileHeader','ProfileIdentity','ProfileCollections','ProfileDraftCard','ProfileJourneyCard','ProfileTabs'].map(n=>[n,n]));components.profileStyles=load('src/components/profile/profile-styles.ts',{'@/components/discovery/ui':ui}).profileStyles;
   const modules={'expo-router':{useLocalSearchParams:()=>params,useRouter:()=>({push:r=>routes.push(r),setParams:update=>{params={...params,...update};}}),useFocusEffect:()=>{}},'react-native-safe-area-context':{SafeAreaView:'SafeAreaView'},'@/components/discovery/ui':ui,'@/components/profile/profile-ui':components,
+    '@/lib/discovery/journey-feed-session':{journeyFeedSessions:{create:(...args)=>{feedCalls.push(args);return 'profile-session';}}},
     '@/hooks/session-context':{useSessionState:()=>auth},'@/hooks/action-intent':{useActionIntent:()=>({cancel(){cancels++;}})},
     '@/hooks/use-load':{useLoad:fn=>{loaders.push(fn);return [draftState,publishedState,savedState][(loaders.length-1)%3];}},
     '@/lib/remix/queries':{loadPrivateDrafts:async()=>draftState.data,withDraftSources:(drafts,cards)=>drafts.map(d=>d.sourceId&&cards.has(d.sourceId)?{...d,source:cards.get(d.sourceId)}:d)},'@/hooks/use-draft-credits':{useDraftCredits:()=>new Map()},'@/lib/profile/queries':{loadPublicProfile:async()=>null,loadPublishedProfileJourneys:async()=>[journey]},
@@ -65,8 +73,9 @@ function accountHarness(initialParams={}){const h=hooks(),routes=[],loaders=[];l
     '@/lib/create/recovery-store':{creationRecovery:{clearUser:async user=>{recoveryCleared.push(user);}}},
     '@/lib/journey/trip-recovery-store':{tripPersistence:{clearUser:async user=>{tripsCleared.push(user);}}}};
   const {default:Screen}=load('src/app/account.tsx',modules,h.react);
-  return {render:()=>h.render(Screen),routes,loaders,draftState,publishedState,savedState,setParams:v=>params=v,setAuth:v=>auth=v,setFail:v=>fail=v,finish:()=>finish(),calls:()=>calls,cancels:()=>cancels,draftRefreshes:()=>draftRefreshes,recoveryCleared,tripsCleared};
+  return {render:()=>h.render(Screen),routes,loaders,feedCalls,draftState,publishedState,savedState,setParams:v=>params=v,setAuth:v=>auth=v,setFail:v=>fail=v,finish:()=>finish(),calls:()=>calls,cancels:()=>cancels,draftRefreshes:()=>draftRefreshes,recoveryCleared,tripsCleared};
 }
+
 test('Account tabs preserve private draft entry, published cards, settings actions and guarded sign-out failure',async()=>{
   const h=accountHarness();let tree=h.render(),list=all(tree,'FlatList')[0];assert.equal(list.props.data[0].kind,'published');assert.equal(list.props.numColumns,3);
   const authoritative=await h.loaders.at(-2)(new AbortController().signal);assert.equal(authoritative.profile.username,'real');assert.equal(authoritative.profile.displayName,'Real owner');
@@ -86,6 +95,15 @@ test('Account gates private content while signed out/loading and preserves draft
   h.setAuth({loading:false,session:{user:{id:uid,user_metadata:{}}}});h.draftState.data=[];h.draftState.error='Offline';tree=h.render();let list=all(tree,'FlatList')[0];assert.equal(list.props.ListEmptyComponent.props.body,'Offline');
   h.draftState.error=null;list=all(h.render(),'FlatList')[0];assert.equal(list.props.ListEmptyComponent.props.title,'No private drafts yet');assert.match(list.props.ListEmptyComponent.props.body,/save your journey privately/);assert.equal(list.props.ListEmptyComponent.props.action,'Start a journey');list.props.ListEmptyComponent.props.retry();assert.equal(h.routes.at(-1),'/create');
 });
+
+test('only the Map tab permits a map Buddy and Account settings suppress it without enabling a floating duplicate',()=>{
+  const h=accountHarness();let tree=h.render();assert.equal(buddyScreens.at(-1).suppressed,true);assert.equal(buddyScreens.at(-1).floating,true);
+  all(all(tree,'FlatList')[0].props.ListHeaderComponent,'ProfileCollections')[0].props.onSelect('map');tree=h.render();
+  assert.equal(buddyScreens.at(-1).suppressed,false);assert.equal(buddyScreens.at(-1).floating,false);
+  all(tree,'ProfileHeader')[0].props.onSettings();tree=h.render();assert.equal(buddyScreens.at(-1).suppressed,true);assert.equal(buddyScreens.at(-1).floating,false);
+  all(tree,'Modal')[0].props.onRequestClose();tree=h.render();assert.equal(buddyScreens.at(-1).suppressed,false);
+  all(all(tree,'FlatList')[0].props.ListHeaderComponent,'ProfileCollections')[0].props.onSelect('published');h.render();assert.equal(buddyScreens.at(-1).suppressed,true);
+});
 test('public Profile exposes only published data and gates owner tab navigation',()=>{
   const routes=[];let viewer=null,state={data:{profile:{id:uid,username:'real',displayName:'Actual creator',avatar:null,bio:'Bio'},journeys:[journey]}};
   const modules={'expo-router':{useFocusEffect:()=>{},useRouter:()=>({push:r=>routes.push(r)}),useLocalSearchParams:()=>({username:'real'})},'react-native-safe-area-context':{SafeAreaView:'SafeAreaView'},'@/components/discovery/ui':ui,
@@ -101,6 +119,8 @@ test('collection tiles use loaded counts, distinguish unknown from zero and sele
   const {ProfileCollections}=shared();let selected;
   const tree=ProfileCollections({publishedCount:9,draftCount:0,savedCount:2,selected:'drafts',onSelect:value=>selected=value});
   const buttons=all(tree,'Pressable');assert.equal(buttons.length,4);assert.ok(buttons.every(n=>n.props.accessibilityRole==='tab'));
+  assert.deepEqual(all(tree,'Feather').map(n=>n.props.name),['grid','bookmark','edit','map']);
+  assert.equal(all(tree,'Text').length,0,'Collection selectors show icons with spoken labels');
   assert.equal(buttons[0].props.accessibilityLabel,'Published journeys, 9');
   assert.equal(buttons[2].props.accessibilityLabel,'Private drafts, 0');
   buttons[0].props.onPress();assert.equal(selected,'published');buttons[1].props.onPress();assert.equal(selected,'saved');buttons[2].props.onPress();assert.equal(selected,'drafts');
@@ -116,6 +136,36 @@ test('account hero actions route correctly and deletion refreshes drafts and ann
   list=all(h.render(),'FlatList')[0];assert.ok(all(list.props.ListHeaderComponent,'Text').some(n=>n.props.children==='Draft deleted.'));
   all(list.props.ListHeaderComponent,'ProfileCollections')[0].props.onSelect('published');
   assert.equal(all(h.render(),'FlatList')[0].props.data[0].kind,'published');
+});
+
+test('Account grid opens the selected post in exact collection order and keeps Saved separate from published',()=>{
+  const h=accountHarness();
+  h.publishedState.data.journeys=[{...journey,id:'post-c'},{...journey,id:'post-a'},{...journey,id:'post-b'}];
+  let list=all(h.render(),'FlatList')[0];
+  assert.equal(list.props.contentContainerStyle.paddingHorizontal,undefined,'Grid reaches the screen edges');
+  assert.equal(list.props.ListHeaderComponent.props.style.paddingHorizontal,16,'Profile identity and icons keep their inset');
+  assert.equal(list.props.columnWrapperStyle.gap,0);
+  for(const index of [0,1,2,3,4]) {
+    const tile=list.props.renderItem({item:list.props.data[index%3],index});
+    assert.deepEqual(tile.props.separators,{left:index%3!==0,top:index>=3});
+  }
+  list.props.renderItem({item:list.props.data[1]}).props.onPress();
+  assert.deepEqual(h.feedCalls.at(-1),[['post-c','post-a','post-b'],'post-a',uid,{fullCollection:true}]);
+  assert.deepEqual(h.routes.at(-1),{pathname:'/journey-feed',params:{session:'profile-session'}});
+  assert.equal(all(list.props.ListHeaderComponent,'Text').some(n=>n.props.children==='My journeys'||n.props.children==='Your shared stories'),false);
+  h.savedState.data=[{...journey,id:'saved-b'},{...journey,id:'saved-a'}];
+  all(list.props.ListHeaderComponent,'ProfileCollections')[0].props.onSelect('saved');list=all(h.render(),'FlatList')[0];
+  list.props.renderItem({item:list.props.data[1]}).props.onPress();
+  assert.deepEqual(h.feedCalls.at(-1),[['saved-b','saved-a'],'saved-a',uid,{fullCollection:true}]);
+  const {ProfileJourneyCard}=shared();
+  const card=ProfileJourneyCard({journey,edgeToEdge:true,separators:{left:true,top:false},onPress:()=>h.routes.push('selected')});
+  const style=Object.assign({},...card.props.style({pressed:false}).filter(Boolean));
+  assert.equal(style.width,'33.333333%');assert.equal(style.flex,undefined);assert.equal(style.borderWidth,0);assert.equal(style.borderRadius,0);assert.equal(style.marginBottom,0);
+  assert.equal(all(card,'JourneyPhoto')[0].props.fill,true);
+  const image=all(card,'View').find(n=>Array.isArray(n.props.style)&&n.props.style.some(v=>v?.aspectRatio===4/5));assert.ok(image);
+  const seam=all(card,'View').find(n=>Array.isArray(n.props.style)&&n.props.style[1]?.borderLeftWidth===1);
+  assert.equal(seam.props.style[1].borderTopWidth,0,'Only interior column/row edges receive thin separators');
+  card.props.onPress();assert.equal(h.routes.at(-1),'selected');
 });
 test('account draft deletion is contained within its card and forwards success without changing navigation',()=>{
   const {ProfileDraftCard}=shared();let deleted=0;
@@ -222,8 +272,8 @@ test('Saved profile tab loads lazily, isolates token/accounts, aborts stale read
     requests[0].resolve([{...journey,id:'saved-a'}]);await tick();tree=render();assert.equal(list(tree).props.data[0].journey.id,'saved-a');
     auth={...auth,session:{...auth.session,access_token:'token-a2'}};tree=render();
     assert.equal(list(tree).props.data.length,0,'Old-token results disappear synchronously');assert.equal(requests[0].signal.aborted,true);
-    requests.at(-1).reject(Error('Saved offline'));await tick();tree=render();assert.equal(list(tree).props.ListEmptyComponent.props.body,'Saved offline');
-    list(tree).props.ListEmptyComponent.props.retry();tree=render();requests.at(-1).resolve([]);await tick();tree=render();assert.equal(list(tree).props.ListEmptyComponent.props.title,'No saved journeys yet');
+    requests.at(-1).reject(Error('Saved offline'));await tick();tree=render();assert.equal(all(list(tree).props.ListEmptyComponent,'Message')[0].props.body,'Saved offline');
+    all(list(tree).props.ListEmptyComponent,'Message')[0].props.retry();tree=render();requests.at(-1).resolve([]);await tick();tree=render();assert.equal(all(list(tree).props.ListEmptyComponent,'Message')[0].props.title,'No saved journeys yet');
     blur=focus();tree=render();const old=requests.at(-1);assert.equal(old.id,uid);
     const other='33333333-3333-4333-8333-333333333333';auth={loading:false,error:null,session:{user:{id:other},access_token:'token-b'}};
     tree=render();assert.equal(old.signal.aborted,true);assert.equal(list(tree).props.data.length,0);assert.equal(requests.at(-1).id,other);

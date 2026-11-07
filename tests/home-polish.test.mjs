@@ -10,6 +10,8 @@ new Function('exports', ts.transpileModule(readFileSync('src/theme/mobile-theme.
 
 
 function load(file, dependencies, state = null, hookOverrides = {}) {
+  dependencies={'./explore-tile':{ExploreTile:'ExploreTile'},...dependencies};
+  dependencies={'@expo/vector-icons/Feather':{__esModule:true,default:'Feather'},...dependencies};
   dependencies={'@/lib/discovery/journey-feed-session':{journeyFeedSessions:{create:()=>null}},'@/hooks/use-journey-social':{useJourneySocial:()=>({state:null})},'@/hooks/use-buddy-geometry':buddyGeometryStub,'@/hooks/use-trip-recovery':{useTripRecovery:()=>({checking:false,notice:null}),useUnfinishedTrip:()=>null},...dependencies};
   const exports = {};
   const jsx = (type, props, key) => ({ type, props, key });
@@ -223,8 +225,9 @@ test('Home fills photo frames without blurred side panels and uses 16:9 expanded
 test('Home retains title, author, count, Locate and both Story entry points (card and Explore journey)', () => {
   const { all, calls } = card();
   const texts = all.filter(n => n.type === 'Text').map(n => [n.props.children].flat().join(''));
-  for (const text of [journey.title, 'By Traveler', '1 stops']) assert.ok(texts.includes(text));
-  for (const label of ['Locate journey: Coastal weekend', 'Explore journey: Coastal weekend', 'Open journey: Coastal weekend, Coast']) all.find(n => n.props?.accessibilityLabel === label).props.onPress();
+  for (const text of [journey.title, 'By Traveler', '1']) assert.ok(texts.includes(text));
+  assert.ok(all.some(n => n.type === 'Feather' && n.props.name === 'map-pin'));
+  for (const label of ['Locate journey: Coastal weekend', 'Explore journey: Coastal weekend', 'Open journey: Coastal weekend, Coast, 1 stops']) all.find(n => n.props?.accessibilityLabel === label).props.onPress();
   assert.deepEqual(calls, [['locate', journey.id], ['open', journey.id], ['open', journey.id]]);
 });
 test('Home cards show a display-only like count, including 0, in compact and expanded layouts', () => {
@@ -242,12 +245,12 @@ test('Home cards show a display-only like count, including 0, in compact and exp
       assert.equal(count[0].props.numberOfLines, 1);
       const row = all.find(n => [n.props?.children].flat().includes(count[0]));
       assert.equal(row.props.style.flexDirection, 'row', 'Count shares the facts line so card height is unchanged');
-      const facts = [row.props.children].flat().find(n => n?.props?.children === '1 stops');
+      const facts = [row.props.children].flat().find(n => n?.props?.accessibilityLabel === '1 stops');
       assert.ok(facts);
-      assert.equal(facts.props.numberOfLines, 1, 'Facts truncate to one line');
+      assert.equal(facts.props.style.flexDirection, 'row', 'Icon counters stay on the facts line');
       assert.equal(facts.props.style.flexShrink, 1, 'Facts shrink before the count');
       assert.equal(Object.assign({}, ...count[0].props.style.filter(Boolean)).flexShrink, 0, 'Count is never pushed off the card');
-      const open = all.find(n => n.props?.accessibilityLabel === 'Open journey: Coastal weekend, Coast, ' + label);
+      const open = all.find(n => n.props?.accessibilityLabel === 'Open journey: Coastal weekend, Coast, 1 stops, ' + label);
       assert.equal(open.props.accessibilityHint, 'Opens Journey Story');
       open.props.onPress();
       for (const action of ['Locate journey: Coastal weekend', 'Explore journey: Coastal weekend']) all.find(n => n.props?.accessibilityLabel === action).props.onPress();
@@ -260,7 +263,7 @@ test('Home cards show a display-only like count, including 0, in compact and exp
       });
       const all = nodes(component.HomeJourneyCard({ journey: { ...journey, likes }, expanded, width: 300, selected: false, onOpen() {}, onLocate() {} }));
       assert.ok(!all.some(n => n.type === 'Text' && [n.props.children].flat().join('').includes('♡')), 'Unknown count shows nothing');
-      assert.ok(all.some(n => n.props?.accessibilityLabel === 'Open journey: Coastal weekend, Coast'));
+      assert.ok(all.some(n => n.props?.accessibilityLabel === 'Open journey: Coastal weekend, Coast, 1 stops'));
     }
   }
 });
@@ -341,7 +344,7 @@ test('Home missing and failed covers use deterministic journey art in the same f
     const { all } = card(uri, failed, expanded);
     const art = all.find(n => n.type === 'JourneyArt');
     assert.equal(art.props.accessibilityLabel, undefined, 'Decorative: the card Pressable already names the journey');
-    assert.ok(all.some(n => n.type === 'Pressable' && n.props.accessibilityLabel === 'Open journey: Coastal weekend, Coast'));
+    assert.ok(all.some(n => n.type === 'Pressable' && n.props.accessibilityLabel === 'Open journey: Coastal weekend, Coast, 1 stops'));
     assert.equal(art.props.seed, 'seed:journey-a:1', 'Seeded from the journey');
     assert.equal(art.props.stops, journey.stops);
     assert.equal(art.props.compact, !expanded);
@@ -490,7 +493,29 @@ test('Home image lists expose data only in active layout and More keeps every jo
  }
 });
 
+test('expanded Home uses fixed three-column Search tiles with inner seams and retains compact cards and Locate',()=>{
+ let expanded=true;const calls=[];const rows=Array.from({length:5},(_,i)=>({...journey,id:String(i)}));
+ const {DiscoveryPanel}=load('src/components/discovery/discovery-panel.tsx',{
+  'react-native':{Animated:{View:'AnimatedView',add:(a,b)=>a+b},FlatList:'FlatList'},
+  '@/lib/discovery/presentation':{discoveryCardWidth:()=>300},'@/hooks/use-discovery-sheet':{useDiscoverySheet:()=>({height:200,expanded,offset:{current:0},responders:{handle:{},content:{}}})},
+  './home-journey-card':{HomeJourneyCard:'Card'},'./ui':{colors},
+ });
+ const render=()=>nodes(DiscoveryPanel({journeys:rows,selectedId:'1',availableHeight:720,availableWidth:360,onOpen:id=>calls.push(['open',id]),onLocate:id=>calls.push(['locate',id])}));
+ let tree=render();const grid=tree.find(n=>n.type==='FlatList'&&!n.props.horizontal);
+ assert.equal(grid.key,'home-grid-3');assert.equal(grid.props.numColumns,3);assert.equal(grid.props.columnWrapperStyle.gap,0);
+ const container=Object.assign({},...grid.props.contentContainerStyle.filter(Boolean));assert.equal(container.paddingHorizontal,0);assert.equal(container.gap,0);
+ for(let index=0;index<5;index++) {
+  const tile=grid.props.renderItem({item:rows[index],index});assert.equal(tile.type,'ExploreTile');assert.equal(tile.props.columns,3);
+  assert.deepEqual(tile.props.separators,{left:index%3!==0,top:index>=3});assert.equal(tile.props.selected,index===1);
+ }
+ const tile=grid.props.renderItem({item:rows[1],index:1});tile.props.onOpen();tile.props.onLocate();assert.deepEqual(calls,[['open','1'],['locate','1']]);
+ expanded=false;tree=render();const compact=tree.find(n=>n.type==='FlatList'&&n.props.horizontal);assert.equal(compact.key,'home-horizontal');assert.equal(compact.props.numColumns,1);
+ const card=compact.props.renderItem({item:rows[0],index:0});assert.equal(card.type,'Card');assert.equal(card.props.expanded,false);assert.equal(card.props.width,300);assert.equal(typeof card.props.onHeight,'function');
+ assert.equal(tree.find(n=>n.type==='FlatList'&&!n.props.horizontal).key,grid.key,'Hidden and active grids keep one stable layout identity');
+});
+
 test('Home explicit refresh retries failed cached images without resetting panel, list or More state',()=>{
+ for(const layoutExpanded of [false,true]) {
  const state=()=>{let cursor=0;const slots=[];return {reset(){cursor=0;},hook:initial=>{const i=cursor++;if(!(i in slots))slots[i]=initial;return [slots[i],value=>{slots[i]=typeof value==='function'?value(slots[i]):value;}];}};};
  const homeState=state(),panelState=state();let expanded=false;const offset={current:87};
  const photo={...journey,coverThumbnail:'https://example.invalid/thumb.jpg'};
@@ -509,13 +534,15 @@ test('Home explicit refresh retries failed cached images without resetting panel
  },panelState.hook).DiscoveryPanel;
  const props=()=>{homeState.reset();return nodes(Home()).find(n=>n.type==='Panel').props;};
  let panelProps=props();const list=()=>{panelState.reset();return nodes(Panel({...panelProps,availableHeight:720,availableWidth:360})).find(n=>n.type==='FlatList'&&n.props.horizontal===!expanded);};
- list().props.ListFooterComponent.props.onPress();expanded=true;assert.equal(list().props.data.length,48);
+ list().props.ListFooterComponent.props.onPress();expanded=layoutExpanded;assert.equal(list().props.data.length,48);
  let key,cardState,Card;
- const image=()=>{const cell=list().props.renderItem({item:rows[0]});if(key!==cell.key){key=cell.key;cardState=state();Card=load('src/components/discovery/home-journey-card.tsx',{'@/lib/discovery/model':{journeyFacts:()=>''},'./ui':{colors}},cardState.hook).HomeJourneyCard;}cardState.reset();return nodes(Card(cell.props)).find(n=>n.type==='Image');};
- assert.equal(image().props.source.uri,photo.coverThumbnail);image().props.onError();assert.equal(image().props.source.uri,photo.cover);image().props.onError();assert.equal(image(),undefined);
+ const image=()=>{const cell=list().props.renderItem({item:rows[0],index:0});if(key!==cell.key){key=cell.key;cardState=state();const components=load(expanded?'src/components/discovery/explore-tile.tsx':'src/components/discovery/home-journey-card.tsx',{'expo-router':{useRouter:()=>({})},'./journey-photo':{JourneyPhoto:'JourneyPhoto'},'@/lib/discovery/model':{journeyFacts:()=>''},'./ui':{colors}},cardState.hook);Card=expanded?components.ExploreTile:components.HomeJourneyCard;}cardState.reset();return nodes(Card(cell.props)).find(n=>n.type==='Image'||n.type==='JourneyPhoto');};
+ const uri=()=>{const media=image();return media?.props.uri??media?.props.source?.uri;};
+ assert.equal(uri(),photo.coverThumbnail);image().props.onError();assert.equal(uri(),photo.cover);image().props.onError();assert.equal(image(),undefined);
  const failedKey=key,listKey=list().key;panelProps.onRefresh();panelProps=props();assert.equal(panelProps.photoRetry,1);
- assert.equal(image().props.source.uri,photo.coverThumbnail,'Retry retains the same cacheable signed URL');assert.notEqual(key,failedKey);
- assert.equal(list().key,listKey);assert.equal(list().props.extraData,1);assert.equal(list().props.data.length,48);assert.equal(expanded,true);assert.equal(offset.current,87);
+ assert.equal(uri(),photo.coverThumbnail,'Retry retains the same cacheable signed URL');assert.notEqual(key,failedKey);
+ assert.equal(list().key,listKey);assert.equal(list().props.extraData,1);assert.equal(list().props.data.length,48);assert.equal(expanded,layoutExpanded);assert.equal(offset.current,87);
+ }
 });
 test('R2: Home shows "Unfinished trip" with Resume for the signed-in user copy and keeps the panel clear',()=>{
   const routes=[];let trip=null;

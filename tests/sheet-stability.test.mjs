@@ -49,6 +49,7 @@ function harness() {
   const model = load('src/lib/discovery/sheet.ts', { './presentation': presentation });
   const hook = load('src/hooks/use-discovery-sheet.ts', { '@/lib/discovery/sheet': model });
   const panel = load('src/components/discovery/discovery-panel.tsx', {
+    './explore-tile': { ExploreTile: 'ExploreTile' },
     '@/lib/discovery/presentation': presentation, '@/hooks/use-discovery-sheet': hook,
     './home-journey-card': { HomeJourneyCard: 'Card' }, './ui': { colors: {} },
   });
@@ -78,7 +79,7 @@ test('horizontal card browsing retains the height graph and never marks the whol
   const h = harness(), node = h.tree.props.style[1].height, responder = h.responder().onPanResponderGrant;
   const keys = () => h.nodes().filter(n => n.key !== undefined).map(n => n.key);
   const lists = keys();
-  assert.deepEqual(lists, ['false', 'true']);
+  assert.deepEqual(lists, ['false', 'home-horizontal', 'true', 'home-grid-3']);
   const interactionCount = h.interactions.length;
   for (let i = 0; i < 8; i++) {
     assert.equal(h.responder().onMoveShouldSetPanResponderCapture(null, { dx: 80, dy: 3, numberActiveTouches: 1 }), false);

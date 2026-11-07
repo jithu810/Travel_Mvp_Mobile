@@ -341,6 +341,7 @@ test('Home shows the only-own empty copy and the panel renders it in place of th
   } finally { h.dispose(); }
   const p = stateHarness();
   const { DiscoveryPanel } = load('src/components/discovery/discovery-panel.tsx', {
+    './explore-tile': { ExploreTile: 'ExploreTile' },
     react: p.hooks, 'react/jsx-runtime': runtime, 'react-native': { ...native, Animated: { View: 'AnimatedView', add: (a, b) => a + b } },
     '@/lib/discovery/presentation': { discoveryCardWidth: () => 300 }, '@/hooks/use-discovery-sheet': { useDiscoverySheet: () => ({ height: 200, expanded: false, offset: { current: 0 }, responders: { handle: {}, content: {} } }) },
     './home-journey-card': { HomeJourneyCard: 'Card' }, './ui': { colors: {} },

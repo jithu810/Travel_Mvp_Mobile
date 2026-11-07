@@ -20,12 +20,15 @@ export default function CreatorProfileScreen() {
   const loader = useCallback((signal: AbortSignal) => loadPublicProfile(handle, signal), [handle]);
   const state = useLoad(loader), value = state.data;
   const scroll = useBuddyScroll();
-  // Temporary profile-only hiding while the memory collections are designed.
-  useBuddyScreen({ floating: true, suppressed: true });
   const refresh = state.refresh;
   // Map is a view of the same published profile; it loads lazily inside its component
   // and refreshes with this profile: focus is soft (45 s cache), pull-to-refresh forces.
   const [tab, setTab] = useState<'published' | 'map'>('published');
+  useBuddyScreen({ floating: tab !== 'map', suppressed: tab !== 'map' || !value });
+  const [listHeight, setListHeight] = useState(0), [headerHeight, setHeaderHeight] = useState(0), [mapOnScreen, setMapOnScreen] = useState(false);
+  const listOffset = useRef(0);
+  const mapHeight = Math.max(160, listHeight - headerHeight - 6);
+  useEffect(() => { setMapOnScreen(listOffset.current + listHeight > headerHeight + 6 && listOffset.current < headerHeight + 6 + mapHeight); }, [listHeight, headerHeight, mapHeight]);
   const [mapRefresh, setMapRefresh] = useState(0), [mapReload, setMapReload] = useState(0);
   const activeTab = useRef(tab);
   useEffect(() => { activeTab.current = tab; }, [tab]);
@@ -34,12 +37,14 @@ export default function CreatorProfileScreen() {
   const owner = Boolean(value && auth.session?.user.id === value.profile.id);
   return <SafeAreaView edges={['left', 'right', 'bottom']} style={ui.safe}><View style={ui.page}>
     <ProfileHeader onSettings={() => router.push('/account')} />
+    <View style={{ flex: 1, minHeight: 0 }} onLayout={event => { const next = event.nativeEvent.layout.height;if (next > 0) setListHeight(previous => previous === next ? previous : next); }}>
     {state.loading ? <BrandedLoading message="Opening this travel journal…" /> : !value
       ? <View style={s.content}><Message title={state.error ? 'A small detour' : 'Creator unavailable'} body={state.error || 'This public creator profile could not be found.'} retry={state.retry} /></View>
-      : <FlatList {...scroll} key="journey-grid-3" numColumns={3} columnWrapperStyle={s.gridRow} data={tab === 'map' ? [] : value.journeys} keyExtractor={journey => journey.id} contentContainerStyle={s.content} showsVerticalScrollIndicator={false}
+      : <FlatList {...scroll} key="journey-grid-3" numColumns={3} columnWrapperStyle={s.gridRow} data={tab === 'map' ? [] : value.journeys} keyExtractor={journey => journey.id} contentContainerStyle={tab === 'map' ? { paddingTop: 6, paddingBottom: 0 } : s.content} showsVerticalScrollIndicator={false}
+        onScroll={event => { scroll.onScroll();listOffset.current = event.nativeEvent.contentOffset.y;setMapOnScreen(listOffset.current + listHeight > headerHeight + 6 && listOffset.current < headerHeight + 6 + mapHeight); }} scrollEventThrottle={32}
         renderItem={({ item }) => <JourneyCard journey={item} />}
         refreshControl={<RefreshControl refreshing={state.refreshing} onRefresh={refreshAll} tintColor={colors.ink} />}
-        ListHeaderComponent={<View>
+        ListHeaderComponent={<View style={tab === 'map' ? { paddingHorizontal: 16 } : undefined} onLayout={event => { const next = event.nativeEvent.layout.height;if (next > 0) setHeaderHeight(previous => previous === next ? previous : next); }}>
           {state.error && <Message title="Couldn’t refresh this profile" body={state.error} retry={state.refresh} />}
           <ProfileIdentity name={value.profile.displayName || value.profile.username} username={value.profile.username} bio={value.profile.bio} avatar={value.profile.avatar} count={value.journeys.length} owner={owner} />
           <ProfileConnections key={value.profile.id} targetId={value.profile.id} name={value.profile.displayName || value.profile.username} />
@@ -47,6 +52,7 @@ export default function CreatorProfileScreen() {
             <ProfileTabs selected={tab} drafts={owner} onSelect={next => { if (next === 'drafts') { if (owner) router.push({ pathname: '/account', params: { collection: 'drafts' } }); } else setTab(next); }} />
           </View>
         </View>}
-        ListEmptyComponent={tab === 'map' ? <ProfileMemoryMap key={value.profile.id} ownerId={value.profile.id} refreshKey={mapRefresh} reloadKey={mapReload} owner={owner} /> : <Message title="No public journeys yet" body="This creator hasn’t shared a public journey here yet." />} />}
+        ListEmptyComponent={tab === 'map' ? <ProfileMemoryMap key={value.profile.id} ownerId={value.profile.id} refreshKey={mapRefresh} reloadKey={mapReload} owner={owner} fullBleed mapHeight={mapHeight} onScreen={mapOnScreen} journeyCovers={value.journeys} /> : <Message title="No public journeys yet" body="This creator hasn’t shared a public journey here yet." />} />}
+    </View>
   </View></SafeAreaView>;
 }

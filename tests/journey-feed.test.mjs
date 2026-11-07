@@ -47,6 +47,16 @@ test('direction lock yields horizontal/diagonal/multitouch/disabled fallback and
   for (const args of [[100, 30, 1, true], [60, 75, 1, true], [0, 100, 2, true], [0, 100, 1, false], [0, 12, 1, true]]) assert.equal(feedGesture(...args), false);
 });
 
+test('profile feed keeps the complete loaded order and opens selections beyond discovery cap without changing Search bounds', () => {
+  const sessions = feedModel.createJourneyFeedSessions();
+  const ids = Array.from({ length: 125 }, (_, i) => id(i));
+  const token = sessions.create(ids, id(120), 'owner', { fullCollection: true });
+  assert.deepEqual(sessions.get(token, 'owner').ids, ids);
+  assert.equal(sessions.get(token, 'owner').index, 120);
+  assert.equal(sessions.create(ids, id(120), 'owner'), null, 'Search keeps its discovery cap');
+  assert.equal(sessions.get(token, 'other'), null, 'Profile collections remain account scoped');
+});
+
 test('raw cache deduplicates, deeply isolates stop mutation, expires at 45s and bounds six entries', async () => {
   let now = 0, calls = 0; const cache = caches.createJourneyDetailCache(() => now);
   const loader = async () => { calls++; return raw(1); };

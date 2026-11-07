@@ -1,13 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { ActivityIndicator, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { Message } from '@/components/discovery/ui';
 import { useLoad } from '@/hooks/use-load';
 import { spaceColor } from '@/lib/discovery/presentation';
-import { memoryMapJourneyLimit, memoryPinRoute, type MemoryPin } from '@/lib/profile/memory-map';
+import { memoryPinRoute, type MemoryPin } from '@/lib/profile/memory-map';
 import { loadProfileMemoryMap, signMemoryPins } from '@/lib/profile/memory-map-queries';
 import { theme } from '@/theme/mobile-theme';
 import { MemoryMapView } from './memory-map-view';
+import type { MemoryJourneyCover } from './memory-buddy-presentation';
 
 // Mounted only while Map is selected, so the read is lazy and unmounting (tab change,
 // leaving the profile) aborts it. A changed owner replaces the loader, which hides the
@@ -15,9 +16,9 @@ import { MemoryMapView } from './memory-map-view';
 // refreshKey: soft profile refresh (focus) that may reuse the 45 s cache, so returning
 // from Story neither refetches nor remounts the map. reloadKey: forced fresh read
 // (pull-to-refresh, foreground).
-export function ProfileMemoryMap({ ownerId, refreshKey = 0, reloadKey = 0, owner = false }: { ownerId: string; refreshKey?: number; reloadKey?: number; owner?: boolean }) {
+export function ProfileMemoryMap({ ownerId, refreshKey = 0, reloadKey = 0, owner = false, fullBleed = false, mapHeight: requestedHeight = 300, onScreen = true, journeyCovers }: { ownerId: string; refreshKey?: number; reloadKey?: number; owner?: boolean; fullBleed?: boolean; mapHeight?: number; onScreen?: boolean; journeyCovers?: readonly MemoryJourneyCover[] }) {
   const router = useRouter();
-  const { width, height } = useWindowDimensions();
+  const { width } = useWindowDimensions();
   const fresh = useRef(false);
   const loader = useCallback((signal: AbortSignal) => {
     const options = { fresh: fresh.current };
@@ -56,9 +57,9 @@ export function ProfileMemoryMap({ ownerId, refreshKey = 0, reloadKey = 0, owner
     navigating.current = true;
     router.push(memoryPinRoute(pin));
   }, [router]);
-  const mapHeight = Math.round(Math.max(300, Math.min(460, height * 0.5)));
-  // Estimated before the first native layout so the map never waits on a measurement.
-  const initialViewport = useMemo(() => ({ width: Math.max(1, Math.min(width, 560) - 32), height: mapHeight }), [width, mapHeight]);
+  const mapWidth = Math.max(1, Math.min(width, 560) - (fullBleed ? 0 : 32));
+  const mapHeight = Math.max(160, requestedHeight);
+  const initialViewport = useMemo(() => ({ width: mapWidth, height: mapHeight }), [mapWidth, mapHeight]);
   if (!data) return state.loading
     ? <View style={[s.frame, { height: mapHeight }, s.center]} accessibilityLabel="Loading travel map" accessibilityRole="progressbar"><ActivityIndicator color={theme.accent} /></View>
     : <Message title="Couldn’t load the travel map" body={state.error || 'Something went wrong. Please try again.'} retry={state.retry} />;
@@ -69,28 +70,15 @@ export function ProfileMemoryMap({ ownerId, refreshKey = 0, reloadKey = 0, owner
       ? 'Stops with a location from journeys you publish will appear here. Drafts stay private and never show on this map.'
       : 'Places from this creator’s published journeys will appear here once they add locations.'} />
   </View>;
-  const places = data.pins.length;
-  const placesText = places + (places === 1 ? ' place' : ' places');
-  const summary = data.limited
-    ? 'Showing ' + (owner ? 'your ' : 'their ') + memoryMapJourneyLimit + ' most recent journeys · ' + placesText
-    : placesText + ' from ' + data.journeyCount + ' published ' + (data.journeyCount === 1 ? 'journey' : 'journeys');
-  return <View style={s.section}>
-    {refreshError}
-    <Text style={s.summary} accessibilityLiveRegion="polite">{summary}</Text>
-    <View style={[s.frame, { height: mapHeight }]} accessibilityLabel={'Travel map, ' + placesText}
-      accessibilityHint="Photo pins open their stop in the journey story. To reach every journey with a screen reader, use the Journeys tab.">
-      {focused ? <MemoryMapView pins={pins} onOpen={open} initialViewport={initialViewport} cameraKey={ownerId.toLowerCase()} /> : null}
-    </View>
-    <Text style={s.note}>{places > data.featuredCount
-      ? 'Photos show for ' + data.featuredCount + ' recent places. Tap a pin or dot to open its stop; every journey is also listed in the Journeys tab.'
-      : 'Tap a pin to open its stop in the journey story. Every journey is also listed in the Journeys tab.'}</Text>
+  return <View style={[s.frame, { height: mapHeight }]}>
+    {focused && <MemoryMapView key={ownerId} pins={pins} onOpen={open} initialViewport={initialViewport} cameraKey={ownerId.toLowerCase()} onScreen={onScreen} journeyCovers={journeyCovers} />}
+    {state.error && <View style={s.error} accessibilityRole="alert" accessibilityLabel={state.error}><Text style={s.errorText}>Couldn’t refresh memories.</Text><Pressable accessibilityRole="button" accessibilityLabel="Retry travel memories" onPress={state.retry} style={s.retry}><Text style={s.errorText}>Retry</Text></Pressable></View>}
   </View>;
 }
 
 const s = StyleSheet.create({
-  section: { gap: 8, paddingBottom: 8 },
-  frame: { borderRadius: 22, overflow: 'hidden', borderWidth: 1, borderColor: theme.border, backgroundColor: spaceColor },
+  frame: { overflow: 'hidden', backgroundColor: spaceColor },
   center: { alignItems: 'center', justifyContent: 'center' },
-  summary: { color: theme.muted, fontSize: 12, lineHeight: 18 },
-  note: { color: theme.muted, fontSize: 11, lineHeight: 17 },
+  error: { position: 'absolute', top: 68, left: 12, flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: theme.surface, borderRadius: 12, paddingLeft: 10 },
+  errorText: { color: theme.text, fontSize: 10, lineHeight: 14 }, retry: { minWidth: 48, minHeight: 48, alignItems: 'center', justifyContent: 'center' },
 });

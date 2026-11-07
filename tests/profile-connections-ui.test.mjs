@@ -31,10 +31,23 @@ function uiHarness(patch = {}) {
     '@/hooks/use-profile-connections': { useProfileConnections: () => state }, '@/components/journey/story-sheet': { StorySheet: 'StorySheet' },
     '@/theme/dark-pilot': { darkPilotStyles: value => value }, '@/theme/mobile-theme': { theme: { text: '#fff', muted: '#ccc' } },
   });
-  const render = () => { cursor = 0;return ProfileConnections({ targetId: state.owner ? viewer : peer, name: 'Traveler' }); };
+  const render = (compact = false) => { cursor = 0;return ProfileConnections({ targetId: state.owner ? viewer : peer, name: 'Traveler', compact }); };
   return { render, calls, routes, state: () => state, set: patch => { state = { ...state, ...patch }; } };
 }
 const button = (tree, label) => nodes(tree).find(node => node.type === 'Pressable' && node.props.accessibilityLabel === label);
+
+test('compact owner counts retain collection access and block unavailable or uncertain reads', () => {
+  const h = uiHarness({ owner: true });
+  for (const [label, collection] of [['Friends, 2', 'friends'], ['Following, 4', 'following'], ['Inbox, 1 unread', 'inbox']]) {
+    const control = button(h.render(true), label);
+    assert.ok(control);assert.equal(control.props.disabled, false);control.props.onPress();
+    assert.deepEqual(h.calls.at(-1), ['select', collection]);
+  }
+  h.set({ summary: null, collection: null });
+  assert.equal(button(h.render(true), 'Friends, count unavailable').props.disabled, true);
+  h.set({ summary: summary({ friendsCount: 0 }), uncertain: true });
+  assert.equal(button(h.render(true), 'Friends, 0').props.disabled, true);
+});
 
 test('public profile friends and Follow are independent and confirmed incoming/outgoing states choose exact commands', () => {
   const h = uiHarness();let tree = h.render();button(tree, 'Add friend Traveler').props.onPress();assert.deepEqual(h.calls, [['request']]);

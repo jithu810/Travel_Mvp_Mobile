@@ -4,8 +4,11 @@ type FeedSession = { ids: readonly string[]; index: number; account: string; exp
 export function createJourneyFeedSessions(clock = Date.now) {
   const sessions = new Map<string, FeedSession>();
   let serial = 0;
-  function create(ids: string[], selected: string, account: string) {
-    const ordered = [...new Set(ids.filter(isJourneyId))].slice(0, discoveryLimit);
+  function create(ids: string[], selected: string, account: string, options?: { fullCollection?: boolean }) {
+    const valid = [...new Set(ids.filter(isJourneyId))];
+    // Profile collections are already loaded and may exceed discovery's result cap.
+    // Store only their ordered IDs; detail loading and prefetch remain bounded.
+    const ordered = options?.fullCollection ? valid : valid.slice(0, discoveryLimit);
     const index = ordered.indexOf(selected);
     if (index < 0) return null;
     const token = `${clock().toString(36)}-${++serial}`;
