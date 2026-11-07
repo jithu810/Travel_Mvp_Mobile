@@ -3,13 +3,15 @@ import { theme } from '@/theme/mobile-theme';
 import type { ReactNode } from 'react';
 import { useCallback, useState } from 'react';
 import { useFocusEffect, useGlobalSearchParams, usePathname, useRouter } from 'expo-router';
-import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Animated, Image, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSessionState } from '@/hooks/session-context';
 import { useLoad } from '@/hooks/use-load';
 import { loadOwnProfile } from '@/lib/profile/edit-queries';
 import { safePhoto } from '@/lib/discovery/model';
 import { useBuddyProtectedBounds } from '@/hooks/use-buddy-geometry';
+
+import { NavigationCompactContext, NavigationControlContext, useNavigationAnimation } from '@/hooks/use-navigation-scroll';
 
 type Destination = 'explore' | 'search' | 'create' | 'story' | 'account' | null;
 function AccountAvatar() {
@@ -39,6 +41,12 @@ export function FloatingNavigation({ active, onHeight }: { active: Destination; 
   const protection = useBuddyProtectedBounds();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { width } = useWindowDimensions();
+  const { compact, progress } = useNavigationAnimation();
+  const left = Math.max(16, insets.left + 8), right = Math.max(16, insets.right + 8);
+  const [measuredWidth, setMeasuredWidth] = useState<number | null>(null);
+  const available = measuredWidth ?? width - left - right;
+  const inset = progress.interpolate({ inputRange: [0, 1], outputRange: [0, Math.max(0, (available - 262) / 2)] });
   const items = [
     { key: 'explore', label: 'Explore', accessible: 'Explore', icon: '◎', route: '/discover' },
     { key: 'search', label: 'Search', accessible: 'Search journeys and creators', route: '/search?view=search' },
@@ -46,14 +54,16 @@ export function FloatingNavigation({ active, onHeight }: { active: Destination; 
     { key: 'story', label: 'Story', accessible: 'Browse public stories', route: '/search?view=stories' },
     { key: 'account', label: 'Account', accessible: 'Open account', route: '/account' },
   ] as const;
-  return <View {...protection} style={[styles.bar, { bottom: Math.max(0, insets.bottom) + 8, left: Math.max(16, insets.left + 8), right: Math.max(16, insets.right + 8) }]}
-    onLayout={event => { protection.onLayout(); onHeight?.(event.nativeEvent.layout.height); }} onStartShouldSetResponder={() => true} onResponderTerminationRequest={() => false}>
+  return <View {...protection} pointerEvents="box-none" style={[styles.slot, { bottom: Math.max(0, insets.bottom) + 8, left, right }]}
+    onLayout={event => { protection.onLayout(); setMeasuredWidth(event.nativeEvent.layout.width); onHeight?.(event.nativeEvent.layout.height); }}>
+    <Animated.View testID={compact ? 'navigation-compact' : 'navigation-expanded'} style={[styles.bar, { left: inset, right: inset }]} onStartShouldSetResponder={() => true} onResponderTerminationRequest={() => false}>
     {items.map(item => <Pressable key={item.key} accessibilityRole="button" accessibilityLabel={item.accessible}
       accessibilityState={{ selected: active === item.key }} onPress={() => { if (active !== item.key) router.navigate(item.route); }}
       style={({ pressed }) => [styles.item, active === item.key && styles.selected, pressed && styles.pressed]}>
       <View accessible={false} importantForAccessibility="no-hide-descendants" style={styles.iconSlot}><NavigationIcon name={item.key} /></View>
-      <Text numberOfLines={1} maxFontSizeMultiplier={1.2} adjustsFontSizeToFit minimumFontScale={0.85} style={[styles.label, active === item.key && styles.active]}>{item.label}</Text>
+      <Animated.View style={{ height: progress.interpolate({ inputRange: [0, 1], outputRange: [14, 0] }), opacity: progress.interpolate({ inputRange: [0, 1], outputRange: [1, 0] }), overflow: 'hidden' }}><Text numberOfLines={1} maxFontSizeMultiplier={1.2} adjustsFontSizeToFit minimumFontScale={0.85} style={[styles.label, active === item.key && styles.active]}>{item.label}</Text></Animated.View>
     </Pressable>)}
+    </Animated.View>
   </View>;
 }
 
@@ -66,19 +76,23 @@ export function MainNavigationFrame({ children }: { children: ReactNode }) {
   const [height, setHeight] = useState(56);
   const visible = path === '/search' || path === '/create' || path === '/account' || (path.startsWith('/journey/') || path === '/journey-feed') || path.startsWith('/customized/') || path.startsWith('/profile/');
   const active: Destination = path === '/search' ? view === 'stories' ? 'story' : 'search' : path === '/create' ? 'create' : path === '/account' ? 'account' : ((path.startsWith('/journey/') || path === '/journey-feed') || path.startsWith('/customized/')) ? 'story' : null;
-  return <View style={[styles.frame, styles.backdrop]}>
+  const routeKey = path + ':' + (view || '');
+  const [navigation, setNavigation] = useState({ routeKey, compact: false });
+  const setCompact = useCallback((compact: boolean) => setNavigation(previous => previous.routeKey === routeKey && previous.compact === compact ? previous : { routeKey, compact }), [routeKey]);
+  return <NavigationControlContext.Provider value={setCompact}><NavigationCompactContext.Provider value={navigation.routeKey === routeKey && navigation.compact}><View style={[styles.frame, styles.backdrop]}>
     <View style={[styles.frame, visible && { paddingBottom: height + 16 }]}>{children}</View>
     {visible && <FloatingNavigation active={active} onHeight={setHeight} />}
-  </View>;
+  </View></NavigationCompactContext.Provider></NavigationControlContext.Provider>;
 }
 const lightStyles_styles = darkPilotStyles(StyleSheet.create({
   frame: { flex: 1 },
   backdrop: { backgroundColor: theme.background, experimental_backgroundImage: theme.backgroundGradient },
-  bar: { position: 'absolute', zIndex: 20, elevation: 5, alignSelf: 'center',
+  slot: { position: 'absolute', height: 58, zIndex: 20 },
+  bar: { position: 'absolute', bottom: 0, zIndex: 20, elevation: 5, alignSelf: 'center',
     flexDirection: 'row', alignItems: 'stretch', gap: 3, padding: 4, borderRadius: 32,
     backgroundColor: 'rgba(242, 246, 255, 0.97)', borderWidth: 1, borderColor: '#DCE6F5',
     shadowColor: '#14251F', shadowOpacity: 0.12, shadowRadius: 8, shadowOffset: { width: 0, height: 3 } },
-  item: { flex: 1, minWidth: 0, minHeight: 48, borderRadius: 26, paddingHorizontal: 4, paddingVertical: 4,
+  item: { flex: 1, minWidth: 0, minHeight: 44, borderRadius: 26, paddingHorizontal: 4, paddingVertical: 4,
     alignItems: 'center', justifyContent: 'center', gap: 0 },
   selected: { backgroundColor: '#C9DFFF' }, pressed: { opacity: 0.65 },
   iconSlot: { height: 26, width: 28, alignItems: 'center', justifyContent: 'center' },

@@ -29,7 +29,7 @@ export function DiscoveryPanel({ journeys, selectedId, onLocate, onOpen, notice,
   const collapsed = Math.min(space, chromeHeight + cardHeight + 14);
   const sheet = useDiscoverySheet(space, publishHeight, onInteraction, { peek: Math.min(44, space), collapsed, expanded: Math.max(collapsed, space - 96) });
   const { expanded } = sheet;
-  const protection = useBuddyProtectedBounds(), scroll = useBuddyScroll();
+  const protection = useBuddyProtectedBounds(), scroll = useBuddyScroll(true, String(expanded), expanded);
   // Touch/search updates rerender Home; retain the same animation graph.
   const panelHeight = useMemo(() => Animated.add(sheet.height, clearance), [sheet.height, clearance]);
   const [visible, setVisible] = useState(24);
@@ -70,7 +70,7 @@ export function DiscoveryPanel({ journeys, selectedId, onLocate, onOpen, notice,
     <FlatList key={listExpanded ? 'home-grid-3' : 'home-horizontal'} {...(listExpanded ? scroll : {})} horizontal={!listExpanded}
       numColumns={listExpanded ? 3 : 1} columnWrapperStyle={listExpanded ? s.gridRow : undefined}
       initialNumToRender={listExpanded ? 3 : 2} maxToRenderPerBatch={2} windowSize={3} updateCellsBatchingPeriod={50}
-      onScroll={event => { if (listExpanded) { scroll.onScroll(); sheet.offset.current = event.nativeEvent.contentOffset.y; } }} scrollEventThrottle={16}
+      onScroll={event => { if (listExpanded) { scroll.onScroll(event); sheet.offset.current = event.nativeEvent.contentOffset.y; } }} scrollEventThrottle={16}
       data={expanded === listExpanded ? journeys.slice(0, visible) : []} keyExtractor={item => item.id} style={s.list}
       extraData={photoRetry}
       showsHorizontalScrollIndicator={false} showsVerticalScrollIndicator={listExpanded}

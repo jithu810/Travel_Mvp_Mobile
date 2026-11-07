@@ -69,7 +69,7 @@ export default function AccountScreen() {
   const [error, setError] = useState<string | null>(null);
   const buddy = useBuddyPreference();
   const resetBuddyGreetings = useBuddyGreetingsReset();
-  const scroll = useBuddyScroll(), footerProtection = useBuddyProtectedBounds();
+  const scroll = useBuddyScroll(true, tab), footerProtection = useBuddyProtectedBounds();
   // Only a loaded draft is offered; nothing is written and no copy is made from here.
   // A failed or running refresh may hold a deleted draft in the last-known list, so offer only a settled, successful load.
   const resumeDraft = drafts.error || drafts.refreshing ? undefined : drafts.data?.[0];
@@ -133,7 +133,7 @@ export default function AccountScreen() {
     <View style={{ flex: 1, minHeight: 0 }} onLayout={event => { const next = event.nativeEvent.layout.height;if (next > 0) setListHeight(previous => previous === next ? previous : next); }}>
     {auth.loading ? <ActivityIndicator color={appTheme.accent} accessibilityLabel="Loading account" /> : !auth.session ? <View style={s.content}><Message title="Your next chapter" body="Sign in to Like, Save, and create private journey copies." retry={() => router.push('/auth')} action="Sign in or register" />{auth.error && <Text accessibilityRole="alert" style={ui.body}>{auth.error}</Text>}</View>
       : <FlatList {...scroll} key={tab === 'drafts' ? 'draft-list' : 'journey-grid-3'} numColumns={tab === 'drafts' ? 1 : 3} columnWrapperStyle={tab === 'drafts' ? undefined : grid ? s.seamlessGridRow : s.gridRow}
-        onScroll={event => { scroll.onScroll();listOffset.current = event.nativeEvent.contentOffset.y;setMapOnScreen(listOffset.current + listHeight > headerHeight + 6 && listOffset.current < headerHeight + 6 + mapHeight); }} scrollEventThrottle={32}
+        onScroll={event => { scroll.onScroll(event);listOffset.current = event.nativeEvent.contentOffset.y;setMapOnScreen(listOffset.current + listHeight > headerHeight + 6 && listOffset.current < headerHeight + 6 + mapHeight); }} scrollEventThrottle={32}
         data={rows} keyExtractor={row => row.kind + ':' + (row.kind === 'draft' ? row.draft.id : row.journey.id)} contentContainerStyle={fullWidthCollection ? tab === 'map' ? [s.accountGridContent, { paddingBottom: 0 }] : s.accountGridContent : s.content} showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={collection.refreshing} onRefresh={refresh} tintColor={colors.ink} />}
         renderItem={({ item, index }) => item.kind === 'draft' ? <ProfileDraftCard draft={item.draft} onDeleted={() => { setDeleteMessage('Draft deleted.'); refreshDrafts(); }} /> : <ProfileJourneyCard journey={item.journey} edgeToEdge separators={{ left: index % 3 !== 0, top: index >= 3 }} onPress={() => openJourney(item.journey.id)} />}

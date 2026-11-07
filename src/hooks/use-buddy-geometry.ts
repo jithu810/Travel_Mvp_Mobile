@@ -1,6 +1,7 @@
+import { useNavigationScroll } from './use-navigation-scroll';
 import { useCallback, useEffect, useRef } from 'react';
 import { useFocusEffect, usePathname } from 'expo-router';
-import { AppState, type View } from 'react-native';
+import { AppState, type View, type NativeScrollEvent, type NativeSyntheticEvent } from 'react-native';
 import { useBuddyApi } from './use-journey-buddy';
 import type { BuddyRect } from '@/lib/buddy/model';
 
@@ -39,7 +40,8 @@ export function useBuddyProtectedBounds(project?: (rect: BuddyRect) => readonly 
 }
 
 // Scroll momentum changes window coordinates even after the finger leaves the screen.
-export function useBuddyScroll() {
+export function useBuddyScroll(navigation = false, resetKey = '', initialCompact = false) {
+  const navigationScroll = useNavigationScroll(navigation, resetKey, initialCompact);
   const api = useBuddyApi(), path = usePathname(), owner = useRef({}), timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const focused = useRef(false), generation = useRef(0);
   const end = useCallback(() => {
@@ -67,5 +69,6 @@ export function useBuddyScroll() {
     const stop = api?.preference.subscribe(() => { if (!api.preference.get().enabled) cancel(); });
     return () => { app.remove(); stop?.(); cancel(); };
   }, [api, path]);
-  return { onScroll: begin, scrollEventThrottle: 32, onScrollBeginDrag: begin, onScrollEndDrag: begin, onMomentumScrollBegin: begin, onMomentumScrollEnd: end };
+  const onScroll = useCallback((event?: NativeSyntheticEvent<NativeScrollEvent>) => { begin(); navigationScroll(event); }, [begin, navigationScroll]);
+  return { onScroll, scrollEventThrottle: 32, onScrollBeginDrag: begin, onScrollEndDrag: begin, onMomentumScrollBegin: begin, onMomentumScrollEnd: end };
 }
