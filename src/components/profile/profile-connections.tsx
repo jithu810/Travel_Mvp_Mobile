@@ -10,8 +10,8 @@ import { theme } from '@/theme/mobile-theme';
 type Dialog = 'respond' | 'remove' | 'signin' | null;
 const collectionNames: Record<ConnectionCollection, string> = { friends: 'Friends', following: 'Following', incoming: 'Requests', outgoing: 'Sent', inbox: 'Inbox' };
 
-// Kept outside the identity card so its approved composition remains unchanged.
-export function ProfileConnections({ targetId, name = 'this traveler' }: { targetId: string; name?: string }) {
+// Account embeds the compact owner counts in the identity; visitor actions retain their layout.
+export function ProfileConnections({ targetId, name = 'this traveler', compact = false }: { targetId: string; name?: string; compact?: boolean }) {
   const connections = useProfileConnections(targetId), router = useRouter();
   const { controller, summary, collection } = connections;
   const [dialogState, setDialogState] = useState<{ controller: typeof controller; value: Dialog }>({ controller, value: null });
@@ -72,8 +72,17 @@ export function ProfileConnections({ targetId, name = 'this traveler' }: { targe
     </StorySheet>
   </View>;
   const friendLabel = summary?.friendStatus === 'incoming' ? 'Respond' : summary?.friendStatus === 'outgoing' ? 'Request sent' : summary?.friendStatus === 'friends' ? 'Friends' : 'Add friend';
-  return <View style={s.container}>
-    {connections.owner ? <View style={s.row}>
+  return <View style={compact ? s.compactContainer : s.container}>
+    {connections.owner && compact ? <View style={s.statsRow}>
+      {([{ key: 'friends', label: 'Friends', count: summary?.friendsCount },
+        { key: 'following', label: 'Following', count: summary?.followingCount },
+        { key: 'inbox', label: 'Inbox', count: summary?.unreadCount }] as const).map(item => <Pressable key={item.key}
+        accessibilityRole="button" accessibilityLabel={item.label + ', ' + (item.count === undefined ? 'count unavailable' : item.count + (item.key === 'inbox' ? ' unread' : ''))}
+        accessibilityState={{ disabled: blocked }} disabled={blocked} onPress={() => controller.select(item.key)}
+        style={({ pressed }) => [s.stat, blocked && s.disabled, pressed && s.pressed]}>
+        <Text style={s.statCount}>{item.count ?? '—'}</Text><Text style={s.statLabel}>{item.label}</Text>
+      </Pressable>)}
+    </View> : connections.owner ? <View style={s.row}>
       <Control label={'Friends · ' + (summary?.friendsCount ?? '—')} accessibilityLabel={'Friends, ' + (summary ? summary.friendsCount : 'count unavailable')} disabled={blocked} onPress={() => controller.select('friends')} />
       <Control label={'Following · ' + (summary?.followingCount ?? '—')} accessibilityLabel={'Following, ' + (summary ? summary.followingCount : 'count unavailable')} disabled={blocked} onPress={() => controller.select('following')} />
       <Control label={'Inbox · ' + (summary?.unreadCount ?? '—')} accessibilityLabel={'Inbox, ' + (summary ? summary.unreadCount + ' unread' : 'unread count unavailable')} disabled={blocked} onPress={() => controller.select('inbox')} />
@@ -120,6 +129,11 @@ function Control({ label, accessibilityLabel, disabled = false, selected = false
 }
 const s = darkPilotStyles(StyleSheet.create({
   container: { marginTop: 10, gap: 5 },
+  compactContainer: { marginTop: 3, gap: 4 },
+  statsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 2 },
+  stat: { flexGrow: 1, flexBasis: 48, minWidth: 48, minHeight: 48, paddingVertical: 3, alignItems: 'center', justifyContent: 'center', gap: 1 },
+  statCount: { color: theme.text, fontSize: 16, lineHeight: 20, fontWeight: '700' },
+  statLabel: { color: theme.muted, fontSize: 10, lineHeight: 15, textAlign: 'center' },
   row: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   control: { minHeight: 48, minWidth: 48, flexGrow: 1, paddingHorizontal: 10, paddingVertical: 9, justifyContent: 'center', alignItems: 'center', borderRadius: 14, borderWidth: 1, borderColor: theme.border, backgroundColor: theme.surface },
   controlText: { color: theme.text, fontSize: 12, lineHeight: 18, fontWeight: '600', textAlign: 'center' },

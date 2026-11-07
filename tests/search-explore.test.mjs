@@ -5,6 +5,7 @@ import { test } from 'node:test';
 import { readFileSync } from 'node:fs';
 import ts from 'typescript';
 function load(path, modules) {
+  modules={'@expo/vector-icons/Feather':{__esModule:true,default:'Feather'},...modules};
   modules={'@/lib/discovery/journey-feed-session':{journeyFeedSessions:{create:()=>null}},...modules};
   modules={'@/components/first-outcome-hint':{FirstOutcomeHint:'FirstOutcomeHint'},...modules};
   modules={'@/components/first-outcome-hint':{FirstOutcomeHint:'FirstOutcomeHint'},...modules};
@@ -50,6 +51,9 @@ test('Explore virtualizes two columns with six initial tiles and preserves all r
   const s=screen();let tree=s.render();let list=tree.find(n=>n.type==='FlatList');
   assert.equal(list.props.numColumns,2);assert.equal(list.props.data.length,19);assert.equal(list.props.initialNumToRender*list.props.numColumns,6);assert.equal(list.props.maxToRenderPerBatch,2);assert.equal(list.props.windowSize,3);
   assert.equal(list.props.renderItem({item:list.props.data[18]}).type,'ExploreTile');
+  assert.equal(list.props.contentContainerStyle.paddingHorizontal,undefined);
+  assert.deepEqual(list.props.renderItem({item:list.props.data[18],index:18}).props.separators,{left:false,top:true});
+  assert.deepEqual(list.props.renderItem({item:list.props.data[1],index:1}).props.separators,{left:true,top:false});
   assert.ok(!tree.some(n=>n.type==='ScreenHeader'));
   assert.ok(!all(list.props.ListHeaderComponent).some(n=>n.type==='Pressable'));
   tree.find(n=>n.type==='TextInput').props.onChangeText('Coast');
@@ -84,15 +88,31 @@ test('Explore tile navigates with source marker and falls back to journey art af
   const journey={id:'a',title:'Coast',destination:'Kerala',creatorName:'Owner',cover:'https://example.test/a.jpg',stops:[{id:'s'}]};
   const render=()=>ExploreTile({journey});let tree=render();tree.props.onPress();assert.deepEqual(routes[0],{pathname:'/journey/[id]',params:{id:'a',source:'search'}});assert.match(tree.props.accessibilityLabel,/Coast.*Kerala.*Owner/);
   const media=t=>t.props.children[0], caption=t=>all(t.props.children[1]).filter(n=>n.type==='Text').map(n=>n.props.children);
-  assert.deepEqual(caption(tree),['Coast','Kerala'],'Photo tiles show title and destination');
+  assert.deepEqual(caption(tree),['Coast','Kerala',1],'Photo tiles show title, destination and stop count');
   media(tree).props.onError();tree=render();const art=media(tree);assert.equal(art.type,'JourneyArt');assert.equal(art.props.accessibilityLabel,undefined,'Decorative inside the labelled tile');
   assert.equal(art.props.seed,'seed:a:1');assert.equal(art.props.destination,'Kerala');assert.equal(art.props.showDestination,undefined,'The shared caption replaces the art destination label');assert.equal(art.props.compact,true);
-  assert.deepEqual(caption(tree),['Coast','Kerala'],'Art tiles share the same caption');assert.equal(tree.props.children[1].props.importantForAccessibility,'no-hide-descendants','The tile label already announces the caption');
+  assert.deepEqual(caption(tree),['Coast','Kerala',1],'Art tiles share the same caption');assert.equal(tree.props.children[1].props.importantForAccessibility,'no-hide-descendants','The tile label already announces the caption');
   journey.cover='https://example.test/b.jpg';assert.equal(media(render()).type,'JourneyPhoto');journey.cover=null;assert.equal(media(render()).type,'JourneyArt');
-  journey.title='  ';tree=render();assert.deepEqual(caption(tree),['Kerala'],'A blank title leaves only the destination');
+  journey.title='  ';tree=render();assert.deepEqual(caption(tree),['Kerala',1],'A blank title retains destination and stop count');
+  journey.durationDays=2;tree=render();assert.deepEqual(caption(tree),['Kerala',2,1]);
+  assert.match(tree.props.accessibilityLabel,/2 days, 1 stop/);
+  assert.deepEqual(all(tree).filter(n=>n.type==='Feather').map(n=>n.props.name),['calendar','map-pin']);
+  const tileStyle=Object.assign({},...tree.props.style({pressed:false}).filter(Boolean));
+  assert.equal(tileStyle.width,'50%');assert.equal(tileStyle.marginBottom,0);assert.equal(tileStyle.borderRadius,0);
 });
 test('Search and legacy source links retain the single heart-first social action owner',()=>{
   const source=readFileSync('src/app/journey/[id].tsx','utf8');assert.doesNotMatch(source,/saveFirst=\{params.source === 'search'\}/);assert.match(source,/saveFirst = false/);assert.match(source,/<SocialActions[^>]*saveFirst=\{saveFirst\}/);assert.equal((source.match(/<SocialActions /g)||[]).length,1);
+});
+
+test('three-column Home tile preserves story tap and offers long-press and accessible Locate with selection',()=>{
+ const calls=[];const {ExploreTile}=load('src/components/discovery/explore-tile.tsx',{'react/jsx-runtime':runtime,react:{useState:()=>[null,()=>{}]},'expo-router':{useRouter:()=>({})},'react-native':native,'./journey-photo':{JourneyPhoto:'JourneyPhoto'},...artModules});
+ const journey={id:'home',title:'Coast',destination:'Kerala',creatorName:'Owner',cover:null,durationDays:2,stops:[{id:'s'}]};
+ const tree=ExploreTile({journey,columns:3,selected:true,onOpen:()=>calls.push('open'),onLocate:()=>calls.push('locate'),separators:{left:true,top:false}});
+ const style=Object.assign({},...tree.props.style({pressed:false}).filter(Boolean));assert.equal(style.width,'33.333333%');assert.equal(style.aspectRatio,4/5);assert.equal(style.flex,undefined);
+ assert.deepEqual(tree.props.accessibilityState,{selected:true});assert.deepEqual(tree.props.accessibilityActions,[{name:'locate',label:'Locate journey on globe'}]);
+ tree.props.onPress();tree.props.onLongPress();tree.props.onAccessibilityAction({nativeEvent:{actionName:'locate'}});tree.props.onAccessibilityAction({nativeEvent:{actionName:'other'}});assert.deepEqual(calls,['open','locate','locate']);
+ assert.ok(all(tree).some(n=>n.props.style?.borderWidth===2),'Located journey retains a visible selected outline');
+ const search=ExploreTile({journey});assert.equal(search.props.onLongPress,undefined);assert.equal(search.props.accessibilityActions,undefined);assert.equal(search.props.accessibilityState,undefined);
 });
 test('Bookmark moves first only when requested, preserving sign-in, selected, busy and retry handling',()=>{
   const calls=[], intents=[],routes=[];let social={auth:{session:null,loading:false},state:null,busy:null,act:x=>calls.push(x),load:()=>calls.push('load')};

@@ -1,5 +1,6 @@
 import { DeleteDraftAction } from '@/components/delete-draft-action';
-import { useCallback, useState } from 'react';
+import { useCallback, useState, type ReactNode } from 'react';
+import Feather from '@expo/vector-icons/Feather';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Image, Platform, Pressable, StatusBar, Text, useWindowDimensions, View } from 'react-native';
@@ -41,8 +42,8 @@ function AtlasDecoration() {
   </View>;
 }
 
-export function ProfileIdentity({ name, username, bio, avatar, count, owner = false, onCreate }: {
-  name: string; username?: string | null; bio?: string | null; avatar?: string | null; count: number | null; owner?: boolean; onCreate?: () => void;
+export function ProfileIdentity({ name, username, bio, avatar, count, owner = false, onCreate, connections }: {
+  name: string; username?: string | null; bio?: string | null; avatar?: string | null; count: number | null; owner?: boolean; onCreate?: () => void; connections?: ReactNode;
 }) {
   const router = useRouter();
   const { width } = useWindowDimensions();
@@ -59,6 +60,7 @@ export function ProfileIdentity({ name, username, bio, avatar, count, owner = fa
       <View style={s.identityCopy}>
         <Text accessibilityRole="header" accessibilityLabel={name} numberOfLines={2} style={s.name}>{name}</Text>
         {username && <Text style={s.handle}>@{username}</Text>}
+        {connections}
       </View>
     </View>
     {bio && (bio.length > 90 ? <View style={s.bioRow}>
@@ -84,14 +86,13 @@ export function ProfileCollections({ publishedCount, draftCount, savedCount = nu
 }) {
   const protection = useBuddyProtectedBounds();
   return <View {...protection} accessibilityRole="tablist" style={s.collections}>
-    {([{ key: 'published', count: publishedCount, title: 'Journeys', label: 'Published journeys' },
-      { key: 'saved', count: savedCount, title: 'Saved', label: 'Private saved journeys' },
-      { key: 'drafts', count: draftCount, title: 'Drafts', label: 'Private drafts' },
-      { key: 'map', count: null, title: 'Map', label: travelMapTabLabel }] as const).map(item => <Pressable key={item.key}
+    {([{ key: 'published', count: publishedCount, icon: 'grid', label: 'Published journeys' },
+      { key: 'saved', count: savedCount, icon: 'bookmark', label: 'Private saved journeys' },
+      { key: 'drafts', count: draftCount, icon: 'edit', label: 'Private drafts' },
+      { key: 'map', count: null, icon: 'map', label: travelMapTabLabel }] as const).map(item => <Pressable key={item.key}
       accessibilityRole="tab" accessibilityLabel={item.key === 'map' ? item.label : item.label + ', ' + (item.count === null ? 'count unavailable' : item.count)} accessibilityState={{ selected: selected === item.key }}
       onPress={() => onSelect(item.key)} style={({ pressed }) => [s.collection, selected === item.key && s.selectedCollection, pressed && s.pressed]}>
-      <Text style={[s.collectionTitle, selected === item.key && s.selectedCollectionText]}>{item.title}</Text>
-      <Text accessible={false} style={s.collectionCount}>{item.count ?? ' '}</Text>
+      <Feather name={item.icon} size={22} accessible={false} style={[s.collectionIcon, selected === item.key && s.selectedCollectionText]} />
     </Pressable>)}
   </View>;
 }
@@ -107,18 +108,21 @@ export function ProfileTabs({ selected, onSelect, drafts = false }: { selected: 
   </View>;
 }
 
-export function ProfileJourneyCard({ journey }: { journey: PublicJourney }) {
+export function ProfileJourneyCard({ journey, onPress, edgeToEdge = false, separators }: { journey: PublicJourney; onPress?: () => void; edgeToEdge?: boolean; separators?: { left: boolean; top: boolean } }) {
   const router = useRouter();
   const protection = useBuddyProtectedBounds();
-  return <Pressable {...protection} accessibilityRole="button" accessibilityLabel={'Open journey: ' + journey.title + ', ' + journey.destination}
-    onPress={() => router.push({ pathname: '/journey/[id]', params: { id: journey.id } })} style={({ pressed }) => [s.card, s.journeyCard, pressed && s.pressed]}>
-    <View style={s.thumbnail}><ThumbnailPhoto uri={journey.cover} thumbnailUri={journey.coverThumbnail} ratio={1} label={journey.title + ' cover photo'}
+  return <Pressable {...protection} accessibilityRole="button" accessibilityLabel={'Open journey: ' + journey.title + ', ' + journey.destination + ', ' + journeyFacts(journey)}
+    onPress={onPress ?? (() => router.push({ pathname: '/journey/[id]', params: { id: journey.id } }))} style={({ pressed }) => [s.card, s.journeyCard, edgeToEdge && s.edgeToEdgeCard, pressed && s.pressed]}>
+    <View style={[s.thumbnail, edgeToEdge && s.portraitThumbnail]}><ThumbnailPhoto uri={journey.cover} thumbnailUri={journey.coverThumbnail} ratio={1} fill={edgeToEdge} label={journey.title + ' cover photo'}
       fallback={<JourneyArt seed={artSeed(journey.id, journey.stops)} stops={journey.stops} compact />} /></View>
-    <View style={s.gridCopy}>
-      {journey.destination !== 'Destination not specified' && <Text numberOfLines={1} style={s.destination}>⌖ {journey.destination}</Text>}
+    <View pointerEvents="none" style={s.gridCopy}>
       <Text numberOfLines={2} style={s.gridTitle}>{journey.title}</Text>
-      <Text numberOfLines={2} style={s.gridFacts}>{journeyFacts(journey)}</Text>
+      <View accessible={false} accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={s.gridMetrics}>
+        {!!journey.durationDays && <View style={s.gridMetric}><Feather name="calendar" size={10} accessible={false} color="#FFFFFF" /><Text style={s.gridFacts}>{journey.durationDays}</Text></View>}
+        <View style={s.gridMetric}><Feather name="map-pin" size={10} accessible={false} color="#FFFFFF" /><Text style={s.gridFacts}>{journey.stops.length}</Text></View>
+      </View>
     </View>
+    {edgeToEdge && separators && <View pointerEvents="none" accessible={false} style={[s.tileSeams, { borderLeftWidth: separators.left ? 1 : 0, borderTopWidth: separators.top ? 1 : 0 }]} />}
   </Pressable>;
 }
 

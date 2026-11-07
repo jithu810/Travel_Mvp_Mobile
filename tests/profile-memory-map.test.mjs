@@ -259,7 +259,7 @@ test('camera cache resumes the last camera per owner only while the places are u
   assert.match(source, /defaultSettings=\{restored \? \{ \.\.\.restored, pitch: 0 \} : frame\.camera\}/);
   assert.match(source, /if \(first && restored\) return;/, 'A resumed camera is not refit');
   const wrapper = readFileSync('src/components/profile/profile-memory-map.tsx', 'utf8');
-  assert.match(wrapper, /\{focused \? <MemoryMapView /, 'Native map renders only while the profile is focused');
+  assert.match(wrapper, /\{focused && <MemoryMapView /, 'Native map renders only while the profile is focused');
 });
 
 // ---- Component and screen wiring (mocked React tree, no native rendering) ----
@@ -284,6 +284,7 @@ function load(path, modules, react) {
   const code = ts.transpileModule(readFileSync(path, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX } }).outputText;
   const exports = {};
   new Function('require', 'exports', code)(name => {
+    if (name === '@/lib/discovery/journey-feed-session' && !(name in modules)) return { journeyFeedSessions: { create: () => null } };
     if (name === 'react') return react; if (name === 'react/jsx-runtime') return { jsx, jsxs: jsx, Fragment: 'Fragment' };
     if (name === 'react-native') return native; if (name === '@/theme/dark-pilot') return lightPilotTheme; if (name === '@/theme/mobile-theme') return appMobileTheme;
     if (name === '@/hooks/use-buddy-geometry') return buddyGeometryStub;
@@ -319,35 +320,32 @@ test('ProfileMemoryMap: loading, error with retry, owner/visitor empty copy, ref
   empty = all(c.render({ ownerId: owner }), 'Message')[0]; assert.match(empty.props.body, /this creator’s published journeys/);
   const pins = memory.normalizeMemoryMap([row(1, [stopRow(1, 0), stopRow(1, 1)])], owner).pins;
   c.set({ data: { pins, journeyCount: 1, featuredCount: 2, limited: false }, loading: false, error: 'Refresh failed' }); tree = c.render({ ownerId: owner });
-  assert.equal(all(tree, 'Message')[0].props.title, 'Couldn’t refresh the travel map', 'Last good pins stay with a refresh error');
-  let view = all(tree, 'MemoryMapView')[0]; assert.equal(view.props.pins, pins, 'Unsigned pins (art) show before photos');
-  assert.deepEqual(view.props.initialViewport, { width: 328, height: 400 }, 'Map gets a usable size before native layout');
+  assert.equal(all(tree, 'View').find(node => node.props.accessibilityRole === 'alert').props.accessibilityLabel, 'Refresh failed', 'Last good pins stay with a refresh error');
+  let view = all(tree, 'MemoryMapView')[0]; assert.equal(view.props.pins, pins, 'Unsigned pins show before photos');
+  assert.deepEqual(view.props.initialViewport, { width: 328, height: 300 }, 'Map receives its usable parent dimensions');
   assert.deepEqual(c.loaders.at(-1)('s'), { pins, signal: 's' }, 'Photos are signed for the loaded pins after they render');
   const signedPins = pins.map(pin => ({ ...pin, photo: 'https://signed/' + pin.stopId }));
   c.setPhotos({ data: signedPins, loading: false, error: null }); tree = c.render({ ownerId: owner }); view = all(tree, 'MemoryMapView')[0];
   assert.equal(view.props.pins, signedPins);
   c.setPhotos({ data: null, loading: false, error: 'The request timed out. Please try again.' }); tree = c.render({ ownerId: owner });
-  assert.equal(all(tree, 'MemoryMapView')[0].props.pins, pins, 'Signing timeout keeps the map with art'); assert.equal(all(tree, 'Message').length, 1, 'No extra error for photos');
-  const frame = all(tree, 'View').find(n => n.props.accessibilityHint);
-  assert.match(frame.props.accessibilityHint, /screen reader, use the Journeys tab/); assert.equal(frame.props.accessibilityLabel, 'Travel map, 2 places');
-  assert.ok(all(tree, 'Text').some(n => /every journey is also listed in the Journeys tab/i.test([n.props.children].flat().join(''))));
-  assert.ok(all(tree, 'Text').some(n => [n.props.children].flat().join('') === '2 places from 1 published journey'));
+  assert.equal(all(tree, 'MemoryMapView')[0].props.pins, pins, 'Signing timeout keeps the map'); assert.equal(all(tree, 'View').filter(node => node.props.accessibilityRole === 'alert').length, 1, 'No extra error for photos');
+  assert.equal(view.props.mosaic, undefined, 'Only the pannable map is mounted');
   view.props.onOpen(pins[1]); assert.deepEqual(c.routes, [{ pathname: '/journey/[id]', params: { id: jid(1), stop: sid(1, 1) } }]);
   view.props.onOpen(pins[1]); view.props.onOpen(pins[0]); assert.equal(c.routes.length, 1, 'Marker+dot or double taps push Story once');
-  assert.equal(view.props.cameraKey, owner, 'Camera resumes per profile owner');
+  assert.equal(view.props.cameraKey, owner, 'Buddy selection and camera remain scoped to the owner');
   const refreshesBeforeStory = c.refreshes(), loadersBeforeStory = c.loaders.length;
   c.focus()()(); tree = c.render({ ownerId: owner }); // focus, then blur (navigate to Story)
-  assert.equal(all(tree, 'MemoryMapView').length, 0, 'One active Mapbox map: the profile map unmounts while Story is open');
-  assert.equal(all(tree, 'View').filter(n => n.props.accessibilityHint).length, 1, 'The map frame keeps its size and labels');
+  assert.equal(all(tree, 'MemoryMapView').length, 0, 'Native map is released while Story is open');
   c.focus()(); tree = c.render({ ownerId: owner });
-  assert.equal(all(tree, 'MemoryMapView').length, 1, 'Remounts on return');
+  assert.equal(all(tree, 'MemoryMapView').length, 1, 'Native presentation may remount on return');
   assert.equal(c.refreshes(), refreshesBeforeStory, 'Focus return alone never forces a read');
   const [mapBefore, photosBefore] = c.loaders.slice(loadersBeforeStory - 2, loadersBeforeStory);
   assert.deepEqual(c.loaders.slice(-2), [mapBefore, photosBefore], 'Same loaders: the cached data and photos are reused, not reloaded');
   all(tree, 'MemoryMapView')[0].props.onOpen(pins[0]); assert.equal(c.routes.length, 2, 'Focus return releases the lock');
   c.set({ data: { pins, journeyCount: 100, featuredCount: 2, limited: true }, loading: false, error: null });
-  assert.ok(all(c.render({ ownerId: owner, owner: true }), 'Text').some(n => n.props.children === 'Showing your 100 most recent journeys · 2 places'));
-  assert.ok(all(c.render({ ownerId: owner }), 'Text').some(n => n.props.children === 'Showing their 100 most recent journeys · 2 places'));
+  assert.equal(all(c.render({ ownerId: owner, fullBleed: true, mapHeight: 240, onScreen: false }), 'MemoryMapView')[0].props.initialViewport.width, 360);
+  assert.equal(all(c.render({ ownerId: owner, fullBleed: true, mapHeight: 240, onScreen: false }), 'MemoryMapView')[0].props.initialViewport.height, 240);
+  assert.equal(all(c.render({ ownerId: owner, onScreen: false }), 'MemoryMapView')[0].props.onScreen, false);
 });
 
 test('ProfileMemoryMap: soft refresh may reuse the cache; reload forces a fresh read', () => {
@@ -364,6 +362,7 @@ test('ProfileMemoryMap: soft refresh may reuse the cache; reload forces a fresh 
 
 function profileUi() {
   return load('src/components/profile/profile-ui.tsx', {
+    '@expo/vector-icons/Feather': { __esModule: true, default: 'Feather' },
     'expo-router': { useRouter: () => ({ push() {} }), useFocusEffect() {} }, 'react-native-safe-area-context': { SafeAreaView: 'SafeAreaView' },
     '@/components/discovery/journey-photo': { JourneyPhoto: 'JourneyPhoto' }, '@/components/discovery/thumbnail-photo': { ThumbnailPhoto: 'ThumbnailPhoto' },
     '@/components/art/journey-art': { JourneyArt: 'JourneyArt' }, '@/lib/art/journey-art': { artSeed: () => 'seed' }, '@/lib/discovery/model': { journeyFacts: () => '' },
@@ -376,7 +375,7 @@ test('Map is an accessible option beside existing collections on own and public 
   const tiles = all(ProfileCollections({ publishedCount: 2, draftCount: 1, savedCount: null, selected: 'map', onSelect: v => { selected = v; } }), 'Pressable');
   assert.deepEqual(tiles.map(n => n.props.accessibilityLabel), ['Published journeys, 2', 'Private saved journeys, count unavailable', 'Private drafts, 1', 'Travel map of published journey stops']);
   assert.deepEqual(tiles.map(n => n.props.accessibilityState.selected), [false, false, false, true]);
-  assert.equal(all(tiles[3], 'Text')[0].props.children, 'Map'); tiles[3].props.onPress(); assert.equal(selected, 'map');
+  assert.equal(all(tiles[3], 'Feather')[0].props.name, 'map'); tiles[3].props.onPress(); assert.equal(selected, 'map');
   const visitor = all(ProfileTabs({ selected: 'published', onSelect: v => { selected = v; } }), 'Pressable');
   assert.deepEqual(visitor.map(n => n.props.accessibilityLabel), ['Published journeys', 'Travel map of published journey stops'], 'Visitors never get Drafts');
   visitor[1].props.onPress(); assert.equal(selected, 'map');
@@ -420,7 +419,8 @@ test('Account Map tab swaps the grid for the owner map (published-only component
   assert.deepEqual(list.props.data, []); assert.equal(list.props.key, 'journey-grid-3', 'Header/connections do not remount'); assert.equal(list.props.numColumns, 3);
   const map = list.props.ListEmptyComponent;
   assert.equal(map.type, 'ProfileMemoryMap'); assert.equal(map.props.ownerId, owner); assert.equal(map.props.owner, true); assert.equal(map.key, owner);
-  assert.equal(all(list.props.ListHeaderComponent, 'Text').find(n => n.props.accessibilityRole === 'header').props.children, 'Travel map');
+  assert.equal(all(list.props.ListHeaderComponent, 'Text').some(n => n.props.children === 'Travel map'), false, 'No heading band between tabs and atlas');
+  assert.equal(map.props.fullBleed, true, 'Map reaches both sides of the Account viewport');
   const key = map.props.refreshKey, reload = map.props.reloadKey;
   const published = a.published.refreshCount;
   list.props.refreshControl.props.onRefresh(); list = all(a.render(), 'FlatList')[0];
@@ -431,6 +431,21 @@ test('Account Map tab swaps the grid for the owner map (published-only component
   const draftRefreshes = a.drafts.refreshCount; a.foreground('background'); a.render(); assert.equal(a.drafts.refreshCount, draftRefreshes);
   all(list.props.ListHeaderComponent, 'ProfileCollections')[0].props.onSelect('drafts');
   list = all(a.render(), 'FlatList')[0]; assert.equal(list.props.data[0].kind, 'draft'); assert.equal(list.props.numColumns, 1, 'Drafts unchanged');
+});
+
+test('Account map fills measured content below its header, removes Map footer and pauses when scrolled offscreen', () => {
+  const a = accountScreen();let tree = a.render(), list = all(tree, 'FlatList')[0];
+  all(list.props.ListHeaderComponent, 'ProfileCollections')[0].props.onSelect('map');tree = a.render();list = all(tree, 'FlatList')[0];
+  const viewport = all(tree, 'View').find(node => node.props.onLayout && node.props.style?.flex === 1 && node.props.style.minHeight === 0);
+  viewport.props.onLayout({ nativeEvent: { layout: { height: 700 } } });
+  list.props.ListHeaderComponent.props.onLayout({ nativeEvent: { layout: { height: 480 } } });list = all(a.render(), 'FlatList')[0];
+  assert.equal(list.props.ListEmptyComponent.props.mapHeight, 214);assert.equal(list.props.ListFooterComponent, null);
+  assert.equal(Object.assign({}, ...list.props.contentContainerStyle).paddingBottom, 0);
+  assert.equal(all(a.render(), 'FlatList')[0].props.ListEmptyComponent.props.onScreen, true);
+  list.props.ListHeaderComponent.props.onLayout({ nativeEvent: { layout: { height: 900 } } });a.render();list = all(a.render(), 'FlatList')[0];
+  assert.equal(list.props.ListEmptyComponent.props.mapHeight, 160, 'Existing short/large-text scrolling retains a usable map minimum');assert.equal(list.props.ListEmptyComponent.props.onScreen, false);
+  list.props.onScroll({ nativeEvent: { contentOffset: { y: 300 } } });list = all(a.render(), 'FlatList')[0];assert.equal(list.props.ListEmptyComponent.props.onScreen, true);
+  list.props.onScroll({ nativeEvent: { contentOffset: { y: 1200 } } });list = all(a.render(), 'FlatList')[0];assert.equal(list.props.ListEmptyComponent.props.onScreen, false);
 });
 
 test('public profile Map tab shows the creator map for every viewer; Drafts still routes owners to Account', () => {

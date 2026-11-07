@@ -1,11 +1,12 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import type { MemoryPin } from '@/lib/profile/memory-map';
+import type { MemoryJourneyCover } from './memory-buddy-presentation';
 import { spaceColor } from '@/lib/discovery/presentation';
 import { lightTheme, theme } from '@/theme/mobile-theme';
 
 export type MemoryMapViewport = { width: number; height: number };
 /** cameraKey: profile owner, for resuming the last camera after the map remounts. */
-export type MemoryMapViewProps = { pins: readonly MemoryPin[]; onOpen: (pin: MemoryPin) => void; initialViewport: MemoryMapViewport; cameraKey: string };
+export type MemoryMapViewProps = { pins: readonly MemoryPin[]; onOpen: (pin: MemoryPin) => void; initialViewport: MemoryMapViewport; cameraKey: string; onScreen?: boolean; journeyCovers?: readonly MemoryJourneyCover[] };
 
 // Shown inside the map frame when the native map cannot render here.
 export function MemoryMapNotice({ message, retry }: { message: string; retry?: () => void }) {

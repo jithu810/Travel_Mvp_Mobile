@@ -1,5 +1,6 @@
 import { darkPilotStyles } from '@/theme/dark-pilot';
 import { memo, useState } from 'react';
+import Feather from '@expo/vector-icons/Feather';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import type { PublicJourney } from '@/types/journey';
 import { journeyFacts } from '@/lib/discovery/model';
@@ -23,8 +24,8 @@ export const HomeJourneyCard = memo(function HomeJourneyCard({ journey, expanded
   const currentLikes = social.state?.likes ?? journey.likes;
   const likes = typeof currentLikes === 'number' && Number.isSafeInteger(currentLikes) && currentLikes >= 0 ? currentLikes : null;
   const likesLabel = likes === null ? null : likes + (likes === 1 ? ' like' : ' likes');
-  return <View style={[s.card, { width }, selected && s.selected]} onLayout={event => onHeight?.(event.nativeEvent.layout.height)}>
-    <Pressable accessibilityRole="button" accessibilityLabel={'Open journey: ' + journey.title + ', ' + journey.destination + (likesLabel ? ', ' + likesLabel : '')}
+  return <View style={[s.card, !expanded && s.connectedCard, { width }, selected && s.selected]} onLayout={event => onHeight?.(event.nativeEvent.layout.height)}>
+    <Pressable accessibilityRole="button" accessibilityLabel={'Open journey: ' + journey.title + ', ' + journey.destination + ', ' + journeyFacts(journey) + (likesLabel ? ', ' + likesLabel : '')}
       accessibilityHint="Opens Journey Story" onPress={() => onOpen(journey.id)} style={[s.story, expanded && s.expandedStory]}>
       <View style={[s.cover, expanded && s.expandedCover, expanded && { height: Math.round(width * 9 / 16) }]}>
         {cover && failedUri !== cover
@@ -36,7 +37,10 @@ export const HomeJourneyCard = memo(function HomeJourneyCard({ journey, expanded
         <Text numberOfLines={expanded ? 2 : 1} style={s.title}>{journey.title}</Text>
         <Text numberOfLines={1} style={s.creator}>By {journey.creatorName}</Text>
         <View style={s.factsRow}>
-          <Text numberOfLines={1} style={s.facts}>{journeyFacts(journey)}</Text>
+          <View accessible={false} importantForAccessibility="no-hide-descendants" accessibilityLabel={journeyFacts(journey)} style={s.facts}>
+            {journey.durationDays ? <View style={s.fact}><Feather name="calendar" size={11} accessible={false} style={s.factIcon} /><Text style={s.factCount}>{journey.durationDays}</Text></View> : null}
+            <View style={s.fact}><Feather name="map-pin" size={11} accessible={false} style={s.factIcon} /><Text style={s.factCount}>{journey.stops.length}</Text></View>
+          </View>
           {likesLabel !== null && <Text numberOfLines={1} style={[s.likes, liked && s.liked]} accessibilityLabel={likesLabel + (liked ? ', liked by you' : '')}>{liked ? '♥' : '♡'} {likes}</Text>}
         </View>
       </View>
@@ -51,6 +55,7 @@ export const HomeJourneyCard = memo(function HomeJourneyCard({ journey, expanded
 });
 const lightStyles_s = darkPilotStyles(StyleSheet.create({
   card: { borderRadius: 18, backgroundColor: colors.white, borderWidth: 1, borderColor: '#E1E8F4', overflow: 'hidden' },
+  connectedCard: { borderRadius: 0, borderWidth: 0, borderRightWidth: 1 },
   selected: { borderColor: '#3873CE', backgroundColor: '#F0F6FF' },
   story: { flexDirection: 'row', padding: 10, paddingBottom: 4, gap: 10 },
   expandedStory: { flexDirection: 'column', padding: 0, gap: 0 },
@@ -63,7 +68,10 @@ const lightStyles_s = darkPilotStyles(StyleSheet.create({
   title: { color: '#14243F', fontSize: 15, lineHeight: 19, fontWeight: '700' },
   creator: { color: colors.muted, fontSize: 10, lineHeight: 14 },
   factsRow: { flexDirection: 'row', alignItems: 'center', gap: 8, minWidth: 0 },
-  facts: { color: colors.muted, fontSize: 10, lineHeight: 14, flexShrink: 1 },
+  facts: { flexDirection: 'row', alignItems: 'center', gap: 8, flexShrink: 1 },
+  fact: { flexDirection: 'row', alignItems: 'center', gap: 3 },
+  factIcon: { color: colors.muted },
+  factCount: { color: colors.muted, fontSize: 10, lineHeight: 14 },
   likes: { color: colors.muted, fontSize: 10, lineHeight: 14, flexShrink: 0 },
   liked: { color: '#FF5364' },
   actions: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 10, paddingBottom: 4, gap: 8 },

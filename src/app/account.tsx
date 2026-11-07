@@ -23,6 +23,7 @@ import { loadSavedJourneys } from '@/lib/social/saved-queries';
 import { ProfileConnections } from '@/components/profile/profile-connections';
 import { ProfileMemoryMap } from '@/components/profile/profile-memory-map';
 import type { PublicJourney } from '@/types/journey';
+import { journeyFeedSessions } from '@/lib/discovery/journey-feed-session';
 
 type Row = { kind: 'draft'; draft: PrivateDraftSummary } | { kind: 'published' | 'saved'; journey: PublicJourney };
 export default function AccountScreen() {
@@ -73,7 +74,7 @@ export default function AccountScreen() {
   // A failed or running refresh may hold a deleted draft in the last-known list, so offer only a settled, successful load.
   const resumeDraft = drafts.error || drafts.refreshing ? undefined : drafts.data?.[0];
   // Temporarily hidden during profile design; preference and resume context stay intact.
-  useBuddyScreen({ floating: true, suppressed: true, resume: resumeDraft ? { id: resumeDraft.id, title: resumeDraft.title } : undefined });
+  useBuddyScreen({ floating: tab !== 'map', suppressed: tab !== 'map' || settings || auth.loading || !auth.session, resume: resumeDraft ? { id: resumeDraft.id, title: resumeDraft.title } : undefined });
   const refreshDrafts = drafts.refresh, refreshPublished = published.refresh, refreshSaved = saved.refresh;
   const activeTab = useRef(tab);
   useEffect(() => { activeTab.current = tab; }, [tab]);
@@ -113,27 +114,41 @@ export default function AccountScreen() {
   const collectionError = tab === 'map' ? null : tab === 'saved' && !savedVisible ? auth.error || 'Sign in again to see your saved journeys.' : collection.error;
   const refresh = tab === 'map' ? () => { refreshPublished(); setMapReload(value => value + 1); } : collection.refresh, retry = collection.retry;
   const collectionTitle = tab === 'drafts' ? 'Private drafts' : tab === 'saved' ? 'Saved journeys' : tab === 'map' ? 'Travel map' : 'My journeys';
+  const grid = tab === 'published' || tab === 'saved';
+  const fullWidthCollection = grid || tab === 'map';
+  const [listHeight, setListHeight] = useState(0), [headerHeight, setHeaderHeight] = useState(0), [mapOnScreen, setMapOnScreen] = useState(false);
+  const listOffset = useRef(0);
+  const mapHeight = Math.max(160, listHeight - headerHeight - 6);
+  useEffect(() => { setMapOnScreen(listOffset.current + listHeight > headerHeight + 6 && listOffset.current < headerHeight + 6 + mapHeight); }, [listHeight, headerHeight, mapHeight]);
+  const openJourney = (id: string) => {
+    const ids = rows.flatMap(row => row.kind === 'draft' ? [] : [row.journey.id]);
+    const session = journeyFeedSessions.create(ids, id, userId || 'anonymous', { fullCollection: true });
+    if (session) router.push({ pathname: '/journey-feed', params: { session } });
+  };
+  const emptyCollection = tab === 'map' ? (userId ? <ProfileMemoryMap key={userId} ownerId={userId} refreshKey={mapRefresh} reloadKey={mapReload} owner fullBleed mapHeight={mapHeight} onScreen={mapOnScreen} journeyCovers={published.data?.journeys} /> : null) : loading ? <ActivityIndicator color={appTheme.accent} accessibilityLabel={'Loading ' + collectionTitle.toLowerCase()} /> : collectionError ? <Message title="Couldn’t load this collection" body={collectionError} retry={retry} />
+          : tab === 'saved' ? <Message title="No saved journeys yet" body="Save a journey you love and find it here when you are ready to explore." retry={() => router.push('/search')} action="Explore journeys" />
+            : <Message title={tab === 'drafts' ? 'No private drafts yet' : 'No public journeys yet'} body={tab === 'drafts' ? 'Start with a place and a title, then save your journey privately. You can return here to add stops and memories before publishing.' : 'Journeys you choose to publish will appear here. You can start a private draft and share it when you are ready.'} retry={() => router.push('/create')} action="Start a journey" />;
   return <SafeAreaView edges={['left', 'right', 'bottom']} style={ui.safe}><View style={ui.page}>
     <ProfileHeader onSettings={() => setSettings(true)} />
-    <View style={{ flex: 1, minHeight: 0 }}>
+    <View style={{ flex: 1, minHeight: 0 }} onLayout={event => { const next = event.nativeEvent.layout.height;if (next > 0) setListHeight(previous => previous === next ? previous : next); }}>
     {auth.loading ? <ActivityIndicator color={appTheme.accent} accessibilityLabel="Loading account" /> : !auth.session ? <View style={s.content}><Message title="Your next chapter" body="Sign in to Like, Save, and create private journey copies." retry={() => router.push('/auth')} action="Sign in or register" />{auth.error && <Text accessibilityRole="alert" style={ui.body}>{auth.error}</Text>}</View>
-      : <FlatList {...scroll} key={tab === 'drafts' ? 'draft-list' : 'journey-grid-3'} numColumns={tab === 'drafts' ? 1 : 3} columnWrapperStyle={tab === 'drafts' ? undefined : s.gridRow}
-        data={rows} keyExtractor={row => row.kind + ':' + (row.kind === 'draft' ? row.draft.id : row.journey.id)} contentContainerStyle={s.content} showsVerticalScrollIndicator={false}
+      : <FlatList {...scroll} key={tab === 'drafts' ? 'draft-list' : 'journey-grid-3'} numColumns={tab === 'drafts' ? 1 : 3} columnWrapperStyle={tab === 'drafts' ? undefined : grid ? s.seamlessGridRow : s.gridRow}
+        onScroll={event => { scroll.onScroll();listOffset.current = event.nativeEvent.contentOffset.y;setMapOnScreen(listOffset.current + listHeight > headerHeight + 6 && listOffset.current < headerHeight + 6 + mapHeight); }} scrollEventThrottle={32}
+        data={rows} keyExtractor={row => row.kind + ':' + (row.kind === 'draft' ? row.draft.id : row.journey.id)} contentContainerStyle={fullWidthCollection ? tab === 'map' ? [s.accountGridContent, { paddingBottom: 0 }] : s.accountGridContent : s.content} showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={collection.refreshing} onRefresh={refresh} tintColor={colors.ink} />}
-        renderItem={({ item }) => item.kind === 'draft' ? <ProfileDraftCard draft={item.draft} onDeleted={() => { setDeleteMessage('Draft deleted.'); refreshDrafts(); }} /> : <ProfileJourneyCard journey={item.journey} />}
-        ListHeaderComponent={<View>
+        renderItem={({ item, index }) => item.kind === 'draft' ? <ProfileDraftCard draft={item.draft} onDeleted={() => { setDeleteMessage('Draft deleted.'); refreshDrafts(); }} /> : <ProfileJourneyCard journey={item.journey} edgeToEdge separators={{ left: index % 3 !== 0, top: index >= 3 }} onPress={() => openJourney(item.journey.id)} />}
+        ListHeaderComponent={<View style={fullWidthCollection ? s.accountInset : undefined} onLayout={event => { const next = event.nativeEvent.layout.height;if (next > 0) setHeaderHeight(previous => previous === next ? previous : next); }}>
           {deleteMessage ? <Text accessibilityLiveRegion="polite" style={s.notice}>{deleteMessage}</Text> : null}
-          <ProfileIdentity name={name} username={profile?.username || null} bio={bio} avatar={avatar} owner count={null} onCreate={() => router.push('/create')} />
-          {userId && <ProfileConnections key={userId} targetId={userId} name={name} />}
+          <ProfileIdentity name={name} username={profile?.username || null} bio={bio} avatar={avatar} owner count={null} onCreate={() => router.push('/create')}
+            connections={userId ? <ProfileConnections key={userId} targetId={userId} name={name} compact /> : null} />
           <ProfileCollections publishedCount={published.data ? published.data.journeys.length : null} draftCount={drafts.data ? drafts.data.length : null} savedCount={tab === 'saved' && savedVisible && saved.data ? saved.data.length : null} selected={tab} onSelect={setTab} />
-          <View style={s.section}><View style={s.sectionTop}><Text accessibilityRole="header" style={s.heading}>{collectionTitle}</Text><Text style={s.sectionNote}>{tab === 'drafts' ? 'Only you · Continue editing' : tab === 'saved' ? 'Only you · For later' : tab === 'map' ? 'Public · Published stops only' : 'Your shared stories'}</Text></View></View>
+          {tab !== 'published' && tab !== 'map' && <View style={s.section}><View style={s.sectionTop}><Text accessibilityRole="header" style={s.heading}>{collectionTitle}</Text><Text style={s.sectionNote}>{tab === 'drafts' ? 'Only you · Continue editing' : 'Only you · For later'}</Text></View></View>}
           {(error || auth.error) && <Text accessibilityRole="alert" style={ui.body}>{error || auth.error}</Text>}
           {collectionError && rows.length > 0 && <Message title="Couldn’t refresh journeys" body={collectionError} retry={retry} />}
         </View>}
-        ListEmptyComponent={tab === 'map' ? (userId ? <ProfileMemoryMap key={userId} ownerId={userId} refreshKey={mapRefresh} reloadKey={mapReload} owner /> : null) : loading ? <ActivityIndicator color={appTheme.accent} accessibilityLabel={'Loading ' + collectionTitle.toLowerCase()} /> : collectionError ? <Message title="Couldn’t load this collection" body={collectionError} retry={retry} />
-          : tab === 'saved' ? <Message title="No saved journeys yet" body="Save a journey you love and find it here when you are ready to explore." retry={() => router.push('/search')} action="Explore journeys" />
-            : <Message title={tab === 'drafts' ? 'No private drafts yet' : 'No public journeys yet'} body={tab === 'drafts' ? 'Start with a place and a title, then save your journey privately. You can return here to add stops and memories before publishing.' : 'Journeys you choose to publish will appear here. You can start a private draft and share it when you are ready.'} retry={() => router.push('/create')} action="Start a journey" />}
-        ListFooterComponent={<Pressable {...footerProtection} accessibilityRole="button" accessibilityLabel={'Refresh ' + collectionTitle.toLowerCase()} onPress={refresh} style={s.close}><Text style={ui.body}>↻ Refresh {tab === 'drafts' ? 'drafts' : tab === 'saved' ? 'saved journeys' : tab === 'map' ? 'map' : 'journeys'}</Text></Pressable>} />}
+        ListEmptyComponent={grid ? <View style={s.accountInset}>{emptyCollection}</View> : emptyCollection}
+        ListFooterComponentStyle={fullWidthCollection ? s.accountInset : undefined}
+        ListFooterComponent={tab === 'map' ? null : <Pressable {...footerProtection} accessibilityRole="button" accessibilityLabel={'Refresh ' + collectionTitle.toLowerCase()} onPress={refresh} style={s.close}><Text style={ui.body}>↻ Refresh {tab === 'drafts' ? 'drafts' : tab === 'saved' ? 'saved journeys' : 'journeys'}</Text></Pressable>} />}
     </View>
     <Modal visible={settings} transparent animationType="none" onRequestClose={() => { if (!busy) setSettings(false); }}>
       <View style={s.shade}><SafeAreaView edges={['bottom', 'left', 'right']} style={s.sheet}><ScrollView keyboardShouldPersistTaps="handled">

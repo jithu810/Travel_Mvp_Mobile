@@ -98,7 +98,7 @@ export default function SearchScreen() {
         </View>}
         {!explore && <Text style={styles.hint}>Search titles, destinations, stops and creators in the latest 100 public journeys.</Text>}
       </View>
-      <FlatList key={explore ? 'explore' : 'stories'} {...scroll} numColumns={explore ? 2 : 1} data={results} keyExtractor={item => item.id} renderItem={({ item }) => explore ? <ExploreTile key={item.id + ':' + photoRetry} journey={item} onOpen={() => openJourney(item.id)} /> : <JourneyCard key={item.id + ':' + photoRetry} journey={item} onOpen={() => openJourney(item.id)} />}
+      <FlatList key={explore ? 'explore' : 'stories'} {...scroll} numColumns={explore ? 2 : 1} data={results} keyExtractor={item => item.id} renderItem={({ item, index }) => explore ? <ExploreTile key={item.id + ':' + photoRetry} journey={item} separators={{ left: index % 2 !== 0, top: index >= 2 }} onOpen={() => openJourney(item.id)} /> : <JourneyCard key={item.id + ':' + photoRetry} journey={item} onOpen={() => openJourney(item.id)} />}
         // FlatList counts rows with numColumns: start with six tiles, then four per batch.
         initialNumToRender={explore ? 3 : undefined} maxToRenderPerBatch={explore ? 2 : undefined} windowSize={explore ? 3 : undefined} updateCellsBatchingPeriod={explore ? 50 : undefined}
         columnWrapperStyle={explore ? styles.gridRow : undefined}
@@ -133,11 +133,11 @@ const styles = darkPilotStyles(StyleSheet.create({
   savedSelected: { backgroundColor: colors.pale, borderWidth: 1, borderColor: colors.green },
   savedLabel: { color: colors.ink, fontSize: 12, fontWeight: '600' },
   savedLabelSelected: { color: colors.green },
-  grid: { flexGrow: 1, paddingHorizontal: 12, paddingBottom: 20 },
-  gridRow: { justifyContent: 'space-between' },
+  grid: { flexGrow: 1, paddingBottom: 20 },
+  gridRow: { justifyContent: 'flex-start', gap: 0 },
   emptyWrap: { paddingHorizontal: 22, paddingTop: 8 },
   exploreControls: { paddingHorizontal: 12, paddingTop: 8, paddingBottom: 10 },
-  exploreResults: { paddingHorizontal: 0, paddingBottom: 0 },
+  exploreResults: { paddingHorizontal: 12, paddingBottom: 0 },
   controls: { paddingHorizontal: 22, paddingBottom: 14, gap: 10 },
   inputRow: { flexDirection: 'row', backgroundColor: colors.white, borderWidth: 1, borderColor: colors.line, borderRadius: 16, alignItems: 'center', minHeight: 56 },
   input: { flex: 1, minWidth: 0, paddingHorizontal: 16, paddingVertical: 16, fontSize: 15, color: colors.ink },
