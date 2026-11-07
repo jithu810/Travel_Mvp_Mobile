@@ -5,7 +5,7 @@ import { test } from 'node:test';
 import ts from 'typescript';
 function load(file, modules = {}, timers = globalThis) {
   const exports = {}, source = ts.transpileModule(readFileSync(file, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX } }).outputText;
-  new Function('require', 'exports', 'setTimeout', 'clearTimeout', source)(id => { if (id === '@/theme/dark-pilot') return lightPilotTheme; assert.ok(id in modules, id); return modules[id]; }, exports, timers.setTimeout, timers.clearTimeout); return exports;
+  new Function('require', 'exports', 'setTimeout', 'clearTimeout', source)(id => { if (id === '@/hooks/use-navigation-scroll') return {NavigationCompactContext:{Provider:'CompactProvider'},NavigationControlContext:{Provider:'ControlProvider'}}; if (id === './use-navigation-scroll') return {useNavigationScroll:()=>()=>{}}; if (id === '@/theme/dark-pilot') return lightPilotTheme; assert.ok(id in modules, id); return modules[id]; }, exports, timers.setTimeout, timers.clearTimeout); return exports;
 }
 const model = load('src/lib/buddy/model.ts'), geometry = load('src/lib/buddy/geometry.ts', { './model': model });
 const globeStyle = load('src/lib/discovery/globe-style.ts');
@@ -283,7 +283,7 @@ test('main-page enabled/off geometry has no Buddy spacer, padding, margin or hei
     'expo-router': { usePathname: () => path, useGlobalSearchParams: () => ({}), useRouter() {}, useFocusEffect() {} }, 'react-native': { StyleSheet: { create: v => v } }, 'react-native-safe-area-context': {},
     '@/hooks/session-context': {}, '@/hooks/use-load': {}, '@/lib/profile/edit-queries': {}, '@/lib/discovery/model': {}, '@/hooks/use-buddy-geometry': { useBuddyProtectedBounds: () => ({ enabled }) } });
   for (path of ['/journey/id', '/journey-feed', '/create', '/search', '/account', '/profile/name']) {
-    enabled = false; const off = MainNavigationFrame({ children: 'SCREEN' }); enabled = true; const on = MainNavigationFrame({ children: 'SCREEN' });
+    enabled = false; const off = MainNavigationFrame({ children: 'SCREEN' }).props.children.props.children; enabled = true; const on = MainNavigationFrame({ children: 'SCREEN' }).props.children.props.children;
     assert.deepEqual(on, off, path); assert.equal(on.props.children[0].props.children, 'SCREEN'); assert.equal(on.props.children[0].props.style[1].paddingBottom, 72, 'Only pre-existing navigation clearance remains');
   }
 });

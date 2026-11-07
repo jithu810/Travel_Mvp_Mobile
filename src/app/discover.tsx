@@ -3,12 +3,13 @@ import { theme, primaryControl } from '@/theme/mobile-theme';
 import { BrandedLoading } from '@/components/branded-loading';
 import { PlacePicker } from '@/components/create/place-picker';
 import type { Place } from '@/lib/create/model';
+import { useNavigationAnimation } from '@/hooks/use-navigation-scroll';
 import { FloatingNavigation } from '@/components/floating-navigation';
 import { useBuddyScreen } from '@/hooks/use-journey-buddy';
 import { useBuddyProtectedBounds } from '@/hooks/use-buddy-geometry';
 import { Stack, useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { AppState, Keyboard, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Animated, AppState, Keyboard, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { DiscoveryGlobe } from '@/components/discovery/globe/discovery-globe';
 import { DiscoveryPanel } from '@/components/discovery/discovery-panel';
@@ -25,6 +26,7 @@ import { useUnfinishedTrip } from '@/hooks/use-trip-recovery';
 
 export default function DiscoverScreen() {
   const s = lightStyles_s;
+  const { compact, progress } = useNavigationAnimation();
   const dark = useDarkPilot();
   const router = useRouter();
   const [choosingOutcome, setChoosingOutcome] = useState(false);
@@ -114,11 +116,12 @@ export default function DiscoverScreen() {
           loading={state.loading || (viewer.pending && !state.error)} emptyText={onlyOwn ? onlyViewerJourneysCopy : undefined} refreshing={state.refreshing} error={state.error} onRefresh={refreshPublic}
           onInteraction={setSheetInteracting} onHeight={setRailHeight} availableHeight={layout.height} availableWidth={layout.width} bottomClearance={navClearance + bannerHeight + 12 + (trip ? tripHeight + 8 : 0)} topClearance={headerClearance} />
       </View>
-      <Pressable {...bannerProtection} accessibilityRole="button" accessibilityLabel="Create Journey from Home" onPress={() => router.push('/create')}
-        onLayout={event => { bannerProtection.onLayout(); setBannerHeight(event.nativeEvent.layout.height); }} style={[s.banner, { bottom: navClearance }]}>
-        <View style={s.bannerCopy}><Text style={s.bannerTitle}>Start your own journey</Text></View>
-        <View style={s.bannerAction}><Text style={s.bannerActionText}>Create Journey ↗</Text></View>
-      </Pressable>
+      <Animated.View pointerEvents="box-none" style={{ position: 'absolute', left: 16, right: 16, bottom: navClearance, zIndex: 3, marginHorizontal: progress.interpolate({ inputRange: [0, 1], outputRange: [0, Math.max(0, (layout.width - 32 - 190) / 2)] }) }}>
+      <Pressable {...bannerProtection} testID={compact ? 'home-create-compact' : 'home-create-expanded'} accessibilityRole="button" accessibilityLabel="Create Journey from Home" onPress={() => router.push('/create')}
+        onLayout={event => { bannerProtection.onLayout(); const height = event.nativeEvent.layout.height; setBannerHeight(previous => Math.max(previous, height)); }} style={[s.banner, { position: 'relative', left: 0, right: 0 }, compact && s.compactBanner]}>
+        <Animated.View accessibilityElementsHidden={compact} importantForAccessibility={compact ? 'no-hide-descendants' : 'auto'} style={[s.bannerCopy, { flexGrow: progress.interpolate({ inputRange: [0, 1], outputRange: [1, 0] }), flexBasis: 0, flexShrink: 1, opacity: progress.interpolate({ inputRange: [0, 1], outputRange: [1, 0] }), overflow: 'hidden', display: compact ? 'none' : 'flex' }]}><Text numberOfLines={1} style={s.bannerTitle}>Start your own journey</Text></Animated.View>
+        <View style={[s.bannerAction, compact && s.compactBannerAction]}><Text style={s.bannerActionText}>Create Journey ↗</Text></View>
+      </Pressable></Animated.View>
       <View pointerEvents="none" testID="home-status-shade" style={[s.statusShade, { height: headerTop + 12 }]} />
       <FloatingNavigation active="explore" onHeight={setNavHeight} />
       {trip && <View {...tripProtection} testID="home-unfinished-trip" onLayout={event => { tripProtection.onLayout(); setTripHeight(event.nativeEvent.layout.height); }} style={[s.banner, { bottom: navClearance + bannerHeight + 8 }]}>
@@ -141,6 +144,8 @@ const lightStyles_s = darkPilotStyles(StyleSheet.create({
   search: { flex: 1, minWidth: 0, minHeight: 48, justifyContent: 'center' },
   banner: { position: 'absolute', left: 16, right: 16, zIndex: 3, minHeight: 48, borderRadius: 20, paddingHorizontal: 12, paddingVertical: 4,
     flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 6, backgroundColor: theme.surface, borderWidth: 1, borderColor: theme.border },
+  compactBanner: { backgroundColor: 'transparent', borderColor: 'transparent', borderWidth: 0, paddingHorizontal: 0, gap: 0, flexWrap: 'nowrap', justifyContent: 'center' },
+  compactBannerAction: { width: '100%', alignItems: 'center' },
   bannerCopy: { flexGrow: 1, flexShrink: 0, flexBasis: 'auto', gap: 2 },
   bannerTitle: { color: theme.text, fontSize: 12, fontWeight: '600' },
   bannerSubtitle: { color: theme.muted, fontSize: 10 },

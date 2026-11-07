@@ -23,7 +23,7 @@ import { invalidatePublicJourneys, loadDiscoveryEntries } from '@/lib/discovery/
 
 export default function SearchScreen() {
   const state = useLoad(loadDiscoveryEntries);
-  const controlsProtection = useBuddyProtectedBounds(), resultsProtection = useBuddyProtectedBounds(), scroll = useBuddyScroll();
+  const controlsProtection = useBuddyProtectedBounds(), resultsProtection = useBuddyProtectedBounds(), scroll = useBuddyScroll(true);
   const [photoRetry, setPhotoRetry] = useState(0);
   const refreshPublic = () => { setPhotoRetry(value => value + 1); invalidatePublicJourneys(); state.refresh(); };
   const { view, guide } = useLocalSearchParams<{ view?: string; guide?: string }>();

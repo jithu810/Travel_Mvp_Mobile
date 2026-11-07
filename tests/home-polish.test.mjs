@@ -10,13 +10,13 @@ new Function('exports', ts.transpileModule(readFileSync('src/theme/mobile-theme.
 
 
 function load(file, dependencies, state = null, hookOverrides = {}) {
-  dependencies={'./explore-tile':{ExploreTile:'ExploreTile'},...dependencies};
+  dependencies={'@/hooks/use-navigation-scroll': { NavigationCompactContext: { Provider: 'CompactProvider' }, NavigationControlContext: { Provider: 'ControlProvider' }, useNavigationAnimation: () => ({ compact: false, progress: { interpolate: ({outputRange}) => outputRange[0] } }) }, './explore-tile':{ExploreTile:'ExploreTile'},...dependencies};
   dependencies={'@expo/vector-icons/Feather':{__esModule:true,default:'Feather'},...dependencies};
   dependencies={'@/lib/discovery/journey-feed-session':{journeyFeedSessions:{create:()=>null}},'@/hooks/use-journey-social':{useJourneySocial:()=>({state:null})},'@/hooks/use-buddy-geometry':buddyGeometryStub,'@/hooks/use-trip-recovery':{useTripRecovery:()=>({checking:false,notice:null}),useUnfinishedTrip:()=>null},...dependencies};
   const exports = {};
   const jsx = (type, props, key) => ({ type, props, key });
   const react = { useRef:()=>({current:null}),useEffect:()=>{}, memo: fn => fn, useState: initial => typeof state === 'function' ? state(initial) : [state ?? initial, () => {}], useMemo: fn => fn(), useCallback: fn => fn, ...hookOverrides };
-  const rn = { StyleSheet: { create: value => value }, Platform: { OS: 'web' }, StatusBar: {} };
+  const rn = { StyleSheet: { create: value => value }, Platform: { OS: 'web' }, StatusBar: {}, useWindowDimensions: () => ({width:360,height:780}), Animated: {View:'View'} };
   for (const name of ['View', 'Text', 'Pressable', 'Image', 'TextInput']) rn[name] = name;
   const source = ts.transpileModule(readFileSync(file, 'utf8'), { compilerOptions: { jsx: ts.JsxEmit.ReactJSX, module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
   new Function('require', 'exports', source)(name => { if (name === '@/theme/dark-pilot') return lightPilotTheme; if (name === '@/theme/mobile-theme') return appMobileTheme;  if(name==='@/components/first-outcome-hint')return {FirstOutcomeHint:'FirstOutcomeHint'};
@@ -69,7 +69,7 @@ test('shared Search route highlights only its selected entry point and Story det
       'expo-router': { usePathname: () => path, useGlobalSearchParams: () => ({ view }) },
       'react-native-safe-area-context': {},
     });
-    assert.equal(nav.MainNavigationFrame({ children: 'screen' }).props.children[1].props.active, active);
+    assert.equal(nav.MainNavigationFrame({ children: 'screen' }).props.children.props.children.props.children[1].props.active, active);
   }
 });
 test('Search and Story share one public list while preserving independent query state', () => {
@@ -120,11 +120,14 @@ test('Account uses the loaded profile avatar and falls back after image failure'
 test('Home embeds place search; Account and navigation retain existing routes and geometry', () => {
   for (const bottomInset of [0, 24, 48]) {
   const pushed = []; const refreshOrder=[];
+  let compact = false;
+  const presentation = {useNavigationAnimation:()=>({compact,progress:{interpolate:({outputRange})=>outputRange[compact?1:0]}})};
   const navigation = load('src/components/floating-navigation.tsx', {
     'expo-router': { useRouter: () => ({ navigate: route => pushed.push(route) }) },
     'react-native-safe-area-context': { useSafeAreaInsets: () => ({ bottom: bottomInset, left: 0, right: 0 }) },
   });
   const home = load('src/app/discover.tsx', {
+    '@/hooks/use-navigation-scroll':presentation,
     '@/components/floating-navigation': navigation,
     '../../assets/journey-creator-logo.png': 'supplied-logo',
     'expo-router': { useRouter: () => ({ push: route => pushed.push(route) }), useFocusEffect: () => {} },
@@ -175,6 +178,17 @@ test('Home embeds place search; Account and navigation retain existing routes an
   assert.ok(!all.some(n => /notification/i.test(n.props?.accessibilityLabel ?? '')), 'No inactive notification affordance');
   assert.ok(all.some(n => n.type === 'Globe'));
   assert.ok(all.some(n => n.type === 'Panel'));all.find(n=>n.type==='Panel').props.onRefresh();assert.deepEqual(refreshOrder,['invalidate','refresh']);
+  compact=true; const compactHome=nodes(home.default());
+  const compactCreate=compactHome.find(n=>n.props?.testID==='home-create-compact');
+  assert.equal(compactCreate.props.accessibilityLabel,'Create Journey from Home');
+  const shell=Object.assign({},...compactCreate.props.style.filter(Boolean));
+  assert.equal(shell.backgroundColor,'transparent');assert.equal(shell.borderWidth,0);assert.equal(shell.paddingHorizontal,0);assert.equal(shell.gap,0);
+  const gradient=compactCreate.props.children[1];
+  assert.equal(Object.assign({},...gradient.props.style.filter(Boolean)).width,'100%');
+  assert.equal(compactCreate.props.children[0].props.style.at(-1).display,'none');
+  assert.ok(compactHome.some(n=>n.props?.accessibilityElementsHidden===true));
+  assert.equal(compactHome.find(n=>n.type==='Panel').props.bottomClearance, all.find(n=>n.type==='Panel').props.bottomClearance);
+  compact=false; assert.ok(nodes(home.default()).some(n=>n.props?.testID==='home-create-expanded'));
   const explore = all.find(n => n.props?.accessibilityLabel === 'Explore');
   const count = pushed.length; explore.props.onPress(); assert.equal(pushed.length, count);
   assert.equal(explore.props.accessibilityState.selected, true);
@@ -182,7 +196,8 @@ test('Home embeds place search; Account and navigation retain existing routes an
   const nav = all.find(n => [n.props?.children].flat(Infinity).includes(explore));
   assert.equal(nav.props.children.length, 5);
   assert.equal(nav.props.style[0].position, 'absolute');
-  assert.equal(nav.props.style[1].bottom, bottomInset + 8);
+  const slot = all.find(n => n.props?.pointerEvents === 'box-none' && n.props.style?.[0]?.height === 58);
+  assert.equal(slot.props.style[1].bottom, bottomInset + 8);
   assert.ok(nav.props.style[0].zIndex > 0 && nav.props.style[0].elevation > 0);
   assert.ok(nav.props.style[0].backgroundColor.startsWith('rgba('));
   assert.equal(nav.props.onStartShouldSetResponder(), true);
@@ -192,7 +207,7 @@ test('Home embeds place search; Account and navigation retain existing routes an
   assert.ok(!nodes(panel).includes(nav));
   for (const child of nav.props.children.slice(1)) {
     assert.equal(child.props.style({ pressed: false })[0].flex, 1);
-    assert.equal(child.props.style({ pressed: false })[0].minHeight, 48);
+    assert.equal(child.props.style({ pressed: false })[0].minHeight, 44);
   }
   }
 });
@@ -423,11 +438,11 @@ test('shared navigation selects each destination and frame includes only standar
       else assert.equal(routes.at(-1), ['/discover', '/search?view=search', '/create', '/search?view=stories', '/account'][i]);
     }
     assert.equal(tree.props.style[1].bottom, 32);
-    assert.equal(tree.props.style[0].backgroundColor, 'rgba(21, 34, 56, 0.98)');
+    assert.equal(tree.props.children.props.style[0].backgroundColor, 'rgba(21, 34, 56, 0.98)');
   }
   for (const path of ['/search', '/create', '/account', '/journey/a', '/customized/a', '/profile/traveler', '/', '/discover', '/auth', '/draft/a', '/travel/a', '/customize/a']) {
     const nav = load('src/components/floating-navigation.tsx', { 'expo-router': { usePathname: () => path }, 'react-native-safe-area-context': {} });
-    const tree = nav.MainNavigationFrame({ children: 'screen' });
+    const tree = nav.MainNavigationFrame({ children: 'screen' }).props.children.props.children;
     const expected = ['/search', '/create', '/account', '/journey/a', '/customized/a', '/profile/traveler'].includes(path);
     assert.equal(Boolean(tree.props.children[1]), expected, path);
     assert.equal(Boolean(tree.props.children[0].props.style[1]), expected);
@@ -568,4 +583,22 @@ test('R2: Home shows "Unfinished trip" with Resume for the signed-in user copy a
   trip={...trip,journeyId:'55555555-5555-4555-8555-555555555555',customized:true};
   nodes(nodes(home.default()).find(n=>n.props?.testID==='home-unfinished-trip')).find(n=>n.props?.accessibilityRole==='button').props.onPress();
   assert.deepEqual(routes.at(-1),{pathname:'/travel/[id]',params:{id:trip.journeyId,customized:'1'}});
+});
+
+
+test('compact navigation retains five accessible 44dp targets in the stable full-height slot',()=>{
+  let compact=false;
+  const nav=load('src/components/floating-navigation.tsx',{
+    '@/hooks/use-navigation-scroll':{useNavigationAnimation:()=>({compact,progress:{interpolate:({outputRange})=>outputRange[compact?1:0]}})},
+    'expo-router':{useRouter:()=>({navigate(){}})},
+    'react-native-safe-area-context':{useSafeAreaInsets:()=>({bottom:24,left:0,right:0})},
+  });
+  const full=nav.FloatingNavigation({active:'search'});compact=true;
+  const small=nav.FloatingNavigation({active:'search'}), all=nodes(small);
+  assert.equal(small.props.style[0].height,full.props.style[0].height);
+  assert.equal(small.props.style[1].bottom,full.props.style[1].bottom);
+  const bar=all.find(n=>n.props?.testID==='navigation-compact');assert.ok(bar.props.style[1].left>0);
+  assert.equal(all.filter(n=>n.type==='Pressable').length,5);
+  for(const button of all.filter(n=>n.type==='Pressable')){assert.ok(button.props.accessibilityLabel);assert.ok(button.props.style({pressed:false})[0].minHeight>=44);}
+  assert.equal(all.find(n=>n.props?.children?.type==='Text' && n.props.style?.overflow==='hidden').props.style.height,0);
 });

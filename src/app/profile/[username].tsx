@@ -19,11 +19,11 @@ export default function CreatorProfileScreen() {
   const router = useRouter(), auth = useSessionState();
   const loader = useCallback((signal: AbortSignal) => loadPublicProfile(handle, signal), [handle]);
   const state = useLoad(loader), value = state.data;
-  const scroll = useBuddyScroll();
   const refresh = state.refresh;
   // Map is a view of the same published profile; it loads lazily inside its component
   // and refreshes with this profile: focus is soft (45 s cache), pull-to-refresh forces.
   const [tab, setTab] = useState<'published' | 'map'>('published');
+  const scroll = useBuddyScroll(true, tab);
   useBuddyScreen({ floating: tab !== 'map', suppressed: tab !== 'map' || !value });
   const [listHeight, setListHeight] = useState(0), [headerHeight, setHeaderHeight] = useState(0), [mapOnScreen, setMapOnScreen] = useState(false);
   const listOffset = useRef(0);
@@ -41,7 +41,7 @@ export default function CreatorProfileScreen() {
     {state.loading ? <BrandedLoading message="Opening this travel journal…" /> : !value
       ? <View style={s.content}><Message title={state.error ? 'A small detour' : 'Creator unavailable'} body={state.error || 'This public creator profile could not be found.'} retry={state.retry} /></View>
       : <FlatList {...scroll} key="journey-grid-3" numColumns={3} columnWrapperStyle={s.gridRow} data={tab === 'map' ? [] : value.journeys} keyExtractor={journey => journey.id} contentContainerStyle={tab === 'map' ? { paddingTop: 6, paddingBottom: 0 } : s.content} showsVerticalScrollIndicator={false}
-        onScroll={event => { scroll.onScroll();listOffset.current = event.nativeEvent.contentOffset.y;setMapOnScreen(listOffset.current + listHeight > headerHeight + 6 && listOffset.current < headerHeight + 6 + mapHeight); }} scrollEventThrottle={32}
+        onScroll={event => { scroll.onScroll(event);listOffset.current = event.nativeEvent.contentOffset.y;setMapOnScreen(listOffset.current + listHeight > headerHeight + 6 && listOffset.current < headerHeight + 6 + mapHeight); }} scrollEventThrottle={32}
         renderItem={({ item }) => <JourneyCard journey={item} />}
         refreshControl={<RefreshControl refreshing={state.refreshing} onRefresh={refreshAll} tintColor={colors.ink} />}
         ListHeaderComponent={<View style={tab === 'map' ? { paddingHorizontal: 16 } : undefined} onLayout={event => { const next = event.nativeEvent.layout.height;if (next > 0) setHeaderHeight(previous => previous === next ? previous : next); }}>
