@@ -1,6 +1,6 @@
 # Prompt 33 — Journey Story UI polish
 
-Implemented in D:\Travel_Mvp_Mobile on 2026-10-11.
+Implemented in travel-mvp-mobile on 2026-10-11.
 
 The existing Journey Story route and components were improved in place. The cream, forest-green and olive design direction remains consistent. The header has a taller cover, clear title/destination hierarchy, compact metadata chips and a single creator profile card. The snapshot and journey actions have distinct surfaces. Social controls have consistent sizing and wrap on narrow screens. Stops use numbered connected cards, larger day labels, fixed-ratio photos and selected styling; missing optional content is omitted and an empty itinerary has explicit copy. The route now has a Story-specific loading skeleton; refresh and error handling remain intact.
 

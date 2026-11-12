@@ -2,7 +2,7 @@
 
 Date: 2026-10-30, approximately 20:53-21:00 IST. Architect performed the authorized phone verification; no specialist implementation or new independent review was needed because application code was unchanged. Prior independent review passed; prior automated/emulator evidence is recorded in IMPROVEMENT_BACKLOG.md.
 
-Baseline: feature/backlog-phase1; only IMPROVEMENT_BACKLOG.md, PROJECT_STATUS.md and ROADMAP.md had local U1 documentation changes. Preserved. Device: CPH2813 / Android 16 (API 36), native dev client, Codex Metro 8081 on the MSI laptop serving D:/Travel_Mvp_Mobile. Physical phone, no emulator or simulated GPS used in this check.
+Baseline: feature/backlog-phase1; only IMPROVEMENT_BACKLOG.md, PROJECT_STATUS.md and ROADMAP.md had local U1 documentation changes. Preserved. Device: CPH2813 / Android 16 (API 36), native dev client, Codex Metro 8081 on the MSI laptop serving travel-mvp-mobile. Physical phone, no emulator or simulated GPS used in this check.
 
 Assessment: verification only, no implementation/backend change. Inspected src/app/travel/[id].tsx, src/hooks/use-trip-location.ts, src/hooks/use-trip-recovery.ts, src/lib/journey/trip-recovery.ts, trip-recovery-store.ts and location-port.native.ts. Trip progress persists only on-device; no schema/auth/API/Storage changes or hosted writes. No live preflight required. Location permission was granted while using the app; owner enabled device-wide Location. Account remained signed in. Connectivity was online; no deliberate loss applied.
 

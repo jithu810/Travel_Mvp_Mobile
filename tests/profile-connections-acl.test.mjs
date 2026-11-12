@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { readFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
-import { offlineDb, migrations } from '../../Travel_Mvp/scripts/lib/offline-db.mjs';
+import { offlineDb, migrations } from '../../travel-mvp-web/scripts/lib/offline-db.mjs';
 
 const originalHash='a94bbf39041bc6c4d4a2ec6b8edd77411eefe9953f9134256fa536825ba05c7f';
 const functionNames=['connection_summary','connection_list','connection_mutate','get_profile_connections','list_profile_connections','mutate_profile_connection'];

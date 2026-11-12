@@ -1,6 +1,6 @@
 # Prompt 28 — Native Mapbox Journey Map
 
-Implemented in D:\Travel_Mvp_Mobile on 2026-10-08. The web application remains separate and unchanged.
+Implemented in travel-mvp-mobile on 2026-10-08. The web application remains separate and unchanged.
 
 ## Dependency and compatibility
 

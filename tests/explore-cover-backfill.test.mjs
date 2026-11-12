@@ -3,6 +3,7 @@ import { Buffer } from 'node:buffer';
 import { test } from 'node:test';
 import { createRequire } from 'node:module';
 import { resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { buildActivationSql, buildRollbackSql, validateOperation, TARGET, SOURCE_MANIFEST_SHA, REVIEW_PLAN_SHA } from '../scripts/explore-cover-backfill-plan.mjs';
 import { bindApprovedFiles, uploadVerifiedBatch, storageExistenceResult } from '../scripts/explore-cover-backfill-upload.mjs';
 import { createHash } from 'node:crypto';
@@ -10,7 +11,7 @@ import { createHash } from 'node:crypto';
 // Reuse the separate Web repository's existing offline Postgres engine. No new
 // Mobile dependency, hosted socket, credential or persistent database is used.
 let PGlite;
-try { ({ PGlite } = createRequire(resolve('../Travel_Mvp/package.json'))('@electric-sql/pglite')); } catch { /* Disclose unavailable sibling fixture in other checkouts. */ }
+try { ({ PGlite } = createRequire(fileURLToPath(new URL('../../travel-mvp-web/package.json', import.meta.url)))('@electric-sql/pglite')); } catch { /* Disclose unavailable sibling fixture in other checkouts. */ }
 const id = (group, n) => `${group}0000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
 const owner = id(1, 1);
 const object = (n, size, mime, hash) => ({ id: id(5, n), version: `v${n}`, size, mime, verifiedSha256: hash });

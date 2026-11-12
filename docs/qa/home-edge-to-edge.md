@@ -4,7 +4,7 @@ QA Tester / Code Reviewer, independent of application writer. 2026-10-23 21:21 I
 
 ## Stable snapshot
 
-D:/Travel_Mvp_Mobile, codex/home-photo-fit, HEAD aba76832ce967503caf5d8692faf019ed3f583ca plus prior dirty Home/Journey work and this delta. Architect released stable Home files before checks; prior user work/untracked baseline retained. SHA256:
+travel-mvp-mobile, codex/home-photo-fit, HEAD aba76832ce967503caf5d8692faf019ed3f583ca plus prior dirty Home/Journey work and this delta. Architect released stable Home files before checks; prior user work/untracked baseline retained. SHA256:
 
 | Path | SHA256 |
 | --- | --- |

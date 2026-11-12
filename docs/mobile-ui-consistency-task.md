@@ -13,7 +13,7 @@ Safe plan: mocked/component regressions, typecheck, lint and native read-only vi
 Architect gate: RELEASED for presentation-only scope. Re-run if contracts/persistence change. Live changes NOT authorized.
 
 ## Environment
-Target originally lacks dependencies/environment file. Ignored node_modules junction reuses existing D:/Travel_Mvp_Mobile/node_modules without installing packages. Android adb confirms connected CPH2813. Managed session uses auto-review and target lies outside writable roots; writes require explicit scoped escalation. No Web files edited.
+Target originally lacks dependencies/environment file. Ignored node_modules junction reuses existing node_modules without installing packages. Android adb confirms connected CPH2813. Managed session uses auto-review and target lies outside writable roots; writes require explicit scoped escalation. No Web files edited.
 
 ## Final implementation / review checkpoint
 2026-10-21 Asia/Kolkata. Local/uncommitted/unpublished branch codex/mobile-ui-consistency, base 07fe90e1a8b0974da15f475d2b1ecbcf363b2a8d.

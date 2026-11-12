@@ -5,7 +5,7 @@ import {join,sep} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {spawnSync} from 'node:child_process';
 import net from 'node:net';
-const bin=process.env.THUMBNAIL_PG_BIN || 'D:/Travel_Mvp/.local-tests/customize-stops-pg/pgsql/bin';
+const bin=process.env.THUMBNAIL_PG_BIN || (process.env.WEB_REPO?join(process.env.WEB_REPO,'.local-tests/customize-stops-pg/pgsql/bin'):fileURLToPath(new URL('../../travel-mvp-web/.local-tests/customize-stops-pg/pgsql/bin',import.meta.url)));
 const exe=name=>join(bin,name+(process.platform==='win32'?'.exe':''));
 const available=['initdb','pg_ctl','psql'].every(name=>existsSync(exe(name)));
 const owner='11111111-1111-4111-8111-111111111111',other='22222222-2222-4222-8222-222222222222';

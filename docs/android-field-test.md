@@ -1,6 +1,6 @@
 # Journey Creator Android field-test release preparation
 
-Prepared 16 October 2026 for `D:\Travel_Mvp_Mobile`.
+Prepared 16 October 2026 for `travel-mvp-mobile`.
 
 Configuration is prepared for a standalone APK. **Before building, configure the four missing EAS preview service variables.** No EAS build or native compilation was started, and no physical-device validation is claimed.
 
@@ -54,7 +54,7 @@ Optional `EXPO_PUBLIC_TRAVEL_COMPANION` is absent locally and remotely. Leaving 
 Alternatively, the installed EAS CLI supports interactive setup without putting values into shell history:
 
 ```powershell
-Set-Location D:\Travel_Mvp_Mobile
+Set-Location travel-mvp-mobile
 eas env:set --environment preview --scope project --name EXPO_PUBLIC_SUPABASE_URL --type string --visibility plaintext
 eas env:set --environment preview --scope project --name EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY --type string --visibility sensitive
 eas env:set --environment preview --scope project --name EXPO_PUBLIC_MAPBOX_TOKEN --type string --visibility sensitive
@@ -104,7 +104,7 @@ Existing mismatches: Expo 57.0.28 → ~57.0.30; Asset 57.0.19 → ~57.0.20; Cons
 Run from PowerShell:
 
 ```powershell
-Set-Location D:\Travel_Mvp_Mobile
+Set-Location travel-mvp-mobile
 eas build --platform android --profile preview
 ```
 
@@ -113,7 +113,7 @@ Use the existing Android signing credential for this package when prompted. The 
 Optional USB installation after downloading the APK to the computer:
 
 ```powershell
-Set-Location D:\Travel_Mvp_Mobile
+Set-Location travel-mvp-mobile
 adb devices
 $apk = Read-Host 'Full path to the downloaded preview APK'
 adb install -r "$apk"

@@ -5,7 +5,7 @@ import { mkdtemp, readFile, readdir, realpath, writeFile } from 'node:fs/promise
 import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { fixtureSql, migrationDirectory } from '../../Travel_Mvp/scripts/lib/offline-db.mjs';
+import { fixtureSql, migrationDirectory } from '../../travel-mvp-web/scripts/lib/offline-db.mjs';
 
 // Local synthetic tests only. No connection-string/host/database/environment-file inputs.
 const args = process.argv.slice(2);

@@ -4,7 +4,7 @@ Date: 2026-10-26
 
 Status: source-based feasibility assessment and prototype plan. No map prototype implemented or released by this task.
 
-Input: `D:/Journey_AI_Business/planning/2026-10-26-buddy-on-map-developer-brief.md`. This report answers that brief's developer-facing request for assessment and planning. It does not modify the business brief.
+Input: `../journey-ai-business/planning/2026-10-26-buddy-on-map-developer-brief.md`. This report answers that brief's developer-facing request for assessment and planning. It does not modify the business brief.
 
 ## Recommendation
 

@@ -1,6 +1,6 @@
 # R3 creation recovery verification
 
-2026-10-30, approximately 21:03-21:12 IST. CPH2813 / Android 16, native dev client, Codex Metro 8081 serving D:/Travel_Mvp_Mobile on MSI. Focused verification of unchanged implementation; Architect operated the physical phone. Prior implementation independent review had no remaining blocking findings. No new review claimed.
+2026-10-30, approximately 21:03-21:12 IST. CPH2813 / Android 16, native dev client, Codex Metro 8081 serving travel-mvp-mobile on MSI. Focused verification of unchanged implementation; Architect operated the physical phone. Prior implementation independent review had no remaining blocking findings. No new review claimed.
 
 Baseline: feature/backlog-phase1 with local U1/R2 changes in IMPROVEMENT_BACKLOG.md, PROJECT_STATUS.md, ROADMAP.md and untracked docs/qa/r2-phone-recovery-2026-10-30.md. Preserved.
 

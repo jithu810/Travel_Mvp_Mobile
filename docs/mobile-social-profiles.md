@@ -1,6 +1,6 @@
 # Prompt 29 — Mobile Likes, Saves, Sharing & Creator Profiles
 
-Implemented on 2026-10-09 in D:\Travel_Mvp_Mobile. D:\Travel_Mvp was inspected only as a reference.
+Implemented on 2026-10-09 in travel-mvp-mobile. ../travel-mvp-web was inspected only as a reference.
 
 ## Features and locations
 

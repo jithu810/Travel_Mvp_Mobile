@@ -4,7 +4,7 @@ QA Tester and independent Code Reviewer, separate from implementation writer. 20
 
 ## Stable snapshot
 
-Repository D:/Travel_Mvp_Mobile; branch codex/home-photo-fit; HEAD aba76832ce967503caf5d8692faf019ed3f583ca plus listed changes. Architect released stable snapshot before checks. Existing Home work, status/roadmap and untracked baseline preserved. SHA256 inspected after automated checks:
+Repository travel-mvp-mobile; branch codex/home-photo-fit; HEAD aba76832ce967503caf5d8692faf019ed3f583ca plus listed changes. Architect released stable snapshot before checks. Existing Home work, status/roadmap and untracked baseline preserved. SHA256 inspected after automated checks:
 
 | Path | SHA256 |
 | --- | --- |

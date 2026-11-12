@@ -34,7 +34,7 @@ Preflight and read-only Mobile architecture review completed. Mobile Developer r
 
 ### Preliminary physical checks, 19:54–19:59 IST
 
-Architect operated CPH2813 / Android 16 / Google Test dev client on MSI, Metro 8081 serving D:/Travel_Mvp_Mobile. Phone remained connected by wireless ADB; online map tiles/photos rendered. No Begin Trip, location permissions, saves, likes, uploads or republish actions were used.
+Architect operated CPH2813 / Android 16 / Google Test dev client on MSI, Metro 8081 serving travel-mvp-mobile. Phone remained connected by wireless ADB; online map tiles/photos rendered. No Begin Trip, location permissions, saves, likes, uploads or republish actions were used.
 
 Search entry and strong vertical card-area swipes opened different journeys. Horizontal swipe changed Stop 1 to Stop 2 without changing journey. After paging forward then backward, the Ponmudi journey restored Stop 2 (Ooty). A vertical drag within the map visibly panned it while preserving that journey/stop. About opened with the Ponmudi title; scrolling its native sheet and closing preserved Stop 2. Map/card/footer/navigation composition remained fitted and all controls visible on this viewport.
 

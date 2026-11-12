@@ -3,7 +3,7 @@
 - Owner authorization: start pending tasks one by one; focused R5 layout slice announced.
 - Baseline: feature/backlog-phase1, d2c3f0d, clean working tree. Architect direct implementation/self-review; no independent review required for these cosmetic changes.
 - Backend assessment: inspected src/app/discover.tsx, src/components/create/place-picker.tsx and src/components/discovery/compact-search-input.tsx. Only placeholder presentation and banner flex sizing change. Existing queries, permissions, auth, persistence, RPC/API and Storage behavior unchanged; no live preflight or hosted writes.
-- Physical device: CPH2813, 1080×2344, Codex Metro 8081 serving D:/Travel_Mvp_Mobile. Original font_scale 1.0; tested 2.0 and restored 1.0.
+- Physical device: CPH2813, 1080×2344, Codex Metro 8081 serving travel-mvp-mobile. Original font_scale 1.0; tested 2.0 and restored 1.0.
 - Reproduced: Home place placeholder clipped a wrapped second line at 2.0; Create banner squeezed its description into four lines.
 - Fixed: Home placeholder uses “Search places” above 1.3 font scale, retaining text scaling and accessibility label. Banner copy uses intrinsic flex basis and does not shrink, allowing the action to wrap to another row.
 - Phone result: shortened placeholder fits; banner description and action readable on separate rows at 2.0; original single-row banner and longer placeholder retained at 1.0. Search tiles and bottom navigation readable; loaded Account main controls readable; Create traveller choices, duration and Create action reachable by scrolling at 2.0. No Create/Save/Publish action submitted.

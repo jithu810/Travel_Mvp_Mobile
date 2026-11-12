@@ -1,6 +1,6 @@
 # Prompt 30 — Mobile authentication, Use and Remix
 
-Implemented in D:\Travel_Mvp_Mobile on 2026-10-09. D:\Travel_Mvp was inspected read-only. No database, RLS, production redirect, dependency, native build configuration, commit, push or deployment changes.
+Implemented in travel-mvp-mobile on 2026-10-09. ../travel-mvp-web was inspected read-only. No database, RLS, production redirect, dependency, native build configuration, commit, push or deployment changes.
 
 ## Files
 

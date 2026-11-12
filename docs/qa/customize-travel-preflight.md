@@ -4,7 +4,7 @@ Owner authorization: current conversation, 2026-10-28. Select/discard cards then
 
 ## Baseline and impact
 
-Repository: D:/Travel_Mvp_Mobile, main 6025168. Existing uncommitted instruction, editor, map, story and test changes are protected; implementation builds on their current state. No stash/reset/checkout/publication is authorized.
+Repository: travel-mvp-mobile, main 6025168. Existing uncommitted instruction, editor, map, story and test changes are protected; implementation builds on their current state. No stash/reset/checkout/publication is authorized.
 
 Inspected: src/components/journey/customize-stops.tsx, src/app/customize/[id].tsx, src/app/travel/[id].tsx, src/lib/remix/customize.ts, src/lib/journey/trip-session.ts, src/lib/journey/travel-preview.ts, src/hooks/use-trip-session.ts. Current Customize invokes remixSelectedJourney and displays a review/draft step; Travel normally loads a public journey and uses an in-memory tripStore keyed by journey ID.
 

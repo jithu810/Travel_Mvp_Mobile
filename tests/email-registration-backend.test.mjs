@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { readFileSync, existsSync, mkdirSync, mkdtempSync, realpathSync } from 'node:fs';
 import { join, sep } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { spawnSync, spawn } from 'node:child_process';
 import { webcrypto } from 'node:crypto';
 import net from 'node:net';
@@ -53,12 +54,12 @@ test('handler returns bounded Retry-After and exposes no account result on quota
   assert.deepEqual(await response.json(), { error: 'rate_limited' });
 });
 
-const bin = 'D:/Travel_Mvp/.local-tests/customize-stops-pg/pgsql/bin';
+const bin = (process.env.WEB_REPO?join(process.env.WEB_REPO,'.local-tests/customize-stops-pg/pgsql/bin'):fileURLToPath(new URL('../../travel-mvp-web/.local-tests/customize-stops-pg/pgsql/bin',import.meta.url)));
 const exe = name => join(bin, name + (process.platform === 'win32' ? '.exe' : ''));
 const available = ['initdb', 'pg_ctl', 'psql'].every(name => existsSync(exe(name)));
 test('isolated PG enforces grants, providers, atomic quotas, window expiry and bounded counters', { skip: !available, timeout: 120000 }, async () => {
   const workspace = realpathSync(process.cwd());
-  assert.match(workspace.replaceAll('\\', '/'), /\/Travel_Mvp_Mobile$/i);
+  assert.equal(workspace, realpathSync(fileURLToPath(new URL('../', import.meta.url))));
   const outputs = join(workspace, '.local-tests'); mkdirSync(outputs, { recursive: true });
   const directory = mkdtempSync(join(outputs, 'email-registration-'));
   assert.ok(realpathSync(directory).startsWith(workspace + sep));

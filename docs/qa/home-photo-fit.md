@@ -4,7 +4,7 @@ QA Tester / independent Code Reviewer: reassigned specialist, separate from appl
 
 ## Tested snapshot
 
-Repository D:/Travel_Mvp_Mobile, branch codex/home-photo-fit, HEAD aba76832ce967503caf5d8692faf019ed3f583ca. Stable application/test snapshot released by Architect before checks; hashes reconfirmed after checks:
+Repository travel-mvp-mobile, branch codex/home-photo-fit, HEAD aba76832ce967503caf5d8692faf019ed3f583ca. Stable application/test snapshot released by Architect before checks; hashes reconfirmed after checks:
 
 | Path | SHA256 |
 | --- | --- |

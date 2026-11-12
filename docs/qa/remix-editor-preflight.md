@@ -4,7 +4,7 @@ Architect / Backend Developer, 2026-10-27 (Asia/Kolkata). **Current decision: UI
 
 ## Product-owner exception and repository assessment
 
-The product owner explicitly approved skipping the live backend preflight for this UI task and updating the shared policy for both repositories. `D:/Travel_Mvp/docs/multi-agent-workflow.md`, both AGENTS.md files and reusable Architect/Backend Developer role instructions now distinguish UI-only repository assessments from the full live-schema preflight.
+The product owner explicitly approved skipping the live backend preflight for this UI task and updating the shared policy for both repositories. `../travel-mvp-web/docs/multi-agent-workflow.md`, both AGENTS.md files and reusable Architect/Backend Developer role instructions now distinguish UI-only repository assessments from the full live-schema preflight.
 
 Architect inspected `src/app/create.tsx`, `src/app/draft/[id].tsx`, the JourneyOptions remix navigation and shared Story map/Buddy components; Mobile Developer independently traced all three remix landing routes, existing Account/customize direct-editor routes and editor hydration. Backend Developer inspected the existing remix/save query contracts and relevant Web migrations as recorded below. The scoped change only changes the navigation destination after existing remix handling and local map/sprite presentation for `sourceId` drafts. It reuses existing owner-checked editor loading and unchanged copy/save queries, parameters, Storage access and media handling. Authentication, authorization, persistence and backend contracts stay unchanged. No live-schema equivalence is claimed.
 
