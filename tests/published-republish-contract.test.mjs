@@ -3,7 +3,7 @@ import { existsSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { test } from 'node:test';
 
-const sharedFixture = new URL('../../Travel_Mvp/scripts/lib/offline-db.mjs',import.meta.url);
+const sharedFixture = new URL('../../travel-mvp-web/scripts/lib/offline-db.mjs',import.meta.url);
 let unavailable = existsSync(sharedFixture) ? null : 'Optional backend contract: sibling Web offline-db fixture is unavailable.';
 if (!unavailable) {
   try { createRequire(sharedFixture).resolve('@electric-sql/pglite'); }

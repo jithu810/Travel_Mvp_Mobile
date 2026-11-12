@@ -25,17 +25,17 @@ Deterministic counters show concurrent/repeated public callers issue one RPC and
 CPH2813 Android16 existing client on Metro8081: dist/images-grid.png confirms compact header and3-column grid render (several remote photos used fallback), and dist/images-saved.png actually captures Home after navigation/reload; it is Home rendering evidence, NOT Saved-filter acceptance. Concurrent reload/navigation state limited this physical session, so do not claim cold/warm request counts, all remote photos loaded, or Saved filter verified anew. No save/like/copy/upload/Travel action exercised. Thumbnail flag remains OFF, so actual native paired upload/disk byte savings are unverified. Physical iOS/TalkBack/large-text/decode-memory/slow-network tests and production thumbnail acceptance remain pending. Prior status-icon transition caveat persists.
 
 ## Architect reviewed backend snapshot SHA256
-- D:\Travel_Mvp_Mobile\src\lib\create\photo-save.ts: 0CAD4CE7F3A70760E3417BA3987BA52CCDE12B435FE3B1EF55E16E33C49A05EB
-- D:\Travel_Mvp_Mobile\src\lib\create\photo-queries.ts: D17FC851EF8491FD3EB09129E42AAAA6D81251436687B6640A502D9FEF8D8F43
-- D:\Travel_Mvp_Mobile\src\lib\discovery\queries.ts: 280743135986CAFF979A66048BD21DAD2F900094E52F05A5C2778FB34C1843F6
-- D:\Travel_Mvp_Mobile\src\lib\discovery\request-cache.ts: A16B873B036CC5A370C458649BEAEB5A5EAA25FCC631EEDE7F38045D7D15C98E
-- D:\Travel_Mvp_Mobile\src\lib\media\image-variants.ts: ECE7E677FB68F0584D094F5E3A35E9FD8EBA76D7D30BA06E624530198F8D0516
-- D:\Travel_Mvp_Mobile\src\types\journey.ts: C3A41044412010DA402CF5EFA7918E2EB77401B0EEFB4B74E1B1A6F468E87AF5
-- D:\Travel_Mvp_Mobile\src\app\create.tsx: 742D6FCB6BE719D66AB4828D0B70E1B2F358149EF69243261DB4ECD18869E215
-- D:\Travel_Mvp_Mobile\docs\backend\image-thumbnails.review.sql: 823C43BE7241B364ACD5B640A80179EB65AC53F389809906C59FBC88985F7C24
-- D:\Travel_Mvp_Mobile\tests\photo-persistence.test.mjs: C665ED89E41A1B50C8F19FE7C635FE4E3355C2F35166C04A871D6F4AE568718A
-- D:\Travel_Mvp_Mobile\tests\image-loading-cache.test.mjs: E65CB28BAF12640FFF72E1D1662A3A47A73E98BA8077FBBBD8238E9C65B06A45
-- D:\Travel_Mvp_Mobile\tests\image-variants.test.mjs: C5742314D8E7D8E88D0E07ACF2B7C969FB2F0DDBBC4F1A9BD8A29C71D7390F32
-- D:\Travel_Mvp_Mobile\tests\thumbnail-policy.test.mjs: 5A73CAA096BED32C3C3158FB7724FF0D625065EA719C5589030E29C9B27F6046
+- src\lib\create\photo-save.ts: 0CAD4CE7F3A70760E3417BA3987BA52CCDE12B435FE3B1EF55E16E33C49A05EB
+- src\lib\create\photo-queries.ts: D17FC851EF8491FD3EB09129E42AAAA6D81251436687B6640A502D9FEF8D8F43
+- src\lib\discovery\queries.ts: 280743135986CAFF979A66048BD21DAD2F900094E52F05A5C2778FB34C1843F6
+- src\lib\discovery\request-cache.ts: A16B873B036CC5A370C458649BEAEB5A5EAA25FCC631EEDE7F38045D7D15C98E
+- src\lib\media\image-variants.ts: ECE7E677FB68F0584D094F5E3A35E9FD8EBA76D7D30BA06E624530198F8D0516
+- src\types\journey.ts: C3A41044412010DA402CF5EFA7918E2EB77401B0EEFB4B74E1B1A6F468E87AF5
+- src\app\create.tsx: 742D6FCB6BE719D66AB4828D0B70E1B2F358149EF69243261DB4ECD18869E215
+- docs\backend\image-thumbnails.review.sql: 823C43BE7241B364ACD5B640A80179EB65AC53F389809906C59FBC88985F7C24
+- tests\photo-persistence.test.mjs: C665ED89E41A1B50C8F19FE7C635FE4E3355C2F35166C04A871D6F4AE568718A
+- tests\image-loading-cache.test.mjs: E65CB28BAF12640FFF72E1D1662A3A47A73E98BA8077FBBBD8238E9C65B06A45
+- tests\image-variants.test.mjs: C5742314D8E7D8E88D0E07ACF2B7C969FB2F0DDBBC4F1A9BD8A29C71D7390F32
+- tests\thumbnail-policy.test.mjs: 5A73CAA096BED32C3C3158FB7724FF0D625065EA719C5589030E29C9B27F6046
 
 Final integration: full609/609 tests0skips, TypeScript, full zero-warning lint, whitespace and Android export1627modules4.4MB passed. No application sources changed after checks. Root documentation/ignore-only changes document the disabled flag and exclude local private test/cache artifacts.

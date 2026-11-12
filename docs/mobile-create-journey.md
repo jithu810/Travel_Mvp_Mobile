@@ -1,6 +1,6 @@
 # Prompt 31 — Native Create Journey
 
-Completed in D:\Travel_Mvp_Mobile on 2026-10-09. Web code, migrations, RLS and backend behavior were inspected read-only. No commit, push, deployment or native build was performed.
+Completed in travel-mvp-mobile on 2026-10-09. Web code, migrations, RLS and backend behavior were inspected read-only. No commit, push, deployment or native build was performed.
 
 ## Files
 

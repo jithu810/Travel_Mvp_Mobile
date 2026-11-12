@@ -1,0 +1,2 @@
+# Shell scripts run under bash on every OS; keep LF so Windows checkouts do not break them.
+*.sh text eol=lf

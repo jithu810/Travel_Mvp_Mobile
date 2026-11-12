@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { readFile } from 'node:fs/promises';
 import ts from 'typescript';
-import { offlineDb, migrations, as } from '../../Travel_Mvp/scripts/lib/offline-db.mjs';
+import { offlineDb, migrations, as } from '../../travel-mvp-web/scripts/lib/offline-db.mjs';
 
 async function pageNormalizer() {
   const exports={};

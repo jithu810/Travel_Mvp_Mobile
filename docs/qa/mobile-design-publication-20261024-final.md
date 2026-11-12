@@ -4,7 +4,7 @@ QA owner: Mobile Developer specialist acting as QA; Architect coordinates public
 
 ## Baseline and scope
 
-Repository `D:/Travel_Mvp_Mobile`, baseline `main` at `c668bb2e70c46e85c48c6dfeb4bad448579df2b7`. Git status inspected before checks. Preserved all accumulated dirty work. `.env.example` is excluded and never read; unrelated untracked `.github/`, `cd`, `eas` are excluded. No dependencies, package manifest, native configuration or environment files changed; no environment files read by this QA. Generated output only under ignored `dist/mobile-design-publication/`; only source-controlled edit by QA is this report.
+Repository `travel-mvp-mobile`, baseline `main` at `c668bb2e70c46e85c48c6dfeb4bad448579df2b7`. Git status inspected before checks. Preserved all accumulated dirty work. `.env.example` is excluded and never read; unrelated untracked `.github/`, `cd`, `eas` are excluded. No dependencies, package manifest, native configuration or environment files changed; no environment files read by this QA. Generated output only under ignored `dist/mobile-design-publication/`; only source-controlled edit by QA is this report.
 
 Architect confirmed remote main still points to the same c668bb2 baseline (no remote drift). All24 application/test hashes were reverified unchanged after the isolated rerun.
 

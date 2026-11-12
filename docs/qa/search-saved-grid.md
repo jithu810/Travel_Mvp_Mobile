@@ -38,9 +38,9 @@ Architect owns native visual checks of matching Home/Search pill shape, keyboard
 ## Architect helper review and native verification — 2026-10-24 Asia/Kolkata
 
 Architect independently reviewed saved-queries.ts and its tests (Backend authored these), inspected identity subscription/before-after verification, abort/deadline cleanup, paginated caller-specific public-only guards, stable-ID dedup and existing photo signing; no actionable findings. Independently reran6/6 saved helper tests. Helper/model contract comment snapshot SHA256:
-- D:\Travel_Mvp_Mobile\src\lib\social\saved-queries.ts: 3EB1CDABCF464F88E214A55412FF7656746CA9247C9A8D2EE57FA8E68CA246FB
-- D:\Travel_Mvp_Mobile\src\lib\discovery\model.ts: 53920D1B418F3DE445E20A072B95047172700CF911A8D9B90095609BC3A0D9D7
-- D:\Travel_Mvp_Mobile\tests\saved-queries.test.mjs: 345C0FF6CD067FDC2D128B09AB1A69BE19DDA880C66E619FE6D8D87395227AF2
+- src\lib\social\saved-queries.ts: 3EB1CDABCF464F88E214A55412FF7656746CA9247C9A8D2EE57FA8E68CA246FB
+- src\lib\discovery\model.ts: 53920D1B418F3DE445E20A072B95047172700CF911A8D9B90095609BC3A0D9D7
+- tests\saved-queries.test.mjs: 345C0FF6CD067FDC2D128B09AB1A69BE19DDA880C66E619FE6D8D87395227AF2
 
 Native CPH2813 Android16, existing Journey Creator0.1.0 Expo SDK57 client on Metro8081. No server restart, native rebuild, dependencies or permission changes. Existing account/Wi-Fi connection retained; GPS/Travel not exercised. Navigation captures settled10seconds; initial updated screen settled12seconds.
 

@@ -1,6 +1,6 @@
 # Prompt 27 — Mobile Journey Story
 
-Implemented in `D:\Travel_Mvp_Mobile` on 2026-10-08. The web project, existing Supabase schema/RLS, public-read transport, and persistent authentication/session foundation are unchanged.
+Implemented in `travel-mvp-mobile` on 2026-10-08. The web project, existing Supabase schema/RLS, public-read transport, and persistent authentication/session foundation are unchanged.
 
 ## UI
 
@@ -65,7 +65,7 @@ Geographic spread and all map/travel/camera/offline/notification capabilities re
 Run:
 
 ```powershell
-Set-Location D:\Travel_Mvp_Mobile
+Set-Location travel-mvp-mobile
 npm start -- --port 8083
 ```
 

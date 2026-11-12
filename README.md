@@ -1,6 +1,6 @@
 # Journey Creator mobile
 
-Independent native React Native / Expo / TypeScript application at `D:\Travel_Mvp_Mobile`, intended for `jithu810/Travel_Mvp_Mobile`. The working web app at `D:\Travel_Mvp` is separate and unchanged.
+Independent native React Native / Expo / TypeScript application at `travel-mvp-mobile`, intended for `jithu810/Travel_Mvp_Mobile`. The working web app at `../travel-mvp-web` is separate and unchanged.
 
 ## Native Create Journey — Prompt 31
 
@@ -97,7 +97,7 @@ Expo **57.0.27**, Expo Router **57.0.25**, React Native **0.86.3**, React **19.2
 An ignored `.env.local` is already configured with only the same backend's public settings. For a fresh checkout:
 
 ```powershell
-Set-Location D:\Travel_Mvp_Mobile
+Set-Location travel-mvp-mobile
 Copy-Item .env.example .env.local
 ```
 
@@ -110,7 +110,7 @@ The original persistent client restores existing Supabase sessions using native 
 Dependencies are installed. Fresh checkouts should run `npm ci`.
 
 ```powershell
-Set-Location D:\Travel_Mvp_Mobile
+Set-Location travel-mvp-mobile
 npm start -- --port 8082
 ```
 

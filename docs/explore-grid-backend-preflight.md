@@ -4,8 +4,8 @@ Owner: Backend Developer. Inspection: 2026-10-24 03:26–03:27 UTC (08:56–08:5
 
 ## Target and protected baseline
 
-- Mobile `D:/Travel_Mvp_Mobile`, `main...origin/main`, HEAD `c878bd303c4687d0185b9cdd36c89268c4ceb51d`; existing untracked `.github/`, `cd`, `eas` preserved. Read AGENTS.md, PROJECT_STATUS.md and ROADMAP.md.
-- Shared backend source inspected read-only in Web `D:/Travel_Mvp`, `backend/integrity-hardening`, HEAD `428182a0454c8f536c56024eeb0497f4f4a05c81`. Baseline includes deleted `.env.example`; changed AGENTS.md/package.json/seed and schema scripts; added eas.json; untracked .codex/.github/workflow and backend reports, scripts/lib, copy/integrity tests, audits, patches and migration proposals. No Web files changed.
+- Mobile `travel-mvp-mobile`, `main...origin/main`, HEAD `c878bd303c4687d0185b9cdd36c89268c4ceb51d`; existing untracked `.github/`, `cd`, `eas` preserved. Read AGENTS.md, PROJECT_STATUS.md and ROADMAP.md.
+- Shared backend source inspected read-only in Web `../travel-mvp-web`, `backend/integrity-hardening`, HEAD `428182a0454c8f536c56024eeb0497f4f4a05c81`. Baseline includes deleted `.env.example`; changed AGENTS.md/package.json/seed and schema scripts; added eas.json; untracked .codex/.github/workflow and backend reports, scripts/lib, copy/integrity tests, audits, patches and migration proposals. No Web files changed.
 - Mobile ignored local configuration URL was compared internally with connected project `gwybjhqgnrpouwcdvusi`: **match true**. No environment values or keys printed/copied. Supabase connector lists this existing active project in ap-northeast-2, PostgreSQL 17.11; treated as live shared backend, not a disposable test target.
 - Read repository workflow, Backend role and Supabase skill. Current Storage documentation retrieved through Supabase search_docs. Changelog markdown fetch was attempted but web fetch rejected its content type; no Supabase implementation/API change is proposed.
 

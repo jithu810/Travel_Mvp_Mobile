@@ -56,7 +56,7 @@ Local minimal correction `docs/backend/profile-connections-execute-acl.sql`, SHA
 
 Targeted native correction QA is now COMPLETE: two fresh PostgreSQL17.11 clusters, four successful first/repeat applications under INHERIT/NOINHERIT corrective actors, exact sole-mutator PUBLIC-grant before-state reproduced, all six final execution ACLs correct. Independent reviewer qualified source, expanded tests and native evidence with no remaining findings; both clusters are stopped and no listener/PID files remain. See [native ACL evidence](profile-connections-native-acl-2026-11-02.md). Correction SQL hash unchanged. Runtime driver now `bc0a7d952a48c1d1208d1fd703683893d6d8a8e59f73d94e6310aef9d0d55230`, adding isolated ACL-only mode and reconstruction filter; original13race result applies to unchanged function bodies. New regression coverage explicitly checks the permission case missed by earlier non-superuser ownership-only checks. No live correction applied.
 
-Phone session reconnected to192.168.1.4:39379, Codex/MSI/Metro8081 serving D:/Travel_Mvp_Mobile. Journey Google Test Home/globe/compact cards/Buddy loaded successfully; screenshot retained in Windows temp `profile-activation-ready.png`. No friend/follow/read-acknowledgement or other live content mutations were tapped. Existing local code/reports remain unpublished.
+Phone session reconnected to192.168.1.4:39379, Codex/MSI/Metro8081 serving travel-mvp-mobile. Journey Google Test Home/globe/compact cards/Buddy loaded successfully; screenshot retained in Windows temp `profile-activation-ready.png`. No friend/follow/read-acknowledgement or other live content mutations were tapped. Existing local code/reports remain unpublished.
 
 ## Approved execute-ACL correction; managed-Auth read blocker
 

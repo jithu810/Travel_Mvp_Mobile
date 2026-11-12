@@ -1,6 +1,6 @@
 # Prompt 34 — Immersive, single-screen Journey Story
 
-Implemented in D:\Travel_Mvp_Mobile on 2026-10-11. This supersedes the vertically scrolling Story composition described in journey-story-polish.md.
+Implemented in travel-mvp-mobile on 2026-10-11. This supersedes the vertically scrolling Story composition described in journey-story-polish.md.
 
 ## Result
 

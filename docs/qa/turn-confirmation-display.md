@@ -112,7 +112,7 @@ Use the installed custom development client (Mapbox requires native modules; Exp
 ```powershell
 Set-Location 'D:/Travel_Mvp_Mobile_Worktrees/turn-confirmation-display'
 # Owner action: copy your existing local environment into this isolated worktree.
-Copy-Item -LiteralPath 'D:/Travel_Mvp_Mobile/.env.local' -Destination './.env.local'
+Copy-Item -LiteralPath '.env.local' -Destination './.env.local'
 npx expo start --dev-client --lan --port 8083
 ```
 

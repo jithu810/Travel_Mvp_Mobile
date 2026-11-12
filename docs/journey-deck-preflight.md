@@ -6,7 +6,7 @@ Backend Developer, 2026-10-23 08:39–08:40 IST (03:09–03:10 UTC). Read-only b
 
 Requested Journey presentation: map first, no title/back header, curved map bottom, animated layered stop cards browsable left/right, consistent photo cover cropping and static native missing-photo art. Preserve selected-stop/map synchronization, story access, social/actions and travel entry. No Travel Mode redesign, stop reorder, upload, persistence or API change.
 
-Mobile D:/Travel_Mvp_Mobile, branch codex/home-photo-fit, HEAD aba76832ce967503caf5d8692faf019ed3f583ca. Dirty baseline preserved: PROJECT_STATUS.md, ROADMAP.md, HomeJourneyCard and home-polish tests; untracked .github/, cd, eas and Home preflight/QA reports. Existing Home acceptance evidence remains separate. Web reference baseline remains protected backend/integrity-hardening as recorded in docs/home-photo-fit-preflight.md; no Web writes.
+Mobile travel-mvp-mobile, branch codex/home-photo-fit, HEAD aba76832ce967503caf5d8692faf019ed3f583ca. Dirty baseline preserved: PROJECT_STATUS.md, ROADMAP.md, HomeJourneyCard and home-polish tests; untracked .github/, cd, eas and Home preflight/QA reports. Existing Home acceptance evidence remains separate. Web reference baseline remains protected backend/integrity-hardening as recorded in docs/home-photo-fit-preflight.md; no Web writes.
 
 Confirmed application Supabase project from preceding same-session environment/project checks: gwybjhqgnrpouwcdvusi, existing hosted backend in ap-northeast-2, ACTIVE_HEALTHY, Postgres 17.11. Fresh read-only connector queries targeted that same explicit project ID. It is not an isolated test database.
 
