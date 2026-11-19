@@ -24,6 +24,7 @@ import { ProfileConnections } from '@/components/profile/profile-connections';
 import { ProfileMemoryMap } from '@/components/profile/profile-memory-map';
 import type { PublicJourney } from '@/types/journey';
 import { journeyFeedSessions } from '@/lib/discovery/journey-feed-session';
+import { BuddyChatPanel } from '@/components/BuddyChatPanel';
 
 type Row = { kind: 'draft'; draft: PrivateDraftSummary } | { kind: 'published' | 'saved'; journey: PublicJourney };
 export default function AccountScreen() {
@@ -149,6 +150,7 @@ export default function AccountScreen() {
         ListEmptyComponent={grid ? <View style={s.accountInset}>{emptyCollection}</View> : emptyCollection}
         ListFooterComponentStyle={fullWidthCollection ? s.accountInset : undefined}
         ListFooterComponent={tab === 'map' ? null : <Pressable {...footerProtection} accessibilityRole="button" accessibilityLabel={'Refresh ' + collectionTitle.toLowerCase()} onPress={refresh} style={s.close}><Text style={ui.body}>↻ Refresh {tab === 'drafts' ? 'drafts' : tab === 'saved' ? 'saved journeys' : 'journeys'}</Text></Pressable>} />}
+    {__DEV__ && <BuddyChatPanel accessToken={accessToken} userAvatar={avatar} userName={name} />}
     </View>
     <Modal visible={settings} transparent animationType="none" onRequestClose={() => { if (!busy) setSettings(false); }}>
       <View style={s.shade}><SafeAreaView edges={['bottom', 'left', 'right']} style={s.sheet}><ScrollView keyboardShouldPersistTaps="handled">
