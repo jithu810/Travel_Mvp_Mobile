@@ -36,6 +36,41 @@ test('maps statuses to kinds and never exposes server text', async () => {
     await withEnv('https://gw.example', l => assert.rejects(l.sendBuddyChat('tok', turns), error => { assert.equal(error.kind, kind); assert.ok(!error.message.includes('secret')); return true; }));
   }
 });
+test('agent: posts only the latest message to /v1/agent and returns reply, status and steps', async () => {
+  let seen;
+  const steps = [{ id: 'understand', status: 'ok', ms: 610 }, { id: 'search', status: 'ok', ms: 0 }, { bad: true }];
+  globalThis.__fetch = async (url, init) => { seen = { url, init }; return reply(200, { reply: 'Beach weekend', status: 'ok', steps }); };
+  const result = await withEnv('https://gw.example', l => l.sendBuddyAgent('tok', 'Goa 2 days'));
+  assert.equal(seen.url, 'https://gw.example/v1/agent');
+  assert.equal(seen.init.headers.Authorization, 'Bearer tok');
+  assert.deepEqual(JSON.parse(seen.init.body), { messages: [{ role: 'user', content: 'Goa 2 days' }] });
+  assert.deepEqual(result, { reply: 'Beach weekend', status: 'ok', steps: steps.slice(0, 2) });
+});
+test('agent: unset URL, missing token and error statuses map like chat', async () => {
+  globalThis.__fetch = () => { throw new Error('should not fetch'); };
+  await assert.rejects(lib.sendBuddyAgent('tok', 'x'), { kind: 'not_configured' });
+  await withEnv('https://gw.example', l => assert.rejects(l.sendBuddyAgent(null, 'x'), { kind: 'sign_in' }));
+  for (const [status, kind] of [[401, 'unauthorized'], [503, 'busy'], [504, 'timeout'], [502, 'generic']]) {
+    globalThis.__fetch = async () => reply(status, { error: 'upstream secret' });
+    await withEnv('https://gw.example', l => assert.rejects(l.sendBuddyAgent('tok', 'x'), { kind }));
+  }
+});
+test('agent: formats real steps with timings, then the reply; a failed run marks validation', () => {
+  const steps = [{ id: 'understand', status: 'ok', ms: 610 }, { id: 'search', status: 'ok', ms: 4 }, { id: 'plan', status: 'ok', ms: 1280 }, { id: 'validate', status: 'ok', ms: 1 }];
+  const nb = (label, s) => label + ' · ' + s + ' s';
+  assert.equal(lib.formatBuddyAgentReply({ reply: 'Trip', status: 'ok', steps }),
+    [nb('✓ Understanding your request', '0.6'), nb('✓ Searching places', '0.0'), nb('✓ Preparing your trip', '1.3'), nb('✓ Validating results', '0.0')].join('\n') + '\n\nTrip');
+  const out = lib.formatBuddyAgentReply({ reply: 'Only Goa', status: 'needs_review', steps });
+  assert.ok(out.includes('✗ Validating results'));
+  assert.ok(out.includes('✓ Preparing your trip'));
+  assert.equal(lib.formatBuddyAgentReply({ reply: 'Plain', status: 'ok', steps: [{ id: 'check', status: 'ok', ms: 0 }] }), 'Plain');
+});
+test('agent-mode turns are never sent as normal chat history', () => {
+  const out = lib.clampBuddyMessages([
+    { role: 'user', content: 'Goa 2 days', agent: true }, { role: 'assistant', content: '✓ steps…', agent: true },
+    { role: 'user', content: 'hi' }]);
+  assert.deepEqual(out, [{ role: 'user', content: 'hi' }]);
+});
 test('clamps to last 10 turns, 2000 chars each, 8000 total, keeping the last message', () => {
   const many = Array.from({ length: 30 }, (_, i) => ({ role: i % 2 ? 'assistant' : 'user', content: 'x'.repeat(2500) }));
   many.push({ role: 'user', content: 'last' });
