@@ -1,8 +1,9 @@
 // DEV-ONLY: talks to the Buddy chat gateway at EXPO_PUBLIC_BUDDY_CHAT_URL: POST /v1/chat,
-// POST /v1/chat/stream (SSE) and GET /v1/usage.
+// POST /v1/chat/stream (SSE), POST /v1/agent (agent mode prototype) and GET /v1/usage.
 // Identity comes from the Supabase access token; no user id or coordinates are sent.
 // Never logs message text, replies or the token.
-export type BuddyTurn = { role: 'user' | 'assistant'; content: string };
+// `agent` marks turns of agent mode: they stay on screen but are never sent as normal chat history.
+export type BuddyTurn = { role: 'user' | 'assistant'; content: string; agent?: true };
 // This month's tokens for the signed-in user (GET /v1/usage). limit null = unlimited;
 // enforced false = the server only counts (never refuses) yet.
 export type BuddyUsage = { used: number; limit: number | null; period: string; enforced: boolean; resetsAt?: string };
@@ -60,7 +61,8 @@ export function isBuddyConfigured(): boolean { return buddyChatEndpoint() !== nu
 // Keep the newest turns within the gateway limits; the last (user) message always stays.
 // Empty turns are dropped (the gateway rejects them), except the last message.
 export function clampBuddyMessages(messages: BuddyTurn[]): BuddyTurn[] {
-  const usable = messages.filter((turn, index) => turn.content.trim() !== '' || index === messages.length - 1);
+  const chat = messages.filter((turn, index) => !turn.agent || index === messages.length - 1);
+  const usable = chat.filter((turn, index) => turn.content.trim() !== '' || index === chat.length - 1);
   const recent = usable.slice(-Math.min(MAX_TURNS, MAX_MESSAGES)).map(turn => ({ role: turn.role, content: turn.content.slice(0, MAX_MESSAGE_CHARS) }));
   let total = recent.reduce((sum, turn) => sum + turn.content.length, 0);
   while (recent.length > 1 && total > MAX_TOTAL_CHARS) total -= recent.shift()!.content.length;
@@ -248,6 +250,56 @@ export async function sendBuddyChatStream(accessToken: string | null | undefined
     external?.removeEventListener('abort', onAbort);
     try { void reader?.cancel().catch(() => {}); } catch { /* already closed */ }
   }
+}
+
+// ---- Agent mode (DEV prototype): POST /v1/agent runs the Goa mini-agent once ----
+// Only the latest message is sent (the prototype agent uses no history). The steps are the agent's own
+// executed steps with real timings, returned after the run (no live streaming).
+export type BuddyAgentStep = { id: string; status: string; ms: number };
+export type BuddyAgentResult = { reply: string; status: string; steps: BuddyAgentStep[] };
+export const BUDDY_AGENT_TIMEOUT_MS = 60000;
+const AGENT_STEP_LABELS: Record<string, string> = {
+  understand: 'Understanding your request',
+  search: 'Searching places',
+  plan: 'Preparing your trip',
+  validate: 'Validating results',
+};
+
+export async function sendBuddyAgent(accessToken: string | null | undefined, text: string, external?: AbortSignal): Promise<BuddyAgentResult> {
+  const base = buddyBase();
+  if (!base) throw new BuddyChatError('not_configured');
+  if (!accessToken) throw new BuddyChatError('sign_in');
+  let response: Response;
+  try {
+    response = await timedFetch(base + '/v1/agent', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + accessToken },
+      body: JSON.stringify({ messages: [{ role: 'user', content: text.slice(0, MAX_MESSAGE_CHARS) }] }),
+    }, BUDDY_AGENT_TIMEOUT_MS, external);
+  } catch (caught) {
+    if (external?.aborted) throw caught;
+    throw new BuddyChatError((caught as { name?: string } | null)?.name === 'AbortError' ? 'timeout' : 'generic');
+  }
+  let data: { reply?: unknown; error?: unknown; status?: unknown; steps?: unknown } = {};
+  try { data = await response.json(); } catch { /* non-JSON body */ }
+  throwForStatus(response.status, response.ok, data);
+  const steps = Array.isArray(data.steps) ? data.steps.flatMap(item => {
+    const s = item as { id?: unknown; status?: unknown; ms?: unknown };
+    return typeof s?.id === 'string' && typeof s.status === 'string' && typeof s.ms === 'number' ? [{ id: s.id, status: s.status, ms: s.ms }] : [];
+  }) : [];
+  return { reply: data.reply as string, status: typeof data.status === 'string' ? data.status : '', steps };
+}
+
+// One plain-text chat bubble: executed steps with timings, a blank line, then Buddy's reply.
+// A run that did not end ok marks the validation step as the place where it stopped.
+export function formatBuddyAgentReply(result: BuddyAgentResult): string {
+  const lines = result.steps.filter(step => step.id in AGENT_STEP_LABELS).map(step => {
+    const failed = step.status !== 'ok' || (step.id === 'validate' && result.status !== 'ok');
+    const seconds = (Math.max(0, step.ms) / 1000).toFixed(1);
+    // Non-breaking spaces keep "· 0.7 s" on one line when the label wraps.
+    return (failed ? '✗ ' : '✓ ') + AGENT_STEP_LABELS[step.id] + ' · ' + seconds + ' s';
+  });
+  return lines.length ? lines.join('\n') + '\n\n' + result.reply : result.reply;
 }
 
 // Usage meter: any failure returns null so the panel simply hides the meter.

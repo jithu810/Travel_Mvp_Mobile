@@ -6,7 +6,7 @@ import { buddyReference } from '@/lib/buddy/animations';
 import Feather from '@expo/vector-icons/Feather';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { theme as appTheme, primaryControl } from '@/theme/mobile-theme';
-import { BUDDY_CHAT_MAX_INPUT, BuddyChatError, buddyErrorMessage, getBuddyUsage, isBuddyConfigured, sendBuddyChatStream, type BuddyTurn, type BuddyUsage } from '@/lib/buddyChat';
+import { BUDDY_CHAT_MAX_INPUT, BuddyChatError, buddyErrorMessage, formatBuddyAgentReply, getBuddyUsage, isBuddyConfigured, sendBuddyAgent, sendBuddyChatStream, type BuddyTurn, type BuddyUsage } from '@/lib/buddyChat';
 
 const BUTTON = 54, RIGHT = 16;
 // Offset inside the Account list container, which already ends above the floating tab bar
@@ -42,6 +42,8 @@ function Panel({ accessToken, me }: { accessToken?: string | null; me: Me }) {
   const [text, setText] = useState(''), [busy, setBusy] = useState(false), [error, setError] = useState<string | null>(null);
   const [usage, setUsage] = useState<BuddyUsage | null>(null);
   const [limited, setLimited] = useState(false);
+  // Agent mode (DEV prototype): each message runs the Goa mini-agent once instead of normal chat.
+  const [agentMode, setAgentMode] = useState(false);
   const configured = isBuddyConfigured();
   const abort = useRef<AbortController | null>(null);
   const streamingStarted = useRef<AbortController | null>(null);
@@ -79,11 +81,18 @@ function Panel({ accessToken, me }: { accessToken?: string | null; me: Me }) {
   const send = useCallback(async () => {
     const content = text.trim();
     if (!content || busy) return;
-    const next: BuddyTurn[] = [...turns, { role: 'user', content }];
+    const next: BuddyTurn[] = [...turns, agentMode ? { role: 'user', content, agent: true } : { role: 'user', content }];
     setTurns(next); setText(''); setError(null); setBusy(true);
     const controller = new AbortController();
     abort.current = controller;
     try {
+      if (agentMode) {
+        const result = await sendBuddyAgent(accessToken, content, controller.signal);
+        if (controller.signal.aborted) return;
+        setTurns(current => [...current, { role: 'assistant', content: formatBuddyAgentReply(result), agent: true }]);
+        refreshUsage();
+        return;
+      }
       const result = await sendBuddyChatStream(accessToken, next, soFar => {
         if (controller.signal.aborted) return;
         pending.current = soFar;
@@ -104,7 +113,7 @@ function Panel({ accessToken, me }: { accessToken?: string | null; me: Me }) {
     } finally {
       if (abort.current === controller) { abort.current = null; setBusy(false); }
     }
-  }, [text, busy, turns, accessToken, refreshUsage, stopFlush]);
+  }, [text, busy, turns, accessToken, refreshUsage, stopFlush, agentMode]);
   // Input is blocked when the server refused (429 limit_reached), when it enforces and the meter
   // is full, or when chat isn't configured (reuses the limit state).
   const meterFull = usage !== null && usage.enforced && usage.limit !== null && usage.used >= usage.limit;
@@ -119,13 +128,15 @@ function Panel({ accessToken, me }: { accessToken?: string | null; me: Me }) {
       <Feather name="message-circle" size={24} color={appTheme.white} />
     </Pressable>
     <Modal visible={open} transparent animationType="slide" statusBarTranslucent onRequestClose={() => setOpen(false)}>
-      <ChatSheet me={me} turns={turns} streaming={streaming} busy={busy} error={shownError} usage={usage} atLimit={atLimit} lockNote={lockNote} onClear={clear} text={text} setText={setText} onSend={() => { void send(); }} onClose={() => setOpen(false)} />
+      <ChatSheet me={me} turns={turns} streaming={streaming} busy={busy} error={shownError} usage={usage} atLimit={atLimit} lockNote={lockNote} onClear={clear} text={text} setText={setText} onSend={() => { void send(); }} onClose={() => setOpen(false)}
+        agentMode={agentMode} onToggleAgent={() => setAgentMode(on => !on)} />
     </Modal>
   </>;
 }
 
-function ChatSheet({ me, turns, streaming, busy, error, usage, atLimit, lockNote, onClear, text, setText, onSend, onClose }: {
+function ChatSheet({ me, turns, streaming, busy, error, usage, atLimit, lockNote, onClear, text, setText, onSend, onClose, agentMode, onToggleAgent }: {
   me: Me; turns: BuddyTurn[]; streaming: string | null; busy: boolean; error: string | null; usage: BuddyUsage | null; atLimit: boolean; lockNote: string | null; onClear: () => void; text: string; setText: (value: string) => void; onSend: () => void; onClose: () => void;
+  agentMode: boolean; onToggleAgent: () => void;
 }) {
   const { height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
@@ -140,9 +151,9 @@ function ChatSheet({ me, turns, streaming, busy, error, usage, atLimit, lockNote
     return () => { show.remove(); hide.remove(); };
   }, []);
 
-  const preferred = Math.min(640, Math.max(320, Math.round(height * 0.7)));
-  const available = height - keyboard - insets.top - 16;
-  const sheetHeight = Math.max(200, Math.min(preferred, available));
+  // Full screen below the status bar. With the Android keyboard open, the outer padding already reserves
+  // keyboard + bottom inset, so the sheet gives that room back.
+  const sheetHeight = Math.max(200, height - insets.top - (keyboard > 0 ? keyboard + insets.bottom : 0));
   const data: Item[] = [...turns, ...(busy ? [streaming !== null ? { role: 'assistant', content: streaming } as const : { role: 'typing', content: '' } as const] : []), ...(error ? [{ role: 'error', content: error } as const] : [])];
   const isStreaming = streaming !== null;
   const scrollEnd = useCallback(() => list.current?.scrollToEnd({ animated: !isStreaming }), [isStreaming]);
@@ -151,12 +162,17 @@ function ChatSheet({ me, turns, streaming, busy, error, usage, atLimit, lockNote
   return <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
     <View style={{ flex: 1, justifyContent: 'flex-end', paddingBottom: Platform.OS === 'android' && keyboard > 0 ? keyboard + insets.bottom : 0 }}>
       <Pressable accessibilityLabel="Close Buddy chat" onPress={onClose} style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)' }} />
-      <View style={{ height: sheetHeight, backgroundColor: appTheme.background, borderTopLeftRadius: 24, borderTopRightRadius: 24, borderWidth: 1, borderBottomWidth: 0, borderColor: appTheme.border, overflow: 'hidden', paddingBottom: keyboard > 0 ? 0 : insets.bottom }}>
+      <View style={{ height: sheetHeight, backgroundColor: appTheme.background, overflow: 'hidden', paddingBottom: keyboard > 0 ? 0 : insets.bottom }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 10 }}>
           <View style={{ flex: 1 }}>
             <Text accessibilityRole="header" style={{ color: appTheme.text, fontSize: 17, fontWeight: '600' }}>Buddy</Text>
-            {usage && <Text style={{ color: appTheme.muted, fontSize: 12 }}>{usageLabel(usage)}</Text>}
+            {agentMode ? <Text style={{ color: appTheme.accent, fontSize: 12 }}>Agent mode · Goa trips</Text>
+              : usage && <Text style={{ color: appTheme.muted, fontSize: 12 }}>{usageLabel(usage)}</Text>}
           </View>
+          <Pressable accessibilityRole="switch" accessibilityLabel="Agent mode" accessibilityState={{ checked: agentMode, disabled: busy }} disabled={busy} onPress={onToggleAgent} hitSlop={8}
+            style={{ width: 40, height: 40, alignItems: 'center', justifyContent: 'center', borderRadius: 20, backgroundColor: agentMode ? appTheme.surface : 'transparent' }}>
+            <Feather name="compass" size={20} color={agentMode ? appTheme.accent : appTheme.text} />
+          </Pressable>
           <Pressable accessibilityRole="button" accessibilityLabel="Clear chat" accessibilityState={{ disabled: turns.length === 0 }} disabled={turns.length === 0} onPress={onClear} hitSlop={8} style={{ width: 40, height: 40, alignItems: 'center', justifyContent: 'center', opacity: turns.length === 0 ? 0.35 : 1 }}>
             <Feather name="trash-2" size={20} color={appTheme.text} />
           </Pressable>
@@ -174,7 +190,7 @@ function ChatSheet({ me, turns, streaming, busy, error, usage, atLimit, lockNote
           renderItem={({ item }) => {
             const mine = item.role === 'user', bad = item.role === 'error';
             const bubble = <View style={{ flexShrink: 1, borderRadius: 16, paddingHorizontal: 12, paddingVertical: 8, backgroundColor: mine ? appTheme.accent : appTheme.surface, borderWidth: mine ? 0 : 1, borderColor: bad ? ERROR_COLOR : appTheme.border }}>
-              <Text style={{ fontSize: 15, color: mine ? appTheme.background : bad ? ERROR_COLOR : appTheme.text, fontStyle: item.role === 'typing' ? 'italic' : 'normal' }}>{item.role === 'typing' ? 'Buddy is typing…' : item.content}</Text>
+              <Text style={{ fontSize: 15, color: mine ? appTheme.background : bad ? ERROR_COLOR : appTheme.text, fontStyle: item.role === 'typing' ? 'italic' : 'normal' }}>{item.role === 'typing' ? (agentMode ? 'Buddy is working on it…' : 'Buddy is typing…') : item.content}</Text>
             </View>;
             // Avatar row: Buddy's head on the left of Buddy turns, your photo on the right of yours.
             return <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 6, alignSelf: mine ? 'flex-end' : 'flex-start', maxWidth: '88%' }}>
