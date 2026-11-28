@@ -17,7 +17,7 @@ for(const inheritance of ['inherit','noinherit']) test(`exact live original stat
   try {
     // Replay prerequisite canonical history; relationship SQL is deliberately
     // applied below under the controlled non-super migration actor.
-    await migrations(db,name=>!name.includes('profile_connections'));
+    await migrations(db,name=>!name.includes('profile_connections')&&!name.includes('chat_v1'));
     const original=await readFile('docs/backend/profile-connections.sql','utf8');
     assert.equal(createHash('sha256').update(original).digest('hex'),originalHash,'never rewrite applied original');
     // Mirrors the hosted non-superuser INHERIT migration actor. Schema/column

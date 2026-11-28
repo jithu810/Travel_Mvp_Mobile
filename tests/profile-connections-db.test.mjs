@@ -24,7 +24,7 @@ test('connections schema, participant isolation, transitions, durable inbox and 
   const mutate=async(id,action,request=null,revision=null,enabled=null,ids=null)=>(await query('select public.mutate_profile_connection($1,$2,$3,$4,$5,$6) result',[id,action,request,revision,enabled,ids]))[0].result;
   const deny=async(promise,code)=>assert.rejects(promise,error=>error.code===code);
   try {
-    await migrations(db,name=>!name.includes('profile_connections'));
+    await migrations(db,name=>!name.includes('profile_connections')&&!name.includes('chat_v1'));
     await db.exec(await readFile('docs/backend/profile-connections.sql','utf8'));
     await query('insert into auth.users(id) values ($1),($2),($3)',[a,b,c]);
     await query("update public.profiles set display_name='   ' where id=$1",[a]);
@@ -127,7 +127,7 @@ test('connections schema, participant isolation, transitions, durable inbox and 
 test('proposal transfers ownership under a non-superuser migration owner and removes temporary powers',async()=>{
   const db=await offlineDb();
   try {
-    await migrations(db,name=>!name.includes('profile_connections'));
+    await migrations(db,name=>!name.includes('profile_connections')&&!name.includes('chat_v1'));
     await db.exec(`create role connection_migrator nologin noinherit nosuperuser nobypassrls createrole;
       grant usage,create on schema public,private to connection_migrator with grant option;
       grant usage on schema auth to connection_migrator with grant option;
