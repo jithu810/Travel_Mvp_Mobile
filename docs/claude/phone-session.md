@@ -64,13 +64,17 @@ It changes no files and prints `METRO_PORT`, `ADB=<path>|none`, `MOBILE_REPO=<pa
   in their own terminal.
 - **METRO=ipv6-only:** Metro was started without the IPv4 option. Tell the user, stop that process
   (only if this conversation started it; otherwise ask) and restart it as above.
-- **APP_FOCUS=no**, wrong URL, or after restarting Metro (only once you own the phone):
+- **APP_FOCUS=no**, wrong URL, or after restarting Metro (only once you own the phone): open the
+  **Journey Google Test** development client (`com.sree8100.journeycreatormobile.googletest`). The phone
+  also has other builds of the app (`com.sree8100.journeycreatormobile` and `.outdoor`) that answer the
+  same `journeycreator://` link, so always name the package:
 
-      adb -s <serial> shell am start -a android.intent.action.VIEW -d "journeycreator://expo-development-client/?url=http%3A%2F%2Flocalhost%3A8082" com.sree8100.journeycreatormobile
+      adb -s <serial> shell am start -a android.intent.action.VIEW -d "journeycreator://expo-development-client/?url=http%3A%2F%2Flocalhost%3A8082" com.sree8100.journeycreatormobile.googletest
 
-  Screen locked (`isKeyguardShowing=true` in `adb -s <serial> shell dumpsys window`) → ask the user to
-  unlock. App not installed (`adb -s <serial> shell pm path com.sree8100.journeycreatormobile` prints
-  nothing) → a development build is needed; building/installing one needs separate approval.
+  Check with `adb -s <serial> shell dumpsys window | grep mCurrentFocus` that the `.googletest` package has
+  focus. Screen locked (`isKeyguardShowing=true` in `adb -s <serial> shell dumpsys window`) → ask the user
+  to unlock. App not installed (`adb -s <serial> shell pm path com.sree8100.journeycreatormobile.googletest`
+  prints nothing) → a development build is needed; building/installing one needs separate approval.
 
 ## 3. Confirm
 Take a screenshot on the phone and pull it into the session scratchpad (never into a repo). This works
