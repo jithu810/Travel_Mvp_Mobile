@@ -16,7 +16,7 @@ const authSql=`select n.nspacl::text schema_acl,pg_get_userbyid(n.nspowner) sche
 
 async function managedFixture() {
   const db=await offlineDb();
-  await migrations(db,name=>!name.includes('profile_connections'));
+  await migrations(db,name=>!name.includes('profile_connections')&&!name.includes('chat_v1'));
   await db.exec(`create role managed_auth nologin noinherit nosuperuser nobypassrls;
     create role bridge_migrator nologin inherit nosuperuser nobypassrls createrole;
     create role default_extra nologin nosuperuser nobypassrls;
